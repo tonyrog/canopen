@@ -1,0 +1,11 @@
+%% -*- erlang -*-
+%%
+%%  Product map file
+
+{16#00, seazone}.
+{16#01, pds}.
+{16#02, pdc}.
+{16#03, pdd}.
+{16#04, pdi}.
+%% {16#05, fuse}
+%% {16#05, adc}.

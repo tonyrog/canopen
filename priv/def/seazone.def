@@ -1,0 +1,310 @@
+%% -*- erlang -*-
+%%
+%% General Seazone node  definitions
+%%
+{module, seazone}.
+
+{require, type}.
+%%
+%% serial:
+%%  Product serial number
+%%
+{objdef, 16#2607,
+ [{id, serial},
+  {name, "serial"},
+  {description, "Node serial number"},
+  {struct, var},
+  {type, unsigned32},
+  {access, rw}]}.
+
+%%
+%% product:
+%%  Product code
+%%
+{objdef, 16#2608,
+ [{id, product},
+  {name, "product"},
+  {description, "Node product code"},
+  {struct, var},
+  {type, unsigned32},
+  {access, rw}
+]}.
+
+%%
+%% datetime:
+%%
+{objdef, 16#2609,
+ [{id, datetime},
+  {name, "datetime"},
+  {description, "Node manufactorer data and time"},
+  {struct, var},
+  {type, unsigned32},
+  {access, rw}
+]}.
+
+{objdef, 16#260A,
+ [{id, crc},
+  {name, "crc"},
+  {description, "Node EEPROM checksum"},
+  {struct, var},
+  {type, unsigned32},
+  {access, rw}
+]}.
+
+{objdef, 16#260B,
+ [{id, id},
+  {name, "id"},
+  {description, "Node ID"},
+  {struct, var},
+  {type, unsigned24},
+  {access, ro}
+]}.
+
+%% uBoot items
+{objdef, 16#260D,
+ [{id, app_addr},
+  {name, "app-addr"},
+  {description, "Application address"},
+  {struct, var},
+  {type, unsigned32},
+  {access, rw}
+]}.
+
+{objdef, 16#260E,
+ [{id, app_vsn},
+  {name, "app-vsn"},
+  {description, "Application version"},
+  {struct, var},
+  {type, unsigned32},
+  {access, rw}
+]}.
+
+{objdef, 16#260F,
+ [{id, boot_vsn},
+  {name, "boot-vsn"},
+  {description, "Bootloader version"},
+  {struct, var},
+  {type, unsigned32},
+  {access, ro}
+]}.
+
+{objdef, 16#2610,
+ [{id, vendor},
+  {name, "vendor"},
+  {description, "Product vendor code"},
+  {struct, var},
+  {type, unsigned32},
+  {access, ro}
+]}.
+
+{objdef,16#2611,
+ [{id, node},
+  {name, "node"},
+  {description, "Node member list"},
+  {struct, array},
+  {category, mandatory},
+  {entry, {1, 128},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+%% UBOOT_HOLD - hold boot loader (for upgrade etc)
+{objdef, 16#2655,
+ [{id, uboot_hold}, 
+  {name, "uboot-hold"},
+  {description, "Hold boot loader from starting application"},
+  {struct,var},
+  {type, boolean},
+  {access, wo}
+ ]}.
+
+%% UBOOT_GO - value is wdt enable
+{objdef, 16#26AA,
+ [{id, uboot_go}, 
+  {name, "uboot-go"},
+  {description, "Run application without reset"},
+  {struct,var},
+  {type, boolean},
+  {access, wo}
+]}.
+
+%% UBOOT_ERASE - erase flash memory
+{objdef, 16#2650,
+ [{id, uboot_erase},
+  {name, "uboot-erase"},
+  {description, "Erase flash memory blocks"},
+  {struct, var},
+  {type, unsigned32},
+  {access, wo}]}.
+
+%% UBOOT_DATA - write/read flash memory
+{objdef, 16#2651,
+ [{id, uboot_data},
+  {name, "uboot-data"},
+  {description, "flash memory data"},
+  {struct, var},
+  {type, domain},
+  {access, rw}]}.
+
+%%
+%% powermode defines how the unit handles powerdown,
+%% in powerdown=idle the node will sleep lightly and wake
+%% on any interrupt.
+%% powerdown=powerdown then the node will sleep deep and
+%% only wake on "external" interrupt. This depend on the
+%% how the hardware is wired.
+%% When powerdown=off then the node will not goto sleep.
+%%
+{enum, powermode, [{off, 0}, {powerdown, 1}, {idle, 2}]}.
+  
+{objdef, 16#270E,
+ [{id, powerdown},
+  {name, "powerdown"},
+  {type, {enum,unsigned8,powermode}},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2604,
+ [{id, location},
+  {name, "location"},
+  {description, "Node location id"},
+  {struct, var},
+  {type, unsigned8},
+  {access, rw}]}.  
+
+%%
+%% PDO definitions
+%%
+{enum, alarm, 
+ [
+  {ok, 0},
+  {fuse,1},
+  {short,2},
+  {high,3},
+  {low,4},
+  {overload,5},
+  {overheat,6},
+  {hot,7},
+  {low_bat, 8},
+  {vin_lev, 9},
+  {his_lev, 10},
+  {his, 11}]}.
+
+
+%% FIXME: add bat, temp etc. 
+
+%% digital signal
+{objdef, 16#6000,
+ [{id, digital},{name, "digital"},{struct, defpdo},
+  {description, "Digital output"},
+  {entry, {1,32}, [{type, boolean}]}
+ ]}.
+
+
+{objdef, 16#6400,
+ [{id, analog},{name, "analog"},{struct, defpdo},
+  {description, "Analog output"},
+  {entry, {1,32}, [{type, unsigned16}]}
+]}.
+
+{objdef, 16#6100,
+ [{id, encoder},{name, "encoder"},{struct, defpdo},
+  {description, "Encoder output"},
+  {entry, {1,32}, [{type, integer32}]}
+ ]}.
+
+%% UBOOT_ON  value is node's serial number (including type code)
+{objdef, 16#28FF,
+ [{id, uboot_on}, {name, "uboot-on"}, {struct,defpdo},
+  {type, unsigned32}]}.
+
+%% POWERON - value is serial number
+{objdef, 16#2800,
+ [{id, poweron}, {name, "power-on"}, {struct, defpdo},
+  {type, unsigned32}]}.
+
+%% POWEROFF - value is serial number
+{objdef, 16#2801,
+ [{id, poweroff}, {name, "power-off"}, {struct, defpdo},
+  {type, unsigned32}]}.
+
+%% WAKEUP - from sleep
+%%   value is serial number
+{objdef, 16#2802,
+ [{id, wakeup}, {name, "wakeup"}, {struct, defpdo},
+  {type, unsigned32}]}.
+
+%% ALARM - alarm notification
+{objdef, 16#2803,
+ [{id, alarm}, {name, "alarm"}, {struct, defpdo},
+  {entry, {0,16}, [{type, {enum, unsigned8, alarm}}]}
+]}.
+
+
+
+%% ALARM acknowledge - acknoledge alarm
+{objdef, 16#2809,
+ [{id, alarm_ack}, {name, "alarm-ack"}, {struct, defpdo},
+  {entry, {0,16}, [{type, {enum, unsigned8, alarm}}]}
+]}.
+
+%% OUTPUT_ADD - add output interface
+%% data is the node:24, chan:8 than this message concern
+{objdef, 16#2804,
+ [{id, output_add}, {name, "output-add"}, {struct, defpdo},
+  {entry, {1,16}, [{type, unsigned32}]}
+ ]}.
+
+%% OUTPUT_DEL - remove output interface
+%% data is the node:24, chan:8 than this message concern
+{objdef, 16#2805,
+ [{id, output_del}, {name, "output-del"}, {struct, defpdo},
+  {entry, {1,16}, [{type, unsigned32}]}
+]}.
+
+%% OUTPUT_ACTIVE - signal output activate/deactivate
+%% data is the node:24, chan:8 than this message concern
+{objdef, 16#2806,
+ [{id, output_active}, {name, "output-active"}, {struct, defpdo},
+  {entry, {1,16}, [{type, unsigned32}]}
+ ]}.
+
+%% BACKLIGHT - signal backlight pwm value 
+{objdef, 16#2807,
+ [{id, output_backlight}, {name, "output-backlight"}, {struct, defpdo},
+  {type, unsigned16}]}.
+
+%% LEDLIGHT - signal ledlight pwm value 
+{objdef, 16#2808,
+ [{id, output_ledlight}, {name, "output-ledlight"}, {struct, defpdo},
+  {type, unsigned16}]}.
+
+%% NODE_ADD - add a new system node to list of members
+{objdef, 16#280A,
+ [{id, node_add}, {name, "node-add"}, {struct, defpdo},
+  {entry, {1,127}, [{type, unsigned32}]}
+]}.
+
+%% NODE_DEL - remove a system node from list of members
+{objdef, 16#280B,
+ [{id, node_del}, {name, "node-del"}, {struct, defpdo},
+  {entry, {1,127}, [{type, unsigned32}]}
+]}.
+
+
+%% NODE_BACKUP - signal backup selection
+{objdef, 16#280C,
+ [{id, node_backup}, {name, "node-backup"}, {struct, defpdo},
+  {entry, {1,127}, [{type, unsigned32}]}
+]}.
+
+%% NODE_RESET - reset a node
+%% data is used to match which node to reset
+%% 0 = all nodes, id:type, 0:type, id:0
+{objdef, 16#28AA,
+ [{id, node_reset}, {name, "node-reset"}, {struct, defpdo},
+  {type, unsigned32}]}.
+
+
+%% end of module node

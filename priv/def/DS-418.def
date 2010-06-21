@@ -1,0 +1,280 @@
+%%
+%% DS-418	Battery Modules
+%%
+%%
+{objdef,16#6000,[
+  {name,"Battery Status"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Battery Status"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6001,[
+  {name,"Charger Status"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Charger Status"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6010,[
+  {name,"Temperature"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Temperature"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6020,[
+  {name,"Battery Parameters"},
+  {struct,array},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Highest Sub-Index Supported"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Battery Type"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,2,[
+    {name,"Ah Capacity"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,3,[
+    {name,"Maximum Charge Current"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,4,[
+    {name,"Number of Cells"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6030,[
+  {name,"Battery Serial Number"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Elements"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,3},[
+    {name,"Packed ASCII Characters %d to %d[(sub*4-3,sub*4)]"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6031,[
+  {name,"Battery ID"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Elements"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,5},[
+    {name,"Packed ASCII Characters %d to %d[(sub*4-3,sub*4)]"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6040,[
+  {name,"Vehicle Serial Number"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Elements"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,5},[
+    {name,"Packed ASCII Characters %d to %d[(sub*4-3,sub*4)]"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6041,[
+  {name,"Vehicle ID"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Elements"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,5},[
+    {name,"Packed ASCII Characters %d to %d[(sub*4-3,sub*4)]"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6050,[
+  {name,"Cumulative Total Ah Charge"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Cumulative Total Ah Charge"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6051,[
+  {name,"Ah Expected Since Last Charge"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Ah Expected Since Last Charge"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6052,[
+  {name,"Ah Returned During Last Charge"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Ah Returned During Last Charge"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6053,[
+  {name,"Ah Since Last Equalization"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Ah Since Last Equalization"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6054,[
+  {name,"Date of Last Equalization"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Elements"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Number of Minutes"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]},
+  {entry,2,[
+    {name,"Number of Days"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6060,[
+  {name,"Battery Voltage"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Battery Voltage"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6070,[
+  {name,"Charge Current Requested"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Charge Current Requested"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6080,[
+  {name,"Charger State of Charge"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Charge State of Charge"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6081,[
+  {name,"Battery State of Charge"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Battery State of Charge"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6090,[
+  {name,"Water Level Status"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Water Level Status"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+

@@ -1,0 +1,293 @@
+%% -*- erlang -*-
+%%
+%% CANopen standard object definitions
+%%
+%% For possible value end options see README.def
+%%
+%% SDO TYPE description
+%% mapped => #sdo_parameter
+%%
+{module, canopen}.
+
+{require, type}.
+
+{objdef, 16#0022, 
+ [{id, sdo_parameter},
+  {name, "SDO Parameter"},
+  {struct,defstruct},
+  {category,mandatory},
+  {entry,0,[{name,"number of entries"},
+	    {type,unsigned8},
+	    {category,mandatory},
+	    {access,ro},
+	    {default,3}]},
+  {entry,1,[{name,"COB-ID client -> server"},
+	    {type,unsigned32},
+	    {category,mandatory},
+	    {access,rw}]},
+  {entry,2,[{name,"COB-ID client <- server"},
+	    {type,unsigned32},
+	    {category,mandatory},
+	    {access,rw}]},
+  {entry,3,[{name,"node ID"},
+	    {type,unsigned8},
+	    {category,mandatory},
+	    {access,rw}]}
+ ]}.
+
+%%
+%% Communication parameter (16#20)
+%% mapped => #pdo_parameter
+%%
+{objdef,16#0020,
+ [{id, pdo_parameter},
+  {name,"PDO Parameter"},
+  {struct,defstruct},
+  {category,mandatory},
+  {entry,0,[{name,"Number of entries"},
+  	    {type,unsigned8},
+	    {category,mandatory},
+	    {access,ro},
+	    {default,5}]},
+  {entry,1,[{id, cob_id},
+	    {name,"cob-id"},
+	    {type,unsigned32},
+	    {category,mandatory},
+	    {access,rw}]},
+  {entry,2,[{id, transmission_type},
+	    {name,"transmission type"},
+	    {type,unsigned8},
+	    {category,mandatory},
+	    {access,rw}]},
+  {entry,3,[{id, inhibit_time},
+	    {name,"inhibit time"},
+	    {type,unsigned16},
+	    {category,mandatory},
+	    {access,rw}]},
+  {entry,4,[{id, reserved},
+	    {name,"reserved"},
+	    {type,unsigned8},
+	    {category,mandatory},
+	    {access,rw}]},
+  {entry,5,[{id, event_timer},
+	    {name,"event timer"},
+	    {type,unsigned16},
+	    {category,mandatory},
+	    {access,rw}]}
+ ]}.
+
+%%
+%% PDO mapping (16#21)
+%% mapped => #pdo_mapping
+%%
+{objdef,16#0021,
+ [{id, pdo_mapping},
+  {name,"PDO Mapping"},
+  {struct,array},
+  {category,mandatory},
+  {entry,0,[{id, size},
+	    {name,"number of mapped"},
+	    {type,unsigned8},
+	    {category,mandatory},
+	    {access,rw},
+	    {range,{16#00,16#40}},
+	    {default,0}]},
+  {entry,{16#00,16#40},
+   [{name,"object ~w"},
+    {type,unsigned32},
+    {category,optional},
+    {access,rw}]}
+ ]}.
+
+{objdef,16#1000,
+ [{id, device_type},
+  {name,"Device type"},
+  {struct,var},
+  {type,unsigned32}, 
+  {category,mandatory},
+  {access,ro}]}.
+
+{objdef,16#1001,
+ [{id, error_register},
+  {name,"Error Register"},
+  {struct,var},
+  {type,unsigned8}, 
+  {category,mandatory},
+  {access,ro}]}.
+
+{objdef,16#1002,
+ [{id, manuf_status_register},
+  {name, "Manufacturer status register"},
+  {struct,var},
+  {type,unsigned32},
+  {category,optional},
+  {access,ro}]}.
+
+%% 1003
+
+{objdef,16#1005,
+ [{id, cobid_sync_message},
+  {name,"COB-ID SYNC-message"},
+  {struct,var},
+  {type,unsigned32},
+  {category,optional},
+  {access,rw}]}.
+
+{objdef,16#1006,
+ [{id, communication_cycle_period},
+  {name,"Communication cycle period"},
+  {struct,var},
+  {type,unsigned32},
+  {category,optional},
+  {access,rw}]}.
+
+{objdef,16#1007,
+ [{id, synchronous_window_length},
+  {name,"Synchronous window length"},
+  {struct,var},
+  {type,unsigned32},
+  {category,optional},
+  {access,rw}]}.
+
+{objdef,16#1008,
+ [{id, manuf_device_name},
+  {name,"Manufacturer device name"},
+  {struct,var},
+  {type,string},
+  {category,optional},
+  {access,c}]}.
+
+{objdef,16#1009,
+ [{id, manuf_hardware_version},
+  {name,"Manufacturer hardware version"},
+  {struct,var},
+  {type,string},
+  {category,optional},
+  {access,c}]}.
+
+
+{objdef,16#100A,
+ [{id, manuf_software_version},
+  {name,"Manufacturer software version"},
+  {struct,var},
+  {type,string},
+  {category,optional},
+  {access,c}]}.
+
+%% 100B - reserved
+{objdef,16#100C,
+ [{id, guard_time},
+  {name,"Guard Time"},
+  {struct,var},
+  {type,unsigned32},
+  {category,optional},
+  {access,rw}]}.
+
+{objdef,16#100D,
+ [{id, life_time_factor},
+  {name,"Life time factor"},
+  {struct,var},
+  {type,unsigned32},
+  {category,optional},
+  {access,rw}]}.
+
+%% 100E - reserved
+%% 100F - reserved
+
+{objdef,16#1010,
+ [{id, store_parameters},
+  {name,"Store parameters"},
+  {struct,var},
+  {type,unsigned32},
+  {category,optional},
+  {access,rw}]}.
+
+{objdef,16#1011,
+ [{id, restore_default_parameters},
+  {name,"Restore default parameters"},
+  {struct,var},
+  {type,unsigned32},
+  {category,optional},
+  {access,rw}]}.
+
+{objdef,16#1012,
+ [{id, cobid_time_stamp},
+  {name,"COB-ID time stamp"},
+  {struct,var},
+  {type,unsigned32},
+  {category,optional},
+  {access,rw}]}.
+
+{objdef,16#1013,
+ [{id, high_resolution_time_stamp},
+  {name,"High resolution time stamp"},
+  {struct,var},
+  {type,unsigned32},
+  {category,optional},
+  {access,rw}]}.
+
+{objdef,16#1014,
+ [{id, cobid_emergency},
+  {name,"COB-ID Emergency"},
+  {struct,var},
+  {type,unsigned32},
+  {category,optional},
+  {access,rw}]}.
+
+{objdef,16#1015,
+ [{id, inhibit_time_emergency},
+  {name,"Inhibit Time Emergency"},
+  {struct,var},
+  {type,unsigned16},
+  {category,optional},
+  {access,rw}]}.
+
+{objdef,16#1016,
+ [{id, consumer_heartbeat_time},
+  {name,"Consumer Heartbeat Time"},
+  {struct,var},
+  {type,unsigned32},
+  {category,optional},
+  {access,rw}]}.
+
+{objdef,16#1017,
+ [{id, producer_hearbeat_time},
+  {name,"Producer Heartbeat Time"},
+  {struct,var},
+  {type,unsigned16},
+  {category,optional},
+  {access,rw}]}.
+
+{objdef,16#1018,
+ [{id, identity_object},
+  {name,"Identity Object"},
+  {struct, var},
+  {type, identity},
+  {category,mandatory},
+  {access, co}]}.
+
+%% 11FF reserved
+%% {objdef,16#1029,"Error Behaviour",record,
+
+%% INDEX Server: 1200 - 127F
+{objdef,{16#1200,16#127F},
+ [{id, server_sdo_parameter},
+  {name, "ServerSDO parameter"},
+  {struct, array},
+  {type, sdo_parameter},
+  {category, optional},
+  {access, rw}]}.
+
+%% INDEX Client: 1280 - 12FF
+{objdef,{16#1280,16#12FF},
+ [{id, client_sdo_parameter},
+  {name, "Client %d SDO parameter"},
+  {struct, array},
+  {type, sdo_parameter},
+  {category, optional},
+  {access, rw}]}.
+
+%% SDO TYPE description
+
+
+%% end of module canopen

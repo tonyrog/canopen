@@ -1,0 +1,16 @@
+%% -*- erlang -*-
+%%
+%%   TEST server dictionay
+%%
+
+%% This is the sync server 16#1111 is the SYNC ID
+{object, 16#1005,
+ [{name, "SYNC_MESSAGE"},
+  {struct, var}, {access, rw}, {type, unsigned32},
+  {value, 16#60001111}]}.  %% 16#6xxxxxx (extended sync server)
+
+%% Send SYNC every 2s
+{object, 16#1006,
+ [{name, "CYCLE_PERIOD"},
+  {struct, var}, {access, rw}, {type, unsigned32},
+  {value, 2000000}]}. 

@@ -1,0 +1,579 @@
+%%
+%% DS-406	Encoders
+%%
+{objdef,16#6000,[
+  {name,"Operating Parameters"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Operating Parameters"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6001,[
+  {name,"Measuring Units per Revolution"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Measuring Units per Revolution"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6002,[
+  {name,"Total Measuring Range in Measuring Unit"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Total Measuring Range in Measuring Unit"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6003,[
+  {name,"Preset Value"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Preset Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6004,[
+  {name,"Position Value"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Position Value"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6005,[
+  {name,"Linear Encoder Measuring Step Settings"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Objects"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Position Step Setting"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]},
+  {entry,2,[
+    {name,"Speed Step Setting"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]},
+  {entry,3,[
+    {name,"Acceleration Step Setting"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]},
+  {entry,4,[
+    {name,"Jerk Step Setting"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6008,[
+  {name,"High Precision Position Value"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"High Precision Position Value"},
+    {type,unsigned64},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6009,[
+  {name,"High Precision Preset Value"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"High Precision Preset Value"},
+    {type,unsigned64},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6010,[
+  {name,"Preset Value for Multi-Sensor Device"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"Preset Value Channel %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6020,[
+  {name,"Position Value for Multi-Sensor Device"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"Position Value Channel %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6030,[
+  {name,"Speed Value"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"Speed Value Channel %d[(sub)]"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6040,[
+  {name,"Acceleration Value"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"Acceleration Value Channel %d[(sub)]"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6050,[
+  {name,"Jerk Value"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"Jerk Value Channel %d[(sub)]"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6200,[
+  {name,"Cyclic Timer"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Cyclic Timer"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6300,[
+  {name,"CAM State Register"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"CAM State Channel %d[(sub)]"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6301,[
+  {name,"CAM Enable"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"CAM Enable Channel %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6302,[
+  {name,"CAM Polarity"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"CAM Polarity Channel %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,{16#6310,16#6317},[
+  {name,"CAM%d Low Limit[(idx)]"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"CAM%d Low Limit Channel %d[(idx,sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#6320,16#6327},[
+  {name,"CAM%d High Limit[(idx)]"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"CAM%d High Limit Channel %d[(idx,sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#6330,16#6337},[
+  {name,"CAM%d Hysteresis[(idx)]"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"CAM%d Hysteresis Channel %d[(idx,sub)]"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6400,[
+  {name,"Area State Register"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"Work Area State Channel %d[(sub)]"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6401,[
+  {name," Work Area Low Limit"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"Work Area Low Limit Channel %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6402,[
+  {name," Work Area High Limit"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"Work Area High Limit Channel %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6500,[
+  {name,"Operating Status"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Operating Status"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6501,[
+  {name,"Single Turn Resolution"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Single Turn Resolution"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6502,[
+  {name,"Number of Distinguishable Revolutions"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Distinguishable Revolutions"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6503,[
+  {name,"Alarms"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Alarms"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6504,[
+  {name,"Supported Alarms"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Supported Alarms"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6505,[
+  {name,"Warnings"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Warnings"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6506,[
+  {name,"Supported Warnings"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Supported Warnings"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6507,[
+  {name,"Profile and Software Version"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Profile and Software Version"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6508,[
+  {name,"Operating Time"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Operating Time"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6509,[
+  {name,"Offset Value"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Offset Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#650A,[
+  {name,"Module Identification"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Manufacturer Offset Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,2,[
+    {name,"Manufacturer Min Position Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,3,[
+    {name,"Manufacturer Max Position Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#650B,[
+  {name,"Serial Number"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Serial Number"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#650C,[
+  {name,"Offset Values for Multi-Sensor Devices"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Available Channels"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,254},[
+    {name,"Offset Value Channel %d[(sub)]"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6510,[
+  {name,"Number of High Precision Revolutions"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of High Precision Revolutions"},
+    {type,unsigned40},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+

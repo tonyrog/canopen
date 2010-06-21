@@ -1,0 +1,57 @@
+%% -*- erlang -*-
+%%
+%%  PDI-xxx node definitions
+%%
+{module, pdi}.
+
+{require, seazone}.
+
+%%
+%% buzzer:
+%% buzzer=off means that buzzer will not be used to signal alarms
+%%
+{objdef,16#270D,
+ [{id, buzzer},
+  {name, "buzzer"},
+  {struct, var},
+  {type, boolean},
+  {category, optional},
+  {access, rw}
+]}.
+
+%%
+%% frequency:
+%% set the alarm freuency as:
+%%   ON-TIME:16, PERIOD:16
+%%
+{objdef,16#270B,
+ [{id, frequency},
+  {name, "frequency"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}
+]}.
+
+
+%% TEMPORARY OBJECT to highlight selected input (in display)
+{objdef, 16#2704,
+ [{id, led_green},
+  {name, "led-green"},
+  {struct, array},
+  {entry, {1,24},
+   [{type, boolean},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#2706,
+ [{id, led_green_mask},
+  {name, "led-green-mask"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}]}.
+
+
+%% end of module pdi

@@ -1,0 +1,54 @@
+{objdef,16#1F20,[
+  {name,"Store DCF"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,127},[
+    {name,"Store DCF for node %d[(sub)]"},
+    {type,domain},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#1F21,[
+  {name,"Storage Format"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,127},[
+    {name,"Storage Format for Node %d[(sub)]"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#1F22,[
+  {name,"Concise DCF"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,127},[
+    {name,"Concise DCF for Node %d[(sub)]"},
+    {type,domain},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+

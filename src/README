@@ -1,0 +1,22 @@
+
+Erlang CANopen stack
+
+Appilication API
+
+1. Node => APP
+
+The application register it's name in the dictionary for the
+objects that belong to the application. This can be done 
+both statically in the dictionary db or dynamically.
+
+  {t_begin,Index,SubInd}
+
+  {t_write,Index,SubInd,Data}
+  {t_write,Index,SubInd,BitOffset,Data}
+
+  {t_read,Index,SubInd,MaxBits}
+  {t_read,Index,SubInd,BitOffset,MaxBits}
+
+  {t_end,Index,SubInd}
+
+

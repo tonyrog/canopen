@@ -1,0 +1,46 @@
+%% -*- erlang -*-
+%%
+%%   TEST dictionay
+
+{object, 16#1005,
+ [{name, "SYNC_MESSAGE"},
+  {struct, var}, {access, rw}, {type, unsigned32},
+  {value, 16#20001111}]}.
+
+{object, 16#2001,
+ [{name, "TEST32"},
+  {struct, var}, {access, rw}, {type, unsigned32},
+  {value, 16#FEEDBABE}]}.
+
+{object, 16#2002,
+ [{name, "BIG-STRING"},
+  {struct, var}, {access, rw}, {type, string},
+  {value, "ABCDEFGHIJKLMNOPQRSTUVXYZ0123456789"
+   "abcdefghijklmnopqrstuvxyz0123456789"}
+  ]}.
+	 
+{object, 16#2003,
+ [{name, "TEST-SMALL-BUFF"},
+  {struct, var}, {access, rw}, {type, string},
+  {value, "Hello World"}]}.
+
+{object, 16#2004,
+ [{name, "TEST-BIG-BUFF"},
+  {struct, var}, {access, rw}, {type, octet_string},
+  {value, <<0,1,2,3,4,5,6,7,8,9,10>>}
+  ]}.
+
+{object, 16#3001,
+ [{name, "TEST32-2"},
+  {struct, var}, {access, rw}, {type, unsigned32},
+  {value, 16#12345678}]}.
+
+%% TPDO entry - 0
+{tpdo, 0, 16#20002222, [{transmission_type,{sync,2}}]}.
+%% TPDO map - 0
+{tpdo_map, 0, [{16#2001, 0, 32},{16#3001,0,32}]}.
+
+%% RPDO entry - 0
+{rpdo, 0, 16#20003333, []}.
+%% RPDO map - 0
+{rpdo_map, 0, [{16#3001, 0, 32}]}.

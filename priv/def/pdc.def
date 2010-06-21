@@ -1,0 +1,88 @@
+%% -*- erlang -*-
+%% 
+%%  PDC-xxx node definitions
+%% 
+%% 
+{module, pdc}.
+{require, seazone}.
+
+%%
+%% buzzer:
+%% buzzer=off means that buzzer will not be used to signal alarm
+%%
+{objdef,16#270D,
+ [{id, buzzer},
+  {name, "buzzer"},
+  {struct, var},
+  {type, boolean},
+  {category, optional},
+  {access, rw}
+]}.
+
+%%
+%% frequency:
+%% Alarm freuqency for leds and buzzer
+%% ON-TIME:16, PERIOD:16
+%%
+{objdef,16#270B,
+ [{id, frequency},
+  {name, "frequency"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}
+]}.
+
+%% TEMPORARY OBJECTS
+
+%% Set green led  1-8
+{objdef, 16#2704,
+ [{id, led_green},
+  {name, "led-green"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, boolean},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+%% Set green mask 0x00 0xFF
+{objdef, 16#2706,
+ [{id, led_green_mask},
+  {name, "led-green-mask"},
+  {struct, var},
+  {type, unsigned32},
+  {access, rw}]}.
+
+%% Set red led  1-8
+{objdef, 16#2705,
+ [{id, led_red},
+  {name, "led-red"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, boolean},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+%% Set red mask 0x00-0xFF
+{objdef, 16#2707,
+ [{id, led_red_mask},
+  {name, "led-red-mask"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}]}.
+
+%% Set encoder sampling prescaler 0-255
+{objdef, 16#270A,
+ [{id, encoder_prescale},
+  {name, "encoder-prescale"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+%% end of module pdc

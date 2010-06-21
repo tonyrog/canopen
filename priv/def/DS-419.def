@@ -1,0 +1,87 @@
+%%
+%% DS-419	Battery Chargers
+%%
+{objdef,16#6000,[
+  {name,"Battery status"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"battery_status"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6001,[
+  {name,"Charger status"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"charger_status"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6052,[
+  {name,"Ah returned during last charge"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"ah_returned_during_last_charge"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6060,[
+  {name,"Battery voltage"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"battery_voltage"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6070,[
+  {name,"Charge current requested"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"charge_current_requested"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6080,[
+  {name,"Charger state of charge"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"charge_state_of_charge"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6081,[
+  {name,"Battery state of charge"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"battery_state_of_charge"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+

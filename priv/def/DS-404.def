@@ -1,0 +1,5343 @@
+%%
+%% DS-404 Measuring devices and closed loop controllers
+%%
+{objdef,16#6000,[
+  {name,"DI Read state 8 Input Lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DI Read state 8 Inputs Lines %d[(sub)]"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6002,[
+  {name,"DI Polarity 8 Input Lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DI Polarity 8 Input Lines %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6020,[
+  {name,"DI Read state 1 Input Lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DI Read state 1 Inputs Lines %d[(sub)]"},
+    {type,boolean},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6030,[
+  {name,"DI Polarity 1 Input Lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DI Polarity 1 Inputs Lines %d[(sub)]"},
+    {type,boolean},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6100,[
+  {name,"AI Input FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input FV %d[(sub)]"},
+    {type,real32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#7100,[
+  {name,"AI Input FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input FV %d[(sub)]"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#8100,[
+  {name,"AI Input FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input FV %d[(sub)]"},
+    {type,integer24},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#9100,[
+  {name,"AI Input FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input FV %d[(sub)]"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6103,[
+  {name,"AI Interrupt delta input FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt delta input FV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7103,[
+  {name,"AI Interrupt delta input FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt delta input FV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8103,[
+  {name,"AI Interrupt delta input FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt delta input FV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9103,[
+  {name,"AI Interrupt delta input FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt delta input FV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6110,[
+  {name,"AI Sensor Type"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Sensor Type %d[(sub)]"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6111,[
+  {name,"AI Autocalibration"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Autocalibration %d[(sub)]"},
+    {type,unsigned32},
+    {access,wo},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6112,[
+  {name,"AI Operating Mode"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Operating Mode %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6114,[
+  {name,"AI ADC Sample Rate"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Sample Rate %d[(sub)]"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6120,[
+  {name,"AI Input Scaling 1 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 1 FV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7120,[
+  {name,"AI Input Scaling 1 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 1 FV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8120,[
+  {name,"AI Input Scaling 1 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 1 FV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9120,[
+  {name,"AI Input Scaling 1 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 1 FV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6121,[
+  {name,"AI Input Scaling 1 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 1 PV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7121,[
+  {name,"AI Input Scaling 1 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 1 PV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8121,[
+  {name,"AI Input Scaling 1 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 1 PV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9121,[
+  {name,"AI Input Scaling 1 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 1 PV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6122,[
+  {name,"AI Input Scaling 2 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 2 FV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7122,[
+  {name,"AI Input Scaling 2 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 2 FV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8122,[
+  {name,"AI Input Scaling 2 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 2 FV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9122,[
+  {name,"AI Input Scaling 2 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 2 FV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6123,[
+  {name,"AI Input Scaling 2 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 2 PV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7123,[
+  {name,"AI Input Scaling 2 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 2 PV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8123,[
+  {name,"AI Input Scaling 2 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 2 PV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9123,[
+  {name,"AI Input Scaling 2 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Scaling 2 PV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6124,[
+  {name,"AI Input Offset"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Offset %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7124,[
+  {name,"AI Input Offset"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Offset %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8124,[
+  {name,"AI Input Offset"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Offset %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9124,[
+  {name,"AI Input Offset"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input Offset %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6125,[
+  {name,"AI Autozero"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Autozero %d[(sub)]"},
+    {type,unsigned32},
+    {access,wo},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6126,[
+  {name,"AI Scaling Factor"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Scaling Factor %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6127,[
+  {name,"AI Scaling Offset"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Scaling Offset %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6130,[
+  {name,"AI Input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input PV %d[(sub)]"},
+    {type,real32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#7130,[
+  {name,"AI Input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input PV %d[(sub)]"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#8130,[
+  {name,"AI Input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input PV %d[(sub)]"},
+    {type,integer24},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#9130,[
+  {name,"AI Input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Input PV %d[(sub)]"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6131,[
+  {name,"AI Physical Unit PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Physical Unit PV %d[(sub)]"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6132,[
+  {name,"AI Decimal digits PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Decimal digits PV %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6133,[
+  {name,"AI Interrupt delta input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt delta input PV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7133,[
+  {name,"AI Interrupt delta input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt delta input PV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8133,[
+  {name,"AI Interrupt delta input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt delta input PV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9133,[
+  {name,"AI Interrupt delta input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt delta input PV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6134,[
+  {name,"AI Interrupt lower input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt lower input PV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7134,[
+  {name,"AI Interrupt lower input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt lower input PV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8134,[
+  {name,"AI Interrupt lower input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt lower input PV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9134,[
+  {name,"AI Interrupt lower input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt lower input PV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6135,[
+  {name,"AI Interrupt upper input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt upper input PV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7135,[
+  {name,"AI Interrupt upper input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt upper input PV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8135,[
+  {name,"AI Interrupt upper input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt upper input PV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9135,[
+  {name,"AI Interrupt upper input PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt upper input PV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6138,[
+  {name,"AI Tare zero"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Tare zero %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7138,[
+  {name,"AI Tare zero"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Tare zero %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8138,[
+  {name,"AI Tare zero"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Tare zero %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9138,[
+  {name,"AI Tare zero"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Tare zero %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6139,[
+  {name,"AI Autotare"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Autotare %d[(sub)]"},
+    {type,unsigned32},
+    {access,wo},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6140,[
+  {name,"AI Net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Net PV %d[(sub)]"},
+    {type,real32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#7140,[
+  {name,"AI Net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Net PV %d[(sub)]"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#8140,[
+  {name,"AI Net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Net PV %d[(sub)]"},
+    {type,integer24},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#9140,[
+  {name,"AI Net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Net PV %d[(sub)]"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6143,[
+  {name,"AI Interrupt delta net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt delta net PV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7143,[
+  {name,"AI Interrupt delta net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt delta net PV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8143,[
+  {name,"AI Interrupt delta net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt delta net PV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9143,[
+  {name,"AI Interrupt delta net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt delta net PV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6144,[
+  {name,"AI Interrupt lower limit net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt lower limit net PV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7144,[
+  {name,"AI Interrupt lower limit net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt lower limit net PV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8144,[
+  {name,"AI Interrupt lower limit net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt lower limit net PV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9144,[
+  {name,"AI Interrupt lower limit net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt lower limit net PV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6145,[
+  {name,"AI Interrupt upper limit net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt upper limit net PV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7145,[
+  {name,"AI Interrupt upper limit net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt upper limit net PV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8145,[
+  {name,"AI Interrupt upper limit net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt upper limit net PV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9145,[
+  {name,"AI Interrupt upper limit net PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Interrupt upper limit net PV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6148,[
+  {name,"AI Span start"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Span start %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7148,[
+  {name,"AI Span start"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Span start %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8148,[
+  {name,"AI Span start"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Span start %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9148,[
+  {name,"AI Span start"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Span start %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6149,[
+  {name,"AI Span end"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Span end %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7149,[
+  {name,"AI Span end"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Span end %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8149,[
+  {name,"AI Span end"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Span end %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9149,[
+  {name,"AI Span end"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Span end %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6150,[
+  {name,"AI Status"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Status %d[(sub)]"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6160,[
+  {name,"AI Control Byte"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Control Byte %d[(sub)]"},
+    {type,unsigned8},
+    {access,wo},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6161,[
+  {name,"AI Control Byte Enable"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Control Byte Enable %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#61A0,[
+  {name,"AI Filter Type"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Filter Type %d[(sub)]"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#61A1,[
+  {name,"AI Filter Constant"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AI Filter Constant %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6200,[
+  {name,"DO Write state 8 output lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DO Write state 8 output lines %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6202,[
+  {name,"DO Polarity 8 output lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DO Polarity 8 output lines %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6206,[
+  {name,"DO Fault mode 8 output lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DO Fault mode 8 output lines %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6207,[
+  {name,"DO Fault state 8 output lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DO Fault state 8 output lines %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6210,[
+  {name,"DO Link object 8 output lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DO Link Object 8 output lines %d[(sub)]"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6220,[
+  {name,"DO Write state 1 output lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DO Write state 1 output lines %d[(sub)]"},
+    {type,boolean},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6240,[
+  {name,"DO Polarity 1 output lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DO Polarity 1 output lines %d[(sub)]"},
+    {type,boolean},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6250,[
+  {name,"DO Fault mode 1 output lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DO Failt mode 1 output lines %d[(sub)]"},
+    {type,boolean},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6260,[
+  {name,"DO Fault state 1 output lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DO Fault state 1 output lines %d[(sub)]"},
+    {type,boolean},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6280,[
+  {name,"DO Link object 1 output lines"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"DO Link object 1 output lines %d[(sub)]"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6300,[
+  {name,"AO Output PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output PV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#7300,[
+  {name,"AO Output PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output PV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#8300,[
+  {name,"AO Output PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output PV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#9300,[
+  {name,"AO Output PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output PV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6301,[
+  {name,"AO Physical Unit PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Physical Unit PV %d[(sub)]"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6302,[
+  {name,"AO Decimal digits PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Decimal digits PV %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6303,[
+  {name,"AO Link output PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Link output PV %d[(sub)]"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6310,[
+  {name,"AO Output type"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output type %d[(sub)]"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6320,[
+  {name,"AO Output Scaling 1 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 1 PV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7320,[
+  {name,"AO Output Scaling 1 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 1 PV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8320,[
+  {name,"AO Output Scaling 1 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 1 PV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9320,[
+  {name,"AO Output Scaling 1 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 1 PV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6321,[
+  {name,"AO Output Scaling 1 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 1 FV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7321,[
+  {name,"AO Output Scaling 1 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 1 FV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8321,[
+  {name,"AO Output Scaling 1 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 1 FV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9321,[
+  {name,"AO Output Scaling 1 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 1 FV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6322,[
+  {name,"AO Output Scaling 2 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 2 PV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7322,[
+  {name,"AO Output Scaling 2 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 2 PV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8322,[
+  {name,"AO Output Scaling 2 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 2 PV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9322,[
+  {name,"AO Output Scaling 2 PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 2 PV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6323,[
+  {name,"AO Output Scaling 2 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 2 FV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7323,[
+  {name,"AO Output Scaling 2 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 2 FV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8323,[
+  {name,"AO Output Scaling 2 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 2 FV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9323,[
+  {name,"AO Output Scaling 2 FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output Scaling 2 FV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6330,[
+  {name,"AO Output FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output FV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7330,[
+  {name,"AO Output FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output FV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8330,[
+  {name,"AO Output FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output FV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9330,[
+  {name,"AO Output FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Output FV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6331,[
+  {name,"AO Physical Unit FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Physical Unit FV %d[(sub)]"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6332,[
+  {name,"AO Decimal digits FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Decimal digits FV %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6340,[
+  {name,"AO Fault mode"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Fault mode %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6341,[
+  {name,"AO Fault FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Fault FV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7341,[
+  {name,"AO Fault FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Fault FV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8341,[
+  {name,"AO Fault FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Fault FV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9341,[
+  {name,"AO Fault FV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AO Fault FV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6400,[
+  {name,"CO Effective Current Value Xeff"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Effective Current Value Xeff %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#7400,[
+  {name,"CO Effective Current Value Xeff"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Effective Current Value Xeff %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#8400,[
+  {name,"CO Effective Current Value Xeff"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Effective Current Value Xeff %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#9400,[
+  {name,"CO Effective Current Value Xeff"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Effective Current Value Xeff %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6401,[
+  {name,"CO Effective Set Point Weff"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Effective Set Point %d[(sub)]"},
+    {type,real32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#7401,[
+  {name,"CO Effective Set Point Weff"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Effective Set Point %d[(sub)]"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#8401,[
+  {name,"CO Effective Set Point Weff"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Effective Set Point %d[(sub)]"},
+    {type,integer24},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#9401,[
+  {name,"CO Effective Set Point Weff"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Effective Set Point %d[(sub)]"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6402,[
+  {name,"CO Set Point W"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Set Point W %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#7402,[
+  {name,"CO Set Point W"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Set Point W %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#8402,[
+  {name,"CO Set Point W"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Set Point W %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#9402,[
+  {name,"CO Set Point W"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Set Point W %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6403,[
+  {name,"CO 2nd Set Point W2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO 2nd Set Point %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#7403,[
+  {name,"CO 2nd Set Point W2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO 2nd Set Point %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#8403,[
+  {name,"CO 2nd Set Point W2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO 2nd Set Point %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#9403,[
+  {name,"CO 2nd Set Point W2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO 2nd Set Point %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6404,[
+  {name,"CO Lower Set Point Limit W0"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Lower Set Point Limit %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7404,[
+  {name,"CO Lower Set Point Limit W0"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Lower Set Point Limit %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8404,[
+  {name,"CO Lower Set Point Limit W0"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Lower Set Point Limit %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9404,[
+  {name,"CO Lower Set Point Limit W0"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Lower Set Point Limit %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6405,[
+  {name,"CO upper Set Point Limit W100"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO 2nd Set Point Limit%d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7405,[
+  {name,"CO upper Set Point Limit W100"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO 2nd Set Point Limit %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8405,[
+  {name,"CO upper Set Point Limit W100"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO 2nd Set Point Limit %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9405,[
+  {name,"CO upper Set Point Limit W100"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO 2nd Set Point Limit %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6406,[
+  {name,"CO Physical Unit XW"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Physical unit XW %d[(sub)]"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6407,[
+  {name,"CO Decimal Digits XW"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Decimal Digits XW %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6410,[
+  {name,"CO Effective Controller Output Y"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Effective Controller Output %d[(sub)]"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6411,[
+  {name,"CO Differential Controller Output Ydiff"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Differential Controller Output %d[(sub)]"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6412,[
+  {name,"CO Manual Controller Output"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Manual Controller Output %d[(sub)]"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6413,[
+  {name,"CO Lower Controller Output Limit Ymin"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Lower Controller Output Limit %d[(sub)]"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6414,[
+  {name,"CO Upper Controller Output Limit Ymax"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Upper Controller Output Limit %d[(sub)]"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6415,[
+  {name,"CO Physical Unit Controller Output"},
+  {struct,rec},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Physical Unit Controller Output %d[(sub)]"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6420,[
+  {name,"CO Set point switch W-W2"},
+  {struct,rec},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Set Point Switch %d[(sub)]"},
+    {type,boolean},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6421,[
+  {name,"CO Automatic-Manual Mode A-M"},
+  {struct,rec},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Automatic-Manual Mode %d[(sub)]"},
+    {type,boolean},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6422,[
+  {name,"CO Controller On-Off"},
+  {struct,rec},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Controller On-Off %d[(sub)]"},
+    {type,boolean},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6423,[
+  {name,"CO Controller Mode"},
+  {struct,rec},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Controller Mode %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6424,[
+  {name,"CO Self Optimization On-Off"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Self optimization on - off %d[(sub)]"},
+    {type,boolean},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6425,[
+  {name,"CO Control Byte"},
+  {struct,rec},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Control Byte %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6426,[
+  {name,"CO Control Byte Enable"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Control Byte Enable %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6427,[
+  {name,"CO Status Word"},
+  {struct,rec},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Status Word %d[(sub)]"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6430,[
+  {name,"CO Minimum Pulse Time Tmin1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Minimum Pulse Time Tmin1 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7430,[
+  {name,"CO Minimum Pulse Time Tmin1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Minimum Pulse Time Tmin1 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8430,[
+  {name,"CO Minimum Pulse Time Tmin1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Minimum Pulse Time Tmin1 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9430,[
+  {name,"CO Minimum Pulse Time Tmin1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Minimum Pulse Time Tmin1 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6431,[
+  {name,"CO Minimum Pulse Time Tmin2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Minimum Pulse Time Tmin2 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7431,[
+  {name,"CO Minimum Pulse Time Tmin2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Minimum Pulse Time Tmin2 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8431,[
+  {name,"CO Minimum Pulse Time Tmin2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Minimum Pulse Time Tmin2 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9431,[
+  {name,"CO Minimum Pulse Time Tmin2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Minimum Pulse Time Tmin2 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6432,[
+  {name,"CO Motor Response Time Tm"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Motor Response Time Tm %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7432,[
+  {name,"CO Motor Response Time Tm"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Motor Response Time Tm %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8432,[
+  {name,"CO Motor Response Time Tm"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Motor Response Time Tm %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9432,[
+  {name,"CO Motor Response Time Tm"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Motor Response Time Tm %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6433,[
+  {name,"CO Min Pulse Length Tpuls"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Min. Pulse Length %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7433,[
+  {name,"CO Min Pulse Length Tpuls"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Min Pulse Length %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8433,[
+  {name,"CO Min Pulse Length Tpuls"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Min Pulse Length %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9433,[
+  {name,"CO Min Pulse Length Tpuls"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Min Pulse Length %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6434,[
+  {name,"CO Physical Unit Pulse Timing"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Physical Unit Pulse Timing %d[(sub)]"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6435,[
+  {name,"CO Decimal Digits PT"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Decimal Digits PT %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6440,[
+  {name,"Neutral Zone 3point Xsh1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Neutral Zone 3point Xsh1 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7440,[
+  {name,"Neutral Zone 3point Xsh1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Neutral Zone 3point Xsh1 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8440,[
+  {name,"Neutral Zone 3point Xsh1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Neutral Zone 3point Xsh1 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9440,[
+  {name,"Neutral Zone 3point Xsh1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Neutral Zone 3point Xsh1 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6441,[
+  {name,"Neutral Zone 3point Xsh2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Neutral Zone 3point Xsh2 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7441,[
+  {name,"Neutral Zone 3point Xsh1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Neutral Zone 3point Xsh2 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8441,[
+  {name,"Neutral Zone 3point Xsh1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Neutral Zone 3point Xsh2 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9441,[
+  {name,"Neutral Zone 3point Xsh1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Neutral Zone 3point Xsh2 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6442,[
+  {name,"CO Neutral Zone 3point Stepping Xsh"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Neutral Zone 3point Stepping %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7442,[
+  {name,"CO Neutral Zone 3point Stepping Xsh"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Neutral Zone 3point Stepping %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8442,[
+  {name,"CO Neutral Zone 3point Stepping Xsh"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Neutral Zone 3point Stepping %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9442,[
+  {name,"CO Neutral Zone 3point Stepping Xsh"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Neutral Zone 3point Stepping %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6443,[
+  {name,"CO Switching Difference of Signaller Xsd1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Switching Difference of Signaller Xsd1 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7443,[
+  {name,"CO Switching Difference of Signaller Xsd1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Switching Difference of Signaller Xsd1 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8443,[
+  {name,"CO Switching Difference of Signaller Xsd1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Switching Difference of Signaller Xsd1 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9443,[
+  {name,"CO Switching Difference of Signaller Xsd1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Switching Difference of Signaller Xsd1 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6444,[
+  {name,"CO Switching Difference of Additional Contact Xsd2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Switching Difference of Additional Contact Xsd2 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7444,[
+  {name,"CO Switching Difference of Additional Contact Xsd2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Switching Difference of Additional Contact Xsd2 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8444,[
+  {name,"CO Switching Difference of Additional Contact Xsd2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Switching Difference of Additional Contact Xsd2 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9444,[
+  {name,"CO Switching Difference of Additional Contact Xsd2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Switching Difference of Additional Contact Xsd2 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6445,[
+  {name,"CO Trigger Point Separation of Additional Contact LW"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Trigger Point Separation of Additional Contact LW %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7445,[
+  {name,"CO Trigger Point Separation of Additional Contact LW"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Trigger Point Separation of Additional Contact LW %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8445,[
+  {name,"CO Trigger Point Separation of Additional Contact LW"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Trigger Point Separation of Additional Contact LW %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9445,[
+  {name,"CO Trigger Point Separation of Additional Contact LW"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Trigger Point Separation of Additional Contact LW %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6450,[
+  {name,"CO Proportional Band Xp1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Proportional Band Xp1 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7450,[
+  {name,"CO Proportional Band Xp1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Proportional Band Xp1 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8450,[
+  {name,"CO Proportional Band Xp1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Proportional Band Xp1 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9450,[
+  {name,"CO Proportional Band Xp1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Proportional Band Xp1 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6451,[
+  {name,"CO Proportional Band Xp2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Proportional Band Xp2 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7451,[
+  {name,"CO Proportional Band Xp2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Proportional Band Xp2 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8451,[
+  {name,"CO Proportional Band Xp2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Proportional Band Xp2 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9451,[
+  {name,"CO Proportional Band Xp2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Proportional Band Xp2 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6452,[
+  {name,"CO Integral Action Time Tn1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Integral Action Time Tn1 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7452,[
+  {name,"CO Integral Action Time Tn1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Integral Action Time Tn1 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8452,[
+  {name,"CO Integral Action Time Tn1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Integral Action Time Tn1 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9452,[
+  {name,"CO Integral Action Time Tn1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Integral Action Time Tn1 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6453,[
+  {name,"CO Integral Action Time Tn2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Integral Action Time Tn2 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7453,[
+  {name,"CO Integral Action Time Tn2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Integral Action Time Tn2 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8453,[
+  {name,"CO Integral Action Time Tn2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Integral Action Time Tn2 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9453,[
+  {name,"CO Integral Action Time Tn2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Integral Action Time Tn2 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6454,[
+  {name,"CO Derivate Action Time Tv1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Derivate Action Time Tv1 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7454,[
+  {name,"CO Derivate Action Time Tv1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Derivate Action Time Tv1 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8454,[
+  {name,"CO Derivate Action Time Tv1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Derivate Action Time Tv1 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9454,[
+  {name,"CO Derivate Action Time Tv1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Derivate Action Time Tv1 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6455,[
+  {name,"CO Derivate Action Time Tv2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Derivate Action Time Tv2 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7455,[
+  {name,"CO Derivate Action Time Tv2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Derivate Action Time Tv2 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8455,[
+  {name,"CO Derivate Action Time Tv2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Derivate Action Time Tv2 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9455,[
+  {name,"CO Derivate Action Time Tv2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Derivate Action Time Tv2 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6456,[
+  {name,"CO Cycle Time T1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Cycle Time T1 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7456,[
+  {name,"CO Cycle Time T1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Cycle Time T1 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8456,[
+  {name,"CO Cycle Time T1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Cycle Time T1 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9456,[
+  {name,"CO Cycle Time T1"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Cycle Time T1 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6457,[
+  {name,"CO Cycle Time T2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Cycle Time T2 %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#7457,[
+  {name,"CO Cycle Time T2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Cycle Time T2 %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#8457,[
+  {name,"CO Cycle Time T2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Cycle Time T2 %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#9457,[
+  {name,"CO Cycle Time T2"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Cycle Time T2 %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6458,[
+  {name,"CO Physical Unit PID"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Physical unit PID %d[(sub)]"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6459,[
+  {name,"CO Decimal Digits PID"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"CO Decimal digits PID %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#6500,16#65F0,16},[
+  {name,"AL %d Input Value[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Input Value %d[(idx,sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,{16#7500,16#75F0,16},[
+  {name,"AL %d Input Value[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Input Value %d[(idx,sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,{16#8500,16#85F0,16},[
+  {name,"AL %d Input Value[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Input Value %d[(idx,sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,{16#9500,16#95F0,16},[
+  {name,"AL %d Input Value[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Input Value %d[(idx,sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,{16#6503,16#65F3,16},[
+  {name,"AL %d Link Input[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Link Input %d[(idx,sub)]"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#6504,16#65F4,16},[
+  {name,"AL %d Alternate Input Value[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Alternate Input Value %d[(idx,sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#7504,16#75F4,16},[
+  {name,"AL %d Alternate Input Value[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Alternate Input Value %d[(idx,sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#8504,16#85F4,16},[
+  {name,"AL %d Alternate Input Value[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Alternate Input Value %d[(idx,sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#9504,16#95F4,16},[
+  {name,"AL %d Alternate Input Value[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Alternate Input Value %d[(idx,sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#6505,16#65F5,16},[
+  {name,"AL %d Link Alternate Input[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Link Alternate Input %d[(idx,sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#6506,16#65F6,16},[
+  {name,"AL %d Fault Mode[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Fault Mode %d[(idx,sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#6507,16#65F7,16},[
+  {name,"AL %d Fault State[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Fault State %d[(idx,sub)]"},
+    {type,boolean},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#6508,16#65F8,16},[
+  {name,"AL %d Type[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Type %d[(idx,sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#6509,16#65F9,16},[
+  {name,"AL %d Action[(idx)]"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Action %d[(idx,sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#650A,16#65FA,16},[
+  {name,"AL %d Level[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Level %d[(idx,sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#750A,16#75FA,16},[
+  {name,"AL %d Level[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Level %d[(idx,sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#850A,16#85FA,16},[
+  {name,"AL %d Level[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Level %d[(idx,sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#950A,16#95FA,16},[
+  {name,"AL %d Level[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Level %d[(idx,sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#650B,16#65FB,16},[
+  {name,"AL %d Hysteresis[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Hysteresis %d[(idx,sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#750B,16#75FB,16},[
+  {name,"AL %d Hysteresis[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Hysteresis %d[(idx,sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#850B,16#85FB,16},[
+  {name,"AL %d Hysteresis[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Hysteresis %d[(idx,sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#950B,16#95FB,16},[
+  {name,"AL %d Hysteresis[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Hysteresis %d[(idx,sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#650C,16#65FC,16},[
+  {name,"AL %d Group[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Group %d[(idx,sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,{16#650D,16#65FD,16},[
+  {name,"AL %d State[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d State %d[(idx,sub)]"},
+    {type,boolean},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,{16#650E,16#65FE,16},[
+  {name,"AL %d Reset[(idx)]"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL %d Reset %d[(idx,sub)]"},
+    {type,boolean},
+    {access,wo},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6600,[
+  {name,"AL 1-8 State"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL 1-8 State %d[(sub)]"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6601,[
+  {name,"AL 9-16 State"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL 9-16 State %d[(sub)]"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6602,[
+  {name,"AL General State"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"AL General State"},
+    {type,boolean},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6603,[
+  {name,"AL Group 1-8 State"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"AL Group 1-8 State"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6610,[
+  {name,"AL General Reset"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"AL General Reset"},
+    {type,boolean},
+    {access,wo},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6611,[
+  {name,"AL 1-8 Reset"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL 1-8 Reset %d[(sub)]"},
+    {type,unsigned8},
+    {access,wo},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6612,[
+  {name,"AL 9-16 Reset"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"AL 9-16 Reset %d[(sub)]"},
+    {type,unsigned8},
+    {access,wo},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6F20,[
+  {name,"Life Counter"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Life Counter %d[(sub)]"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6F30,[
+  {name,"Receive PDO Check"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"rPDO Check %d[(sub)]"},
+    {type,unsigned8},
+    {access,wo},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6F31,[
+  {name,"Transmit PDO check"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"tPDO check %d[(sub)]"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6F50,[
+  {name,"Receive PV"},
+  {struct,rec},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Receive PV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#7F50,[
+  {name,"Receive PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Receive PV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#8F50,[
+  {name,"Receive PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Receive PV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#9F50,[
+  {name,"Receive PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Receive PV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6F51,[
+  {name,"Alternate Receive PV"},
+  {struct,rec},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Alternate Receive PV %d[(sub)]"},
+    {type,real32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#7F51,[
+  {name,"Alternate Receive PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Alternate Receive PV %d[(sub)]"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#8F51,[
+  {name,"Alternate Receive PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Alternate Receive PV %d[(sub)]"},
+    {type,integer24},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#9F51,[
+  {name,"Alternate Receive PV"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Alternate Receive PV %d[(sub)]"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6F52,[
+  {name,"Received Status"},
+  {struct,rec},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Received Status %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6F53,[
+  {name,"Alternate Received Status"},
+  {struct,rec},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,{1,199},[
+    {name,"Alternate Received Status %d[(sub)]"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6F60,[
+  {name,"Transmission Enable"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Transmission Enable"},
+    {type,boolean},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+

@@ -1,0 +1,267 @@
+%%
+%% DS-410	Declinometers
+%%
+{objdef,16#6000,[
+  {name,"resolution"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"resolution"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6010,[
+  {name,"Slope_Long16"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Slope_Long16"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6011,[
+  {name,"Slope_Long16_Operating_Parameter"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Slope_Long16_Operating_Parameter"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6012,[
+  {name,"Slope_Long16_preset_value"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Slope_Long16_preset_value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6013,[
+  {name,"Slope_Long16_Offset"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Slope_Long16_Offset"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6014,[
+  {name,"Differential_Slope_Long16_Offset"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Differential_Slope_Long16_Offset"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6020,[
+  {name,"Slope_Lateral16"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Slope_Lateral16_Offset"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6021,[
+  {name,"Slope_Lateral16_Operating_Parameter"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Slope_Lateral16_Operating_Parameter"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6022,[
+  {name,"Slope_Lateral16_preset_value"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Slope_Lateral16_preset_value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6023,[
+  {name,"Slope_Lateral16_Offset"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Slope_Lateral16_Offset"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6024,[
+  {name,"Differential_Slope_Lateral16_Offset"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Differential_Slope_Lateral16_Offset"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6110,[
+  {name,"Slope_Long32"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Slope_Long32"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6111,[
+  {name,"Slope_Long32_Operating_Parameter"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Slope_Long32_Operating_Parameter"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6112,[
+  {name,"Slope_Long32_preset_value"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Slope_Long32_preset_value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6113,[
+  {name,"Slope_Long32_Offset"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Slope_Long32_Offset"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6114,[
+  {name,"Differential_Slope_Long32_Offset"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Differential_Slope_Long32_Offset"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6120,[
+  {name,"Slope_Lateral32"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Slope_Lateral32_Offset"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6121,[
+  {name,"Slope_Lateral32_Operating_Parameter"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Slope_Lateral32_Operating_Parameter"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6122,[
+  {name,"Slope_Lateral32_preset_value"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Slope_Lateral32_preset_value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6123,[
+  {name,"Slope_Lateral32_Offset"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Slope_Lateral32_Offset"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6124,[
+  {name,"Differential_Slope_Lateral32_Offset"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Differential_Slope_Lateral32_Offset"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#67FF,[
+  {name,"Device type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Device type"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+

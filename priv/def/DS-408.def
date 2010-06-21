@@ -1,0 +1,8433 @@
+%%
+%% DS-408  Fluid Power Technology - Hydraulic drives and proportional valves
+%%
+{objdef,16#0080,[
+  {name,"Value parameter record Unsigned8"},
+  {struct,array},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#0081,[
+  {name,"Value parameter record Unsigned16"},
+  {struct,array},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#0082,[
+  {name,"Value parameter record Unsigned32"},
+  {struct,array},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#0083,[
+  {name,"Value parameter record integer8"},
+  {struct,array},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#0084,[
+  {name,"Value parameter record integer16"},
+  {struct,array},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#0085,[
+  {name,"Value parameter record integer32"},
+  {struct,array},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#0086,[
+  {name,"Value parameter record Float32"},
+  {struct,array},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,real32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#0087,[
+  {name,"Value parameter record Float64"},
+  {struct,array},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Number of Entries"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,real64},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6040,[
+  {name,"Device control word"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Device control word"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6041,[
+  {name,"Device status word"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Device status word"},
+    {type,unsigned16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6042,[
+  {name,"Device mode"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Device mode"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6043,[
+  {name,"Device control mode"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Device control mode"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#604E,[
+  {name,"Device error code"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Device error code"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#604F,[
+  {name,"Device local"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Device local"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6050,[
+  {name,"Device version"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Device version"},
+    {type,visible_string},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6051,[
+  {name,"Device code number"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Device code number"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6052,[
+  {name,"Device serial number"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Device version"},
+    {type,visible_string},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6053,[
+  {name,"Device description"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Device description"},
+    {type,visible_string},
+    {access,rw},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6054,[
+  {name,"Device model description"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Device model description"},
+    {type,visible_string},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6055,[
+  {name,"Device model URL"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Device model URL"},
+    {type,visible_string},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#6056,[
+  {name,"Device parameter set code"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Device parameter set code"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6057,[
+  {name,"Device vendor name"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"Device vendor name"},
+    {type,visible_string},
+    {access,ro},
+    {pdo_mapping,no}
+  ]}
+]}.
+
+{objdef,16#605F,[
+  {name,"Device capability"},
+  {struct,var},
+  {category,mandatory},
+  {entry,0,[
+    {name,"Device capability"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6100,[
+  {name,"viv actual value conditioning max interface number"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"viv actual value conditioning"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6101,[
+  {name,"viv actual value conditioning interface number"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"viv actual value conditioning"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6102,[
+  {name,"viv actual value conditioning type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"viv actual value conditioning type"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6103,[
+  {name,"viv actual value conditioning sign"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"viv actual value conditioning sign"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6104,[
+  {name,"viv actual value conditioning actual value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6110,[
+  {name,"viv actual value conditioning actual valuei 1"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6111,[
+  {name,"viv actual value conditioning actual valuei 2"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6112,[
+  {name,"viv actual value conditioning actual valuei 3"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6113,[
+  {name,"viv actual value conditioning actual valuei 4"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6114,[
+  {name,"viv actual value conditioning actual valuei 5"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6115,[
+  {name,"viv actual value conditioning actual valuei 6"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6116,[
+  {name,"viv actual value conditioning actual valuei 7"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6117,[
+  {name,"viv actual value conditioning actual valuei 8"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6120,[
+  {name,"viv actual value conditioning min pressure"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6121,[
+  {name,"viv actual value conditioning max pressure"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6122,[
+  {name,"viv actual value conditioning area"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6123,[
+  {name,"viv actual value conditioning pressure offset"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6124,[
+  {name,"viv actual value conditioning min tranducer signal"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6125,[
+  {name,"viv actual value conditioning max tranducer signal"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6130,[
+  {name,"viv actual value conditioning min referance"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6131,[
+  {name,"viv actual value conditioning max referance"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6132,[
+  {name,"viv actual value conditioning T1"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6133,[
+  {name,"viv actual value conditioning min interface"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6134,[
+  {name,"viv actual value conditioning max interface"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6140,[
+  {name,"viv actual value conditioning resolution"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6141,[
+  {name,"viv actual value conditioning position offset"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6142,[
+  {name,"viv actual value conditioning zero shift"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6143,[
+  {name,"viv actual value conditioning bit size"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6144,[
+  {name,"viv actual value conditioning C"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6145,[
+  {name,"viv actual value conditioning start stop type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"viv actual value conditioning start stop type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6200,[
+  {name,"drv actual value conditioning max interface"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"drv actual value conditioning max interface"},
+    {type,unsigned8},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6201,[
+  {name,"drv actual value conditioning interface number"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"drv actual value conditioning interface number"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6202,[
+  {name,"drv actual value conditioning type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"drv actual value conditioning type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6203,[
+  {name,"drv actual value conditioning sign"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"drv actual value conditioning sign"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6204,[
+  {name,"drv actual value conditioning actual value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6210,[
+  {name,"drv actual value conditioning actual value 1"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6211,[
+  {name,"drv actual value conditioning actual value 2"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6212,[
+  {name,"drv actual value conditioning actual value 3"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6213,[
+  {name,"drv actual value conditioning actual value 4"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6214,[
+  {name,"drv actual value conditioning actual value 5"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6215,[
+  {name,"drv actual value conditioning actual value 6"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6216,[
+  {name,"drv actual value conditioning actual value 7"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6217,[
+  {name,"drv actual value conditioning actual value 8"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6220,[
+  {name,"drv actual value conditioning min pressure"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6221,[
+  {name,"drv actual value conditioning max pressure"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6222,[
+  {name,"drv actual value conditioning area"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6223,[
+  {name,"drv actual value conditioning pressure offset"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6224,[
+  {name,"drv actual value conditioning min transducer signal"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6225,[
+  {name,"drv actual value conditioning max transducer signal"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6230,[
+  {name,"drv actual value conditioning min referance"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6231,[
+  {name,"drv actual value conditioning max referance"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6232,[
+  {name,"drv actual value conditioning T1"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6233,[
+  {name,"drv actual value conditioning min interface"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6234,[
+  {name,"drv actual value conditioning max interface"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6240,[
+  {name,"drv actual value conditioning resolution"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6241,[
+  {name,"drv actual value conditioning position offset"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6242,[
+  {name,"drv actual value conditioning zero shift"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6243,[
+  {name,"drv actual value conditioning bit size"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"drv actual value conditioning bit size"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6244,[
+  {name,"drv actual value conditioning C"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6245,[
+  {name,"drv actual value conditioning start stop type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"drv actual value conditioning bit size"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6280,[
+  {name,"drv controller output"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6281,[
+  {name,"drv controller output interface min"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6282,[
+  {name,"drv controller output interface max"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6290,[
+  {name,"drv controler output filter type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"drv controler output filter type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6291,[
+  {name,"drv controller output filter T1"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6292,[
+  {name,"drv controller output filter D"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6293,[
+  {name,"drv controller output filter f0"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#62A0,[
+  {name,"drv controller output directional dependant gain type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"drv controler output directional dependant gain type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#62A1,[
+  {name,"drv controller output directional dependant gain factor"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"drv controler output directional dependant gain factor"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#62A2,[
+  {name,"drv controller output characteristic compensation type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"drv controler output characteristic compensation type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#62B0,[
+  {name,"drv controller output dead band compensation type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"drv controler output dead band compensation type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#62B1,[
+  {name,"drv controller output dead band compensation A side"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#62B2,[
+  {name,"drv controller output dead band compensation B side"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#62C0,[
+  {name,"drv controller output zero correction offset"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#62D0,[
+  {name,"drv controller output dither type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"drv controler output dither type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#62D1,[
+  {name,"drv controller output dither amplitude"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#62D2,[
+  {name,"drv controller output dither frequency"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#62E0,[
+  {name,"drv controller output upper limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#62E1,[
+  {name,"drv controller output lower limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#62F0,[
+  {name,"drv controller output inverting sign"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"drv controler output inverting sign"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6300,[
+  {name,"vpoc set point"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6301,[
+  {name,"vpoc actual value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6302,[
+  {name,"vpoc interface referance"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6310,[
+  {name,"vpoc demand value generator demand value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6311,[
+  {name,"vpoc demand value generator referance value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6314,[
+  {name,"vpoc demand value generator hold set point"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6320,[
+  {name,"vpoc demand value generator upper limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6321,[
+  {name,"vpoc demand value generator lower limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6322,[
+  {name,"vpoc demand value generator scaling factor"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vpoc demand value generator scaling factor"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6323,[
+  {name,"vpoc demand value generator scaling offset"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6324,[
+  {name,"vpoc demand value generator zero correction offset"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6330,[
+  {name,"vpoc demand value generator ramp type"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6331,[
+  {name,"vpoc demand value generator ramp acceleration time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6332,[
+  {name,"vpoc demand value generator ramp acceleration time positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6333,[
+  {name,"vpoc demand value generator ramp acceleration time negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6334,[
+  {name,"vpoc demand value generator ramp deceleration time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6335,[
+  {name,"vpoc demand value generator ramp deceleration"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6336,[
+  {name,"vpoc demand value generator ramp deceleration time negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6340,[
+  {name,"vpoc demand value generator directional dependent gain type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vpoc demand value generator directional dependent gain type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6341,[
+  {name,"vpoc demand value generator directional dependent gain factor"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vpoc demand value generator directional dependent gain factor"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6342,[
+  {name,"vpoc demand value generator dead band compensation type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vpoc demand value generator dead band compensation type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6343,[
+  {name,"vpoc demand value generator dead band compensation A side"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6344,[
+  {name,"vpoc demand value generator dead band compensation B side"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6345,[
+  {name,"vpoc demand value generator dead band compensation threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6346,[
+  {name,"vpoc demand value generator characteristic compensation type"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6350,[
+  {name,"vpoc control deviation"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6351,[
+  {name,"vpoc control monitoring type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vpoc control monitoring type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6352,[
+  {name,"vpoc control monitoring delay time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6353,[
+  {name,"vpoc control monitoring threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6354,[
+  {name,"vpoc control monitoring upper threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6355,[
+  {name,"vpoc control monitoring lower threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6360,[
+  {name,"vpoc dither type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vpoc dither type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6361,[
+  {name,"vpoc dither amplitude"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6362,[
+  {name,"vpoc dither frequency"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6371,[
+  {name,"vpoc target window monitoring type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vpoc target window monitoring type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6362,[
+  {name,"vpoc target window monitoring switch on time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6363,[
+  {name,"vpoc target window monitoring switch off time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6373,[
+  {name,"vpoc target window monitoring threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6374,[
+  {name,"vpoc target window monitoring upper threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6375,[
+  {name,"vpoc target window monitoring lower threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6380,[
+  {name,"vprc set point"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6381,[
+  {name,"vprc actual value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6382,[
+  {name,"vprc interface referance"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vprc interface referance"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6390,[
+  {name,"vprc demand value generator demand value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6391,[
+  {name,"vprc demand value generator referance value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6394,[
+  {name,"vprc demand value generator hold set point"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63A0,[
+  {name,"vprc demand value generator upper limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63A1,[
+  {name,"vprc demand value generator lower limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63A2,[
+  {name,"vprc demand value generator scaling factor"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vprc demand value generator scaling factor"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63A3,[
+  {name,"vprc demand value generator scaling offset"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63A4,[
+  {name,"vprc demand value generator zero correction offset"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63B0,[
+  {name,"vprc demand value generator ramp type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vprc demand value generator ramp type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63B1,[
+  {name,"vprc demand value generator ramp acceleration time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63B2,[
+  {name,"vprc demand value generator ramp acceleration time positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63B3,[
+  {name,"vprc demand value generator ramp acceleration time negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63B4,[
+  {name,"vprc demand value generator ramp deceleration time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63B5,[
+  {name,"vprc demand value generator ramp deceleration time positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63B5,[
+  {name,"vprc demand value generator ramp deceleration time negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63C0,[
+  {name,"vprc demand value generator directional dependent gain type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vprc demand value generator directional dependent gain type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63C1,[
+  {name,"vprc demand value generator directional dependent gain factor"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vprc demand value generator directional dependent gain factor"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63C2,[
+  {name,"vprc demand value generator dead band compensation type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vprc demand value generator dead band compensation type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63C3,[
+  {name,"vprc demand value generator dead band compensation A side"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63C4,[
+  {name,"vprc demand value generator dead band compensation B side"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63C5,[
+  {name,"vprc demand value generator dead band compensation threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63D0,[
+  {name,"vprc control deviation"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63D1,[
+  {name,"vprc control monitoring type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vprc control monitoring type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63D2,[
+  {name,"vprc control monitoring delay time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63D3,[
+  {name,"vprc control monitoring treshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63D4,[
+  {name,"vprc control monitoring upper treshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63D5,[
+  {name,"vprc control monitoring lower treshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63E0,[
+  {name,"vprc dither type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vprc dither type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63E1,[
+  {name,"vprc dither amplitude"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63E2,[
+  {name,"vprc dither frequency"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63F0,[
+  {name,"vprc target window monitoring type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vprc target window monitoring type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63F1,[
+  {name,"vprc target window monitoring switch on time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63F2,[
+  {name,"vprc target window monitoring switch off time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63F3,[
+  {name,"vprc target window monitoring treshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63F4,[
+  {name,"vprc target window monitoring upper treshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#63F5,[
+  {name,"vprc target window monitoring lower treshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#640D,[
+  {name,"vpqc power limit factor"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vprc power limit factor"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#640E,[
+  {name,"vpqc hydrostatic actual power"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6460,[
+  {name,"vpqc dither type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vprc dither type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6461,[
+  {name,"vpqc dither amplitude"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6462,[
+  {name,"vpqc dither frequency"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6470,[
+  {name,"vpqc target window monitoring type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"vprc target window monitoring type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6471,[
+  {name,"vpqc target window monitoring switch on time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6472,[
+  {name,"vpqc target window monitoring switch off time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6473,[
+  {name,"vpqc target window monitoring threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6474,[
+  {name,"vpqc target window monitoring upper threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6475,[
+  {name,"vpqc target window monitoring lower threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer16},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6480,[
+  {name,"dcol set point"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6490,[
+  {name,"dcol demand value generator demand value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6492,[
+  {name,"dcol demand value generator reference A value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6493,[
+  {name,"dcol demand value generator reference B value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6494,[
+  {name,"dcol demand value generator hold set point"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#64A0,[
+  {name,"dcol demand value generator upper limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#64A1,[
+  {name,"dcol demand value generator lower limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#64B0,[
+  {name,"dcol demand value generator ramp type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"dcol demand value generator ramp type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#64B1,[
+  {name,"dcol demand value generator ramp acceleration time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#64B2,[
+  {name,"dcol demand value generator ramp acceleration time positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#64B3,[
+  {name,"dcol demand value generator ramp acceleration time negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#64B4,[
+  {name,"dcol demand value generator ramp deceleration time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#64B5,[
+  {name,"dcol demand value generator ramp deceleration time positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#64B6,[
+  {name,"dcol demand value generator ramp deceleration time negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6500,[
+  {name,"dsc set point"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6501,[
+  {name,"dsc actual value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6502,[
+  {name,"dsc interface referance"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"dsc interface referance"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6503,[
+  {name,"dsc Kp"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6504,[
+  {name,"dsc Ti"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6510,[
+  {name,"dsc demand value generator demand value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6512,[
+  {name,"dsc demand value generator referance A value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6513,[
+  {name,"dsc demand value generator referance B value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6514,[
+  {name,"dsc demand value generator hold set point"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6520,[
+  {name,"dsc demand value generator upper limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6521,[
+  {name,"dsc demand value generator lower limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6530,[
+  {name,"dsc demand value generator ramp type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"dsc demand value generator ramp type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6531,[
+  {name,"dsc demand value generator ramp acceleration time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6532,[
+  {name,"dsc demand value generator ramp acceleration time positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6533,[
+  {name,"dsc demand value generator ramp acceleration time negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6534,[
+  {name,"dsc demand value generator ramp deceleration time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6535,[
+  {name,"dsc demand value generator ramp deceleration time positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6536,[
+  {name,"dsc demand value generator ramp deceleration time negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6550,[
+  {name,"dsc control deviation"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6551,[
+  {name,"dsc control monitoring type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"dsc control monitoring type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6552,[
+  {name,"dsc control monitoring delay time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6553,[
+  {name,"dsc control monitoring threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6554,[
+  {name,"dsc control monitoring upper threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6555,[
+  {name,"dsc control monitoring lower threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6556,[
+  {name,"dsc control monitoring threshold Vmax"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6557,[
+  {name,"dsc control monitoring upper threshold Vmax positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6558,[
+  {name,"dsc control monitoring lower threshold Vmax negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6570,[
+  {name,"dsc target window monitoring type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"dsc target window monitoring type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6571,[
+  {name,"dsc target window monitoring switch on time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6572,[
+  {name,"dsc target window monitoring switch off time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6573,[
+  {name,"dsc target window monitoring threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6574,[
+  {name,"dsc target window monitoring upper threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6575,[
+  {name,"dsc target window monitoring lower threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6580,[
+  {name,"dfpc set point"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6581,[
+  {name,"dfpc actual value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6582,[
+  {name,"dfpc interface referance"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"dfpc interface referance"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6583,[
+  {name,"dfpc Kp"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6584,[
+  {name,"dfpc Td"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6585,[
+  {name,"dfpc T1"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6586,[
+  {name,"dfpc Ti"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6587,[
+  {name,"dfpc pressure sample time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6590,[
+  {name,"dfpc demand value generator demand value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6592,[
+  {name,"dfpc demand value generator referance A value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6593,[
+  {name,"dfpc demand value generator referance B value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6594,[
+  {name,"dfpc demand value generator hold set point"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65A0,[
+  {name,"dfpc demand value generator upper limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65A1,[
+  {name,"dfpc demand value generator lower limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65B0,[
+  {name,"dfpc demand value generator ramp type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"dfpc demand value generator ramp type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65B1,[
+  {name,"dfpc demand value generator ramp acceleration time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65B2,[
+  {name,"dfpc demand value generator ramp acceleration time positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65B3,[
+  {name,"dfpc demand value generator ramp acceleration time negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65B4,[
+  {name,"dfpc demand value generator ramp deceleration time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65B5,[
+  {name,"dfpc demand value generator ramp deceleration time positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65B6,[
+  {name,"dfpc demand value generator ramp deceleration time negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65D0,[
+  {name,"dfpc control deviation"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65D1,[
+  {name,"dfpc control monitoring type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"dfpc control monitoring type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65D2,[
+  {name,"dfpc control monitoring delay time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65D3,[
+  {name,"dfpc control monitoring threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65D4,[
+  {name,"dfpc control monitoring upper threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65D5,[
+  {name,"dfpc control monitoring lower threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65D6,[
+  {name,"dfpc control monitoring threshold Vmax"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65D7,[
+  {name,"dfpc control monitoring upper threshold Vmax positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65D8,[
+  {name,"dfpc control monitoring lower threshold Vmax negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65F0,[
+  {name,"dfpc target window monitoring type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"dfpc target window monitoring type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65F1,[
+  {name,"dfpc target window monitoring switch on time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,integer8},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65F2,[
+  {name,"dfpc target window monitoring switch off time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65F3,[
+  {name,"dfpc target window monitoring threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65F4,[
+  {name,"dfpc target window monitoring upper threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#65F5,[
+  {name,"dfpc target window monitoring lower threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6600,[
+  {name,"dpc set point"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6601,[
+  {name,"dpc actual value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6602,[
+  {name,"dpc interface referance"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6603,[
+  {name,"dpc Kp"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6604,[
+  {name,"dpc Td"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6605,[
+  {name,"dpc T1"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6608,[
+  {name,"dpc switched integrator type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"dpc switched integrator type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6609,[
+  {name,"dpc switched integrator Ti"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#660A,[
+  {name,"dpc switched integrator dX"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#660C,[
+  {name,"dpc condition feedback Kv"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#660D,[
+  {name,"dpc condition feedback Kc"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#660E,[
+  {name,"dpc condition feedback Kpp"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#660F,[
+  {name,"dpc condition feedback T1pp"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6610,[
+  {name,"dpc demand value generator demand value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,ro},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6612,[
+  {name,"dpc demand value generator referance A value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6613,[
+  {name,"dpc demand value generator referance B value"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6614,[
+  {name,"dpc demand value generator hold set point"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6620,[
+  {name,"dpc demand value generator upper limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6621,[
+  {name,"dpc demand value generator lower limit"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6630,[
+  {name,"dpc demand value generator ramp type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"dpc demand value generator ramp type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6631,[
+  {name,"dpc demand value generator ramp acceleration time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6632,[
+  {name,"dpc demand value generator ramp acceleration time positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6633,[
+  {name,"dpc demand value generator ramp acceleration time negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6634,[
+  {name,"dpc demand value generator ramp deceleration time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6635,[
+  {name,"dpc demand value generator ramp deceleration time positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6636,[
+  {name,"dpc demand value generator ramp deceleration time negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6637,[
+  {name,"dpc demand value generator ramp velocity"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6638,[
+  {name,"dpc demand value generator ramp acceleration"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6639,[
+  {name,"dpc demand value generator ramp deceleration"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6650,[
+  {name,"dpc control deviation"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6651,[
+  {name,"dpc control monitoring type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"dpc control monitoring type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6652,[
+  {name,"dpc control monitoring delay time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6653,[
+  {name,"dpc control monitoring threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6654,[
+  {name,"dpc control monitoring upper threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6655,[
+  {name,"dpc control monitoring lower threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6656,[
+  {name,"dpc control monitoring threshold Vmax"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6657,[
+  {name,"dpc control monitoring upper threshold Vmax positive"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6658,[
+  {name,"dpc control monitoring lower threshold Vmax negative"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6670,[
+  {name,"dpc window monitoring type"},
+  {struct,var},
+  {category,optional},
+  {entry,0,[
+    {name,"dpc window monitoring type"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6671,[
+  {name,"dpc target window monitoring switch on time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6672,[
+  {name,"dpc target window monitoring switch off time"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,unsigned32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6673,[
+  {name,"dpc target window monitoring threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6674,[
+  {name,"dpc target window monitoring upper threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+
+{objdef,16#6675,[
+  {name,"dpc target window monitoring lower threshold"},
+  {struct,array},
+  {category,optional},
+  {entry,0,[
+    {name,"Number of entries"},
+    {type,unsigned32},
+    {access,ro},
+    {pdo_mapping,no}
+  ]},
+  {entry,1,[
+    {name,"Value"},
+    {type,integer32},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,2,[
+    {name,"SI unit"},
+    {type,unsigned8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]},
+  {entry,3,[
+    {name,"Prefix"},
+    {type,integer8},
+    {access,rw},
+    {pdo_mapping,optional}
+  ]}
+]}.
+

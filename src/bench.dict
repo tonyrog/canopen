@@ -1,0 +1,45 @@
+%% -*- erlang -*-
+
+{object, 16#2500,
+ [{name,"Button"},
+  {struct,array},{access,ro},{type,unsigned8},
+  {entry,0,[{access,ro},{type,unsigned8},{value,4}]},
+  {entry,1,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,2,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,3,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,4,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,5,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,6,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,7,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,8,[{access,ro},{type,unsigned8},{value,0}]}
+ ]}.
+
+{object, 16#2501,
+ [{name,"Encoder"},
+  {struct,array},{access,ro},{type,unsigned8},
+  {entry,0,[{access,ro},{type,unsigned8},{value,4}]},
+  {entry,1,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,2,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,3,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,4,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,5,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,6,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,7,[{access,ro},{type,unsigned8},{value,0}]},
+  {entry,8,[{access,ro},{type,unsigned8},{value,0}]}
+ ]}.
+
+%%
+%% TPDO1 - send button and encoder events
+%%
+{tpdo, 0, {pdo1_tx,{extended,65}}, [{transmission_type,specific}]}.
+
+%% map button and encode 32 bits
+{tpdo_map, 0,
+ [{16#2500,1,2}, {16#2501,1,2},
+  {16#2500,2,2}, {16#2501,2,2},
+  {16#2500,3,2}, {16#2501,3,2},
+  {16#2500,4,2}, {16#2501,4,2},
+  {16#2500,5,2}, {16#2501,5,2},
+  {16#2500,6,2}, {16#2501,6,2},
+  {16#2500,7,2}, {16#2501,7,2},
+  {16#2500,8,2}, {16#2501,8,2}]}.
