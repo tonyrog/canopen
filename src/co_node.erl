@@ -613,8 +613,8 @@ handle_lss(M, Ctx) ->
 %%
 %% SYNC
 %%
-handle_sync(Frame, Ctx) ->
-    ?dbg("~s: handle_sync: ~p\n", [Ctx#co_ctx.name,Frame]),
+handle_sync(_Frame, Ctx) ->
+    ?dbg("~s: handle_sync: ~p\n", [Ctx#co_ctx.name,_Frame]),
     lists:foreach(
       fun(T) -> co_tpdo:sync(T#tpdo.pid) end, Ctx#co_ctx.tpdo_list),
     Ctx.
@@ -623,15 +623,15 @@ handle_sync(Frame, Ctx) ->
 %% TIME STAMP
 %%  
 %%
-handle_time_stamp(M, Ctx) ->
-    ?dbg("~s: handle_timestamp: ~p\n", [Ctx#co_ctx.name,M]),
+handle_time_stamp(_Frame, Ctx) ->
+    ?dbg("~s: handle_timestamp: ~p\n", [Ctx#co_ctx.name,_Frame]),
     Ctx.
 
 %%
 %% EMERGENCY
 %%
-handle_emergency(M, Ctx) ->
-    ?dbg("~s: handle_emergency: ~p\n", [Ctx#co_ctx.name,M]),
+handle_emergency(_Frame, Ctx) ->
+    ?dbg("~s: handle_emergency: ~p\n", [Ctx#co_ctx.name,_Frame]),
     Ctx.
 
 %%
@@ -945,14 +945,14 @@ create_cob_table(ID) ->
 
 add_subscription(T, Ix, Pid) ->
     ets:insert(T, {{Ix,Ix,Pid}}).
-add_subscription(T, Ix1, Ix2, Pid) when Ix =< Ix2 ->
+add_subscription(T, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
     ets:insert(T, {{Ix1,Ix2,Pid}}).
 
-remove_subscription(T, Ix1, Ix2, Pid) when Ix =< Ix2 ->
+remove_subscription(T, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
     ets:delete(T, {{Ix1,Ix2,Pid}}).
 
 %% Find all subscribers to Ix
-subscribers(T, Ix) ->
+subscribers(_T, _Ix) ->
     %% FIXME!
     [].
     

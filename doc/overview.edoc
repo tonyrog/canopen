@@ -1,0 +1,7 @@
+@author  Tony Rogvall <tony@rogvall.se>
+@version 1.0
+@title Erlang CANopen stack
+@doc CANopen is an industry standard for managing small embedded nodes
+in a CAN network.
+
+

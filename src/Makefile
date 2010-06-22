@@ -50,6 +50,9 @@ depend:
 dialyze:
 	dialyzer --src -o dia.out -I ../include -c $(MODULES:%=%.erl) 
 
+edoc:
+	erl -noshell -pa doc -run edoc_run application "canopen" '".."' '[{private,false},no_packages,{sort_functions,false}]'
+
 clean:
 	rm -f $(OBJS) 
 
