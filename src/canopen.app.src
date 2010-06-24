@@ -4,7 +4,6 @@
   {modules, [canopen, co_codec, co_sdo, co_file, co_format, co_node, co_dict,
 	     co_probe, crc]},
   {registered, []},
-  {mod,{can_app,[]}},
   {env, []},
   {applications,[kernel,stdlib,can]}
   ]}.

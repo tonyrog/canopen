@@ -295,7 +295,7 @@
 	{
 	  client_to_server_id,     %% unsigned:32 (Rx/Tx)
 	  server_to_client_id,     %% unsigned:32 (Rx/Tx)
-	  node_id                  %% Node:8
+	  node_id                  %% Node:8 (extension 25/32 bits)
 	}).
 
 %% DEFSTRUCT 16#0023  (identity)
@@ -314,6 +314,13 @@
 		    {type,unsigned8},{value,?UNSIGNED32}]},
 	  {entry,4,[{name,serial},{access,c},
 		    {type,unsigned8},{value,?UNSIGNED32}]}]}).
+
+-define(DAYS_FROM_0_TO_1970,    719528).
+-define(DAYS_FROM_0_TO_1984,    724641).
+-define(TIMEOFDAY_MS(H,M,S,Ms), (1000*((S)+60*((M) + (H)*60)) + (Ms))).
+-define(MAX_TIMEOFDAY_MS,       ?TIMEOFDAY_MS(23,59,59,0)).
+-define(SECS_PER_DAY,           86400).
+-define(MS_PER_DAY,             86400000).
 
 %% Time since January 1, 1984
 -record(time_of_day,
@@ -425,7 +432,12 @@
 	  sdo_list=[],      %% [#sdo{}]
 	  sync_tmr = false, %% TimerRef
 	  sync_time = 0,    %% Sync timer value (ms) should be us
-	  sync_id           %% COBID
+	  sync_id,          %% COBID
+	  time_stamp_time = 0,    %% Time stamp timer value ms
+	  time_stamp_tmr = false, %% Time stamp timer
+	  time_stamp_id = 0,      %% Time stamp COBID
+	  emcy_id = 0,
+	  error_list = []         %% time unique ordered list (0-254)
 	}).
 
 
@@ -537,6 +549,7 @@
 -define(IX_DEVICE_TYPE,                16#1000).
 -define(IX_ERROR_REGISTER,             16#1001).
 -define(IX_MANUF_STATUS_REGISTER,      16#1002).
+-define(IX_PREDEFINED_ERROR_FIELD,     16#1003).
 -define(IX_COB_ID_SYNC_MESSAGE,        16#1005).
 -define(IX_COM_CYCLE_PERIOD,           16#1006).
 -define(IX_SYNC_WINDOW_LENGTH,         16#1007).
@@ -584,7 +597,9 @@
 %% COB-ID entry field
 %%  Invalid:1, RtrAllowed:1, Extended:1, Id:29
 -define(COBID_ENTRY_INVALID,        16#80000000).
--define(COBID_ENTRY_SYNC,           16#40000000).   %% 0x1005 usage
+-define(COBID_ENTRY_TIME_CONSUMER,  16#80000000).   %% 0x1012 TIME_STAMP consumer
+-define(COBID_ENTRY_SYNC,           16#40000000).   %% 0x1005 usage produce SYNC
+-define(COBID_ENTRY_TIME_PRODUCER,  16#40000000).   %% 0x1012 usage produce TIME_STAMP
 -define(COBID_ENTRY_RTR_DISALLOWED, 16#40000000).
 -define(COBID_ENTRY_EXTENDED,       16#20000000).
 -define(COBID_ENTRY_ID_MASK,        16#1FFFFFFF).

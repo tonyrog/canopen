@@ -65,6 +65,7 @@
 %%          {serial, SerialNumber}
 %%          {vendor, VendorID}
 %%          extended                     - use extended (29-bit) ID
+%%          {time_stamp,  timeout()}     - ( 60000 )  1m
 %%          {sdo_timeout, timeout()}     - ( 1000 )
 %%          {blk_timeout, timeout()}     - ( 500 )
 %%          {pst, integer()}             - ( 16 )
@@ -209,13 +210,13 @@ serial_to_pid(Pid) when is_pid(Pid); is_atom(Pid) ->
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
 init([NodeId,NodeName,Opts]) ->
-    Dict = co_dict:new(public),
+    Dict = create_dict(),
     SdoCtx = #sdo_ctx {
-      timeout     = proplists:get_value(sdo_timeout,Opts,1000),
-      blk_timeout = proplists:get_value(blk_timeout,Opts,500),
-      pst         = proplists:get_value(pst,Opts,16),
-      max_blksize = proplists:get_value(max_blksize,Opts,74),
-      use_crc     = proplists:get_value(use_crc,Opts,true),
+      timeout         = proplists:get_value(sdo_timeout,Opts,1000),
+      blk_timeout     = proplists:get_value(blk_timeout,Opts,500),
+      pst             = proplists:get_value(pst,Opts,16),
+      max_blksize     = proplists:get_value(max_blksize,Opts,74),
+      use_crc         = proplists:get_value(use_crc,Opts,true),
       dict        = Dict
      },
     ID = case proplists:get_value(extended,Opts,false) of
@@ -240,7 +241,8 @@ init([NodeId,NodeName,Opts]) ->
       toggle = 0,
       data = [],
       sdo  = SdoCtx,
-      sdo_list = []
+      sdo_list = [],
+      time_stamp_time = proplists:get_value(time_stamp, Opts, 60000)
      },
     can_router:attach(),
     if NodeId =:= 0 ->
@@ -281,12 +283,12 @@ initialization(Ctx) ->
 
 handle_call({set,Ix,Si,Value}, _From, Ctx) ->
     case co_dict:set(Ctx#co_ctx.dict, Ix, Si, Value) of
-	ok ->  {reply,ok, update_cob_table(Ix, Ctx)};
+	ok ->  {reply,ok, handle_notify(Ix, Ctx)};
 	Error -> {reply, Error, Ctx}
     end;
 handle_call({direct_set,Ix,Si,Value}, _From, Ctx) ->
     case co_dict:direct_set(Ctx#co_ctx.dict, Ix, Si, Value) of
-	ok ->  {reply,ok, update_cob_table(Ix, Ctx)};
+	ok ->  {reply,ok, handle_notify(Ix, Ctx)};
 	Error -> {reply, Error, Ctx}
     end;	
 handle_call({value,Ix}, _From, Ctx) ->
@@ -359,7 +361,7 @@ handle_call({load_dict, File}, _From, Ctx) ->
 	    Ctx1 = 
 		foldl(fun({Obj,_Es},Ctx0) ->
 			      I = Obj#dict_object.index,
-			      update_cob_table(I, Ctx0)
+			      handle_notify(I, Ctx0)
 		      end, Ctx, Os),
 	    {reply, ok, Ctx1};
 	Error ->
@@ -461,6 +463,17 @@ handle_info({timeout,Ref,sync}, Ctx) when Ref =:= Ctx#co_ctx.sync_tmr ->
     Ctx1 = Ctx#co_ctx { sync_tmr = start_timer(Ctx#co_ctx.sync_time, sync) },
     {noreply, Ctx1};
 
+handle_info({timeout,Ref,time_stamp}, Ctx) when Ref =:= Ctx#co_ctx.time_stamp_tmr ->
+    %% Send a TIME_STAMP frame
+    FrameID = ?COBID_TO_CANID(Ctx#co_ctx.time_stamp_id),
+    Time = time_of_day(),
+    Data = co_codec:encode(Time, ?TIME_OF_DAY),
+    Size = byte_size(Data),
+    Frame = #can_frame { id = FrameID, len=Size, data=Data },
+    can:send(Frame),
+    Ctx1 = Ctx#co_ctx { time_stamp_tmr = start_timer(Ctx#co_ctx.time_stamp_time, time_stamp) },
+    {noreply, Ctx1};
+
 handle_info({'DOWN',Ref,process,_Pid,Reason}, Ctx) ->
     case lists:keysearch(Ref, #sdo.mon, Ctx#co_ctx.sdo_list) of
 	{value,_S} ->
@@ -524,12 +537,12 @@ handle_can(Frame, Ctx) ->
     COBID = ?CANID_TO_COBID(Frame#can_frame.id),
     ?dbg("~s: handle_can: COBID=~8.16.0B\n", [Ctx#co_ctx.name, COBID]),
     case lookup_cobid(COBID, Ctx) of
-	nmt  -> handle_nmt(Frame, Ctx);
-	sync -> handle_sync(Frame, Ctx);
+	nmt        -> handle_nmt(Frame, Ctx);
+	sync       -> handle_sync(Frame, Ctx);
+	emcy       -> handle_emcy(Frame, Ctx);
 	times_tamp -> handle_time_stamp(Frame, Ctx);
 	node_guard -> handle_node_guard(Frame, Ctx);
 	lss        -> handle_lss(Frame, Ctx);
-	emergency  -> handle_emergency(Frame, Ctx);
 	{rpdo,Offset} -> handle_rpdo(Frame, Offset, COBID, Ctx);
 	{sdo_tx,Rx} ->
 	    if Ctx#co_ctx.state=:= ?Operational; 
@@ -620,18 +633,26 @@ handle_sync(_Frame, Ctx) ->
     Ctx.
 
 %%
-%% TIME STAMP
-%%  
+%% TIME STAMP - update local time offset
 %%
-handle_time_stamp(_Frame, Ctx) ->
-    ?dbg("~s: handle_timestamp: ~p\n", [Ctx#co_ctx.name,_Frame]),
-    Ctx.
+handle_time_stamp(Frame, Ctx) ->
+    ?dbg("~s: handle_timestamp: ~p\n", [Ctx#co_ctx.name,Frame]),
+    try co_codec:decode(Frame#can_frame.data, ?TIME_OF_DAY) of
+	{T, _Bits} when is_record(T, time_of_day) ->
+	    set_time_of_day(T),
+	    Ctx;
+	_ ->
+	    Ctx
+    catch
+	error:_ ->
+	    Ctx
+    end.
 
 %%
-%% EMERGENCY
+%% EMERGENCY - this is the consumer side detecting emergency
 %%
-handle_emergency(_Frame, Ctx) ->
-    ?dbg("~s: handle_emergency: ~p\n", [Ctx#co_ctx.name,_Frame]),
+handle_emcy(_Frame, Ctx) ->
+    ?dbg("~s: handle_emcy: ~p\n", [Ctx#co_ctx.name,_Frame]),
     Ctx.
 
 %%
@@ -752,101 +773,142 @@ set_dict_object({O,Es}, Ctx) when is_record(O, dict_object) ->
     lists:foreach(fun(E) -> ets:insert(Ctx#co_ctx.dict, E) end, Es),
     ets:insert(Ctx#co_ctx.dict, O),
     I = O#dict_object.index,
-    update_cob_table(I, Ctx).
+    handle_notify(I, Ctx).
 
 set_dict_entry(E, Ctx) when is_record(E, dict_entry) ->
     {I,_} = E#dict_entry.index,
     ets:insert(Ctx#co_ctx.dict, E),
-    update_cob_table(I, Ctx).
+    handle_notify(I, Ctx).
 
-update_cob_table(?IX_COB_ID_SYNC_MESSAGE, Ctx) ->
-    update_sync(Ctx);
-update_cob_table(?IX_COM_CYCLE_PERIOD, Ctx) ->
-    update_sync(Ctx);
-update_cob_table(?IX_COB_ID_TIME_STAMP, Ctx) ->
-    Ctx;
-update_cob_table(?IX_COB_ID_EMERGENCY, Ctx) ->
-    Ctx;
-update_cob_table(I, Ctx) when
-      I >= ?IX_SDO_SERVER_FIRST, I =< ?IX_SDO_SERVER_LAST ->
-    Rx = co_dict:direct_value(Ctx#co_ctx.dict,I,?SI_SDO_CLIENT_TO_SERVER),
-    Tx = co_dict:direct_value(Ctx#co_ctx.dict,I,?SI_SDO_SERVER_TO_CLIENT),
-    ets:insert(Ctx#co_ctx.cob_table, {Rx,{sdo_rx,Tx}}),
-    ets:insert(Ctx#co_ctx.cob_table, {Tx,{sdo_tx,Rx}}),
-    Ctx;
-update_cob_table(I, Ctx) when
-      I >= ?IX_SDO_CLIENT_FIRST, I =< ?IX_SDO_CLIENT_LAST ->
-    Tx = co_dict:direct_value(Ctx#co_ctx.dict,I,?SI_SDO_CLIENT_TO_SERVER),
-    Rx = co_dict:direct_value(Ctx#co_ctx.dict,I,?SI_SDO_SERVER_TO_CLIENT),
-    ets:insert(Ctx#co_ctx.cob_table, {Rx,{sdo_rx,Tx}}),
-    ets:insert(Ctx#co_ctx.cob_table, {Tx,{sdo_tx,Rx}}),
-    Ctx;
-update_cob_table(I, Ctx) when 
-      I >= ?IX_RPDO_PARAM_FIRST, I =< ?IX_RPDO_PARAM_LAST ->
-    io:format("update RPDO\n"),
-    Id = co_dict:direct_value(Ctx#co_ctx.dict,I,?SI_PDO_COB_ID),
-    Offset = I - ?IX_RPDO_PARAM_FIRST,
-    Valid = (Id band ?COBID_ENTRY_INVALID) =:= 0,
-    COBID = Id band (?COBID_ENTRY_ID_MASK bor ?COBID_ENTRY_EXTENDED),
-    if not Valid ->
-	    ets:delete(Ctx#co_ctx.cob_table, COBID),
-	    Ctx;
-       true ->
-	    ets:insert(Ctx#co_ctx.cob_table, {COBID,{rpdo,Offset}}),
-	    Ctx
-    end;
-update_cob_table(I, Ctx) when
-      I >= ?IX_TPDO_PARAM_FIRST, I =< ?IX_TPDO_PARAM_LAST ->
-    Offset = I - ?IX_TPDO_PARAM_FIRST,
-    ?dbg("update TPDO: offset=~p\n",[Offset]),
-    ID = co_dict:direct_value(Ctx#co_ctx.dict,I,?SI_PDO_COB_ID),
-    Trans = co_dict:direct_value(Ctx#co_ctx.dict,I,?SI_PDO_TRANSMISSION_TYPE),
-    Inhibit = co_dict:direct_value(Ctx#co_ctx.dict,I,?SI_PDO_INHIBIT_TIME),
-    Timer = co_dict:direct_value(Ctx#co_ctx.dict,I,?SI_PDO_EVENT_TIMER),
-    Valid = (ID band ?COBID_ENTRY_INVALID) =:= 0,
-    RtrAllowed = (ID band ?COBID_ENTRY_RTR_DISALLOWED) =:=0,
-    COBID = ID band (?COBID_ENTRY_ID_MASK bor ?COBID_ENTRY_EXTENDED),
-    Param = #pdo_parameter { offset = Offset,
-			     valid = Valid,
-			     rtr_allowed = RtrAllowed,
-			     cob_id = COBID,
-			     transmission_type=Trans,
-			     inhibit_time = Inhibit,
-			     event_timer = Timer },
-    case update_tpdo(Param, Ctx) of
-	{new, {T,Ctx1}} ->
-	    io:format("TPDO:new\n"),
-	    ets:insert(Ctx#co_ctx.cob_table, 
-		       {COBID,{tpdo,RtrAllowed,T#tpdo.pid}}),
-	    Ctx1;
-	{existing,T} ->
-	    io:format("TPDO:existing\n"),
-	    co_tpdo:update(T#tpdo.pid, Param),
-	    Ctx;
-	{deleted,Ctx1} ->
-	    io:format("TPDO:deleted\n"),
-	    ets:delete(Ctx#co_ctx.cob_table, COBID),
-	    Ctx1;
-	none ->
-	    io:format("TPDO:none\n"),
-	    Ctx
-    end;
-update_cob_table(I, Ctx) when
-      I >= ?IX_TPDO_MAPPING_FIRST, I =< ?IX_TPDO_MAPPING_LAST ->
-    Offset = I - ?IX_TPDO_MAPPING_FIRST,
-    io:format("update TPDO-MAP: offset=~w\n", [Offset]),
-    J = ?IX_TPDO_PARAM_FIRST + Offset,
-    COBID = co_dict:direct_value(Ctx#co_ctx.dict,J,?SI_PDO_COB_ID),
-    case lookup_cobid(COBID, Ctx) of
-	{tpdo,_RtrAllowed,Pid} ->
-	    co_tpdo:update_map(Pid),
-	    Ctx;
+%%
+%% Dictionary entry has been updated
+%%
+
+handle_notify(I, Ctx) ->
+    case I of
+	?IX_COB_ID_SYNC_MESSAGE ->
+	    update_sync(Ctx);
+	?IX_COM_CYCLE_PERIOD ->
+	    update_sync(Ctx);
+	?IX_COB_ID_TIME_STAMP ->
+	    update_time_stamp(Ctx);
+	?IX_COB_ID_EMERGENCY ->
+	    update_emcy(Ctx);
+	_ when I >= ?IX_SDO_SERVER_FIRST, I =< ?IX_SDO_SERVER_LAST ->
+	    case load_sdo_parameter(I, Ctx) of
+		undefined -> Ctx;
+		SDO ->
+		    Rx = SDO#sdo_parameter.client_to_server_id,
+		    Tx = SDO#sdo_parameter.server_to_client_id,
+		    ets:insert(Ctx#co_ctx.cob_table, {Rx,{sdo_rx,Tx}}),
+		    ets:insert(Ctx#co_ctx.cob_table, {Tx,{sdo_tx,Rx}}),
+		    Ctx
+	    end;
+	_ when I >= ?IX_SDO_CLIENT_FIRST, I =< ?IX_SDO_CLIENT_LAST ->
+	    case load_sdo_parameter(I, Ctx) of
+		undefined -> Ctx;
+		SDO ->
+		    Tx = SDO#sdo_parameter.client_to_server_id,
+		    Rx = SDO#sdo_parameter.server_to_client_id,
+		    ets:insert(Ctx#co_ctx.cob_table, {Rx,{sdo_rx,Tx}}),
+		    ets:insert(Ctx#co_ctx.cob_table, {Tx,{sdo_tx,Rx}}),
+		    Ctx
+	    end;
+	_ when I >= ?IX_RPDO_PARAM_FIRST, I =< ?IX_RPDO_PARAM_LAST ->
+	    io:format("update RPDO offset=~w\n", [(I-?IX_RPDO_PARAM_FIRST)]),
+	    case load_pdo_parameter(I, (I-?IX_RPDO_PARAM_FIRST), Ctx) of
+		undefined -> Ctx;
+		Param ->
+		    if not (Param#pdo_parameter.valid) ->
+			    ets:delete(Ctx#co_ctx.cob_table, Param#pdo_parameter.cob_id);
+		       true ->
+			    ets:insert(Ctx#co_ctx.cob_table, {Param#pdo_parameter.cob_id,
+							      {rpdo,Param#pdo_parameter.offset}})
+		    end
+	    end;
+	_ when I >= ?IX_TPDO_PARAM_FIRST, I =< ?IX_TPDO_PARAM_LAST ->
+	    ?dbg("update TPDO: offset=~p\n",[I - ?IX_TPDO_PARAM_FIRST]),
+	    case load_pdo_parameter(I, (I-?IX_TPDO_PARAM_FIRST), Ctx) of
+		undefined -> Ctx;
+		Param ->
+		    case update_tpdo(Param, Ctx) of
+			{new, {T,Ctx1}} ->
+			    io:format("TPDO:new\n"),
+			    ets:insert(Ctx#co_ctx.cob_table, 
+				       {Param#pdo_parameter.cob_id,
+					{tpdo,Param#pdo_parameter.rtr_allowed,T#tpdo.pid}}),
+			    Ctx1;
+			{existing,T} ->
+			    io:format("TPDO:existing\n"),
+			    co_tpdo:update(T#tpdo.pid, Param),
+			    Ctx;
+			{deleted,Ctx1} ->
+			    io:format("TPDO:deleted\n"),
+			    ets:delete(Ctx#co_ctx.cob_table, Param#pdo_parameter.cob_id),
+			    Ctx1;
+			none ->
+			    io:format("TPDO:none\n"),
+			    Ctx
+		    end
+	    end;
+	_ when I >= ?IX_TPDO_MAPPING_FIRST, I =< ?IX_TPDO_MAPPING_LAST ->
+	    Offset = I - ?IX_TPDO_MAPPING_FIRST,
+	    io:format("update TPDO-MAP: offset=~w\n", [Offset]),
+	    J = ?IX_TPDO_PARAM_FIRST + Offset,
+	    COBID = co_dict:direct_value(Ctx#co_ctx.dict,J,?SI_PDO_COB_ID),
+	    case lookup_cobid(COBID, Ctx) of
+		{tpdo,_RtrAllowed,Pid} ->
+		    co_tpdo:update_map(Pid),
+		    Ctx;
+		_ ->
+		    Ctx
+	    end;
 	_ ->
+	    io:format("item not subscribed for ix=~w\n", [I]),
 	    Ctx
-    end;
-update_cob_table(_I, Ctx) ->
-    %% add more.
-    Ctx.
+    end.
+
+%% Load time_stamp COBID - maybe start co_time_stamp server
+update_time_stamp(Ctx) ->
+    try co_dict:direct_value(Ctx#co_ctx.dict,?IX_COB_ID_TIME_STAMP,0) of
+	ID ->
+	    COBID = ID band (?COBID_ENTRY_ID_MASK bor ?COBID_ENTRY_EXTENDED),
+	    if ID band ?COBID_ENTRY_TIME_PRODUCER =/= 0 ->
+		    Time = Ctx#co_ctx.time_stamp_time,
+		    if Time > 0 ->
+			    Tmr = start_timer(Ctx#co_ctx.time_stamp_time, time_stamp),
+			    Ctx#co_ctx { time_stamp_tmr=Tmr, time_stamp_id=COBID };
+		       true ->
+			    Tmr = stop_timer(Ctx#co_ctx.time_stamp_tmr),
+			    Ctx#co_ctx { time_stamp_tmr=Tmr, time_stamp_id=COBID}
+		    end;
+	       ID band ?COBID_ENTRY_TIME_CONSUMER =/= 0 ->
+		    %% consumer
+		    Tmr = stop_timer(Ctx#co_ctx.time_stamp_tmr),
+		    %% FIXME: delete old COBID!!!
+		    ets:insert(Ctx#co_ctx.cob_table, {COBID,time_stamp}),
+		    Ctx#co_ctx { time_stamp_tmr=Tmr, time_stamp_id=COBID}
+	    end
+    catch
+	error:_Reason ->
+	    Ctx
+    end.
+
+
+%% Load emcy COBID 
+update_emcy(Ctx) ->
+    try co_dict:direct_value(Ctx#co_ctx.dict,?IX_COB_ID_EMERGENCY,0) of
+	ID ->
+	    COBID = ID band (?COBID_ENTRY_ID_MASK bor ?COBID_ENTRY_EXTENDED),
+	    if ID band ?COBID_ENTRY_INVALID =/= 0 ->
+		    Ctx#co_ctx { emcy_id = COBID };
+	       true ->
+		    Ctx#co_ctx { emcy_id = 0 }
+	    end
+    catch
+	error:_ ->
+	    Ctx#co_ctx { emcy_id = 0 }  %% FIXME? keep or reset?
+    end.
 
 %% Either SYNC_MESSAGE or CYCLE_WINDOW is updated
 update_sync(Ctx) ->
@@ -907,6 +969,82 @@ update_tpdo(Param, Ctx) ->
 		    {deleted,Ctx#co_ctx { tpdo_list = TList }}
 	    end
     end.
+
+
+load_pdo_parameter(I, Offset, Ctx) ->
+    case load_list(Ctx#co_ctx.dict, [{I, ?SI_PDO_COB_ID}, 
+			  {I,?SI_PDO_TRANSMISSION_TYPE, 255},
+			  {I,?SI_PDO_INHIBIT_TIME, 0},
+			  {I,?SI_PDO_EVENT_TIMER, 0}]) of
+	[ID,Trans,Inhibit,Timer] ->
+	    Valid = (ID band ?COBID_ENTRY_INVALID) =:= 0,
+	    RtrAllowed = (ID band ?COBID_ENTRY_RTR_DISALLOWED) =:=0,
+	    COBID = ID band (?COBID_ENTRY_ID_MASK bor ?COBID_ENTRY_EXTENDED),
+	    #pdo_parameter { offset = Offset,
+			     valid = Valid,
+			     rtr_allowed = RtrAllowed,
+			     cob_id = COBID,
+			     transmission_type=Trans,
+			     inhibit_time = Inhibit,
+			     event_timer = Timer };
+	_ ->
+	    undefined
+    end.
+    
+
+load_sdo_parameter(I, Ctx) ->
+    case load_list(Ctx#co_ctx.dict, [{I,?SI_SDO_CLIENT_TO_SERVER},{I,?SI_SDO_SERVER_TO_CLIENT},
+			  {I,?SI_SDO_NODEID,undefined}]) of
+	[CS,SC,NodeID] ->
+	    #sdo_parameter { client_to_server_id = CS, 
+			     server_to_client_id = SC,
+			     node_id = NodeID };
+	_ ->
+	    undefined
+    end.
+
+load_list(Dict, List) ->
+    load_list(Dict, List, []).
+
+load_list(Dict, [{IX,SI}|List], Acc) ->
+    try co_dict:direct_value(Dict,IX,SI) of
+	Value -> load_list(Dict, List, [Value|Acc])
+    catch
+	error:_ -> undefined
+    end;
+load_list(Dict, [{IX,SI,Default}|List],Acc) ->
+    try co_dict:direct_value(Dict,IX,SI) of
+	Value -> load_list(Dict, List, [Value|Acc])
+    catch
+	error:_ ->
+	    load_list(Dict, List, [Default|Acc])
+    end;
+load_list(_Dict, [], Acc) ->
+    reverse(Acc).
+
+%% 
+%% Create and initialize dictionary
+%%
+create_dict() ->
+    Dict = co_dict:new(public),
+    %% install mandatory default items
+    co_dict:add_object(Dict, #dict_object { index=?IX_ERROR_REGISTER,
+					    access=?ACCESS_RO,
+					    struct=?OBJECT_VAR,
+					    type=?UNSIGNED8 },
+		       [#dict_entry { index={?IX_ERROR_REGISTER, 0},
+				      access=?ACCESS_RO,
+				      type=?UNSIGNED8,
+				      value=0}]),
+    co_dict:add_object(Dict, #dict_object { index=?IX_PREDEFINED_ERROR_FIELD,
+					    access=?ACCESS_RO,
+					    struct=?OBJECT_ARRAY,
+					    type=?UNSIGNED32 },
+		       [#dict_entry { index={?IX_PREDEFINED_ERROR_FIELD,0},
+				      access=?ACCESS_RW,
+				      type=?UNSIGNED8,
+				      value=0}]),
+    Dict.
     
 %%
 %% Initialized the default connection set
@@ -943,19 +1081,51 @@ create_cob_table(ID) ->
 	    T
     end.
 
-add_subscription(T, Ix, Pid) ->
-    ets:insert(T, {{Ix,Ix,Pid}}).
-add_subscription(T, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
-    ets:insert(T, {{Ix1,Ix2,Pid}}).
+add_subscription(Tab, Ix, Pid) ->
+    add_subscription(Tab, Ix, Ix, Pid).
 
-remove_subscription(T, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
-    ets:delete(T, {{Ix1,Ix2,Pid}}).
+add_subscription(Tab, Ix1, Ix2, Pid) when ?is_index(Ix1), ?is_index(Ix2), 
+					  Ix1 =< Ix2, 
+					  (is_pid(Pid) orelse is_atom(Pid)) ->
+    I = iset:new(Ix1, Ix2),
+    case ets:lookup(Tab, Pid) of
+	[] -> ets:insert(Tab, {Pid, I});
+	[{_,ISet}] -> ets:insert(Tab, {Pid, iset:union(ISet, I)})
+    end.
 
-%% Find all subscribers to Ix
-subscribers(_T, _Ix) ->
-    %% FIXME!
-    [].
-    
+remove_subscription(Tab, Ix, Pid) ->
+    remove_subscription(Tab, Ix, Ix, Pid).
+
+remove_subscription(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
+    case ets:lookup(Tab, Pid) of
+	[] -> ok;
+	[{_,ISet}] ->
+	    case iset:subtract(ISet, iset:new(Ix1, Ix2)) of
+		[] -> ets:delete(Tab, Pid);
+		ISet1 -> ets:insert(Tab, {Pid,ISet1})
+	    end
+    end.
+
+subscribers(Tab, Ix) when ?is_index(Ix) ->
+    ets:foldl(
+      fun({ID,ISet}, Acc) ->
+	      case iset:member(Ix, ISet) of
+		  true -> [ID|Acc];
+		  false -> Acc
+	      end
+      end, [], Tab).
+
+subscribers(Tab, Ix1, Ix2) when ?is_index(Ix1), ?is_index(Ix2),
+				Ix1 =< Ix2 ->
+    I = iset:new(Ix1, Ix2),
+    ets:foldl(
+      fun({ID,ISet}, Acc) ->
+	      case iset:intersect(I, ISet) of
+		  [] -> Acc;
+		  _ -> [ID|Acc]
+	      end
+      end, [], Tab).
+
 %% Create subscription table
 create_sub_table() ->
     T = ets:new(public, [ordered_set]),
@@ -970,7 +1140,6 @@ create_sub_table() ->
     add_subscription(T, ?IX_TPDO_MAPPING_FIRST, ?IX_TPDO_MAPPING_LAST,self()),
     T.
     
-
 lookup_sdo_server(COBID, Ctx) ->
     case lookup_cobid(COBID, Ctx) of
 	{sdo_rx, SDOTx} -> 
@@ -978,10 +1147,18 @@ lookup_sdo_server(COBID, Ctx) ->
 	undefined ->
 	    if ?is_nodeid_extended(COBID) ->
 		    NodeID = COBID band ?COBID_ENTRY_ID_MASK,
-		    {?XCOB_ID(?SDO_TX,NodeID),?XCOB_ID(?SDO_RX,NodeID)};
+		    Tx = ?XCOB_ID(?SDO_TX,NodeID),
+		    Rx = ?XCOB_ID(?SDO_RX,NodeID),
+		    ets:insert(Ctx#co_ctx.cob_table, {Rx,{sdo_rx,Tx}}),
+		    ets:insert(Ctx#co_ctx.cob_table, {Tx,{sdo_tx,Rx}}),
+		    {Tx,Rx};
 	       ?is_nodeid(COBID) ->
 		    NodeID = COBID band 16#7F,
-		    {?COB_ID(?SDO_TX,NodeID),?COB_ID(?SDO_RX,NodeID)};
+		    Tx = ?COB_ID(?SDO_TX,NodeID),
+		    Rx = ?COB_ID(?SDO_RX,NodeID),
+		    ets:insert(Ctx#co_ctx.cob_table, {Rx,{sdo_rx,Tx}}),
+		    ets:insert(Ctx#co_ctx.cob_table, {Tx,{sdo_tx,Rx}}),
+		    {Tx,Rx};
 	       true ->
 		    undefined
 	    end;
@@ -1129,118 +1306,52 @@ pdo_mapping(IX,SI,Sn,Ts,Is,Dict) ->
 	    Error
     end.
 
-%%
-%% Find RPDO parmeter entry given COBID (PDO_Tx) 
-%% FIXME: cache
-%%
-find_rpdo(COBID, Ctx) ->
-    Cmp = fun(PdoEnt) ->
-		  COBID1 = cob_map(PdoEnt,Ctx),
-		  if COBID1 band ?COBID_ENTRY_INVALID =/= 0 ->
-			  false;
-		     true ->
-			  (COBID1 band ?COBID_ENTRY_ID_MASK) == COBID
-		  end
-	  end,
-    co_dict:find_object(Ctx#co_ctx.dict,
-			?IX_RPDO_PARAM_FIRST, ?IX_RPDO_PARAM_LAST,
-			?SI_PDO_COB_ID, Cmp).
-%%
-%% Find TPDO Parameter entry given COBID (PDO_Tx)
-%% FIXME: cache
-%%
-find_tpdo(COBID, Ctx) ->
-    Cmp = fun(PdoEnt) ->
-		  COBID1 = cob_map(PdoEnt,Ctx),
-		  if COBID1 band ?COBID_ENTRY_INVALID =/= 0 ->
-			  false;
-		     COBID1 band ?COBID_ENTRY_RTR_DISALLOWED =/= 0 ->
-			  false;
-		     true ->
-			  (COBID1 band ?COBID_ENTRY_ID_MASK) == COBID
-		  end
-	  end,
-    co_dict:find_object(Ctx#co_ctx.dict,
-			?IX_TPDO_PARAM_FIRST, ?IX_TPDO_PARAM_LAST,
-			?SI_PDO_COB_ID, Cmp).
-%%
-%% find_sdo_server:
-%%  Lookup COBID (Tx/Rx) in server side table 
-%%  SDO SERVER side lookup to find incoming SDO communication id 
-%%
-
-find_sdo_server_tx(Dict, COBID) ->
-    co_dict:find_object(Dict,
-			?IX_SDO_SERVER_FIRST, ?IX_SDO_SERVER_LAST, 
-			?SI_SDO_SERVER_TO_CLIENT, COBID).
-
-find_sdo_server_rx(Dict, COBID) ->
-    co_dict:find_object(Dict,
-			?IX_SDO_SERVER_FIRST, ?IX_SDO_SERVER_LAST, 
-			?SI_SDO_CLIENT_TO_SERVER, COBID).
-
-find_sdo_server_id(Dict, NodeID) ->
-    co_dict:find_object(Dict,
-			?IX_SDO_SERVER_FIRST, ?IX_SDO_SERVER_LAST,
-			?SI_SDO_NODEID, NodeID).
-
-
-%%
-%% find_sdo_client:
-%%  Lookup COBID (Tx/Rx) in client side table 
-%%  SDO CLIENT side lookup to find incoming SDO communication id 
-%%
-find_sdo_client_rx(Dict, COBID) ->
-    co_dict:find_object(Dict, 
-			?IX_SDO_CLIENT_FIRST, ?IX_SDO_CLIENT_LAST, 
-			?SI_SDO_SERVER_TO_CLIENT, COBID).
-
-find_sdo_client_tx(Dict, COBID) ->
-    co_dict:find_object(Dict, 
-			?IX_SDO_CLIENT_FIRST, ?IX_SDO_CLIENT_LAST, 
-			?SI_SDO_CLIENT_TO_SERVER, COBID).
-
-find_sdo_client_id(Dict, NodeID) ->
-    co_dict:find_object(Dict,
-			?IX_SDO_CLIENT_FIRST, ?IX_SDO_CLIENT_LAST, 
-			?SI_SDO_NODEID, NodeID).
-
-
-find_sdo_cli(Ctx, CobID) ->
-    if	CobID == ?COB_ID(?SDO_TX, Ctx#co_ctx.id) ->
-	    {ok,?COB_ID(?SDO_RX, Ctx#co_ctx.id)};
-	CobID == ?XCOB_ID(?SDO_TX, Ctx#co_ctx.id) ->
-	    {ok,?XCOB_ID(?SDO_RX, Ctx#co_ctx.id)};
-       true ->
-	    case find_sdo_client_rx(Ctx#co_ctx.dict, CobID) of
-		{ok,Ix} ->
-		    co_dict:value(Ctx#co_ctx.dict, 
-				  {Ix,?SI_SDO_CLIENT_TO_SERVER});
-		Error ->
-		    if Ctx#co_ctx.id == 0 -> %% special master case
-			    Nid = ?NODE_ID(CobID),
-			    {ok, ?COB_ID(?SDO_RX, Nid)};
-		       true ->
-			    Error
-		    end
-	    end
+%% Set error code - and send the emergency object (if defined)
+%% FIXME: clear error list when code 0000
+set_error(Error, Code, Ctx) ->
+    case lists:member(Code, Ctx#co_ctx.error_list) of
+	true -> 
+	    Ctx;  %% condition already reported, do NOT send
+	false ->
+	    co_dict:direct_set(Ctx#co_ctx.dict,?IX_ERROR_REGISTER, 0, Error),
+	    NewErrorList = update_error_list([Code | Ctx#co_ctx.error_list], 1, Ctx),
+	    if Ctx#co_ctx.emcy_id =:= 0 ->
+		    ok;
+	       true ->
+		    FrameID = ?COBID_TO_CANID(Ctx#co_ctx.emcy_id),
+		    Data = <<Code:16/little,Error,0,0,0,0,0>>,
+		    Frame = #can_frame { id = FrameID, len=0, data=Data },
+		    can:send(Frame)
+	    end,
+	    Ctx#co_ctx { error_list = NewErrorList }
     end.
 
-find_sdo_srv(Ctx, CobID) ->
-    if  CobID == ?COB_ID(?SDO_RX, Ctx#co_ctx.id) ->
-	    {ok,?COB_ID(?SDO_TX, Ctx#co_ctx.id)};
-	CobID == ?XCOB_ID(?SDO_RX, Ctx#co_ctx.id) ->
-	    {ok,?XCOB_ID(?SDO_TX, Ctx#co_ctx.id)};
-	true ->
-	    case find_sdo_server_tx(Ctx#co_ctx.dict, CobID) of
-		{ok,SRVix} ->
-		    co_dict:value(Ctx#co_ctx.dict,
-				  {SRVix,?SI_SDO_SERVER_TO_CLIENT});
-		Error ->
-		    Error
-	    end
-    end.
+update_error_list([], SI, Ctx) ->
+    co_dict:update_entry(Ctx#co_ctx.dict,
+			 #dict_entry { index = {?IX_PREDEFINED_ERROR_FIELD,0},
+				       access = ?ACCESS_RW,
+				       type  = ?UNSIGNED8,
+				       value = SI }),
+    [];
+update_error_list(_Cs, SI, Ctx) when SI >= 254 ->
+    co_dict:update_entry(Ctx#co_ctx.dict,
+			 #dict_entry { index = {?IX_PREDEFINED_ERROR_FIELD,0},
+				       access = ?ACCESS_RW,
+				       type  = ?UNSIGNED8,
+				       value = 254 }),
+    [];
+update_error_list([Code|Cs], SI, Ctx) ->
+    co_dict:update_entry(Ctx#co_ctx.dict,
+			 #dict_entry { index = {?IX_PREDEFINED_ERROR_FIELD,SI},
+				       access = ?ACCESS_RO,
+				       type  = ?UNSIGNED32,
+				       value = Code }),
+    [Code | update_error_list(Cs, SI+1, Ctx)].
+    
 
+
+
+				       
 
 %% Optionally start a timer
 start_timer(0, _Type) -> false;
@@ -1258,3 +1369,25 @@ stop_timer(TimerRef) ->
 	    end;
 	_Remain -> false
     end.
+
+
+time_of_day() ->
+    now_to_time_of_day(now()).
+
+set_time_of_day(Time) ->
+    io:format("set_time_of_day: ~p\n", [Time]),
+    ok.
+
+now_to_time_of_day({Sm,S0,Us}) ->
+    S1 = Sm*1000000 + S0,
+    D = S1 div ?SECS_PER_DAY,
+    S = S1 rem ?SECS_PER_DAY,
+    Ms = S*1000 + (Us  div 1000),
+    Days = D + (?DAYS_FROM_0_TO_1970 - ?DAYS_FROM_0_TO_1984),
+    #time_of_day { ms = Ms, days = Days }.
+
+time_of_day_to_now(T) when is_record(T, time_of_day)  ->
+    D = T#time_of_day.days + (?DAYS_FROM_0_TO_1984-?DAYS_FROM_0_TO_1970),
+    Sec = D*?SECS_PER_DAY + (T#time_of_day.ms div 1000),
+    USec = (T#time_of_day.ms rem 1000)*1000,
+    {Sec div 1000000, Sec rem 1000000, USec}.
