@@ -281,16 +281,12 @@ initialization(Ctx) ->
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
 
-handle_call({set,Ix,Si,Value}, _From, Ctx) ->
-    case co_dict:set(Ctx#co_ctx.dict, Ix, Si, Value) of
-	ok ->  {reply,ok, handle_notify(Ix, Ctx)};
-	Error -> {reply, Error, Ctx}
-    end;
-handle_call({direct_set,Ix,Si,Value}, _From, Ctx) ->
-    case co_dict:direct_set(Ctx#co_ctx.dict, Ix, Si, Value) of
-	ok ->  {reply,ok, handle_notify(Ix, Ctx)};
-	Error -> {reply, Error, Ctx}
-    end;	
+handle_call({set,IX,SI,Value}, _From, Ctx) ->
+    {Reply,Ctx1} = set_dict_value(IX,SI,Value,Ctx),
+    {reply, Reply, Ctx1};
+handle_call({direct_set,IX,SI,Value}, _From, Ctx) ->
+    {Reply,Ctx1} = direct_set_dict_value(IX,SI,Value,Ctx),
+    {reply, Reply, Ctx1};
 handle_call({value,Ix}, _From, Ctx) ->
     Result = co_dict:value(Ctx#co_ctx.dict, Ix),
     {reply, Result, Ctx};
@@ -458,19 +454,19 @@ handle_info(Frame, Ctx) when is_record(Frame, can_frame) ->
 handle_info({timeout,Ref,sync}, Ctx) when Ref =:= Ctx#co_ctx.sync_tmr ->
     %% Send a SYNC frame
     FrameID = ?COBID_TO_CANID(Ctx#co_ctx.sync_id),
-    Frame = #can_frame { id = FrameID, len=0, data=(<<>>) },
+    Frame = #can_frame { id=FrameID, len=0, data=(<<>>) },
     can:send(Frame),
     Ctx1 = Ctx#co_ctx { sync_tmr = start_timer(Ctx#co_ctx.sync_time, sync) },
     {noreply, Ctx1};
 
 handle_info({timeout,Ref,time_stamp}, Ctx) when Ref =:= Ctx#co_ctx.time_stamp_tmr ->
-    %% Send a TIME_STAMP frame
     FrameID = ?COBID_TO_CANID(Ctx#co_ctx.time_stamp_id),
     Time = time_of_day(),
     Data = co_codec:encode(Time, ?TIME_OF_DAY),
     Size = byte_size(Data),
-    Frame = #can_frame { id = FrameID, len=Size, data=Data },
+    Frame = #can_frame { id=FrameID, len=Size, data=Data },
     can:send(Frame),
+    io:format("Sent time stamp ~p\n", [Time]),
     Ctx1 = Ctx#co_ctx { time_stamp_tmr = start_timer(Ctx#co_ctx.time_stamp_time, time_stamp) },
     {noreply, Ctx1};
 
@@ -540,7 +536,7 @@ handle_can(Frame, Ctx) ->
 	nmt        -> handle_nmt(Frame, Ctx);
 	sync       -> handle_sync(Frame, Ctx);
 	emcy       -> handle_emcy(Frame, Ctx);
-	times_tamp -> handle_time_stamp(Frame, Ctx);
+	time_stamp  -> handle_time_stamp(Frame, Ctx);
 	node_guard -> handle_node_guard(Frame, Ctx);
 	lss        -> handle_lss(Frame, Ctx);
 	{rpdo,Offset} -> handle_rpdo(Frame, Offset, COBID, Ctx);
@@ -639,6 +635,7 @@ handle_time_stamp(Frame, Ctx) ->
     ?dbg("~s: handle_timestamp: ~p\n", [Ctx#co_ctx.name,Frame]),
     try co_codec:decode(Frame#can_frame.data, ?TIME_OF_DAY) of
 	{T, _Bits} when is_record(T, time_of_day) ->
+	    io:format("Got timestamp: ~p\n", [T]),
 	    set_time_of_day(T),
 	    Ctx;
 	_ ->
@@ -660,8 +657,7 @@ handle_emcy(_Frame, Ctx) ->
 %%
 handle_rpdo(Frame, Offset, _COBID, Ctx) ->
     ?dbg("~s: handle_rpdo: ~p\n", [Ctx#co_ctx.name,Frame]),
-    rpdo_unpack(Offset,Frame#can_frame.data, Ctx#co_ctx.dict),
-    Ctx.
+    rpdo_unpack(Offset,Frame#can_frame.data, Ctx).
 
 %% CLIENT side:
 %% SDO tx - here we receive can_node response
@@ -780,8 +776,25 @@ set_dict_entry(E, Ctx) when is_record(E, dict_entry) ->
     ets:insert(Ctx#co_ctx.dict, E),
     handle_notify(I, Ctx).
 
+set_dict_value(IX,SI,Value,Ctx) ->
+    try co_dict:set(Ctx#co_ctx.dict, IX,SI,Value) of
+	ok -> {ok, handle_notify(IX, Ctx)};
+	Error -> {Error, Ctx}
+    catch
+	error:Reason -> {{error,Reason}, Ctx}
+    end.
+
+direct_set_dict_value(IX,SI,Value,Ctx) ->
+    try co_dict:direct_set(Ctx#co_ctx.dict, IX,SI,Value) of
+	ok -> {ok, handle_notify(IX, Ctx)};
+	Error -> {Error, Ctx}
+    catch
+	error:Reason -> {{error,Reason}, Ctx}
+    end.
+
 %%
 %% Dictionary entry has been updated
+%% Emulate co_node as subscriber to dictionary updates
 %%
 
 handle_notify(I, Ctx) ->
@@ -817,14 +830,18 @@ handle_notify(I, Ctx) ->
 	_ when I >= ?IX_RPDO_PARAM_FIRST, I =< ?IX_RPDO_PARAM_LAST ->
 	    io:format("update RPDO offset=~w\n", [(I-?IX_RPDO_PARAM_FIRST)]),
 	    case load_pdo_parameter(I, (I-?IX_RPDO_PARAM_FIRST), Ctx) of
-		undefined -> Ctx;
+		undefined -> 
+		    Ctx;
 		Param ->
 		    if not (Param#pdo_parameter.valid) ->
-			    ets:delete(Ctx#co_ctx.cob_table, Param#pdo_parameter.cob_id);
+			    ets:delete(Ctx#co_ctx.cob_table,
+				       Param#pdo_parameter.cob_id);
 		       true ->
-			    ets:insert(Ctx#co_ctx.cob_table, {Param#pdo_parameter.cob_id,
-							      {rpdo,Param#pdo_parameter.offset}})
-		    end
+			    ets:insert(Ctx#co_ctx.cob_table, 
+				       {Param#pdo_parameter.cob_id,
+					{rpdo,Param#pdo_parameter.offset}})
+		    end,
+		    Ctx
 	    end;
 	_ when I >= ?IX_TPDO_PARAM_FIRST, I =< ?IX_TPDO_PARAM_LAST ->
 	    ?dbg("update TPDO: offset=~p\n",[I - ?IX_TPDO_PARAM_FIRST]),
@@ -875,15 +892,20 @@ update_time_stamp(Ctx) ->
 	    COBID = ID band (?COBID_ENTRY_ID_MASK bor ?COBID_ENTRY_EXTENDED),
 	    if ID band ?COBID_ENTRY_TIME_PRODUCER =/= 0 ->
 		    Time = Ctx#co_ctx.time_stamp_time,
+		    io:format("Timestamp server time=~p\n", [Time]),
 		    if Time > 0 ->
-			    Tmr = start_timer(Ctx#co_ctx.time_stamp_time, time_stamp),
-			    Ctx#co_ctx { time_stamp_tmr=Tmr, time_stamp_id=COBID };
+			    Tmr = start_timer(Ctx#co_ctx.time_stamp_time,
+					      time_stamp),
+			    Ctx#co_ctx { time_stamp_tmr=Tmr, 
+					 time_stamp_id=COBID };
 		       true ->
 			    Tmr = stop_timer(Ctx#co_ctx.time_stamp_tmr),
-			    Ctx#co_ctx { time_stamp_tmr=Tmr, time_stamp_id=COBID}
+			    Ctx#co_ctx { time_stamp_tmr=Tmr,
+					 time_stamp_id=COBID}
 		    end;
 	       ID band ?COBID_ENTRY_TIME_CONSUMER =/= 0 ->
 		    %% consumer
+		    io:format("Timestamp consumer\n", []),
 		    Tmr = stop_timer(Ctx#co_ctx.time_stamp_tmr),
 		    %% FIXME: delete old COBID!!!
 		    ets:insert(Ctx#co_ctx.cob_table, {COBID,time_stamp}),
@@ -1060,10 +1082,6 @@ create_cob_table(ID) ->
 	    SDORx = ?XCOB_ID(?SDO_RX,Nid),
 	    SDOTx = ?XCOB_ID(?SDO_TX,Nid),
 	    ets:insert(T, {?XCOB_ID(?NMT, 0), nmt}),
-	    %% Optional
-	    %% ets:insert(T, {?XCOB_ID(?SYNC, 0), sync}),
-	    %% ets:insert(T, {?XCOB_ID(?TIME_STAMP, 0), time_stamp}),
-	    %% FIXME: insert in read only dictionary entry as well
 	    ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
 	    ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
 	    T;
@@ -1072,10 +1090,6 @@ create_cob_table(ID) ->
 	    SDORx = ?COB_ID(?SDO_RX,Nid),
 	    SDOTx = ?COB_ID(?SDO_TX,Nid),
 	    ets:insert(T, {?COB_ID(?NMT, 0), nmt}),
-	    %% Optional
-	    %% ets:insert(T, {?COB_ID(?SYNC, 0), sync}),
-	    %% ets:insert(T, {?COB_ID(?TIME_STAMP, 0), time_stamp}),
-	    %% FIXME: insert in read only dictionary entry as well
 	    ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
 	    ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
 	    T
@@ -1249,20 +1263,25 @@ dyn_nodeid({cob,_I,Serial},Ctx) ->
 %%
 %% Unpack PDO Data from external TPDO 
 %%
-rpdo_unpack(I, Data, Dict) ->
-    case rpdo_mapping(I, Dict) of
-	{ok,{Ts,Is}} ->
+rpdo_unpack(I, Data, Ctx) ->
+    case rpdo_mapping(I, Ctx#co_ctx.dict) of
+	{pdo,{Ts,Is}} ->
 	    {Ds,_}= co_codec:decode(Data, Ts),
-	    rpdo_set(Dict, Is, Ds);
+	    rpdo_set(Is, Ds, Ctx);
 	Error ->
-	    Error
+	    io:format("rpdo_unpack: error = ~p\n", [Error]),
+	    Ctx
     end.
 
-rpdo_set(Dict, [{Ix,Si}|Is], [Value|Vs]) ->
-    co_dict:set(Dict, Ix, Si, Value),
-    rpdo_set(Dict, Is, Vs);
-rpdo_set(_Dict, [], []) ->
-    ok.
+rpdo_set([{IX,SI}|Is], [Value|Vs], Ctx) ->
+    if IX >= ?BOOLEAN, IX =< ?UNSIGNED32 -> %% skip entry
+	    rpdo_set(Is, Vs, Ctx);
+       true ->
+	    {_Reply,Ctx1} = set_dict_value(IX,SI,Value,Ctx),
+	    rpdo_set(Is, Vs, Ctx1)
+    end;
+rpdo_set([], [], Ctx) ->
+    Ctx.
 
 
 %% Get the RPDO mapping
@@ -1276,18 +1295,22 @@ tpdo_mapping(I, Dict) ->
 %% read PDO mapping  => {ok,[{Type,Len}],[Index]}
 pdo_mapping(IX, Dict) ->
     case co_dict:value(Dict, IX, 0) of
-	{ok,N} ->
-	    pdo_mapping(IX,1,N,Dict);
+	{ok,N} when N >= 0, N =< 64 ->
+	    pdo_mapping(pdo,IX,1,N,Dict);
+	{ok,254} -> %% SAM-MPDO
+	    {mpdo,[]};
+	{ok,255} -> %% DAM-MPDO
+	    pdo_mapping(mpdo,IX,1,1,Dict);
 	Error ->
 	    Error
     end.
 
-pdo_mapping(IX,SI,Sn,Dict) ->
-    pdo_mapping(IX,SI,Sn,[],[],Dict).
+pdo_mapping(MType,IX,SI,Sn,Dict) ->
+    pdo_mapping(MType,IX,SI,Sn,[],[],Dict).
 
-pdo_mapping(_IX,SI,Sn,Ts,Is,_Dict) when SI > Sn ->
-    {ok, {reverse(Ts),reverse(Is)}};
-pdo_mapping(IX,SI,Sn,Ts,Is,Dict) ->
+pdo_mapping(MType,_IX,SI,Sn,Ts,Is,_Dict) when SI > Sn ->
+    {MType, {reverse(Ts),reverse(Is)}};
+pdo_mapping(MType,IX,SI,Sn,Ts,Is,Dict) ->
     case co_dict:value(Dict,IX,SI) of
 	{ok,Map} ->
 	    ?dbg("pdo_mapping: ~w:~w = ~w\n", [IX,SI,Map]),
@@ -1295,7 +1318,7 @@ pdo_mapping(IX,SI,Sn,Ts,Is,Dict) ->
 	    ?dbg("pdo_mapping: entry[~w] = ~p\n", [SI,Index]),
 	    case co_dict:lookup_entry(Dict,Index) of
 		{ok,E} ->
-		    pdo_mapping(IX,SI+1,Sn,
+		    pdo_mapping(MType,IX,SI+1,Sn,
 				[{E#dict_entry.type,?PDO_MAP_BITS(Map)}|Ts],
 				[Index|Is], Dict);
 		Error ->
@@ -1341,6 +1364,7 @@ update_error_list(_Cs, SI, Ctx) when SI >= 254 ->
 				       value = 254 }),
     [];
 update_error_list([Code|Cs], SI, Ctx) ->
+    %% FIXME: Code should be 16 bit MSB ?
     co_dict:update_entry(Ctx#co_ctx.dict,
 			 #dict_entry { index = {?IX_PREDEFINED_ERROR_FIELD,SI},
 				       access = ?ACCESS_RO,

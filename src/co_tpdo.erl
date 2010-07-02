@@ -312,11 +312,12 @@ code_change(_OldVsn, State, _Extra) ->
 tpdo_mapping(Offset, Dict) ->
     %% cob_id is changed!
     case co_node:tpdo_mapping(Offset, Dict) of
-	{ok,Mapping} -> 
+	{pdo,Mapping} -> 
 	    ?dbg("tpdo_mapping: offset=~p, ~p\n", [Offset,Mapping]),
 	    Mapping;
-	Error ->
-	    ?dbg("tpdo_mapping: offset=~p, ~p\n", [Offset,Error]),
+	%% {mpdo,Mapping} -> %% FIXME
+	_Error ->
+	    ?dbg("tpdo_mapping: offset=~p, ~p\n", [Offset,_Error]),
 	    {[],[]}
     end.
 

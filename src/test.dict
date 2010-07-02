@@ -2,6 +2,12 @@
 %%
 %%   TEST dictionay
 
+%% time-stamp consumer
+{object, 16#1012,
+ [{name, "TIME_STAMP"},
+  {struct, var}, {access, rw}, {type, unsigned32},
+  {value, 16#A0001110}]}.
+
 {object, 16#1005,
  [{name, "SYNC_MESSAGE"},
   {struct, var}, {access, rw}, {type, unsigned32},

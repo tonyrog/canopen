@@ -568,6 +568,22 @@
 -define(IX_PRODUCER_HEARTBEAT_TIME,    16#1017).
 -define(IX_IDENTITY_OBJECT,            16#1018).
 
+-define(IX_STORE_EDS,                  16#1021).
+-define(IX_STORE_EDS_FORMAT,           16#1022).
+
+-define(IX_OS_COMMAND,                 16#1023).  %% Type=0025
+-define(SI_OS_COMMAND,  1).
+-define(SI_OS_STATUS,   2).
+-define(SI_OS_REPLY,    3).
+
+-define(IX_OS_COMMAND_MODE,            16#1024).
+-define(IX_OS_DEBUGGER,                16#1025).  %% Type=0024
+-define(IX_OS_PROMPT,                  16#1026).  %% Type=ARRAY UNSIGNED8
+-define(SI_STDIN,   1).  %% UNSIGNED8
+-define(SI_STDOUT,  2).  %% UNSIGNED8
+-define(SI_STDERR,  3).  %% UNSIGNED8
+
+%% SDO
 -define(IX_SDO_SERVER_FIRST,           16#1200).
 -define(IX_SDO_SERVER_LAST,            16#127F).
 
@@ -578,7 +594,7 @@
 -define(SI_SDO_SERVER_TO_CLIENT,    2).
 -define(SI_SDO_NODEID,              3).
 
-
+%% PDO
 -define(IX_RPDO_PARAM_FIRST,           16#1400).
 -define(IX_RPDO_PARAM_LAST,            16#15FF).
 -define(IX_RPDO_MAPPING_FIRST,         16#1600).
@@ -587,6 +603,13 @@
 -define(IX_TPDO_PARAM_LAST,            16#19FF).
 -define(IX_TPDO_MAPPING_FIRST,         16#1A00).
 -define(IX_TPDO_MAPPING_LAST,          16#1BFF).
+
+%% MPDO
+-define(IX_OBJECT_SCANNER_FIRST,       16#1FA0).
+-define(IX_OBJECT_SCANNER_LAST,        16#1FCF).
+-define(IX_OBJECT_DISPATCH_FIRST,      16#1FD0).
+-define(IX_OBJECT_DISPATCH_LAST,       16#1FFF).
+
 
 -define(SI_PDO_COB_ID,            1).
 -define(SI_PDO_TRANSMISSION_TYPE, 2).

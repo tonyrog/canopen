@@ -3,6 +3,12 @@
 %%   TEST server dictionay
 %%
 
+%% time-stamp producer
+{object, 16#1012,
+ [{name, "TIME_STAMP"},
+  {struct, var}, {access, rw}, {type, unsigned32},
+  {value, 16#60001110}]}.
+
 %% This is the sync server 16#1111 is the SYNC ID
 {object, 16#1005,
  [{name, "SYNC_MESSAGE"},

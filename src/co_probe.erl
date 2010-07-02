@@ -153,7 +153,8 @@ print_message(S, Msg) ->
 			    end
 		    end;
 		_ ->
-		    io:format("UNKNOWN: ~p\n", [Msg])
+		    io:format("~s\n", [can_probe:format_frame(Msg)]),
+		    S
 	    end
     end.
 

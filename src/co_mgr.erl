@@ -7,7 +7,7 @@
 
 -module(co_mgr).
 
--export([start/0, stop/0]).
+-export([start/0, start/1, stop/0]).
 -export([fetch/3, fetch/4]).
 -export([load/1]).
 -export([fetch_block/3, fetch_block/4]).
@@ -17,8 +17,10 @@
 -define(CO_MGR_NAME, ?MODULE).
 
 start() ->
+    start([]).
+start(Opts) ->
     can_udp:start(),  %% DEMO only remove this later!
-    co_node:start(0, [{name,co_mgr}]).
+    co_node:start(0, [{name,co_mgr}|Opts]).
 
 stop() ->
     co_node:stop(?CO_MGR_NAME).
