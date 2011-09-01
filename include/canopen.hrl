@@ -118,7 +118,7 @@
 -define(SI_FARAD,    16#27).   %% F
 -define(SI_OHM,      16#28).   %% W
 -define(SI_SIEMENS,  16#29).   %% S
--define(SI_WEBER,    16#2A).   Wb
+-define(SI_WEBER,    16#2A).   %% Wb
 -define(SI_TESLA,    16#2B).   %% T
 -define(SI_HENRY,    16#2C).   %% H
 -define(SI_CELSIUS,  16#2D).   %% °C
