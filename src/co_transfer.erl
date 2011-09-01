@@ -124,23 +124,18 @@ write_block_segment_end(TH) ->
 				   lists:reverse(TH#t_handle.block))),
     MaxSize = TH#t_handle.max_size,
     Size = byte_size(Bin),
+    %% io:format("write_block_segment_end: max=~w, sz=~w, bin=~p\n", [MaxSize, size(Bin), Bin]),
     if MaxSize =:= 0 ->
 	    write(TH, Bin, Size);
        true ->
 	    Remain = MaxSize - TH#t_handle.size,
 	    if Remain =< 0 ->
 		    {error, ?abort_data_length_too_high};
-	       Size =< Remain ->
+	       Size =< Remain; (Size-Remain) < 7 ->
 		    NewData = <<(TH#t_handle.data)/binary, Bin/binary>>,
 		    NewSize = TH#t_handle.size + Size,
 		    TH1 = TH#t_handle { size=NewSize,data=NewData,block=[]},
 		    {ok, TH1, Size};
-	       (Size - Remain) < 7 ->
-		    <<Bin1:Remain/binary, _/binary>> = Bin,
-		    NewData = <<(TH#t_handle.data)/binary, Bin1/binary>>,
-		    NewSize = TH#t_handle.size + Remain,
-		    TH1 = TH#t_handle { size=NewSize,data=NewData,block=[]},
-		    {ok, TH1, Remain};
 	       true ->
 		    {error, ?abort_data_length_too_high}
 	    end
@@ -158,7 +153,12 @@ write_block_end(Handle,N,CRC,CheckCrc) ->
 		<<Data1:Size1/binary,_/binary>> = Handle#t_handle.data,
 		Handle#t_handle { data=Data1, size=Size1 }
 	end,
-    if CheckCrc ->
+    if Handle1#t_handle.max_size > 0,
+       Handle1#t_handle.size > Handle1#t_handle.max_size ->
+	    {error, ?abort_data_length_too_high};
+       CheckCrc ->
+	    Data = Handle1#t_handle.data,
+	    io:format("co_transfer: data0=~p, size=~w, data=~p\n", [Handle#t_handle.data,size(Data),Data]),
 	    case co_crc:checksum(Handle1#t_handle.data) of
 		CRC ->
 		    write_end(Handle1);
@@ -204,7 +204,7 @@ write_end(Handle) ->
 %%  |  {ok, Handle, MaxSize}
 %%
 %%
-    
+
 read_begin(Ctx, Index, SubInd) ->
     Dict = Ctx#sdo_ctx.dict,
     case co_dict:lookup_entry(Dict, {Index,SubInd}) of

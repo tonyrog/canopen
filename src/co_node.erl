@@ -453,6 +453,7 @@ handle_info(Frame, Ctx) when is_record(Frame, can_frame) ->
 
 handle_info({timeout,Ref,sync}, Ctx) when Ref =:= Ctx#co_ctx.sync_tmr ->
     %% Send a SYNC frame
+    %% FIXME: check that we still are sync producer?
     FrameID = ?COBID_TO_CANID(Ctx#co_ctx.sync_id),
     Frame = #can_frame { id=FrameID, len=0, data=(<<>>) },
     can:send(Frame),
@@ -460,6 +461,7 @@ handle_info({timeout,Ref,sync}, Ctx) when Ref =:= Ctx#co_ctx.sync_tmr ->
     {noreply, Ctx1};
 
 handle_info({timeout,Ref,time_stamp}, Ctx) when Ref =:= Ctx#co_ctx.time_stamp_tmr ->
+    %% FIXME: Check that we still are time stamp producer
     FrameID = ?COBID_TO_CANID(Ctx#co_ctx.time_stamp_id),
     Time = time_of_day(),
     Data = co_codec:encode(Time, ?TIME_OF_DAY),

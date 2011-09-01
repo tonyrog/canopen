@@ -242,6 +242,19 @@ lookup_object(Dict, Ix) when ?is_index(Ix) ->
 	    i_fail(Dict,Ix)
     end.
 
+
+lookup_entry(Dict, Index={Ix,255}) ->
+    case ets:lookup(Dict, Ix) of
+	[O] ->
+	    Value = ((O#dict_object.type band 16#ff) bsl 8) bor
+		(O#dict_object.struct band 16#ff),
+	    {ok,#dict_entry { index  = Index,
+			      access = ?ACCESS_RO,
+			      type   = ?UNSIGNED32,
+			      value  = Value }};
+	[] ->
+	    i_fail(Dict,Ix)
+    end;    
 lookup_entry(Dict, Index={Ix,Sx}) when ?is_index(Ix), ?is_subind(Sx) ->
     case ets:lookup(Dict, Index) of
 	[E] ->

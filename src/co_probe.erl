@@ -38,46 +38,62 @@ loop(S) ->
 	    ?MODULE:loop(S)
     end.
 
-print_message(S, Msg) ->
-    case Msg#can_frame.id of
+print_message(S, Frame) ->
+    if ?is_can_frame_eff(Frame) ->
+	    CobId   = Frame#can_frame.id band ?CAN_EFF_MASK,
+	    Func = ?XFUNCTION_CODE(CobId),
+	    NodeId = ?XNODE_ID(CobId),
+	    print_message(S,true,Func,CobId,NodeId,Frame);
+       true ->
+	    CobId = Frame#can_frame.id band ?CAN_SFF_MASK,
+	    Func = ?FUNCTION_CODE(CobId),
+	    NodeId  = ?NODE_ID(CobId),
+	    print_message(S,false,Func,CobId,NodeId,Frame)
+    end.
+
+print_message(S,Ext,Func,CobId,NodeId,Frame) ->
+    case CobId of
 	?NMT_ID ->
-	    io:format("NMT: ~p\n", [Msg]),
+	    io:format("NMT: ~p\n", [Frame]),
 	    S;
 	?SYNC_ID ->
-	    io:format("SYNC: ~p\n", [Msg]),
+	    io:format("SYNC: ~p\n", [Frame]),
 	    S;
 	?TIME_STAMP_ID ->
-	    io:format("TIME-STAMP: ~p\n", [Msg]),
+	    io:format("TIME-STAMP: ~p\n", [Frame]),
 	    S;
-	MID ->
-	    case ?FUNCTION_CODE(MID) of
+	_ ->
+	    case Func of
 		?NODE_GUARD ->
-		    print_node_guard(Msg),
+		    print_node_guard(Frame),
 		    S;
 		?LSS ->
-		    io:format("LSS: ~p\n", [Msg]),
+		    io:format("LSS: ~p\n", [Frame]),
 		    S;
 		?EMERGENCY ->
-		    io:format("EMERGENCY: ~p\n", [Msg]),
+		    io:format("EMERGENCY: ~p\n", [Frame]),
 		    S;
-		?PDO1_TX -> print_pdo_tx(Msg), S;
-		?PDO2_TX -> print_pdo_tx(Msg), S;
-		?PDO3_TX -> print_pdo_tx(Msg), S;
-		?PDO4_TX -> print_pdo_tx(Msg), S;
-		?PDO1_RX -> print_pdo_rx(Msg), S;
-		?PDO2_RX -> print_pdo_rx(Msg), S;
-		?PDO3_RX -> print_pdo_rx(Msg), S;
-		?PDO4_RX -> print_pdo_rx(Msg), S;
+		?PDO1_TX -> print_pdo_tx(Frame), S;
+		?PDO2_TX -> print_pdo_tx(Frame), S;
+		?PDO3_TX -> print_pdo_tx(Frame), S;
+		?PDO4_TX -> print_pdo_tx(Frame), S;
+		?PDO1_RX -> print_pdo_rx(Frame), S;
+		?PDO2_RX -> print_pdo_rx(Frame), S;
+		?PDO3_RX -> print_pdo_rx(Frame), S;
+		?PDO4_RX -> print_pdo_rx(Frame), S;
 		?SDO_TX ->
-		    Tx = Msg#can_frame.id,
-		    NodeId = ?NODE_ID(Tx),
-		    Rx = ?COB_ID(?SDO_RX, NodeId),
+		    Tx = Frame#can_frame.id band ?CAN_EFF_MASK,
+		    Rx = if Ext ->
+				 ?XCOB_ID(?SDO_RX, NodeId);
+			    true ->
+				 ?COB_ID(?SDO_RX, NodeId)
+			 end,
 		    ID = {Tx, Rx},  %% {ToClient,ToServer}
 		    Session0 = S#state.session,
 		    io:format("LOOKUP: id=~p\n", [ID]),
 		    case lists:keytake(ID, #s.id, Session0) of
 			false ->
-			    case print_sdo_tx(Msg) of
+			    case print_sdo_tx(Frame) of
 				false -> S;
 				Block ->
 				    io:format("ADD: id=~p,block=~p\n", 
@@ -89,7 +105,7 @@ print_message(S, Msg) ->
 			{value,E,Session1} ->
 			    case E#s.block of
 				upload ->
-				    case print_sdo_tx_block(Msg) of
+				    case print_sdo_tx_block(Frame) of
 					true ->
 					    Session2 = 
 						[E#s{block=false}|Session1],
@@ -98,7 +114,7 @@ print_message(S, Msg) ->
 					    S
 				    end;
 				_ ->
-				    case print_sdo_tx(Msg) of
+				    case print_sdo_tx(Frame) of
 					false -> S;
 					Block ->
 					    io:format("ADD: id=~p,block=~p\n", 
@@ -111,15 +127,18 @@ print_message(S, Msg) ->
 		    end;
 
 		?SDO_RX ->
-		    Rx = Msg#can_frame.id,
-		    NodeId = ?NODE_ID(Rx),
-		    Tx = ?COB_ID(?SDO_TX, NodeId),
+		    Rx = Frame#can_frame.id band ?CAN_EFF_MASK,
+		    Tx = if Ext ->
+				 ?XCOB_ID(?SDO_TX, NodeId);
+			    true ->
+				 ?COB_ID(?SDO_TX, NodeId)
+			 end,
 		    ID = {Tx, Rx},  %% {ToClient,ToServer}
 		    Session0 = S#state.session,
 		    io:format("LOOKUP: id=~p\n", [ID]),
 		    case lists:keytake(ID, #s.id, Session0) of
 			false ->
-			    case print_sdo_rx(Msg) of
+			    case print_sdo_rx(Frame) of
 				false -> 
 				    S;
 				Block ->
@@ -132,7 +151,7 @@ print_message(S, Msg) ->
 			{value,E,Session1} ->
 			    case E#s.block of
 				download ->
-				    case print_sdo_rx_block(Msg) of
+				    case print_sdo_rx_block(Frame) of
 					true ->
 					    Session2 = 
 						[E#s{block=false}|Session1],
@@ -141,7 +160,7 @@ print_message(S, Msg) ->
 					    S
 				    end;
 				_ ->
-				    case print_sdo_rx(Msg) of
+				    case print_sdo_rx(Frame) of
 					false -> S;
 					Block ->
 					    io:format("ADD: id=~p,block=~p\n", 
@@ -153,17 +172,17 @@ print_message(S, Msg) ->
 			    end
 		    end;
 		_ ->
-		    io:format("~s\n", [can_probe:format_frame(Msg)]),
+		    io:format("~s\n", [can_probe:format_frame(Frame)]),
 		    S
 	    end
     end.
 
 
-print_node_guard(Msg) ->    
-    io:format("NODE-GUARD(~w): ~s: ~s\n", 
-	      [?NODE_ID(Msg#can_frame.id),
-	       co_format:message_id(Msg),
-	       format_node_guard(Msg#can_frame.data)
+print_node_guard(Frame) ->    
+    io:format("NODE-GUARD(~s): ~s: ~s\n", 
+	      [co_format:node_id(Frame),
+	       co_format:message_id(Frame),
+	       format_node_guard(Frame#can_frame.data)
 	      ]).
 
 %% fmt_verify_crc(Serial, Crc) ->
@@ -180,29 +199,29 @@ format_node_guard(Data) ->
 			  [co_format:state(State), Toggle])
     end.
 
-print_sdo_tx_block(Msg) ->
-    case Msg#can_frame.data of
+print_sdo_tx_block(Frame) ->
+    case Frame#can_frame.data of
 	?ma_block_segment(Last,Seq,Data) ->
 	    Pdu = #sdo_block_segment{last=Last,seqno=Seq,d=Data},
-	    io:format("SDO_TX(~w): ~s: ~s\n", 
-		      [?NODE_ID(Msg#can_frame.id), 
-		       co_format:message_id(Msg),
+	    io:format("SDO_TX(~s): ~s: ~s\n", 
+		      [co_format:node_id(Frame), 
+		       co_format:message_id(Frame),
 		       co_format:format_sdo(Pdu)]),
 	    Last =:= 1
     end.
 
 
-print_sdo_tx(Msg) ->
-    case catch co_sdo:decode_tx(Msg#can_frame.data) of
+print_sdo_tx(Frame) ->
+    case catch co_sdo:decode_tx(Frame#can_frame.data) of
 	{'EXIT', Reason} ->
-	    io:format("SDO_TX(~w): ~s: decode-error: ~p, ~p\n", 
-		      [?NODE_ID(Msg#can_frame.id), 
-		       co_format:message_id(Msg),
-		       Reason,Msg]);
+	    io:format("SDO_TX(~s): ~s: decode-error: ~p, ~p\n", 
+		      [co_format:node_id(Frame), 
+		       co_format:message_id(Frame),
+		       Reason,Frame]);
 	Pdu ->	    
-	    io:format("SDO_TX(~w): ~s: ~s\n", 
-		      [?NODE_ID(Msg#can_frame.id), 
-		       co_format:message_id(Msg),
+	    io:format("SDO_TX(~s): ~s: ~s\n", 
+		      [co_format:node_id(Frame), 
+		       co_format:message_id(Frame),
 		       co_format:format_sdo(Pdu)]),
 	    case Pdu of
 		#sdo_scs_block_initiate_download_response{} ->
@@ -212,29 +231,29 @@ print_sdo_tx(Msg) ->
 	    end
     end.
 
-print_sdo_rx_block(Msg) ->
-    case Msg#can_frame.data of
+print_sdo_rx_block(Frame) ->
+    case Frame#can_frame.data of
 	?ma_block_segment(Last,Seq,Data) ->
 	    Pdu = #sdo_block_segment{last=Last,seqno=Seq,d=Data},
-	    io:format("SDO_RX(~w): ~s: ~s\n", 
-		      [?NODE_ID(Msg#can_frame.id), 
-		       co_format:message_id(Msg),
+	    io:format("SDO_RX(~s): ~s: ~s\n", 
+		      [co_format:node_id(Frame), 
+		       co_format:message_id(Frame),
 		       co_format:format_sdo(Pdu)]),
 	    Last =:= 1
     end.
 
 
-print_sdo_rx(Msg) ->
-    case catch co_sdo:decode_rx(Msg#can_frame.data) of
+print_sdo_rx(Frame) ->
+    case catch co_sdo:decode_rx(Frame#can_frame.data) of
 	{'EXIT', Reason} ->
-	    io:format("SDO_RX(~w): ~s: decode-error: ~p, ~p\n", 
-		      [?NODE_ID(Msg#can_frame.id), 
-		       co_format:message_id(Msg),
-		       Reason,Msg]);
+	    io:format("SDO_RX(~s): ~s: decode-error: ~p, ~p\n", 
+		      [co_format:node_id(Frame), 
+		       co_format:message_id(Frame),
+		       Reason,Frame]);
 	Pdu ->
-	    io:format("SDO_RX(~w): ~s: ~s\n", 
-		      [?NODE_ID(Msg#can_frame.id),
-		       co_format:message_id(Msg),
+	    io:format("SDO_RX(~s): ~s: ~s\n", 
+		      [co_format:node_id(Frame), 
+		       co_format:message_id(Frame),
 		       co_format:format_sdo(Pdu)]),
 	    case Pdu of
 		#sdo_ccs_block_upload_start{} ->
@@ -244,12 +263,12 @@ print_sdo_rx(Msg) ->
 	    end
     end.
 
-print_pdo_tx(Msg) ->
+print_pdo_tx(Frame) ->
     io:format("TPDO: ~s: ~p\n", 
-	      [co_format:message_id(Msg), Msg#can_frame.data]).
+	      [co_format:message_id(Frame), Frame#can_frame.data]).
 
-print_pdo_rx(Msg) ->
+print_pdo_rx(Frame) ->
     io:format("RPDO: ~s: ~p\n", 
-	      [co_format:message_id(Msg), Msg#can_frame.data]).
+	      [co_format:message_id(Frame), Frame#can_frame.data]).
 
 	    

@@ -184,6 +184,40 @@ load_objects([{rpdo_map,I,Map}|Es], Os) ->
 					value=?PDO_MAP(Mi,Ms,Bl) }
 		  end, lists:zip(seq(1,N), Map))]},
     load_objects(Es, [Obj|Os]);
+%% 
+%% MPDO Object Dispatching List (I is zero based)
+%% value range 1 - 16#FE 
+%%
+load_objects([{mpdo_dispatch,I,Map}|Es], Os) ->
+    io:format("Load Object Dispatching List: ~w\n", [I]),
+    Index = ?IX_OBJECT_DISPATCH_FIRST + I,
+    N = length(Map),
+    Obj = {#dict_object { index = Index, type=?UNSIGNED64,
+			  struct=?OBJECT_ARRAY, access=?ACCESS_RW },
+	   [#dict_entry { index={Index,0}, type=?UNSIGNED8,
+			  access=?ACCESS_RW, value=N }
+	    | map(fun({Si,{Bs,Li,Ls,Ri,Rs,Ni}}) ->
+			  #dict_entry { index={Index,Si}, type=?UNSIGNED64,
+					access=?ACCESS_RW,
+					value=?RMPDO_MAP(Bs,Li,Ls,Ri,Rs,Ni) }
+		  end, lists:zip(seq(1,N), Map))]},
+    load_objects(Es, [Obj|Os]);
+
+load_objects([{mpdo_scanner,I,Map}|Es], Os) ->
+    io:format("Load Object Scanner List: ~w\n", [I]),
+    Index = ?IX_OBJECT_SCANNER_FIRST + I,
+    N = length(Map),
+    Obj = {#dict_object { index = Index, type=?UNSIGNED32,
+			  struct=?OBJECT_ARRAY, access=?ACCESS_RW },
+	   [#dict_entry { index={Index,0}, type=?UNSIGNED8,
+			  access=?ACCESS_RW, value=N }
+	    | map(fun({Si,{Bs,Li,Ls}}) ->
+			  #dict_entry { index={Index,Si}, type=?UNSIGNED32,
+					access=?ACCESS_RW,
+					value=?TMPDO_MAP(Bs,Li,Ls) }
+		  end, lists:zip(seq(1,N), Map))]},
+    load_objects(Es, [Obj|Os]);
+
 load_objects([], Os) ->
     lists:sort(fun({O1,_},{O2,_}) -> 
 		       O1#dict_object.index < O2#dict_object.index

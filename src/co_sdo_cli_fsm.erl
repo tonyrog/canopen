@@ -378,6 +378,9 @@ s_block_upload_response(M, S) when is_record(M, can_frame) ->
 	    S1 = S#co_session { crc = CrcSup =:= 1,
 				blkseq = 0, th=TH },
 	    {next_state, s_block_upload, S1, ?TMO(S1)};
+	?ma_scs_initiate_upload_response(_N,_E,_SizeInd,_IX,_SI,_Data) ->
+	    %% protocol switched
+	    s_segmented_upload_response(M, S);
 	_ ->
 	    %% check if this was a protcol switch...
 	    s_segmented_upload_response(M, S)

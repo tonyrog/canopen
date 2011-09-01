@@ -200,8 +200,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    {next_state, s_block_upload_start,S2,?TMO(S2)}
 	    end;
 	_ ->
-	    %% FIXME: filter crap like this before starting fsm?
-	    abort(S, ?abort_command_specifier)
+	    {stop, garbage, S}
     end;
 s_initial(timeout, S) ->
     {stop, timeout, S}.

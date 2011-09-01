@@ -95,6 +95,41 @@
 -define(is_index(I),  (I)>=0, (I)=<16#ffff).
 -define(is_subind(I), (I)>=0, (I)=<16#ff).
 
+%% SI unit coding DR-303-2
+-define(SI_NONE,     16#00).
+-define(SI_METER,    16#01).   %% m
+-define(SI_KILOGRAM, 16#02).   %% kg
+-define(SI_SECOND,   16#03).   %% s
+-define(SI_AMPERE,   16#04).   %% A
+-define(SI_KELVIN,   16#05).   %% K
+-define(SI_MOLE,     16#06).   %% mol
+-define(SI_CANDELA,  16#07).   %% cd
+
+-define(SI_RADIAN,   16#10).   %% rad
+-define(SI_STERADIN, 16#11).   %% sr
+
+-define(SI_HERTZ,    16#20).   %% HZ
+-define(SI_NEWTON,   16#21).   %% N
+-define(SI_PASCAL,   16#22).   %% PA
+-define(SI_JOULE,    16#23).   %% J
+-define(SI_WATT,     16#24).   %% W
+-define(SI_COULOMB,  16#25).   %% C
+-define(SI_VOLT,     16#26).   %% V
+-define(SI_FARAD,    16#27).   %% F
+-define(SI_OHM,      16#28).   %% W
+-define(SI_SIEMENS,  16#29).   %% S
+-define(SI_WEBER,    16#2A).   Wb
+-define(SI_TESLA,    16#2B).   %% T
+-define(SI_HENRY,    16#2C).   %% H
+-define(SI_CELSIUS,  16#2D).   %% °C
+-define(SI_LUMEN,    16#2E).   %% lm
+-define(SI_LUX,      16#2F).   %% lx
+-define(SI_BECQUEREL,16#30).   %% Bq
+-define(SI_GRAY,     16#31).   %% Gy
+-define(SI_SIEVERT,  16#32).   %% Sv
+
+%% add more SI units and SI prefix encoding
+
 %% Dictionary entry
 %% Note:
 %%      For arrays and record the entry {Ix,0} is special and contains
@@ -368,7 +403,6 @@
 	  subind :: subind(),      %% sub-index of object
 	  t      :: uint1(),       %% session toggle bit (0|1)
 	  crc    :: boolean(),     %% generate/check CRC for block data
-	  chkcrc :: boolean(),     %% check CRC for block data
 	  blksize :: uint8(),      %% Max number of segment per block
 	  blkseq  :: uint8(),      %% Block number to expect or to send
 	  blkseg  :: binary(),     %% last received block segment (7 bytes)
@@ -678,5 +712,29 @@
 -define(PDO_MAP_INDEX(Map),  (((Map) bsr 16) band 16#ffff)).
 -define(PDO_MAP_SUBIND(Map), (((Map) bsr 8) band 16#FF)).
 -define(PDO_MAP_BITS(Map),   ((Map) band 16#FF)).
+
+%% Receive MPDO map  UNSIGNED64 entry
+%% BlockSize:8  - number of consecutive sub-indices used
+%%    Index:16  - local dictionary index
+%%   Subind:8   - local dictionary sub-index (base)
+%%   RIndex:8   - sender dictionary index
+%%  RSubinx:8   - sender dictionary sub-index (base)
+%%      Nid:8   - sender node id
+-define(RMPDO_MAP(BlockSize,Index,Subind,RIndex,RSubind,Nid),
+	(((BlockSize) band 16#ff) bsl 56) bor 
+	    (((Index) band 16#ffff) bsl 40) bor 
+	    (((Subind) band 16#ff) bsl 32) bor
+	    (((RIndex) band 16#ffff) bsl 16) bor
+	    (((RSubind) band 16#ff) bsl 8) bor 
+	    ((Nid) band 16#ff)).
+
+%% Transmit MPDO map UNSIGNED32 entry
+%% BlockSize:8  - number of consecutive sub-indices used
+%%    Index:16  - local dictionary index
+%%   Subind:8   - local dictionary sub-index (base)
+-define(TMPDO_MAP(BlockSize,Index,Subind),
+	(((BlockSize) band 16#ff) bsl 24) bor 
+	    (((Index) band 16#ffff) bsl 8) bor
+	    ((Subind) band 16#ff)).
 
 -endif.

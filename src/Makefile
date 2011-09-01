@@ -9,6 +9,7 @@ MODULES = \
 	co_test \
 	co_format \
 	co_file \
+	eds_file \
 	co_sdo \
 	co_mgr \
 	co_transfer \

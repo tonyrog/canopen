@@ -155,7 +155,7 @@ encode_pdo_mapping(default) -> ?MAPPING_DEFAULT.
 
 decode_pdo_mapping(?MAPPING_NO) -> no;
 decode_pdo_mapping(?MAPPING_OPTIONAL) -> optional;
-decode_pdo_mapping( ?MAPPING_DEFAULT) -> default.
+decode_pdo_mapping(?MAPPING_DEFAULT) -> default.
 
 encode_struct(null)      -> ?OBJECT_NULL;
 encode_struct(domain)    -> ?OBJECT_DOMAIN;
@@ -273,7 +273,7 @@ dmod([{require, Module}|Os], DMod, DCtx) when is_atom(Module) ->
 	false ->
 	    case lists:member(Module, DCtx#dctx.loading) of
 		true ->
-		    erlang:error({circlular_definition, Module});
+		    erlang:error({circular_definition, Module});
 		false ->
 		    DCtx1 =  DCtx#dctx { loading=[Module|DCtx#dctx.loading]},
 		    {_, DCtx2} = load_dmod(Module, DCtx1),
@@ -433,7 +433,8 @@ entry_by_index(Index, SubInd, Def) ->
     end.
 
 find_entry(SubInd, Obj) ->
-    if SubInd == 0, Obj#objdef.struct == var ->
+    if SubInd == 0, Obj#objdef.struct == var;
+       SubInd == 0, Obj#objdef.struct == defpdo ->
 	    if Obj#objdef.entry == undefined ->
 		    case find_ent(SubInd, Obj#objdef.entries) of
 			error -> error;

@@ -26,6 +26,11 @@ message_id(Frame) when ?is_can_frame_eff(Frame) ->
 message_id(Frame) ->
     io_lib:format("~3.16.0B", [Frame#can_frame.id band ?CAN_SFF_MASK]).
 
+node_id(Frame) when ?is_can_frame_eff(Frame) ->
+    io_lib:format("~8.16.0B", [?XNODE_ID(Frame#can_frame.id)]);
+node_id(Frame) ->
+    io_lib:format("~3.16.0B", [?NODE_ID(Frame#can_frame.id)]).
+
 format_record(R, Fields) ->
     ["#",atom_to_list(element(1, R)),"{",
      format_fields(R, 2, Fields), "}"].
