@@ -287,8 +287,11 @@ handle_call({set,IX,SI,Value}, _From, Ctx) ->
 handle_call({direct_set,IX,SI,Value}, _From, Ctx) ->
     {Reply,Ctx1} = direct_set_dict_value(IX,SI,Value,Ctx),
     {reply, Reply, Ctx1};
+handle_call({value,{Ix, Si}}, _From, Ctx) ->
+    Result = co_dict:value(Ctx#co_ctx.dict, Ix, Si),
+    {reply, Result, Ctx};
 handle_call({value,Ix}, _From, Ctx) ->
-    Result = co_dict:value(Ctx#co_ctx.dict, Ix),
+    Result = co_dict:value(Ctx#co_ctx.dict, Ix, 0),
     {reply, Result, Ctx};
 
 handle_call({store,Block,COBID,IX,SI,Bin}, From, Ctx) ->
@@ -1103,10 +1106,11 @@ add_subscription(Tab, Ix, Pid) ->
 add_subscription(Tab, Ix1, Ix2, Pid) when ?is_index(Ix1), ?is_index(Ix2), 
 					  Ix1 =< Ix2, 
 					  (is_pid(Pid) orelse is_atom(Pid)) ->
-    I = iset:new(Ix1, Ix2),
+    I = co_iset:new(Ix1, Ix2),
+
     case ets:lookup(Tab, Pid) of
 	[] -> ets:insert(Tab, {Pid, I});
-	[{_,ISet}] -> ets:insert(Tab, {Pid, iset:union(ISet, I)})
+	[{_,ISet}] -> ets:insert(Tab, {Pid, co_iset:union(ISet, I)})
     end.
 
 remove_subscription(Tab, Ix, Pid) ->
@@ -1116,7 +1120,7 @@ remove_subscription(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
     case ets:lookup(Tab, Pid) of
 	[] -> ok;
 	[{_,ISet}] ->
-	    case iset:subtract(ISet, iset:new(Ix1, Ix2)) of
+	    case co_iset:subtract(ISet, co_iset:new(Ix1, Ix2)) of
 		[] -> ets:delete(Tab, Pid);
 		ISet1 -> ets:insert(Tab, {Pid,ISet1})
 	    end
@@ -1125,7 +1129,7 @@ remove_subscription(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
 subscribers(Tab, Ix) when ?is_index(Ix) ->
     ets:foldl(
       fun({ID,ISet}, Acc) ->
-	      case iset:member(Ix, ISet) of
+	      case co_iset:member(Ix, ISet) of
 		  true -> [ID|Acc];
 		  false -> Acc
 	      end
@@ -1133,10 +1137,10 @@ subscribers(Tab, Ix) when ?is_index(Ix) ->
 
 subscribers(Tab, Ix1, Ix2) when ?is_index(Ix1), ?is_index(Ix2),
 				Ix1 =< Ix2 ->
-    I = iset:new(Ix1, Ix2),
+    I = co_iset:new(Ix1, Ix2),
     ets:foldl(
       fun({ID,ISet}, Acc) ->
-	      case iset:intersect(I, ISet) of
+	      case co_iset:intersect(I, ISet) of
 		  [] -> Acc;
 		  _ -> [ID|Acc]
 	      end
