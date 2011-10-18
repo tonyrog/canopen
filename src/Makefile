@@ -5,6 +5,7 @@
 MODULES = \
 	canopen \
 	co_crc \
+	co_iset \
 	co_probe \
 	co_test \
 	co_format \
