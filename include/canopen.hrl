@@ -151,7 +151,7 @@
 -record(dict_object,
 	{
 	  index,     %% {index:16, 0}
-	  access,    %% access for var - overalll access for array/rec
+	  access,    %% access for var - overall access for array/rec
 	  type,      %% type of object for record/var - main type for array
 	  struct     %% structure type - var/rec/array/deftype/defstruct ...
 	 }).
@@ -392,7 +392,8 @@
 	  pst,          %% pst parameter
 	  max_blksize,  %% max block size to use when sending blocks
 	  use_crc,      %% use crc
-	  dict          %% copy of can dictionary in co_ctx
+	  dict,         %% copy of can dictionary in co_ctx
+	  sub_table     %% copy of subscriber table in co_ctx
 	}).
 
 -record(co_session,

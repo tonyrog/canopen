@@ -37,6 +37,12 @@
 	}).
    
 -define(is_seq(N), ((N) band -128)=:=0, (N) =/= 0).
+-ifdef(debug).
+-define(dbg(Fmt,As), io:format(Fmt, As)).
+-else.
+-define(dbg(Fmt, As), ok).
+-endif.
+
 %%
 %% Start a write operation 
 %% return
@@ -45,6 +51,16 @@
 %%
 %%
 write_begin(Ctx, Index, SubInd) ->
+    case co_node:subscribers(Ctx#sdo_ctx.sub_table, Index) of
+	[] ->
+	    ?dbg("No subscribes for index ~p\n", [Index]),
+	    local_write_begin(Ctx, Index, SubInd);
+	[Pid | _Tail] ->
+	    ?dbg("Process ~p subscribes to index ~p\n", [Pid, Index]),
+	    app_write_begin(Index, SubInd, Pid)
+    end.
+
+local_write_begin(Ctx, Index, SubInd) ->
     Dict = Ctx#sdo_ctx.dict,
     case co_dict:lookup_entry(Dict, {Index,SubInd}) of
 	Err = {error,_} ->
@@ -63,8 +79,23 @@ write_begin(Ctx, Index, SubInd) ->
 	    end
     end.
 
+app_write_begin(Index, SubInd, Pid) ->
+    case app_call(Pid, {get, Index, SubInd}) of
+	{value, Type, _OldValue} ->
+	    MaxSize = co_codec:bytesize(Type),
+	    Handle = #t_handle { dict = Pid, type=Type,
+				 index=Index, subind=SubInd,
+				 data=(<<>>), size=0,
+				 max_size=MaxSize },
+	    {ok, Handle, MaxSize};
+
+	{error, Reason}  ->
+	    {error, Reason}
+    end.
+    
+    
 %% 
-%%  Start a read operation with just a value no dictionary
+%%  Start a write operation with just a value no dictionary
 %% 
 write_data_begin(Index, SubInd, EndF) ->
     MaxSize = 0,
@@ -108,6 +139,7 @@ write(Handle, Data, NBytes) ->
        true ->
 	    {error, ?abort_unsupported_access}
     end.
+
 
 %% Write block segment data (7 bytes) Seq=1..127 
 %% Imply that max block size 127*7 = 889 bytes
@@ -184,10 +216,18 @@ write_end(Handle) ->
 	    try co_codec:decode(Handle#t_handle.data, 
 				Handle#t_handle.type) of
 		{Value,_} ->
-		    co_dict:direct_set(Handle#t_handle.dict,
-				       Handle#t_handle.index,
-				       Handle#t_handle.subind,
-				       Value)
+		    Index = Handle#t_handle.index,
+		    SubInd = Handle#t_handle.subind,
+						  
+		    case Handle#t_handle.dict of
+			Pid when is_pid(Pid) ->
+			    %% An application is responsible for the data
+			    ?dbg("write_to_app: Index = ~p, SubInd = ~p, Value = ~p\n", 
+				 [Index, SubInd, Value]),
+			    app_call(Pid, {set, Index, SubInd, Value});
+			Dict ->
+			    co_dict:direct_set(Dict, Index, SubInd, Value)
+		    end
 	    catch
 		error:_ ->
 		    {error, ?abort_internal_error}
@@ -206,6 +246,14 @@ write_end(Handle) ->
 %%
 
 read_begin(Ctx, Index, SubInd) ->
+    case co_node:subscribers(Ctx#sdo_ctx.sub_table, Index) of
+	[] ->
+	    local_read_begin(Ctx, Index, SubInd);
+	[ Pid | _Tail ] ->
+	    app_read_begin(Index, SubInd, Pid)
+    end.
+
+local_read_begin(Ctx, Index, SubInd) ->
     Dict = Ctx#sdo_ctx.dict,
     case co_dict:lookup_entry(Dict, {Index,SubInd}) of
 	Err = {error,_} ->
@@ -220,10 +268,27 @@ read_begin(Ctx, Index, SubInd) ->
 				     index=Index, subind=SubInd,
 				     data=Data, size=MaxSize,
 				     max_size=MaxSize },
+
 		    {ok, TH, MaxSize}
 	    end
     end.
 
+app_read_begin(Index, SubInd, Pid) ->
+    case app_call(Pid, {get, Index, SubInd}) of
+	{value, Type, Value} ->
+	    Data = co_codec:encode(Value, Type),
+	    MaxSize = byte_size(Data),
+	    TH = #t_handle { dict = Pid, type=Type,
+			     index=Index, subind=SubInd,
+			     data=Data, size=MaxSize,
+			     max_size=MaxSize },
+	    
+	    {ok, TH, MaxSize};
+
+	{error, Reason}  ->
+	    {error, Reason}
+    end.
+	
 %% 
 %%  Start a read operation with just a value no dcitionary 
 %% 
@@ -274,5 +339,13 @@ get_size(Handle) ->
     Handle#t_handle.size.
 
 
+app_call(Pid, Msg) ->
+    case catch gen_server:call(Pid, Msg) of 
+	{'EXIT', Reason} ->
+	    io:format("app_call: catch error ~p\n",[Reason]), 
+	    {error, ?ABORT_INTERNAL_ERROR};
+	Answer ->
+	    Answer
+    end.
 
 

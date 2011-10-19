@@ -20,6 +20,9 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
+%% Application interface
+-export([subscribe/2, unsubscribe/2]).
+-export([my_subscriptions/1, my_subscriptions/2, all_subscribers/2]).
 
 -export([add_entry/2]).
 -export([load_dict/2]).
@@ -97,6 +100,7 @@ serial(Opts,Default) ->
 	    Sn band 16#FFFFFFFF;
 	{serial,Serial} when is_list(Serial) ->
 	    canopen:string_to_serial(Serial) band 16#FFFFFFFF;
+
 	_ -> erlang:error(badarg)
     end.
     
@@ -121,7 +125,23 @@ attach(Pid) ->
     gen_server:call(serial_to_pid(Pid), {attach, self()}).
 
 detach(Pid) ->
-    gen_server:call(serial_to_pid(Pid), {dettach, self()}).
+    gen_server:call(serial_to_pid(Pid), {detach, self()}).
+
+%% Subscribe to changes to object dictionary
+subscribe(Serial, Ix) ->
+    gen_server:call(serial_to_pid(Serial), {subscribe, Ix, self()}).
+
+unsubscribe(Serial, Ix) ->
+    gen_server:call(serial_to_pid(Serial), {unsubscribe, Ix, self()}).
+
+my_subscriptions(Serial, Pid) ->
+    gen_server:call(serial_to_pid(Serial), {subscriptions, Pid}).
+
+my_subscriptions(Serial) ->
+    gen_server:call(serial_to_pid(Serial), {subscriptions, self()}).
+
+all_subscribers(Serial, Ix) ->
+    gen_server:call(serial_to_pid(Serial), {subscribers, Ix}).
 
 %%
 %% Internal access to node dictionay
@@ -211,20 +231,21 @@ serial_to_pid(Pid) when is_pid(Pid); is_atom(Pid) ->
 %%--------------------------------------------------------------------
 init([NodeId,NodeName,Opts]) ->
     Dict = create_dict(),
+    SubTable = create_sub_table(),
     SdoCtx = #sdo_ctx {
       timeout         = proplists:get_value(sdo_timeout,Opts,1000),
       blk_timeout     = proplists:get_value(blk_timeout,Opts,500),
       pst             = proplists:get_value(pst,Opts,16),
       max_blksize     = proplists:get_value(max_blksize,Opts,74),
       use_crc         = proplists:get_value(use_crc,Opts,true),
-      dict        = Dict
+      dict            = Dict,
+      sub_table       = SubTable
      },
     ID = case proplists:get_value(extended,Opts,false) of
 	     false -> NodeId band ?NODE_ID_MASK;
 	     true  -> (NodeId band ?XNODE_ID_MASK) bor ?COBID_ENTRY_EXTENDED
 	 end,
     CobTable = create_cob_table(ID),
-    SubTable = create_sub_table(),
     Ctx = #co_ctx {
       id     = ID,
       name   = NodeName,
@@ -381,15 +402,41 @@ handle_call({attach,Pid}, _From, Ctx) when is_pid(Pid) ->
 	    {reply, {error, already_attached}, Ctx}
     end;
 
-handle_call({dettach,Pid}, _From, Ctx) when is_pid(Pid) ->
+handle_call({detach,Pid}, _From, Ctx) when is_pid(Pid) ->
     case lists:keyseach(Pid, #app.pid, Ctx#co_ctx.app_list) of
 	false ->
 	    {reply, {error, not_attached}, Ctx};
 	{value,App} ->
+	    remove_subscriptions(Ctx#co_ctx.sub_table, Pid),
 	    erlang:demonitor(App#app.mon, [flush]),
 	    Ctx1 = Ctx#co_ctx { app_list = Ctx#co_ctx.app_list - [App]},
 	    {reply, ok, Ctx1}
     end;
+
+handle_call({subscribe,{Ix1, Ix2},Pid}, _From, Ctx) when is_pid(Pid) ->
+    add_subscription(Ctx#co_ctx.sub_table, Ix1, Ix2, Pid),
+    {reply, ok, Ctx};
+
+handle_call({subscribe,Ix,Pid}, _From, Ctx) when is_pid(Pid) ->
+    add_subscription(Ctx#co_ctx.sub_table, Ix, Pid),
+    {reply, ok, Ctx};
+
+handle_call({unsubscribe,{Ix1, Ix2},Pid}, _From, Ctx) when is_pid(Pid) ->
+    remove_subscription(Ctx#co_ctx.sub_table, Ix1, Ix2, Pid),
+    {reply, ok, Ctx};
+
+handle_call({unsubscribe,Ix,Pid}, _From, Ctx) when is_pid(Pid) ->
+    remove_subscription(Ctx#co_ctx.sub_table, Ix, Pid),
+    {reply, ok, Ctx};
+
+handle_call({subscriptions,Pid}, _From, Ctx) when is_pid(Pid) ->
+    Subs = subscriptions(Ctx#co_ctx.sub_table, Pid),
+    {reply, Subs, Ctx};
+
+handle_call({subscribers,Ix}, _From, Ctx)  ->
+    Subs = subscribers(Ctx#co_ctx.sub_table, Ix),
+    {reply, Subs, Ctx};
+
 handle_call(dump, _From, Ctx) ->
     io:format("    ID: ~w\n", [Ctx#co_ctx.id]),
     io:format("VENDOR: ~8.16.0B\n", [Ctx#co_ctx.vendor]),
@@ -491,6 +538,7 @@ handle_info({'DOWN',Ref,process,_Pid,Reason}, Ctx) ->
 		    {noreply, Ctx};
 		{value,A} ->
 		    io:format("can_node: id=~w application died\n", [A#app.pid]),
+		    remove_subscriptions(Ctx#co_ctx.sub_table, A#app.pid),
 		    %% FIXME: restart application? application_mod ?
 		    {noreply, Ctx#co_ctx { app_list = Ctx#co_ctx.app_list--[A]}}
 	    end
@@ -801,8 +849,13 @@ direct_set_dict_value(IX,SI,Value,Ctx) ->
 %% Dictionary entry has been updated
 %% Emulate co_node as subscriber to dictionary updates
 %%
-
 handle_notify(I, Ctx) ->
+    ?dbg("handle_notify: Index=~p",[I]),
+    NewCtx = handle_notify1(I, Ctx),
+    inform_subscribers(I, NewCtx),
+    NewCtx.
+
+handle_notify1(I, Ctx) ->
     case I of
 	?IX_COB_ID_SYNC_MESSAGE ->
 	    update_sync(Ctx);
@@ -1080,7 +1133,7 @@ create_dict() ->
 %% We may handle the mixed mode later on....
 %%
 create_cob_table(ID) ->
-    T = ets:new(public, []),
+    T = ets:new(cob_table, [public]),
     ets:insert(T, {?COB_ID(?NMT, 0), nmt}),
     if ?is_cobid_extended(ID) ->
 	    Nid = ?XNODE_ID(ID),
@@ -1100,12 +1153,27 @@ create_cob_table(ID) ->
 	    T
     end.
 
+%% Create subscription table
+create_sub_table() ->
+    T = ets:new(sub_table, [public,ordered_set]),
+    add_subscription(T, ?IX_COB_ID_SYNC_MESSAGE, self()),
+    add_subscription(T, ?IX_COM_CYCLE_PERIOD, self()),
+    add_subscription(T, ?IX_COB_ID_TIME_STAMP, self()),
+    add_subscription(T, ?IX_COB_ID_EMERGENCY, self()),
+    add_subscription(T, ?IX_SDO_SERVER_FIRST,?IX_SDO_SERVER_LAST,self()),
+    add_subscription(T, ?IX_SDO_CLIENT_FIRST,?IX_SDO_CLIENT_LAST,self()),
+    add_subscription(T, ?IX_RPDO_PARAM_FIRST, ?IX_RPDO_PARAM_LAST,self()),
+    add_subscription(T, ?IX_TPDO_PARAM_FIRST, ?IX_TPDO_PARAM_LAST,self()),
+    add_subscription(T, ?IX_TPDO_MAPPING_FIRST, ?IX_TPDO_MAPPING_LAST,self()),
+    T.
+    
 add_subscription(Tab, Ix, Pid) ->
     add_subscription(Tab, Ix, Ix, Pid).
 
 add_subscription(Tab, Ix1, Ix2, Pid) when ?is_index(Ix1), ?is_index(Ix2), 
 					  Ix1 =< Ix2, 
 					  (is_pid(Pid) orelse is_atom(Pid)) ->
+    ?dbg("add_subscription: ~w:~w for ~w\n", [Ix1, Ix2, Pid]),
     I = co_iset:new(Ix1, Ix2),
 
     case ets:lookup(Tab, Pid) of
@@ -1113,16 +1181,24 @@ add_subscription(Tab, Ix1, Ix2, Pid) when ?is_index(Ix1), ?is_index(Ix2),
 	[{_,ISet}] -> ets:insert(Tab, {Pid, co_iset:union(ISet, I)})
     end.
 
+remove_subscriptions(Tab, Pid) ->
+    ets:delete(Tab, Pid).
+
 remove_subscription(Tab, Ix, Pid) ->
     remove_subscription(Tab, Ix, Ix, Pid).
 
 remove_subscription(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
+    ?dbg("remove_subscription: ~w:~w for ~w\n", [Ix1, Ix2, Pid]),
     case ets:lookup(Tab, Pid) of
 	[] -> ok;
-	[{_,ISet}] ->
-	    case co_iset:subtract(ISet, co_iset:new(Ix1, Ix2)) of
-		[] -> ets:delete(Tab, Pid);
-		ISet1 -> ets:insert(Tab, {Pid,ISet1})
+	[{Pid,ISet}] ->
+	    case co_iset:difference(ISet, co_iset:new(Ix1, Ix2)) of
+		[] ->
+		    ?dbg("remove_subscription: last index for ~w\n", [Pid]),
+		    ets:delete(Tab, Pid);
+		ISet1 -> 
+		    ?dbg("remove_subscription: new index set ~p for ~w\n", [ISet1,Pid]),
+		    ets:insert(Tab, {Pid,ISet1})
 	    end
     end.
 
@@ -1146,20 +1222,23 @@ subscribers(Tab, Ix1, Ix2) when ?is_index(Ix1), ?is_index(Ix2),
 	      end
       end, [], Tab).
 
-%% Create subscription table
-create_sub_table() ->
-    T = ets:new(public, [ordered_set]),
-    add_subscription(T, ?IX_COB_ID_SYNC_MESSAGE, self()),
-    add_subscription(T, ?IX_COM_CYCLE_PERIOD, self()),
-    add_subscription(T, ?IX_COB_ID_TIME_STAMP, self()),
-    add_subscription(T, ?IX_COB_ID_EMERGENCY, self()),
-    add_subscription(T, ?IX_SDO_SERVER_FIRST,?IX_SDO_SERVER_LAST,self()),
-    add_subscription(T, ?IX_SDO_CLIENT_FIRST,?IX_SDO_CLIENT_LAST,self()),
-    add_subscription(T, ?IX_RPDO_PARAM_FIRST, ?IX_RPDO_PARAM_LAST,self()),
-    add_subscription(T, ?IX_TPDO_PARAM_FIRST, ?IX_TPDO_PARAM_LAST,self()),
-    add_subscription(T, ?IX_TPDO_MAPPING_FIRST, ?IX_TPDO_MAPPING_LAST,self()),
-    T.
-    
+subscriptions(Tab, Pid) when is_pid(Pid) ->
+    case ets:lookup(Tab, Pid) of
+	[] -> [];
+	[{Pid, Iset}] -> Iset
+    end.
+		
+inform_subscribers(I, Ctx) ->			
+    lists:foreach(fun(Pid) ->
+			  case self() of
+			      Pid -> do_nothing;
+			      _OtherPid ->
+				  ?dbg("Sending object changed to ~p", [Pid]),
+				  gen_server:cast(Pid, {object_changed, I}) 
+			  end
+		  end,
+		  subscribers(Ctx#co_ctx.sub_table, I)).
+	
 lookup_sdo_server(COBID, Ctx) ->
     case lookup_cobid(COBID, Ctx) of
 	{sdo_rx, SDOTx} -> 

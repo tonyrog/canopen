@@ -35,6 +35,12 @@
 
 -define(TMO(S), ((S)#co_session.ctx)#sdo_ctx.timeout).
 -define(BLKTMO(S), ((S)#co_session.ctx)#sdo_ctx.blk_timeout).
+
+-ifdef(debug).
+-define(dbg(Fmt,As), io:format(Fmt, As)).
+-else.
+-define(dbg(Fmt, As), ok).
+-endif.
 		 
 %%%===================================================================
 %%% API
@@ -70,7 +76,7 @@ start(Ctx,Src,Dst) when is_record(Ctx, sdo_ctx) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Ctx,NodePid,Src,Dst]) ->
-    io:format("co_sdo_srv_fsm: started src=~p, dst=~p \n", [Src, Dst]),
+    ?dbg("co_sdo_srv_fsm: started src=~p, dst=~p \n", [Src, Dst]),
     S0 = #co_session {
       src    = Src,
       dst    = Dst,
@@ -111,7 +117,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 	    case co_transfer:write_begin(S#co_session.ctx,IX,SI) of
 		{error,Reason} ->
 		    abort(S1, Reason);
-		{ok,TH, _MaxSize} -> %% transfer handle
+		{ok, TH, _MaxSize} -> %% transfer handle
 		    if Expedited =:= 1 ->
 			    NBytes = if SizeInd =:= 1 -> 4-N;
 					true -> 0
@@ -183,13 +189,13 @@ s_initial(M, S) when is_record(M, can_frame) ->
 	    S1 = S#co_session {index=IX,subind=SI},
 	    case co_transfer:read_begin(S1#co_session.ctx, IX, SI) of
 		{error,Reason} ->
-		    io:format("start block upload error=~p\n", [Reason]),
+		    ?dbg("start block upload error=~p\n", [Reason]),
 		    abort(S1, Reason);
 		{ok, TH, NBytes} when Pst =/= 0, NBytes > 0, NBytes =< Pst ->
-		    io:format("protocol switch\n"),
+		    ?dbg("protocol switch\n",[]),
 		    start_segmented_upload(S1, IX, SI, TH, NBytes);
 		{ok, TH, NBytes} ->
-		    io:format("starting block upload bytes=~p\n", [NBytes]),
+		    ?dbg("starting block upload bytes=~p\n", [NBytes]),
 		    SizeInd = ?UINT1(NBytes > 0),
 		    DoCrc = (S1#co_session.ctx)#sdo_ctx.use_crc andalso (GenCrc =:= 1),
 		    CrcSup = ?UINT1(DoCrc),
@@ -291,7 +297,7 @@ s_segmented_upload(M, S) when is_record(M, can_frame) ->
 		{error,Reason} ->
 		    abort(S,Reason);
 		{ok,TH1,Data} ->
-		    io:format("s_segmented_upload: data=~p\n", [Data]),
+		    ?dbg("s_segmented_upload: data=~p\n", [Data]),
 		    T1 = 1-T,
 		    Remain = co_transfer:get_size(TH1),
 		    N = 7-size(Data),
@@ -598,7 +604,7 @@ l_abort(M, S, State) ->
 
 
 abort(S, Reason) ->
-    io:format("co_sdo_srv_fsm: ix=~p, subind=~p, abort reason=~p\n", 
+    ?dbg("co_sdo_srv_fsm: ix=~p, subind=~p, abort reason=~p\n", 
 	      [S#co_session.index, S#co_session.subind, Reason]),
     Code = co_sdo:encode_abort_code(Reason),
     R = ?mk_scs_abort_transfer(S#co_session.index, S#co_session.subind, Code),
@@ -607,7 +613,7 @@ abort(S, Reason) ->
     
 
 send(S, Data) when is_binary(Data) ->
-    io:format("send: ~s\n", [co_format:format_sdo(co_sdo:decode_tx(Data))]),
+    ?dbg("send: ~s\n", [co_format:format_sdo(co_sdo:decode_tx(Data))]),
     Dst = S#co_session.dst,
     ID = if ?is_cobid_extended(Dst) ->
 		 (Dst band ?CAN_EFF_MASK) bor ?CAN_EFF_FLAG;

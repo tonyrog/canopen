@@ -21,7 +21,8 @@ MODULES = \
 	co_dict \
 	co_codec \
 	co_node \
-	co_sdo_test
+	co_sdo_test \
+	co_ex_app
 
 
 
