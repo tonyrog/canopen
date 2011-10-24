@@ -4,7 +4,7 @@
 %%% @doc
 %%%  TPDO manager. This server manage ONE TPDO
 %%%  it receives updates from dictionary notifications
-%%%  or applikation. It pack and send the PDO handling
+%%%  or application. It packs and sends the PDO handling
 %%%  inhibit timers and sync signals etc.
 %%% @end
 %%% Created : 16 Jun 2010 by Tony Rogvall <tony@rogvall.se>
@@ -313,11 +313,11 @@ tpdo_mapping(Offset, Dict) ->
     %% cob_id is changed!
     case co_node:tpdo_mapping(Offset, Dict) of
 	{pdo,Mapping} -> 
-	    ?dbg("tpdo_mapping: offset=~p, ~p\n", [Offset,Mapping]),
+	    ?dbg("tpdo_mapping: offset=~8.16.0#, ~p\n", [Offset,Mapping]),
 	    Mapping;
 	%% {mpdo,Mapping} -> %% FIXME
 	_Error ->
-	    ?dbg("tpdo_mapping: offset=~p, ~p\n", [Offset,_Error]),
+	    ?dbg("tpdo_mapping: offset=~8.16.0#, ~p\n", [Offset,_Error]),
 	    {[],[]}
     end.
 

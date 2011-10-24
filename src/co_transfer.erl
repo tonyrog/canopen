@@ -53,7 +53,7 @@
 write_begin(Ctx, Index, SubInd) ->
     case co_node:subscribers(Ctx#sdo_ctx.sub_table, Index) of
 	[] ->
-	    ?dbg("No subscribes for index ~p\n", [Index]),
+	    ?dbg("No subscribers for index ~p\n", [Index]),
 	    local_write_begin(Ctx, Index, SubInd);
 	[Pid | _Tail] ->
 	    ?dbg("Process ~p subscribes to index ~p\n", [Pid, Index]),
@@ -339,8 +339,10 @@ get_size(Handle) ->
     Handle#t_handle.size.
 
 
+-define(default_timeout, 5000).
+
 app_call(Pid, Msg) ->
-    case catch gen_server:call(Pid, Msg) of 
+    case catch do_call(Pid, Msg) of 
 	{'EXIT', Reason} ->
 	    io:format("app_call: catch error ~p\n",[Reason]), 
 	    {error, ?ABORT_INTERNAL_ERROR};
@@ -349,3 +351,29 @@ app_call(Pid, Msg) ->
     end.
 
 
+do_call(Process, Request) ->
+    Mref = erlang:monitor(process, Process),
+
+    catch erlang:send(Process, {'$gen_call', {self(), Mref}, Request},
+		      [noconnect]),
+    receive
+	{Mref, Reply} ->
+	    erlang:demonitor(Mref, [flush]),
+	    Reply;
+	{abort, Reason} ->
+	    erlang:demonitor(Mref, [flush]),
+	    {error, Reason};
+	{'DOWN', Mref, _, _, noconnection} ->
+	    erlang:demonitor(Mref, [flush]),
+	    exit({nodedown, node()});
+	{'DOWN', Mref, _, _, Reason} ->
+	    erlang:demonitor(Mref, [flush]),
+	    exit(Reason)
+    after ?default_timeout ->
+	    erlang:demonitor(Mref),
+	    receive
+		{'DOWN', Mref, _, _, _} -> true
+	    after 0 -> true
+	    end,
+	    exit(timeout)
+    end.

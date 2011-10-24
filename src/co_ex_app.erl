@@ -20,7 +20,9 @@
 -define(TEST_IX, 16#2003).
 -define(DICT,[{{16#2003, 0}, ?VISIBLE_STRING, "Mine"},
 	      {{16#3003, 0}, ?INTEGER, 7},
-	      {{16#3004, 0}, ?VISIBLE_STRING, "Long string"}]).
+	      {{16#3004, 0}, ?VISIBLE_STRING, "Long string"},
+	      {{16#3333, 2}, ?INTEGER, 0},
+	      {{16#6000, 0}, ?INTEGER, 0}]).
 
 -record(loop_data,
 	{
@@ -70,8 +72,9 @@ dict() ->
 %%--------------------------------------------------------------------
 init([CoNode]) ->
     Dict = ets:new(my_dict, [public, ordered_set]),
-    load_dict(CoNode, Dict),
     co_node:attach(CoNode),
+    load_dict(CoNode, Dict),
+    co_node:subscribe(CoNode, {?IX_RPDO_PARAM_FIRST, ?IX_RPDO_PARAM_LAST}),
     {ok, #loop_data {state=init, co_node = CoNode, dict=Dict}}.
 
 load_dict(CoNode, Dict) ->
@@ -152,6 +155,10 @@ handle_cast(_Msg, LoopData) ->
 %%                                   {stop, Reason, LoopData}
 %% @end
 %%--------------------------------------------------------------------
+handle_info({notify, RemoteId, Index, SubInd, Value}, LoopData) ->
+    io:format("handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w \n", 
+	      [RemoteId, Index, SubInd, Value]),
+    {noreply, LoopData};
 handle_info(Info, LoopData) ->
     io:format("handle_info: Unknown Info ~p\n", [Info]),
     {noreply, LoopData}.
@@ -171,6 +178,7 @@ terminate(_Reason, LoopData) ->
     lists:foreach(fun({{Index, _SubInd}, _Type, _Value}) ->
 			  co_node:unsubscribe(LoopData#loop_data.co_node, Index)
 		  end, ?DICT),
+    co_node:detach(LoopData#loop_data.co_node),
     ok.
 
 %%--------------------------------------------------------------------

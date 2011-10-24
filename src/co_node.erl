@@ -22,7 +22,7 @@
 
 %% Application interface
 -export([subscribe/2, unsubscribe/2]).
--export([my_subscriptions/1, my_subscriptions/2, all_subscribers/2]).
+-export([my_subscriptions/1, my_subscriptions/2, all_subscribers/1, all_subscribers/2]).
 
 -export([add_entry/2]).
 -export([load_dict/2]).
@@ -139,6 +139,9 @@ my_subscriptions(Serial, Pid) ->
 
 my_subscriptions(Serial) ->
     gen_server:call(serial_to_pid(Serial), {subscriptions, self()}).
+
+all_subscribers(Serial) ->
+    gen_server:call(serial_to_pid(Serial), {subscribers}).
 
 all_subscribers(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {subscribers, Ix}).
@@ -326,7 +329,7 @@ handle_call({store,Block,COBID,IX,SI,Bin}, From, Ctx) ->
 		    Mon = erlang:monitor(process, Pid),
 		    sys:trace(Pid, true),
 		    S = #sdo { id=ID, pid=Pid, mon=Mon },
-		    io:format("store: added session id=~p\n", [ID]),
+		    ?dbg("store: added session id=~p\n", [ID]),
 		    Sessions = Ctx#co_ctx.sdo_list,
 		    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
 	    end;
@@ -345,7 +348,7 @@ handle_call({fetch,Block,COBID,IX,SI}, From, Ctx) ->
 		    Mon = erlang:monitor(process, Pid),
 		    sys:trace(Pid, true),
 		    S = #sdo { id=ID, pid=Pid, mon=Mon },
-		    io:format("fetch: added session id=~p\n", [ID]),
+		    ?dbg("fetch: added session id=~p\n", [ID]),
 		    Sessions = Ctx#co_ctx.sdo_list,
 		    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
 	    end;
@@ -403,13 +406,13 @@ handle_call({attach,Pid}, _From, Ctx) when is_pid(Pid) ->
     end;
 
 handle_call({detach,Pid}, _From, Ctx) when is_pid(Pid) ->
-    case lists:keyseach(Pid, #app.pid, Ctx#co_ctx.app_list) of
+    case lists:keysearch(Pid, #app.pid, Ctx#co_ctx.app_list) of
 	false ->
 	    {reply, {error, not_attached}, Ctx};
-	{value,App} ->
+	{value, App} ->
 	    remove_subscriptions(Ctx#co_ctx.sub_table, Pid),
 	    erlang:demonitor(App#app.mon, [flush]),
-	    Ctx1 = Ctx#co_ctx { app_list = Ctx#co_ctx.app_list - [App]},
+	    Ctx1 = Ctx#co_ctx { app_list = Ctx#co_ctx.app_list -- [App]},
 	    {reply, ok, Ctx1}
     end;
 
@@ -437,6 +440,10 @@ handle_call({subscribers,Ix}, _From, Ctx)  ->
     Subs = subscribers(Ctx#co_ctx.sub_table, Ix),
     {reply, Subs, Ctx};
 
+handle_call({subscribers}, _From, Ctx)  ->
+    Subs = subscribers(Ctx#co_ctx.sub_table),
+    {reply, Subs, Ctx};
+
 handle_call(dump, _From, Ctx) ->
     io:format("    ID: ~w\n", [Ctx#co_ctx.id]),
     io:format("VENDOR: ~8.16.0B\n", [Ctx#co_ctx.vendor]),
@@ -458,8 +465,29 @@ handle_call(dump, _From, Ctx) ->
     io:format("---- NODE MAP TABLE ----\n"),
     ets:foldl(
       fun({Sn,NodeId},_) ->
-	      io:format("~8.16.0B => ~w\n", [Sn,NodeId])
+	      io:format("~8.16.0B => ~w\n", [Sn, NodeId])
       end, ok, Ctx#co_ctx.node_map),
+    io:format("---- COB TABLE ----\n"),
+    ets:foldl(
+      fun({CobId, X},_) ->
+	      io:format("~8.16.0B => ~p\n", [CobId, X])
+      end, ok, Ctx#co_ctx.cob_table),
+    io:format("---- SUB TABLE ----\n"),
+    ets:foldl(
+      fun({Pid, IxList},_) ->
+	      io:format("~p => ", [Pid]),
+	      lists:foreach(
+		fun(Ixs) ->
+			case Ixs of
+			    {IxStart, IxEnd} ->
+				io:format("[~7.16.0#-~7.16.0#] ", [IxStart, IxEnd]);
+			    Ix ->
+				io:format("~7.16.0# ",[Ix])
+			end
+		end,
+		IxList),
+	      io:format("\n")
+      end, ok, Ctx#co_ctx.sub_table),
     io:format("------------------------\n"),
     {reply, ok, Ctx};
 
@@ -518,7 +546,7 @@ handle_info({timeout,Ref,time_stamp}, Ctx) when Ref =:= Ctx#co_ctx.time_stamp_tm
     Size = byte_size(Data),
     Frame = #can_frame { id=FrameID, len=Size, data=Data },
     can:send(Frame),
-    io:format("Sent time stamp ~p\n", [Time]),
+    ?dbg("Sent time stamp ~p\n", [Time]),
     Ctx1 = Ctx#co_ctx { time_stamp_tmr = start_timer(Ctx#co_ctx.time_stamp_time, time_stamp) },
     {noreply, Ctx1};
 
@@ -572,6 +600,7 @@ code_change(_OldVsn, Ctx, _Extra) ->
 %%
 handle_can(Frame, Ctx) when ?is_can_frame_rtr(Frame) ->
     COBID = ?CANID_TO_COBID(Frame#can_frame.id),
+    ?dbg("~s: handle_can: COBID=~8.16.0B\n", [Ctx#co_ctx.name, COBID]),
     case lookup_cobid(COBID, Ctx) of
 	nmt  ->
 	    %% Handle Node guard
@@ -607,16 +636,25 @@ handle_can(Frame, Ctx) ->
 	       true ->
 		    Ctx
 	    end;
-	_Other ->
-	    ?dbg("~s: handle_can: not handled: ~p\n", [Ctx#co_ctx.name,_Other]),
-	    Ctx
+	_NotKnown ->
+	    %% Test if MPDO
+	    <<F:1, Addr:7, Ix:16/little, Si:8, Data:32/little>> = 
+		Frame#can_frame.data,
+	    case {F, Addr} of
+		{0, 0} ->
+		    %% DAM-MPDO, destination is a group
+		    handle_dam_mpdo(Ctx, ?XNODE_ID(COBID), Ix, Si, Data);
+		_Other ->
+		    ?dbg("~s: handle_can: not handled: ~p\n", [Ctx#co_ctx.name,_Other]),
+		    Ctx
+	    end
     end.
 
 %%
 %% NMT 
 %%
 handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
-    io:format("~s: handle_nmt: ~p\n", [Ctx#co_ctx.name, M]),
+    ?dbg("~s: handle_nmt: ~p\n", [Ctx#co_ctx.name, M]),
     <<NodeId,Cs,_/binary>> = M#can_frame.data,
     if NodeId == 0; NodeId == Ctx#co_ctx.id ->
 	    case Cs of
@@ -631,7 +669,7 @@ handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
 		?NMT_STOP_REMOTE_NODE ->
 		    Ctx#co_ctx { state = ?Stopped };
 		_ ->
-		    io:format("handle_nmt: unknown cs=~w\n", [Cs]),
+		    ?dbg("handle_nmt: unknown cs=~w\n", [Cs]),
 		    Ctx
 	    end;
        true ->
@@ -641,7 +679,7 @@ handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
 
 
 handle_node_guard(Frame, Ctx) when ?is_can_frame_rtr(Frame) ->
-    io:format("~s: handle_node_guard: request ~p\n", [Ctx#co_ctx.name,Frame]),
+    ?dbg("~s: handle_node_guard: request ~p\n", [Ctx#co_ctx.name,Frame]),
     NodeId = ?NODE_ID(Frame#can_frame.id),
     if NodeId == 0; NodeId == Ctx#co_ctx.id ->
 	    Data = Ctx#co_ctx.state bor Ctx#co_ctx.toggle,
@@ -655,7 +693,7 @@ handle_node_guard(Frame, Ctx) when ?is_can_frame_rtr(Frame) ->
 	    Ctx
     end;
 handle_node_guard(Frame, Ctx) when Frame#can_frame.len >= 1 ->
-    io:format("~s: handle_node_guard: ~p\n", [Ctx#co_ctx.name,Frame]),
+    ?dbg("~s: handle_node_guard: ~p\n", [Ctx#co_ctx.name,Frame]),
     NodeId = ?NODE_ID(Frame#can_frame.id),
     case Frame#can_frame.data of
 	<<_Toggle:1, State:7, _/binary>> when NodeId =/= Ctx#co_ctx.id ->
@@ -669,7 +707,7 @@ handle_node_guard(Frame, Ctx) when Frame#can_frame.len >= 1 ->
 %% LSS
 %% 
 handle_lss(M, Ctx) ->
-    io:format("~s: handle_lss: ~p\n", [Ctx#co_ctx.name,M]),
+    ?dbg("~s: handle_lss: ~p\n", [Ctx#co_ctx.name,M]),
     Ctx.
 
 %%
@@ -688,7 +726,7 @@ handle_time_stamp(Frame, Ctx) ->
     ?dbg("~s: handle_timestamp: ~p\n", [Ctx#co_ctx.name,Frame]),
     try co_codec:decode(Frame#can_frame.data, ?TIME_OF_DAY) of
 	{T, _Bits} when is_record(T, time_of_day) ->
-	    io:format("Got timestamp: ~p\n", [T]),
+	    ?dbg("Got timestamp: ~p\n", [T]),
 	    set_time_of_day(T),
 	    Ctx;
 	_ ->
@@ -717,18 +755,18 @@ handle_rpdo(Frame, Offset, _COBID, Ctx) ->
 %% FIXME: conditional compile this
 %%
 handle_sdo_tx(Frame, Tx, Rx, Ctx) ->
-    io:format("~s: handle_sdo_tx: src=~p, ~s\n",
+    ?dbg("~s: handle_sdo_tx: src=~p, ~s\n",
 	      [Ctx#co_ctx.name, Tx,
 	       co_format:format_sdo(co_sdo:decode_tx(Frame#can_frame.data))]),
     ID = {Tx,Rx},
-    io:format("handle_sdo_tx: session id=~p\n", [ID]),
+    ?dbg("handle_sdo_tx: session id=~p\n", [ID]),
     Sessions = Ctx#co_ctx.sdo_list,
     case lists:keysearch(ID,#sdo.id,Sessions) of
 	{value, S} ->
 	    gen_fsm:send_event(S#sdo.pid, Frame),
 	    Ctx;
 	false ->
-	    io:format("handle_sdo_tx: session not found\n", []),
+	    ?dbg("handle_sdo_tx: session not found\n", []),
 	    %% no such session active
 	    Ctx
     end.
@@ -738,7 +776,7 @@ handle_sdo_tx(Frame, Tx, Rx, Ctx) ->
 %% FIXME: conditional compile this
 %%
 handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
-    io:format("~s: handle_sdo_rx: ~s\n", 
+    ?dbg("~s: handle_sdo_rx: ~s\n", 
 	      [Ctx#co_ctx.name,
 	       co_format:format_sdo(co_sdo:decode_rx(Frame#can_frame.data))]),
     ID = {Rx,Tx},
@@ -763,6 +801,23 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
 		    Ctx#co_ctx { sdo_list = [S|Sessions]}
 	    end
     end.
+
+%%
+%% DAM-MPDO
+%%
+handle_dam_mpdo(Ctx, RId, Ix, Si, Data) ->
+    ?dbg("~s: handle_dam_mpdo: Index = ~8.16.0#\n", [Ctx#co_ctx.name,Ix]),
+    case co_node:subscribers(Ctx#co_ctx.sub_table, Ix) of
+	[] ->
+	    ?dbg("No subscribers for index ~8.16.0#\n", [Ix]);
+	PidList ->
+	    lists:foreach(
+	      fun(Pid) ->
+		      ?dbg("Process ~p subscribes to index ~8.16.0#\n", [Pid, Ix]),
+		      Pid ! {notify, RId, Ix, Si, Data}
+	      end, PidList)
+    end,
+    Ctx.
 
 %% NMT requests (call from within node process)
 set_node_state(Ctx, NodeId, State) ->
@@ -850,12 +905,12 @@ direct_set_dict_value(IX,SI,Value,Ctx) ->
 %% Emulate co_node as subscriber to dictionary updates
 %%
 handle_notify(I, Ctx) ->
-    ?dbg("handle_notify: Index=~p",[I]),
     NewCtx = handle_notify1(I, Ctx),
     inform_subscribers(I, NewCtx),
     NewCtx.
 
 handle_notify1(I, Ctx) ->
+    ?dbg("handle_notify: Index=~8.16.0#\n",[I]),
     case I of
 	?IX_COB_ID_SYNC_MESSAGE ->
 	    update_sync(Ctx);
@@ -886,7 +941,7 @@ handle_notify1(I, Ctx) ->
 		    Ctx
 	    end;
 	_ when I >= ?IX_RPDO_PARAM_FIRST, I =< ?IX_RPDO_PARAM_LAST ->
-	    io:format("update RPDO offset=~w\n", [(I-?IX_RPDO_PARAM_FIRST)]),
+	    ?dbg("update RPDO offset=~8.16.0#\n", [(I-?IX_RPDO_PARAM_FIRST)]),
 	    case load_pdo_parameter(I, (I-?IX_RPDO_PARAM_FIRST), Ctx) of
 		undefined -> 
 		    Ctx;
@@ -902,33 +957,33 @@ handle_notify1(I, Ctx) ->
 		    Ctx
 	    end;
 	_ when I >= ?IX_TPDO_PARAM_FIRST, I =< ?IX_TPDO_PARAM_LAST ->
-	    ?dbg("update TPDO: offset=~p\n",[I - ?IX_TPDO_PARAM_FIRST]),
+	    ?dbg("update TPDO: offset=~8.16.0#\n",[I - ?IX_TPDO_PARAM_FIRST]),
 	    case load_pdo_parameter(I, (I-?IX_TPDO_PARAM_FIRST), Ctx) of
 		undefined -> Ctx;
 		Param ->
 		    case update_tpdo(Param, Ctx) of
 			{new, {T,Ctx1}} ->
-			    io:format("TPDO:new\n"),
+			    ?dbg("TPDO:new\n",[]),
 			    ets:insert(Ctx#co_ctx.cob_table, 
 				       {Param#pdo_parameter.cob_id,
 					{tpdo,Param#pdo_parameter.rtr_allowed,T#tpdo.pid}}),
 			    Ctx1;
 			{existing,T} ->
-			    io:format("TPDO:existing\n"),
+			    ?dbg("TPDO:existing\n",[]),
 			    co_tpdo:update(T#tpdo.pid, Param),
 			    Ctx;
 			{deleted,Ctx1} ->
-			    io:format("TPDO:deleted\n"),
+			    ?dbg("TPDO:deleted\n",[]),
 			    ets:delete(Ctx#co_ctx.cob_table, Param#pdo_parameter.cob_id),
 			    Ctx1;
 			none ->
-			    io:format("TPDO:none\n"),
+			    ?dbg("TPDO:none\n",[]),
 			    Ctx
 		    end
 	    end;
 	_ when I >= ?IX_TPDO_MAPPING_FIRST, I =< ?IX_TPDO_MAPPING_LAST ->
 	    Offset = I - ?IX_TPDO_MAPPING_FIRST,
-	    io:format("update TPDO-MAP: offset=~w\n", [Offset]),
+	    ?dbg("update TPDO-MAP: offset=~w\n", [Offset]),
 	    J = ?IX_TPDO_PARAM_FIRST + Offset,
 	    COBID = co_dict:direct_value(Ctx#co_ctx.dict,J,?SI_PDO_COB_ID),
 	    case lookup_cobid(COBID, Ctx) of
@@ -939,7 +994,7 @@ handle_notify1(I, Ctx) ->
 		    Ctx
 	    end;
 	_ ->
-	    io:format("item not subscribed for ix=~w\n", [I]),
+	    ?dbg("item not subscribed for ix=~8.16.0#\n", [I]),
 	    Ctx
     end.
 
@@ -950,7 +1005,7 @@ update_time_stamp(Ctx) ->
 	    COBID = ID band (?COBID_ENTRY_ID_MASK bor ?COBID_ENTRY_EXTENDED),
 	    if ID band ?COBID_ENTRY_TIME_PRODUCER =/= 0 ->
 		    Time = Ctx#co_ctx.time_stamp_time,
-		    io:format("Timestamp server time=~p\n", [Time]),
+		    ?dbg("Timestamp server time=~p\n", [Time]),
 		    if Time > 0 ->
 			    Tmr = start_timer(Ctx#co_ctx.time_stamp_time,
 					      time_stamp),
@@ -963,7 +1018,7 @@ update_time_stamp(Ctx) ->
 		    end;
 	       ID band ?COBID_ENTRY_TIME_CONSUMER =/= 0 ->
 		    %% consumer
-		    io:format("Timestamp consumer\n", []),
+		    ?dbg("Timestamp consumer\n", []),
 		    Tmr = stop_timer(Ctx#co_ctx.time_stamp_tmr),
 		    %% FIXME: delete old COBID!!!
 		    ets:insert(Ctx#co_ctx.cob_table, {COBID,time_stamp}),
@@ -1173,7 +1228,7 @@ add_subscription(Tab, Ix, Pid) ->
 add_subscription(Tab, Ix1, Ix2, Pid) when ?is_index(Ix1), ?is_index(Ix2), 
 					  Ix1 =< Ix2, 
 					  (is_pid(Pid) orelse is_atom(Pid)) ->
-    ?dbg("add_subscription: ~w:~w for ~w\n", [Ix1, Ix2, Pid]),
+    ?dbg("add_subscription: ~8.16.0#:~8.16.0# for ~w\n", [Ix1, Ix2, Pid]),
     I = co_iset:new(Ix1, Ix2),
 
     case ets:lookup(Tab, Pid) of
@@ -1201,6 +1256,9 @@ remove_subscription(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
 		    ets:insert(Tab, {Pid,ISet1})
 	    end
     end.
+
+subscribers(Tab) ->
+    [Pid || {Pid, _Ixs} <- ets:tab2list(Tab)].
 
 subscribers(Tab, Ix) when ?is_index(Ix) ->
     ets:foldl(
@@ -1398,9 +1456,9 @@ pdo_mapping(MType,_IX,SI,Sn,Ts,Is,_Dict) when SI > Sn ->
 pdo_mapping(MType,IX,SI,Sn,Ts,Is,Dict) ->
     case co_dict:value(Dict,IX,SI) of
 	{ok,Map} ->
-	    ?dbg("pdo_mapping: ~w:~w = ~w\n", [IX,SI,Map]),
-	    Index = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
-	    ?dbg("pdo_mapping: entry[~w] = ~p\n", [SI,Index]),
+	    ?dbg("pdo_mapping: ~8.16.0#:~w = ~16.16.0#\n", [IX,SI,Map]),
+	    Index = {I,S} = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
+	    ?dbg("pdo_mapping: entry[~w] = {~8.16.0#:~w}\n", [SI,I,S]),
 	    case co_dict:lookup_entry(Dict,Index) of
 		{ok,E} ->
 		    pdo_mapping(MType,IX,SI+1,Sn,
@@ -1410,7 +1468,7 @@ pdo_mapping(MType,IX,SI,Sn,Ts,Is,Dict) ->
 		    Error
 	    end;
 	Error ->
-	    ?dbg("pdo_mapping: ~w:~w = ~w\n", [IX,SI,Error]),
+	    ?dbg("pdo_mapping: ~8.16.0#:~w = Error ~w\n", [IX,SI,Error]),
 	    Error
     end.
 
@@ -1484,7 +1542,7 @@ time_of_day() ->
     now_to_time_of_day(now()).
 
 set_time_of_day(Time) ->
-    io:format("set_time_of_day: ~p\n", [Time]),
+    ?dbg("set_time_of_day: ~p\n", [Time]),
     ok.
 
 now_to_time_of_day({Sm,S0,Us}) ->

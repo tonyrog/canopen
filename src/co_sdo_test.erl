@@ -8,6 +8,7 @@
 -module(co_sdo_test).
 
 -include_lib("can/include/can.hrl").
+-include_lib("canopen/include/canopen.hrl").
 -include("../include/sdo.hrl").
 
 -compile(export_all).
@@ -22,7 +23,7 @@ verify_tx() ->
     check_tx(#sdo_scs_initiate_download_response { index=1000, subind=7 }),
     check_tx(#sdo_scs_upload_segment_response { t=1, n=2, c=1, d= <<1,2,3,4,5,6,7>> }),
     check_tx(#sdo_scs_download_segment_response { t=1 }),
-    check_tx(#sdo_abort { index=1000, subind=7, code=1234 }),
+    check_tx(#sdo_abort { index=1000, subind=7, code=?abort_internal_error }),
     check_tx(#sdo_scs_block_initiate_download_response { sc=1,
 							 index=1000,
 							 subind=7,
@@ -47,7 +48,7 @@ verify_rx() ->
 						  d= <<1,2,3,4,5,6,7>>}),
     check_rx(#sdo_ccs_upload_segment_request { t=1 }),
     check_rx(#sdo_ccs_initiate_upload_request { index=1000, subind=7 }),
-    check_rx(#sdo_abort { index=1000, subind=7, code=1234 }),
+    check_rx(#sdo_abort { index=1000, subind=7, code=?abort_internal_error }),
     check_rx(#sdo_ccs_block_upload_request { cc=1,index=1000, subind=7,
 					     blksize=80, pst=50 }),
     check_rx(#sdo_ccs_block_upload_end_response {}),    
@@ -61,12 +62,14 @@ verify_rx() ->
     
 
 check_tx(PDU) ->
+    io:format("Checking ~p\n", [PDU]),
     Data = co_sdo:encode(PDU),
     case co_sdo:decode_tx(Data) of
 	PDU -> ok
     end.
 
 check_rx(PDU) ->
+    io:format("Checking ~p\n", [PDU]),
     Data = co_sdo:encode(PDU),
     case co_sdo:decode_rx(Data) of
 	PDU -> ok
