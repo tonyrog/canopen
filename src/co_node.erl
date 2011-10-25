@@ -62,10 +62,9 @@
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% Function: start(NodeId [,Opts])
+%% Function: start(Serial [,Opts])
 %%
 %%   Opts:  {name,   Name}
-%%          {serial, SerialNumber}
 %%          {vendor, VendorID}
 %%          extended                     - use extended (29-bit) ID
 %%          {time_stamp,  timeout()}     - ( 60000 )  1m
@@ -78,43 +77,34 @@
 %% Description: Starts the server
 %%--------------------------------------------------------------------
 
-start(NodeId) ->
-    start(NodeId, []).
+start(Serial) ->
+    start(Serial, []).
 
-start(NodeId,Opts) ->
-    case name(Opts) of
-	undefined ->
-	    gen_server:start(?MODULE, [NodeId,undefined,Opts], []);
-	Name ->
-	    gen_server:start({local, Name}, ?MODULE, [NodeId,Name,Opts], [])
-    end.
+start(Serial,Opts) ->
+    S = serial(Serial),
+    NodeId = (S bsr 8) bor ?CAN_EFF_FLAG,
+    Name = name(Opts, S),
+    ?dbg("~p: Starting co_node with Name = ~p, Serial = ~.16#, NodeId = ~.16#\n",
+	 [?MODULE, Name, S, NodeId]),
+    gen_server:start({local, Name}, ?MODULE, [S,NodeId,Name,Opts], []).
 
 %%
 %% Get serial number, accepts both string and number
 %%
 
-serial(Opts,Default) ->
-    case proplists:lookup(serial, Opts) of
-	none -> Default;
-	{serial,Sn} when is_integer(Sn) ->
-	    Sn band 16#FFFFFFFF;
-	{serial,Serial} when is_list(Serial) ->
-	    canopen:string_to_serial(Serial) band 16#FFFFFFFF;
-
-	_ -> erlang:error(badarg)
-    end.
+serial(Serial) when is_integer(Serial) ->
+    Serial band 16#FFFFFFFF;
+serial(Serial) when is_list(Serial) ->
+    canopen:string_to_serial(Serial) band 16#FFFFFFFF;
+serial(_Serial) ->
+    erlang:error(badarg).
     
-name(Opts) ->
+name(Opts, Serial) ->
     case proplists:lookup(name, Opts) of
 	{name,Name} when is_atom(Name) ->
 	    Name;
 	none ->
-	    case serial(Opts,undefined) of
-		undefined -> undefined;
-		Sn -> list_to_atom(canopen:serial_to_string(Sn))
-	    end;
-	_ ->
-	    erlang:error(badarg)
+	    list_to_atom(canopen:serial_to_string(Serial))
     end.
 
 stop(Serial) ->
@@ -247,7 +237,7 @@ notify(Nid,Index,Subind,Value) ->
 %%                         {stop, Reason}
 %% Description: Initiates the server
 %%--------------------------------------------------------------------
-init([NodeId,NodeName,Opts]) ->
+init([Serial,NodeId, NodeName,Opts]) ->
     Dict = create_dict(),
     SubTable = create_sub_table(),
     SdoCtx = #sdo_ctx {
@@ -268,7 +258,7 @@ init([NodeId,NodeName,Opts]) ->
       id     = ID,
       name   = NodeName,
       vendor = proplists:get_value(vendor,Opts,0),
-      serial = serial(Opts, 0),
+      serial = Serial,
       state  = ?Initialisation,
       node_map = ets:new(node_map, [{keypos,1}]),
       nmt_table = ets:new(nmt_table, [{keypos,#nmt_entry.id}]),
@@ -598,23 +588,37 @@ handle_info(_Info, Ctx) ->
 %% The return value is ignored.
 %%--------------------------------------------------------------------
 terminate(_Reason, Ctx) ->
-    %% Stop all tpdo-servers ??
-    lists:foreach(
-      fun(T) ->
-	      Self = self(),
-	      case T#tpdo.pid of
-		  Self  -> do_nothing; %% ??
-		  Pid -> co_tpdo:stop(Pid) 
-		end
-      end,
-      Ctx#co_ctx.tpdo_list),
+    Self = self(),
 
     %% Stop all subscribers?? or inform them ??
     lists:foreach(
       fun(Pid) -> 
-	      gen_server:cast(Pid, co_node_terminated) 
+	      case Pid of
+		  Self -> 
+		      do_nothing;
+		  _NotSelf ->
+		      ?dbg("~s: terminate: Killing application with pid = ~p\n", 
+			   [Ctx#co_ctx.name, Pid]),
+		      exit(Pid, co_node_terminated)
+			  %% Or gen_server:cast(Pid, co_node_terminated) ??	      end
       end,
       subscribers(Ctx#co_ctx.sub_table)),
+
+    %% Stop all tpdo-servers ??
+    lists:foreach(
+      fun(T) ->
+	      case T#tpdo.pid of
+		  Self  -> do_nothing; %% ??
+		  Pid -> 
+		      ?dbg("~s: terminate: Killing TPDO with pid = ~p\n", 
+			   [Ctx#co_ctx.name, Pid]),
+		      exit(Pid, co_node_terminated)
+			  %% Or gen_server:cast(Pid, co_node_terminated) ??
+		end
+      end,
+      Ctx#co_ctx.tpdo_list),
+
+    ?dbg("~s: terminate: cleaned up, exiting\n", [Ctx#co_ctx.name]),
     ok.
 
 %%--------------------------------------------------------------------
