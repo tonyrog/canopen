@@ -117,15 +117,15 @@ name(Opts) ->
 	    erlang:error(badarg)
     end.
 
-stop(Pid) ->
-    gen_server:call(serial_to_pid(Pid), stop).
+stop(Serial) ->
+    gen_server:call(serial_to_pid(Serial), stop).
 
 %% Attach application to can node
-attach(Pid) ->
-    gen_server:call(serial_to_pid(Pid), {attach, self()}).
+attach(Serial) ->
+    gen_server:call(serial_to_pid(Serial), {attach, self()}).
 
-detach(Pid) ->
-    gen_server:call(serial_to_pid(Pid), {detach, self()}).
+detach(Serial) ->
+    gen_server:call(serial_to_pid(Serial), {detach, self()}).
 
 %% Subscribe to changes to object dictionary
 subscribe(Serial, Ix) ->
@@ -149,31 +149,31 @@ all_subscribers(Serial, Ix) ->
 %%
 %% Internal access to node dictionay
 %%
-add_entry(Pid, Ent) ->
-    gen_server:call(serial_to_pid(Pid), {add_entry, Ent}).
+add_entry(Serial, Ent) ->
+    gen_server:call(serial_to_pid(Serial), {add_entry, Ent}).
 
-get_entry(Pid, Ix) ->
-    gen_server:call(serial_to_pid(Pid), {get_entry,Ix}).
+get_entry(Serial, Ix) ->
+    gen_server:call(serial_to_pid(Serial), {get_entry,Ix}).
 
-load_dict(Pid, File) ->
-    gen_server:call(serial_to_pid(Pid), {load_dict, File}).
+load_dict(Serial, File) ->
+    gen_server:call(serial_to_pid(Serial), {load_dict, File}).
     
 
 %% Get/Set local value (internal api)
-set(Pid, Ix, Si, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    gen_server:call(serial_to_pid(Pid), {set,Ix,Si,Value}).    
-set(Pid, Ix, Value) when ?is_index(Ix) ->
-    gen_server:call(serial_to_pid(Pid), {set,Ix,0,Value}).
+set(Serial, Ix, Si, Value) when ?is_index(Ix), ?is_subind(Si) ->
+    gen_server:call(serial_to_pid(Serial), {set,Ix,Si,Value}).    
+set(Serial, Ix, Value) when ?is_index(Ix) ->
+    gen_server:call(serial_to_pid(Serial), {set,Ix,0,Value}).
 
 %% Set raw value (used to update internal read only tables etc)
-direct_set(Pid, Ix, Si, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    gen_server:call(serial_to_pid(Pid), {direct_set,Ix,Si,Value}).
-direct_set(Pid, Ix, Value) when ?is_index(Ix) ->
-    gen_server:call(serial_to_pid(Pid), {direct_set,Ix,0,Value}).
+direct_set(Serial, Ix, Si, Value) when ?is_index(Ix), ?is_subind(Si) ->
+    gen_server:call(serial_to_pid(Serial), {direct_set,Ix,Si,Value}).
+direct_set(Serial, Ix, Value) when ?is_index(Ix) ->
+    gen_server:call(serial_to_pid(Serial), {direct_set,Ix,0,Value}).
 
 %% Read dictionary value
-value(Pid, Ix) ->
-    gen_server:call(serial_to_pid(Pid), {value,Ix}).
+value(Serial, Ix) ->
+    gen_server:call(serial_to_pid(Serial), {value,Ix}).
 
 %% 
 %% Note on COBID for SDO service
@@ -190,28 +190,28 @@ value(Pid, Ix) ->
 %%
 
 %% Store Value at IX:SI on remote node
-store(Pid, COBID, IX, SI, Value) 
+store(Serial, COBID, IX, SI, Value) 
   when ?is_index(IX), ?is_subind(SI), is_binary(Value) ->
-    gen_server:call(serial_to_pid(Pid), {store,false,COBID,IX,SI,Value}).
+    gen_server:call(serial_to_pid(Serial), {store,false,COBID,IX,SI,Value}).
 
 %% Store Value at IX:SI on remote node
-store_block(Pid, COBID, IX, SI, Value) 
+store_block(Serial, COBID, IX, SI, Value) 
   when ?is_index(IX), ?is_subind(SI), is_binary(Value) ->
-    gen_server:call(serial_to_pid(Pid), {store,true,COBID,IX,SI,Value}).
+    gen_server:call(serial_to_pid(Serial), {store,true,COBID,IX,SI,Value}).
 
 %% Fetch Value from IX:SI on remote node
-fetch(Pid, COBID, IX, SI)
+fetch(Serial, COBID, IX, SI)
   when ?is_index(IX), ?is_subind(SI) ->
-    gen_server:call(serial_to_pid(Pid), {fetch,false,COBID,IX,SI}).
+    gen_server:call(serial_to_pid(Serial), {fetch,false,COBID,IX,SI}).
 
 %% Fetch Value from IX:SI on remote node
-fetch_block(Pid, COBID, IX, SI)
+fetch_block(Serial, COBID, IX, SI)
   when ?is_index(IX), ?is_subind(SI) ->
-    gen_server:call(serial_to_pid(Pid), {fetch,true,COBID,IX,SI}).
+    gen_server:call(serial_to_pid(Serial), {fetch,true,COBID,IX,SI}).
 
 %% 
-dump(Pid) ->
-    gen_server:call(serial_to_pid(Pid), dump).
+dump(Serial) ->
+    gen_server:call(serial_to_pid(Serial), dump).
 
 %% convert a node serial name to a local name
 serial_to_pid(Sn) when is_integer(Sn) ->
@@ -220,6 +220,21 @@ serial_to_pid(Serial) when is_list(Serial) ->
     serial_to_pid(canopen:string_to_serial(Serial));
 serial_to_pid(Pid) when is_pid(Pid); is_atom(Pid) ->
     Pid.
+
+%% Send notification (from Nid)
+notify(Nid,Index,Value) ->
+    notify(Nid,Index,0,Value).
+
+notify(Nid,Index,Subind,Value) ->
+    io:format("~p: notify: Nid = ~.16#, Index = ~7.16.0#:~w, Value = ~8.16.0B\n",
+	      [self(), Nid, Index, Subind, Value]),
+    CobId = ?PDO1_TX_ID(Nid),
+    FrameID = ?COBID_TO_CANID(CobId),
+    Frame = #can_frame { id=FrameID, len=0, 
+			 data=(<<16#80,Index:16/little,Subind:8,Value:32/little>>) },
+    ?dbg("~p: notify: Sending frame ~p from Nid = ~.16# (CobId = ~.16#, CanId = ~.16#)\n",
+	 [self(), Frame, Nid, CobId, FrameID]),
+    can:send(Frame).
 
 %%====================================================================
 %% gen_server callbacks
@@ -329,7 +344,7 @@ handle_call({store,Block,COBID,IX,SI,Bin}, From, Ctx) ->
 		    Mon = erlang:monitor(process, Pid),
 		    sys:trace(Pid, true),
 		    S = #sdo { id=ID, pid=Pid, mon=Mon },
-		    ?dbg("store: added session id=~p\n", [ID]),
+		    ?dbg("~s: store: added session id=~p\n", [Ctx#co_ctx.name, ID]),
 		    Sessions = Ctx#co_ctx.sdo_list,
 		    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
 	    end;
@@ -348,7 +363,7 @@ handle_call({fetch,Block,COBID,IX,SI}, From, Ctx) ->
 		    Mon = erlang:monitor(process, Pid),
 		    sys:trace(Pid, true),
 		    S = #sdo { id=ID, pid=Pid, mon=Mon },
-		    ?dbg("fetch: added session id=~p\n", [ID]),
+		    ?dbg("~s: fetch: added session id=~p\n", [Ctx#co_ctx.name, ID]),
 		    Sessions = Ctx#co_ctx.sdo_list,
 		    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
 	    end;
@@ -445,7 +460,8 @@ handle_call({subscribers}, _From, Ctx)  ->
     {reply, Subs, Ctx};
 
 handle_call(dump, _From, Ctx) ->
-    io:format("    ID: ~w\n", [Ctx#co_ctx.id]),
+    io:format("  NAME: ~p\n", [Ctx#co_ctx.name]),
+    io:format("    ID: ~8.16.0B\n", [Ctx#co_ctx.id]),
     io:format("VENDOR: ~8.16.0B\n", [Ctx#co_ctx.vendor]),
     io:format("SERIAL: ~8.16.0B\n", [Ctx#co_ctx.serial]),
     io:format(" STATE: ~s\n", [co_format:state(Ctx#co_ctx.state)]),
@@ -546,7 +562,7 @@ handle_info({timeout,Ref,time_stamp}, Ctx) when Ref =:= Ctx#co_ctx.time_stamp_tm
     Size = byte_size(Data),
     Frame = #can_frame { id=FrameID, len=Size, data=Data },
     can:send(Frame),
-    ?dbg("Sent time stamp ~p\n", [Time]),
+    ?dbg("~s: handle_info: Sent time stamp ~p\n", [Ctx#co_ctx.name, Time]),
     Ctx1 = Ctx#co_ctx { time_stamp_tmr = start_timer(Ctx#co_ctx.time_stamp_time, time_stamp) },
     {noreply, Ctx1};
 
@@ -554,7 +570,7 @@ handle_info({'DOWN',Ref,process,_Pid,Reason}, Ctx) ->
     case lists:keysearch(Ref, #sdo.mon, Ctx#co_ctx.sdo_list) of
 	{value,_S} ->
 	    if Reason =/= normal ->
-		    io:format("co_node: session died: ~p\n", [Reason]);
+		    io:format("~p: session died: ~p\n", [?MODULE, Reason]);
 	       true ->
 		    ok
 	    end,
@@ -581,7 +597,24 @@ handle_info(_Info, Ctx) ->
 %% cleaning up. When it returns, the gen_server terminates with Reason.
 %% The return value is ignored.
 %%--------------------------------------------------------------------
-terminate(_Reason, _Ctx) ->
+terminate(_Reason, Ctx) ->
+    %% Stop all tpdo-servers ??
+    lists:foreach(
+      fun(T) ->
+	      Self = self(),
+	      case T#tpdo.pid of
+		  Self  -> do_nothing; %% ??
+		  Pid -> co_tpdo:stop(Pid) 
+		end
+      end,
+      Ctx#co_ctx.tpdo_list),
+
+    %% Stop all subscribers?? or inform them ??
+    lists:foreach(
+      fun(Pid) -> 
+	      gen_server:cast(Pid, co_node_terminated) 
+      end,
+      subscribers(Ctx#co_ctx.sub_table)),
     ok.
 
 %%--------------------------------------------------------------------
@@ -641,11 +674,12 @@ handle_can(Frame, Ctx) ->
 	    <<F:1, Addr:7, Ix:16/little, Si:8, Data:32/little>> = 
 		Frame#can_frame.data,
 	    case {F, Addr} of
-		{0, 0} ->
+		{1, 0} ->
 		    %% DAM-MPDO, destination is a group
 		    handle_dam_mpdo(Ctx, ?XNODE_ID(COBID), Ix, Si, Data);
 		_Other ->
-		    ?dbg("~s: handle_can: not handled: ~p\n", [Ctx#co_ctx.name,_Other]),
+		    ?dbg("~s: handle_can: frame not handled: Frame = ~p\n", 
+			 [Ctx#co_ctx.name, Frame]),
 		    Ctx
 	    end
     end.
@@ -726,7 +760,7 @@ handle_time_stamp(Frame, Ctx) ->
     ?dbg("~s: handle_timestamp: ~p\n", [Ctx#co_ctx.name,Frame]),
     try co_codec:decode(Frame#can_frame.data, ?TIME_OF_DAY) of
 	{T, _Bits} when is_record(T, time_of_day) ->
-	    ?dbg("Got timestamp: ~p\n", [T]),
+	    ?dbg("~s: Got timestamp: ~p\n", [Ctx#co_ctx.name, T]),
 	    set_time_of_day(T),
 	    Ctx;
 	_ ->
@@ -759,14 +793,14 @@ handle_sdo_tx(Frame, Tx, Rx, Ctx) ->
 	      [Ctx#co_ctx.name, Tx,
 	       co_format:format_sdo(co_sdo:decode_tx(Frame#can_frame.data))]),
     ID = {Tx,Rx},
-    ?dbg("handle_sdo_tx: session id=~p\n", [ID]),
+    ?dbg("~s: handle_sdo_tx: session id=~p\n", [Ctx#co_ctx.name, ID]),
     Sessions = Ctx#co_ctx.sdo_list,
     case lists:keysearch(ID,#sdo.id,Sessions) of
 	{value, S} ->
 	    gen_fsm:send_event(S#sdo.pid, Frame),
 	    Ctx;
 	false ->
-	    ?dbg("handle_sdo_tx: session not found\n", []),
+	    ?dbg("~s: handle_sdo_tx: session not found\n", [Ctx#co_ctx.name]),
 	    %% no such session active
 	    Ctx
     end.
@@ -806,14 +840,15 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
 %% DAM-MPDO
 %%
 handle_dam_mpdo(Ctx, RId, Ix, Si, Data) ->
-    ?dbg("~s: handle_dam_mpdo: Index = ~8.16.0#\n", [Ctx#co_ctx.name,Ix]),
+    ?dbg("~s: handle_dam_mpdo: Index = ~7.16.0#\n", [Ctx#co_ctx.name,Ix]),
     case co_node:subscribers(Ctx#co_ctx.sub_table, Ix) of
 	[] ->
-	    ?dbg("No subscribers for index ~8.16.0#\n", [Ix]);
+	    ?dbg("~s: No subscribers for index ~7.16.0#\n", [Ctx#co_ctx.name, Ix]);
 	PidList ->
 	    lists:foreach(
 	      fun(Pid) ->
-		      ?dbg("Process ~p subscribes to index ~8.16.0#\n", [Pid, Ix]),
+		      ?dbg("~s: Process ~p subscribes to index ~7.16.0#\n", 
+			   [Ctx#co_ctx.name, Pid, Ix]),
 		      Pid ! {notify, RId, Ix, Si, Data}
 	      end, PidList)
     end,
@@ -910,7 +945,7 @@ handle_notify(I, Ctx) ->
     NewCtx.
 
 handle_notify1(I, Ctx) ->
-    ?dbg("handle_notify: Index=~8.16.0#\n",[I]),
+    ?dbg("~s: handle_notify: Index=~7.16.0#\n",[Ctx#co_ctx.name, I]),
     case I of
 	?IX_COB_ID_SYNC_MESSAGE ->
 	    update_sync(Ctx);
@@ -941,7 +976,8 @@ handle_notify1(I, Ctx) ->
 		    Ctx
 	    end;
 	_ when I >= ?IX_RPDO_PARAM_FIRST, I =< ?IX_RPDO_PARAM_LAST ->
-	    ?dbg("update RPDO offset=~8.16.0#\n", [(I-?IX_RPDO_PARAM_FIRST)]),
+	    ?dbg("~s: handle_notify: update RPDO offset=~7.16.0#\n", 
+		 [Ctx#co_ctx.name, (I-?IX_RPDO_PARAM_FIRST)]),
 	    case load_pdo_parameter(I, (I-?IX_RPDO_PARAM_FIRST), Ctx) of
 		undefined -> 
 		    Ctx;
@@ -957,33 +993,37 @@ handle_notify1(I, Ctx) ->
 		    Ctx
 	    end;
 	_ when I >= ?IX_TPDO_PARAM_FIRST, I =< ?IX_TPDO_PARAM_LAST ->
-	    ?dbg("update TPDO: offset=~8.16.0#\n",[I - ?IX_TPDO_PARAM_FIRST]),
+	    ?dbg("~s: handle_notify: update TPDO: offset=~7.16.0#\n",
+		 [Ctx#co_ctx.name, I - ?IX_TPDO_PARAM_FIRST]),
 	    case load_pdo_parameter(I, (I-?IX_TPDO_PARAM_FIRST), Ctx) of
 		undefined -> Ctx;
 		Param ->
 		    case update_tpdo(Param, Ctx) of
 			{new, {T,Ctx1}} ->
-			    ?dbg("TPDO:new\n",[]),
+			    ?dbg("~s: handle_notify: TPDO:new\n",[Ctx#co_ctx.name]),
 			    ets:insert(Ctx#co_ctx.cob_table, 
 				       {Param#pdo_parameter.cob_id,
 					{tpdo,Param#pdo_parameter.rtr_allowed,T#tpdo.pid}}),
 			    Ctx1;
 			{existing,T} ->
-			    ?dbg("TPDO:existing\n",[]),
+			    ?dbg("~s: handle_notify: TPDO:existing\n",
+				 [Ctx#co_ctx.name]),
 			    co_tpdo:update(T#tpdo.pid, Param),
 			    Ctx;
 			{deleted,Ctx1} ->
-			    ?dbg("TPDO:deleted\n",[]),
+			    ?dbg("~s: handle_notify: TPDO:deleted\n",
+				 [Ctx#co_ctx.name]),
 			    ets:delete(Ctx#co_ctx.cob_table, Param#pdo_parameter.cob_id),
 			    Ctx1;
 			none ->
-			    ?dbg("TPDO:none\n",[]),
+			    ?dbg("~s: handle_notify: TPDO:none\n",[Ctx#co_ctx.name]),
 			    Ctx
 		    end
 	    end;
 	_ when I >= ?IX_TPDO_MAPPING_FIRST, I =< ?IX_TPDO_MAPPING_LAST ->
 	    Offset = I - ?IX_TPDO_MAPPING_FIRST,
-	    ?dbg("update TPDO-MAP: offset=~w\n", [Offset]),
+	    ?dbg("~s: handle_notify: update TPDO-MAP: offset=~w\n", 
+		 [Ctx#co_ctx.name, Offset]),
 	    J = ?IX_TPDO_PARAM_FIRST + Offset,
 	    COBID = co_dict:direct_value(Ctx#co_ctx.dict,J,?SI_PDO_COB_ID),
 	    case lookup_cobid(COBID, Ctx) of
@@ -994,7 +1034,8 @@ handle_notify1(I, Ctx) ->
 		    Ctx
 	    end;
 	_ ->
-	    ?dbg("item not subscribed for ix=~8.16.0#\n", [I]),
+	    ?dbg("~s: handle_notfy: item not subscribed for ix=~7.16.0#\n", 
+		 [Ctx#co_ctx.name, I]),
 	    Ctx
     end.
 
@@ -1005,7 +1046,8 @@ update_time_stamp(Ctx) ->
 	    COBID = ID band (?COBID_ENTRY_ID_MASK bor ?COBID_ENTRY_EXTENDED),
 	    if ID band ?COBID_ENTRY_TIME_PRODUCER =/= 0 ->
 		    Time = Ctx#co_ctx.time_stamp_time,
-		    ?dbg("Timestamp server time=~p\n", [Time]),
+		    ?dbg("~s: update_time_stamp: Timestamp server time=~p\n", 
+			 [Ctx#co_ctx.name, Time]),
 		    if Time > 0 ->
 			    Tmr = start_timer(Ctx#co_ctx.time_stamp_time,
 					      time_stamp),
@@ -1018,7 +1060,8 @@ update_time_stamp(Ctx) ->
 		    end;
 	       ID band ?COBID_ENTRY_TIME_CONSUMER =/= 0 ->
 		    %% consumer
-		    ?dbg("Timestamp consumer\n", []),
+		    ?dbg("~s: update_time_stamp: Timestamp consumer\n", 
+			 [Ctx#co_ctx.name]),
 		    Tmr = stop_timer(Ctx#co_ctx.time_stamp_tmr),
 		    %% FIXME: delete old COBID!!!
 		    ets:insert(Ctx#co_ctx.cob_table, {COBID,time_stamp}),
@@ -1228,7 +1271,8 @@ add_subscription(Tab, Ix, Pid) ->
 add_subscription(Tab, Ix1, Ix2, Pid) when ?is_index(Ix1), ?is_index(Ix2), 
 					  Ix1 =< Ix2, 
 					  (is_pid(Pid) orelse is_atom(Pid)) ->
-    ?dbg("add_subscription: ~8.16.0#:~8.16.0# for ~w\n", [Ix1, Ix2, Pid]),
+    ?dbg("~p: add_subscription: ~7.16.0#:~7.16.0# for ~w\n", 
+	 [?MODULE, Ix1, Ix2, Pid]),
     I = co_iset:new(Ix1, Ix2),
 
     case ets:lookup(Tab, Pid) of
@@ -1243,16 +1287,18 @@ remove_subscription(Tab, Ix, Pid) ->
     remove_subscription(Tab, Ix, Ix, Pid).
 
 remove_subscription(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
-    ?dbg("remove_subscription: ~w:~w for ~w\n", [Ix1, Ix2, Pid]),
+    ?dbg("~p: remove_subscription: ~w:~w for ~w\n", [?MODULE, Ix1, Ix2, Pid]),
     case ets:lookup(Tab, Pid) of
 	[] -> ok;
 	[{Pid,ISet}] ->
 	    case co_iset:difference(ISet, co_iset:new(Ix1, Ix2)) of
 		[] ->
-		    ?dbg("remove_subscription: last index for ~w\n", [Pid]),
+		    ?dbg("~p: remove_subscription: last index for ~w\n", 
+			 [?MODULE, Pid]),
 		    ets:delete(Tab, Pid);
 		ISet1 -> 
-		    ?dbg("remove_subscription: new index set ~p for ~w\n", [ISet1,Pid]),
+		    ?dbg("~p: remove_subscription: new index set ~p for ~w\n", 
+			 [?MODULE, ISet1,Pid]),
 		    ets:insert(Tab, {Pid,ISet1})
 	    end
     end.
@@ -1287,15 +1333,17 @@ subscriptions(Tab, Pid) when is_pid(Pid) ->
     end.
 		
 inform_subscribers(I, Ctx) ->			
-    lists:foreach(fun(Pid) ->
-			  case self() of
-			      Pid -> do_nothing;
-			      _OtherPid ->
-				  ?dbg("Sending object changed to ~p", [Pid]),
-				  gen_server:cast(Pid, {object_changed, I}) 
-			  end
-		  end,
-		  subscribers(Ctx#co_ctx.sub_table, I)).
+    lists:foreach(
+      fun(Pid) ->
+	      case self() of
+		  Pid -> do_nothing;
+		  _OtherPid ->
+		      ?dbg("~s: inform_subscribers: Sending object changed to ~p", 
+			   [Ctx#co_ctx.name, Pid]),
+		      gen_server:cast(Pid, {object_changed, I}) 
+	      end
+      end,
+      subscribers(Ctx#co_ctx.sub_table, I)).
 	
 lookup_sdo_server(COBID, Ctx) ->
     case lookup_cobid(COBID, Ctx) of
@@ -1456,9 +1504,11 @@ pdo_mapping(MType,_IX,SI,Sn,Ts,Is,_Dict) when SI > Sn ->
 pdo_mapping(MType,IX,SI,Sn,Ts,Is,Dict) ->
     case co_dict:value(Dict,IX,SI) of
 	{ok,Map} ->
-	    ?dbg("pdo_mapping: ~8.16.0#:~w = ~16.16.0#\n", [IX,SI,Map]),
+	    ?dbg("~p: pdo_mapping: ~7.16.0#:~w = ~11.16.0#\n", 
+		 [?MODULE, IX,SI,Map]),
 	    Index = {I,S} = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
-	    ?dbg("pdo_mapping: entry[~w] = {~8.16.0#:~w}\n", [SI,I,S]),
+	    ?dbg("~p: pdo_mapping: entry[~w] = {~7.16.0#:~w}\n", 
+		 [?MODULE, SI,I,S]),
 	    case co_dict:lookup_entry(Dict,Index) of
 		{ok,E} ->
 		    pdo_mapping(MType,IX,SI+1,Sn,
@@ -1468,7 +1518,8 @@ pdo_mapping(MType,IX,SI,Sn,Ts,Is,Dict) ->
 		    Error
 	    end;
 	Error ->
-	    ?dbg("pdo_mapping: ~8.16.0#:~w = Error ~w\n", [IX,SI,Error]),
+	    ?dbg("~p: pdo_mapping: ~7.16.0#:~w = Error ~w\n", 
+		 [?MODULE, IX,SI,Error]),
 	    Error
     end.
 
@@ -1542,7 +1593,7 @@ time_of_day() ->
     now_to_time_of_day(now()).
 
 set_time_of_day(Time) ->
-    ?dbg("set_time_of_day: ~p\n", [Time]),
+    ?dbg("~p: set_time_of_day: ~p\n", [?MODULE, Time]),
     ok.
 
 now_to_time_of_day({Sm,S0,Us}) ->

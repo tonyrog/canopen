@@ -45,14 +45,14 @@ fold_objects(_Fun, Acc, []) ->
 
 load_objects([{object,Index,Options}|Es],Os) 
   when ?is_index(Index), is_list(Options) ->
-    io:format("Load object: ~8.16.0B\n", [Index]),
+    io:format("~p: Load object: ~8.16.0B\n", [?MODULE, Index]),
     Obj = load_object(Options,#dict_object { index=Index },undefined,[]),
     load_objects(Es, [Obj|Os]);
 %%
 %% Simplified SDO server config
 %%
 load_objects([{sdo_server,I,ClientID}|Es],Os) ->
-    io:format("Load SDO-SERVER: ~w\n", [I]),
+    io:format("~p: Load SDO-SERVER: ~w\n", [?MODULE, I]),
     Access = if I==0 -> ?ACCESS_RO; true -> ?ACCESS_RW end,
     Index = ?IX_SDO_SERVER_FIRST+I,
     SDORx = cobid(sdo_rx, ClientID),
@@ -62,7 +62,7 @@ load_objects([{sdo_server,I,ClientID}|Es],Os) ->
     load_objects(Es, [Obj|Os]);
 
 load_objects([{sdo_server,I,Rx,Tx}|Es],Os) ->
-    io:format("Load SDO-SERVER: ~w\n", [I]),
+    io:format("~p: Load SDO-SERVER: ~w\n", [?MODULE, I]),
     Access = if I==0 -> ?ACCESS_RO; true -> ?ACCESS_RW end,
     Index = ?IX_SDO_SERVER_FIRST,
     SDORx = cobid(Rx),
@@ -74,7 +74,7 @@ load_objects([{sdo_server,I,Rx,Tx}|Es],Os) ->
 %% Load general SDO server config
 %%
 load_objects([{sdo_server,I,Rx,Tx,ClientID}|Es],Os) ->
-    io:format("Load SDO-SERVER: ~w\n", [I]),
+    io:format("~p: Load SDO-SERVER: ~w\n", [?MODULE, I]),
     Access = if I==0 -> ?ACCESS_RO; true -> ?ACCESS_RW end,
     Index = ?IX_SDO_SERVER_FIRST+I,
     SDORx = cobid(Rx),
@@ -86,7 +86,7 @@ load_objects([{sdo_server,I,Rx,Tx,ClientID}|Es],Os) ->
 %% SDO - client spec
 %%
 load_objects([{sdo_client,I,Tx,Rx,ServerID}|Es],Os) ->
-    io:format("Load SDO-CLIENT: ~w\n", [I]),
+    io:format("~p: Load SDO-CLIENT: ~w\n", [?MODULE, I]),
     Index = ?IX_SDO_CLIENT_FIRST + I,
     SDORx = cobid(Rx),
     SDOTx = cobid(Tx),
@@ -97,7 +97,7 @@ load_objects([{sdo_client,I,Tx,Rx,ServerID}|Es],Os) ->
 %% TPDO parameter config
 %%
 load_objects([{tpdo,I,ID,Opts}|Es],Os) ->
-    io:format("Load TPDO-PARAMETER: ~w\n", [I]),
+    io:format("~p: Load TPDO-PARAMETER: ~w\n", [?MODULE, I]),
     Index = ?IX_TPDO_PARAM_FIRST + I,
     COBID = cobid(ID),
     Trans = proplists:get_value(transmission_type,Opts,specific),
@@ -119,13 +119,13 @@ load_objects([{tpdo,I,ID,Opts}|Es],Os) ->
 			  access=?ACCESS_RW, value=0},
 	    #dict_entry { index={Index,5}, type=?UNSIGNED16,
 			  access=?ACCESS_RW, value=EventTimer}]},
-    io:format("TPDO-PARAMETER: ~w\n", [Obj]),
+    io:format("~p: TPDO-PARAMETER: ~w\n", [?MODULE, Obj]),
     load_objects(Es, [Obj|Os]);
 %%
 %% TPDO mapping
 %%
 load_objects([{tpdo_map,I,Map}|Es], Os) ->
-    io:format("Load TPDO-MAP: ~w\n", [I]),
+    io:format("~p: Load TPDO-MAP: ~w\n", [?MODULE, I]),
     Index = ?IX_TPDO_MAPPING_FIRST + I,
     N = length(Map),
     Obj={#dict_object { index = Index, type=?PDO_MAPPING,
@@ -143,7 +143,7 @@ load_objects([{tpdo_map,I,Map}|Es], Os) ->
 %% RPDO parameter config
 %%
 load_objects([{rpdo,I,ID,Opts}|Es],Os) ->
-    io:format("Load RPDO-PARAMETER: ~w\n", [I]),
+    io:format("~p: Load RPDO-PARAMETER: ~w\n", [?MODULE, I]),
     Index = ?IX_RPDO_PARAM_FIRST + I,
     COBID = cobid(ID),
     Trans = proplists:get_value(transmission_type,Opts,specific),
@@ -171,7 +171,7 @@ load_objects([{rpdo,I,ID,Opts}|Es],Os) ->
 %% RPDO mapping
 %%
 load_objects([{rpdo_map,I,Map}|Es], Os) ->
-    io:format("Load RPDO-MAP: ~w\n", [I]),
+    io:format("~p: Load RPDO-MAP: ~w\n", [?MODULE, I]),
     Index = ?IX_RPDO_MAPPING_FIRST + I,
     N = length(Map),
     Obj = {#dict_object { index = Index, type=?PDO_MAPPING,
@@ -189,7 +189,7 @@ load_objects([{rpdo_map,I,Map}|Es], Os) ->
 %% value range 1 - 16#FE 
 %%
 load_objects([{mpdo_dispatch,I,Map}|Es], Os) ->
-    io:format("Load Object Dispatching List: ~w\n", [I]),
+    io:format("~p: Load Object Dispatching List: ~w\n", [?MODULE, I]),
     Index = ?IX_OBJECT_DISPATCH_FIRST + I,
     N = length(Map),
     Obj = {#dict_object { index = Index, type=?UNSIGNED64,
@@ -204,7 +204,7 @@ load_objects([{mpdo_dispatch,I,Map}|Es], Os) ->
     load_objects(Es, [Obj|Os]);
 
 load_objects([{mpdo_scanner,I,Map}|Es], Os) ->
-    io:format("Load Object Scanner List: ~w\n", [I]),
+    io:format("~p: Load Object Scanner List: ~w\n", [?MODULE, I]),
     Index = ?IX_OBJECT_SCANNER_FIRST + I,
     N = length(Map),
     Obj = {#dict_object { index = Index, type=?UNSIGNED32,

@@ -95,6 +95,9 @@ load_dict(CoNode, Dict) ->
 %%                                   {noreply, LoopData, Timeout} |
 %%                                   {stop, Reason, Reply, LoopData} |
 %%                                   {stop, Reason, LoopData}
+%%
+%% Request = {get, Index, SubIndex} |
+%%           {set, Index, SubInd, Value}
 %% @end
 %%--------------------------------------------------------------------
 handle_call({get, Index, SubInd}, _From, LoopData) ->
@@ -153,6 +156,8 @@ handle_cast(_Msg, LoopData) ->
 %% @spec handle_info(Info, LoopData) -> {noreply, LoopData} |
 %%                                   {noreply, LoopData, Timeout} |
 %%                                   {stop, Reason, LoopData}
+%%
+%% Info = {notify, RemoteId, Index, SubInd, Value}
 %% @end
 %%--------------------------------------------------------------------
 handle_info({notify, RemoteId, Index, SubInd, Value}, LoopData) ->
