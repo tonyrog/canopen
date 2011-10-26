@@ -23,16 +23,19 @@
 
 %% Application interface
 -export([subscribe/2, unsubscribe/2]).
--export([my_subscriptions/1, my_subscriptions/2, all_subscribers/1, all_subscribers/2]).
+-export([my_subscriptions/1, my_subscriptions/2]).
+-export([all_subscribers/1, all_subscribers/2]).
+-export([notify/3, notify/4]). %% To send MPOs
 
--export([add_entry/2]).
+%% CANopen application internal
+-export([add_entry/2, get_entry/2]).
 -export([load_dict/2]).
 
 -export([set/3, value/2]).
 -export([store/5, fetch/4]).
 -export([store_block/5, fetch_block/4]).
 
--export([notify/3, notify/4]).
+-export([tpdo_mapping/2, rpdo_mapping/2]).
 
 %% Debug interface
 -export([dump/1]).
@@ -379,12 +382,16 @@ serial_to_pid(Serial) when is_list(Serial) ->
 serial_to_pid(Pid) when is_pid(Pid); is_atom(Pid) ->
     Pid.
 
+
+
+
 %%--------------------------------------------------------------------
 %% @spec notify(Nid, Index, Value) -> ok | {error, Error}
 %%
 %% @doc
-%% Send notification (from Nid). 
-%% SubInd is set to 0.
+%% Send notification (from Nid). <br/>
+%% SubInd is set to 0.<br/>
+%% Executing in calling process context.<br/>
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -395,7 +402,8 @@ notify(Nid,Index,Value) ->
 %% @spec notify(Nid, Index, SubInd, Value) -> ok | {error, Error}
 %%
 %% @doc
-%% Send notification (from Nid).
+%% Send notification (from Nid). <br/>
+%% Executing in calling process context.<br/>
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -409,6 +417,31 @@ notify(Nid,Index,Subind,Value) ->
     ?dbg("~p: notify: Sending frame ~p from Nid = ~.16# (CobId = ~.16#, CanId = ~.16#)\n",
 	 [self(), Frame, Nid, CobId, FrameID]),
     can:send(Frame).
+
+%%--------------------------------------------------------------------
+%% @spec rpdo_mapping(I, Dixt) -> Map | {error, Error}
+%%
+%% @doc
+%% Get the RPDO mapping
+%% Executing in calling process context.<br/>
+%%
+%% @end
+%%--------------------------------------------------------------------
+rpdo_mapping(I, Dict) ->
+    pdo_mapping(I+?IX_RPDO_MAPPING_FIRST,Dict).
+
+%%--------------------------------------------------------------------
+%% @spec tpdo_mapping(I, Dixt) -> Map | {error, Error}
+%%
+%% @doc
+%% Get the TPDO mapping
+%% Executing in calling process context.<br/>
+%%
+%% @end
+%%--------------------------------------------------------------------
+tpdo_mapping(I, Dict) ->
+    pdo_mapping(I+?IX_TPDO_MAPPING_FIRST,Dict).
+
 
 %%====================================================================
 %% gen_server callbacks
@@ -1054,7 +1087,7 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
 %%
 handle_dam_mpdo(Ctx, RId, Ix, Si, Data) ->
     ?dbg("~s: handle_dam_mpdo: Index = ~7.16.0#\n", [Ctx#co_ctx.name,Ix]),
-    case co_node:subscribers(Ctx#co_ctx.sub_table, Ix) of
+    case subscribers(Ctx#co_ctx.sub_table, Ix) of
 	[] ->
 	    ?dbg("~s: No subscribers for index ~7.16.0#\n", [Ctx#co_ctx.name, Ix]);
 	PidList ->
@@ -1687,14 +1720,6 @@ rpdo_set([{IX,SI}|Is], [Value|Vs], Ctx) ->
 rpdo_set([], [], Ctx) ->
     Ctx.
 
-
-%% Get the RPDO mapping
-rpdo_mapping(I, Dict) ->
-    pdo_mapping(I+?IX_RPDO_MAPPING_FIRST,Dict).
-
-%% Get the TPDO mapping
-tpdo_mapping(I, Dict) ->
-    pdo_mapping(I+?IX_TPDO_MAPPING_FIRST,Dict).
 
 %% read PDO mapping  => {ok,[{Type,Len}],[Index]}
 pdo_mapping(IX, Dict) ->
