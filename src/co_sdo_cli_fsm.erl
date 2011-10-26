@@ -44,18 +44,29 @@
 %%%===================================================================
 
 %%--------------------------------------------------------------------
+%% @spec store(Ctx,Block,From,Src,Dst,IX,SI,Bin) -> 
+%%           {ok, Pid} | ignore | {error, Error}
 %% @doc
 %% Creates a gen_fsm process which calls Module:init/1 to
 %% initialize. To ensure a synchronized start-up procedure, this
 %% function does not return until Module:init/1 has returned.
 %%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
 store(Ctx,Block,From,Src,Dst,IX,SI,Bin) when is_record(Ctx, sdo_ctx) ->
     gen_fsm:start(?MODULE, 
 		  [store,Block,Ctx,From,self(),Src,Dst,IX,SI,Bin], []).
 
+%%--------------------------------------------------------------------
+%% @spec fetch(Ctx,Block,From,Src,Dst,IX,SI) -> 
+%%           {ok, Pid} | ignore | {error, Error}
+%% @doc
+%% Creates a gen_fsm process which calls Module:init/1 to
+%% initialize. To ensure a synchronized start-up procedure, this
+%% function does not return until Module:init/1 has returned.
+%%
+%% @end
+%%--------------------------------------------------------------------
 fetch(Ctx,Block,From,Src,Dst,IX,SI) ->
     gen_fsm:start(?MODULE, 
 		  [fetch,Block,Ctx,From,self(),Src,Dst,IX,SI], []).
@@ -66,15 +77,15 @@ fetch(Ctx,Block,From,Src,Dst,IX,SI) ->
 
 %%--------------------------------------------------------------------
 %% @private
+%% @spec init(Args) -> {ok, StateName, State} |
+%%                     {ok, StateName, State, Timeout} |
+%%                     ignore |
+%%                     {stop, StopReason}
 %% @doc
 %% Whenever a gen_fsm is started using gen_fsm:start/[3,4] or
 %% gen_fsm:start_link/[3,4], this function is called by the new
 %% process to initialize.
 %%
-%% @spec init(Args) -> {ok, StateName, State} |
-%%                     {ok, StateName, State, Timeout} |
-%%                     ignore |
-%%                     {stop, StopReason}
 %% @end
 %%--------------------------------------------------------------------
 init([store,false,Ctx,From,NodePid,Src,Dst,IX,SI,Data]) ->
@@ -138,6 +149,10 @@ init([fetch,true,Ctx,From,NodePid,Src,Dst,IX,SI]) ->
 
 %%--------------------------------------------------------------------
 %% @private
+%% @spec state_name(Event, State) ->
+%%                   {next_state, NextStateName, NextState} |
+%%                   {next_state, NextStateName, NextState, Timeout} |
+%%                   {stop, Reason, NewState}
 %% @doc
 %% There should be one instance of this function for each possible
 %% state name. Whenever a gen_fsm receives an event sent using
@@ -145,12 +160,10 @@ init([fetch,true,Ctx,From,NodePid,Src,Dst,IX,SI]) ->
 %% name as the current state name StateName is called to handle
 %% the event. It is also called if a timeout occurs.
 %%
-%% @spec state_name(Event, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState}
 %% @end
 %%--------------------------------------------------------------------
+state_name(_Event, _State) ->
+    dummy_for_edoc.
 
 s_segmented_download_response(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
@@ -453,38 +466,15 @@ s_block_upload_end(timeout, S) ->
 			    
 %%--------------------------------------------------------------------
 %% @private
-%% @doc
-%% There should be one instance of this function for each possible
-%% state name. Whenever a gen_fsm receives an event sent using
-%% gen_fsm:sync_send_event/[2,3], the instance of this function with
-%% the same name as the current state name StateName is called to
-%% handle the event.
-%%
-%% @spec state_name(Event, From, State) ->
+%% @spec handle_event(Event, StateName, State) ->
 %%                   {next_state, NextStateName, NextState} |
 %%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {reply, Reply, NextStateName, NextState} |
-%%                   {reply, Reply, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState} |
-%%                   {stop, Reason, Reply, NewState}
-%% @end
-%%--------------------------------------------------------------------
-
-%% state_name(_Event, _From, State) ->
-%%     Reply = ok,
-%%     {reply, Reply, state_name, State}.
-
-%%--------------------------------------------------------------------
-%% @private
+%%                   {stop, Reason, NewState}
 %% @doc
 %% Whenever a gen_fsm receives an event sent using
 %% gen_fsm:send_all_state_event/2, this function is called to handle
 %% the event.
 %%
-%% @spec handle_event(Event, StateName, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState}
 %% @end
 %%--------------------------------------------------------------------
 handle_event(_Event, StateName, S) ->
@@ -493,11 +483,6 @@ handle_event(_Event, StateName, S) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc
-%% Whenever a gen_fsm receives an event sent using
-%% gen_fsm:sync_send_all_state_event/[2,3], this function is called
-%% to handle the event.
-%%
 %% @spec handle_sync_event(Event, From, StateName, State) ->
 %%                   {next_state, NextStateName, NextState} |
 %%                   {next_state, NextStateName, NextState, Timeout} |
@@ -505,6 +490,11 @@ handle_event(_Event, StateName, S) ->
 %%                   {reply, Reply, NextStateName, NextState, Timeout} |
 %%                   {stop, Reason, NewState} |
 %%                   {stop, Reason, Reply, NewState}
+%% @doc
+%% Whenever a gen_fsm receives an event sent using
+%% gen_fsm:sync_send_all_state_event/[2,3], this function is called
+%% to handle the event.
+%%
 %% @end
 %%--------------------------------------------------------------------
 handle_sync_event(_Event, _From, StateName, State) ->
@@ -513,15 +503,15 @@ handle_sync_event(_Event, _From, StateName, State) ->
 
 %%--------------------------------------------------------------------
 %% @private
+%% @spec handle_info(Info,StateName,State)->
+%%                   {next_state, NextStateName, NextState} |
+%%                   {next_state, NextStateName, NextState, Timeout} |
+%%                   {stop, Reason, NewState}
 %% @doc
 %% This function is called by a gen_fsm when it receives any
 %% message other than a synchronous or asynchronous event
 %% (or a system message).
 %%
-%% @spec handle_info(Info,StateName,State)->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState}
 %% @end
 %%--------------------------------------------------------------------
 handle_info(_Info, StateName, State) ->
@@ -529,13 +519,13 @@ handle_info(_Info, StateName, State) ->
 
 %%--------------------------------------------------------------------
 %% @private
+%% @spec terminate(Reason, StateName, State) -> void()
 %% @doc
 %% This function is called by a gen_fsm when it is about to
 %% terminate. It should be the opposite of Module:init/1 and do any
 %% necessary cleaning up. When it returns, the gen_fsm terminates with
 %% Reason. The return value is ignored.
 %%
-%% @spec terminate(Reason, StateName, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, _StateName, _State) ->
@@ -543,11 +533,11 @@ terminate(_Reason, _StateName, _State) ->
 
 %%--------------------------------------------------------------------
 %% @private
+%% @spec code_change(OldVsn, StateName, State, Extra) ->
+%%                   {ok, StateName, NewState}
 %% @doc
 %% Convert process state when code is changed
 %%
-%% @spec code_change(OldVsn, StateName, State, Extra) ->
-%%                   {ok, StateName, NewState}
 %% @end
 %%--------------------------------------------------------------------
 code_change(_OldVsn, StateName, State, _Extra) ->

@@ -99,10 +99,10 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({transfer_write,Index,SubInd,Data}, _From, State) ->
+handle_cast({transfer_write,Index,SubInd,Data}, State) ->
     %% Complete data for item
     {noreply, State};
-handle_cast({transfer_write,Index,SubInd,Offset,Data}, _From, State) ->
+handle_cast({transfer_write,Index,SubInd,Offset,Data}, State) ->
     %% Partial data for item
     {noreply, State};
 handle_cast(_Msg, State) ->

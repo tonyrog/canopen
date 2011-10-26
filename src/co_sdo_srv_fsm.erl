@@ -47,12 +47,13 @@
 %%%===================================================================
 
 %%--------------------------------------------------------------------
+%% @spec start(Ctx, Src, Dst) -> {ok, Pid} | ignore | {error, Error}
+%%
 %% @doc
 %% Creates a gen_fsm process which calls Module:init/1 to
 %% initialize. To ensure a synchronized start-up procedure, this
 %% function does not return until Module:init/1 has returned.
 %%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
 start(Ctx,Src,Dst) when is_record(Ctx, sdo_ctx) ->
@@ -64,15 +65,15 @@ start(Ctx,Src,Dst) when is_record(Ctx, sdo_ctx) ->
 
 %%--------------------------------------------------------------------
 %% @private
+%% @spec init(Args) -> {ok, StateName, State} |
+%%                     {ok, StateName, State, Timeout} |
+%%                     ignore |
+%%                     {stop, StopReason}
 %% @doc
 %% Whenever a gen_fsm is started using gen_fsm:start/[3,4] or
 %% gen_fsm:start_link/[3,4], this function is called by the new
 %% process to initialize.
 %%
-%% @spec init(Args) -> {ok, StateName, State} |
-%%                     {ok, StateName, State, Timeout} |
-%%                     ignore |
-%%                     {stop, StopReason}
 %% @end
 %%--------------------------------------------------------------------
 init([Ctx,NodePid,Src,Dst]) ->
@@ -96,6 +97,10 @@ init([Ctx,NodePid,Src,Dst]) ->
 
 %%--------------------------------------------------------------------
 %% @private
+%% @spec state_name(Event, State) ->
+%%                   {next_state, NextStateName, NextState} |
+%%                   {next_state, NextStateName, NextState, Timeout} |
+%%                   {stop, Reason, NewState}
 %% @doc
 %% There should be one instance of this function for each possible
 %% state name. Whenever a gen_fsm receives an event sent using
@@ -103,12 +108,10 @@ init([Ctx,NodePid,Src,Dst]) ->
 %% name as the current state name StateName is called to handle
 %% the event. It is also called if a timeout occurs.
 %%
-%% @spec state_name(Event, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState}
 %% @end
 %%--------------------------------------------------------------------
+state_name(_Event, _State) ->
+    dummy_for_edoc.
 
 s_initial(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
@@ -474,29 +477,6 @@ s_block_download_end(M, S) when is_record(M, can_frame) ->
 s_block_download_end(timeout, S) ->
     abort(S, ?abort_timed_out).    
 
-
-%%--------------------------------------------------------------------
-%% @private
-%% @doc
-%% There should be one instance of this function for each possible
-%% state name. Whenever a gen_fsm receives an event sent using
-%% gen_fsm:sync_send_event/[2,3], the instance of this function with
-%% the same name as the current state name StateName is called to
-%% handle the event.
-%%
-%% @spec state_name(Event, From, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {reply, Reply, NextStateName, NextState} |
-%%                   {reply, Reply, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState} |
-%%                   {stop, Reason, Reply, NewState}
-%% @end
-%%--------------------------------------------------------------------
-
-%% state_name(_Event, _From, State) ->
-%%    Reply = ok,
-%%    {reply, Reply, state_name, State}.
 
 %%--------------------------------------------------------------------
 %% @private

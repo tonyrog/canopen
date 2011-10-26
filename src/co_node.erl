@@ -1,16 +1,17 @@
 %%%-------------------------------------------------------------------
+%%% @author Tony Rogvall <tony@rogvall.se>
+%%% @copyright (C) 2010, Tony Rogvall
+%%% @doc
 %%% File    : co_node.erl
-%%% Author  : Tony Rogvall <tony@PBook.local>
 %%% Description : can_node
 %%%
-%%% Created : 10 Jan 2008 by Tony Rogvall <tony@PBook.local>
+%%% Created : 10 Jan 2008 
+%%% @end
 %%%-------------------------------------------------------------------
 
 -module(co_node).
 
 -behaviour(gen_server).
-
--compile(export_all).
 
 %% API
 -export([start/1, start/2, stop/1]).
@@ -30,6 +31,11 @@
 -export([set/3, value/2]).
 -export([store/5, fetch/4]).
 -export([store_block/5, fetch_block/4]).
+
+-export([notify/3, notify/4]).
+
+%% Debug interface
+-export([dump/1]).
 
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
 
@@ -62,24 +68,32 @@
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% Function: start(Serial [,Opts])
+%% @spec start(Serial, [Opts]) -> {ok,Pid} | ignore | {error,Error}
 %%
-%%   Opts:  {name,   Name}
-%%          {vendor, VendorID}
-%%          extended                     - use extended (29-bit) ID
-%%          {time_stamp,  timeout()}     - ( 60000 )  1m
-%%          {sdo_timeout, timeout()}     - ( 1000 )
-%%          {blk_timeout, timeout()}     - ( 500 )
-%%          {pst, integer()}             - ( 16 )
-%%          {max_blksize, integer()}     - ( 74 = 518 bytes)
-%%          {use_crc, boolean()}         - use crc for block (true)
-%% 
-%% Description: Starts the server
+%%   Opts = {name,   Name} |
+%%          {vendor, VendorID} |
+%%          extended |                  
+%%          {time_stamp,  timeout()} |  
+%%          {sdo_timeout, timeout()} |  
+%%          {blk_timeout, timeout()} |  
+%%          {pst, integer()} |          
+%%          {max_blksize, integer()} |  
+%%          {use_crc, boolean()}        
+%%
+%% @doc
+%% Description: Starts the server.
+%%
+%% Options: 
+%%          extended - use extended (29-bit) ID <br/>
+%%          {time_stamp,  timeout()} - ( 60000 )  1m <br/>
+%%          {sdo_timeout, timeout()} - ( 1000 ) <br/>
+%%          {blk_timeout, timeout()} - ( 500 ) <br/>
+%%          {pst, integer()}         - ( 16 ) <br/>
+%%          {max_blksize, integer()} - ( 74 = 518 bytes) <br/>
+%%          {use_crc, boolean()}     - use crc for block (true) <br/>
+%%         
+%% @end
 %%--------------------------------------------------------------------
-
-start(Serial) ->
-    start(Serial, []).
-
 start(Serial,Opts) ->
     S = serial(Serial),
     NodeId = (S bsr 8) bor ?CAN_EFF_FLAG,
@@ -87,6 +101,17 @@ start(Serial,Opts) ->
     ?dbg("~p: Starting co_node with Name = ~p, Serial = ~.16#, NodeId = ~.16#\n",
 	 [?MODULE, Name, S, NodeId]),
     gen_server:start({local, Name}, ?MODULE, [S,NodeId,Name,Opts], []).
+
+%%--------------------------------------------------------------------
+%% @spec start(Serial) -> {ok,Pid} | ignore | {error,Error}
+%%
+%% @doc
+%% Description: Starts the server.
+%%
+%% @end
+%%--------------------------------------------------------------------
+start(Serial) ->
+    start(Serial, []).
 
 %%
 %% Get serial number, accepts both string and number
@@ -107,53 +132,153 @@ name(Opts, Serial) ->
 	    list_to_atom(canopen:serial_to_string(Serial))
     end.
 
+%%--------------------------------------------------------------------
+%% @spec stop(Serial) -> ok | {error, Error}
+%%
+%% @doc
+%% Stops the server.
+%%
+%% @end
+%%--------------------------------------------------------------------
 stop(Serial) ->
     gen_server:call(serial_to_pid(Serial), stop).
 
-%% Attach application to can node
+%%--------------------------------------------------------------------
+%% @spec attach(Serial) -> ok | {error, Error}
+%%
+%% @doc
+%% Attches the calling process to the CANnode Serial.
+%%
+%% @end
+%%--------------------------------------------------------------------
 attach(Serial) ->
     gen_server:call(serial_to_pid(Serial), {attach, self()}).
 
+%%--------------------------------------------------------------------
+%% @spec detach(Serial) -> ok | {error, Error}
+%%
+%% @doc
+%% Detaches the calling process from the CANnode Serial.
+%%
+%% @end
+%%--------------------------------------------------------------------
 detach(Serial) ->
     gen_server:call(serial_to_pid(Serial), {detach, self()}).
 
-%% Subscribe to changes to object dictionary
+%%--------------------------------------------------------------------
+%% @spec subscribe(Serial, Index) -> ok | {error, Error}
+%%
+%% @doc
+%% Adds a subscription to changes of the Dictionary Object in position Index.
+%% Index can also be a range [Index1 - Index2].
+%%
+%% @end
+%%--------------------------------------------------------------------
 subscribe(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {subscribe, Ix, self()}).
 
+%%--------------------------------------------------------------------
+%% @spec unsubscribe(Serial, Index) -> ok | {error, Error}
+%%
+%% @doc
+%% Removes a subscription to changes of the Dictionary Object in position Index.
+%% Index can also be a range [Index1 - Index2].
+%%
+%% @end
+%%--------------------------------------------------------------------
 unsubscribe(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {unsubscribe, Ix, self()}).
 
+%%--------------------------------------------------------------------
+%% @spec my_subscriptions(Serial, Pid) -> [Index] | {error, Error}
+%%
+%% @doc
+%% Returns the Indexes for which Pid has subscriptions.
+%%
+%% @end
+%%--------------------------------------------------------------------
 my_subscriptions(Serial, Pid) ->
     gen_server:call(serial_to_pid(Serial), {subscriptions, Pid}).
 
+%%--------------------------------------------------------------------
+%% @spec my_subscriptions(Serial) -> [Index] | {error, Error}
+%%
+%% @doc
+%% Returns the Indexes for which the calling process has subscriptions.
+%%
+%% @end
+%%--------------------------------------------------------------------
 my_subscriptions(Serial) ->
     gen_server:call(serial_to_pid(Serial), {subscriptions, self()}).
 
+%%--------------------------------------------------------------------
+%% @spec all_subscribers(Serial) -> [Pid] | {error, Error}
+%%
+%% @doc
+%% Returns the Pids that subscribes to any Index.
+%%
+%% @end
+%%--------------------------------------------------------------------
 all_subscribers(Serial) ->
     gen_server:call(serial_to_pid(Serial), {subscribers}).
 
+%%--------------------------------------------------------------------
+%% @spec all_subscribers(Serial, Ix) -> [Pid] | {error, Error}
+%%
+%% @doc
+%% Returns the Pids that subscribes to Index.
+%%
+%% @end
+%%--------------------------------------------------------------------
 all_subscribers(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {subscribers, Ix}).
 
+%%--------------------------------------------------------------------
+%% @spec add_entry(Serial, Entry) -> ok | {error, Error}
 %%
-%% Internal access to node dictionay
+%% @doc
+%% Adds Entry to the Object dictionary.
 %%
+%% @end
+%%--------------------------------------------------------------------
 add_entry(Serial, Ent) ->
     gen_server:call(serial_to_pid(Serial), {add_entry, Ent}).
 
+%%--------------------------------------------------------------------
+%% @spec get_entry(Serial, Index) -> ok | {error, Error}
+%%
+%% @doc
+%% Gets the Entry at Index in Object dictionary.
+%%
+%% @end
+%%--------------------------------------------------------------------
 get_entry(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {get_entry,Ix}).
 
+%%--------------------------------------------------------------------
+%% @spec load_dict(Serial, File) -> ok | {error, Error}
+%%
+%% @doc
+%% Loads a new Object Dictionary from File.
+%%
+%% @end
+%%-------------------------------------------------------------------
 load_dict(Serial, File) ->
     gen_server:call(serial_to_pid(Serial), {load_dict, File}).
     
 
-%% Get/Set local value (internal api)
-set(Serial, Ix, Si, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    gen_server:call(serial_to_pid(Serial), {set,Ix,Si,Value}).    
+%%--------------------------------------------------------------------
+%% @spec set(Serial, Index, Value) -> ok | {error, Error}
+%%
+%% @doc
+%% Sets Index to Value.
+%%
+%% @end
+%%--------------------------------------------------------------------
 set(Serial, Ix, Value) when ?is_index(Ix) ->
     gen_server:call(serial_to_pid(Serial), {set,Ix,0,Value}).
+set(Serial, Ix, Si, Value) when ?is_index(Ix), ?is_subind(Si) ->
+    gen_server:call(serial_to_pid(Serial), {set,Ix,Si,Value}).    
 
 %% Set raw value (used to update internal read only tables etc)
 direct_set(Serial, Ix, Si, Value) when ?is_index(Ix), ?is_subind(Si) ->
@@ -161,7 +286,14 @@ direct_set(Serial, Ix, Si, Value) when ?is_index(Ix), ?is_subind(Si) ->
 direct_set(Serial, Ix, Value) when ?is_index(Ix) ->
     gen_server:call(serial_to_pid(Serial), {direct_set,Ix,0,Value}).
 
-%% Read dictionary value
+%%--------------------------------------------------------------------
+%% @spec value(Serial, Index) -> Value | {error, Error}
+%%
+%% @doc
+%% Gets Value for Index.
+%%
+%% @end
+%%--------------------------------------------------------------------
 value(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {value,Ix}).
 
@@ -179,27 +311,63 @@ value(Serial, Ix) ->
 %% 
 %%
 
-%% Store Value at IX:SI on remote node
+%%--------------------------------------------------------------------
+%% @spec store(Serial, CobId, Index, SubInd, Value) -> noreply | {error, Error}
+%%
+%% @doc
+%% Starts a store session to store Value at Index:Subind on remote node.
+%%
+%% @end
+%%--------------------------------------------------------------------
 store(Serial, COBID, IX, SI, Value) 
   when ?is_index(IX), ?is_subind(SI), is_binary(Value) ->
     gen_server:call(serial_to_pid(Serial), {store,false,COBID,IX,SI,Value}).
 
-%% Store Value at IX:SI on remote node
+%%--------------------------------------------------------------------
+%% @spec store_block(Serial, CobId, Index, SubInd, Value) -> noreply | {error, Error}
+%%
+%% @doc
+%% Starts a store session to store Value at Index:Subind on remote node.
+%%
+%% @end
+%%--------------------------------------------------------------------
 store_block(Serial, COBID, IX, SI, Value) 
   when ?is_index(IX), ?is_subind(SI), is_binary(Value) ->
     gen_server:call(serial_to_pid(Serial), {store,true,COBID,IX,SI,Value}).
 
-%% Fetch Value from IX:SI on remote node
+%%--------------------------------------------------------------------
+%% @spec fetch(Serial, CobId, Index, SubInd) -> noreply | {error, Error}
+%%
+%% @doc
+%% Starts a fetch session to fetch Value at Index:Subind on remote node.
+%%
+%% @end
+%%--------------------------------------------------------------------
 fetch(Serial, COBID, IX, SI)
   when ?is_index(IX), ?is_subind(SI) ->
     gen_server:call(serial_to_pid(Serial), {fetch,false,COBID,IX,SI}).
 
-%% Fetch Value from IX:SI on remote node
+%%--------------------------------------------------------------------
+%% @spec fetch_block(Serial, CobId, Index, SubInd) -> noreply | {error, Error}
+%%
+%% @doc
+%% Starts a fetch session to fetch Value at Index:Subind on remote node.
+%%
+%% @end
+%%--------------------------------------------------------------------
 fetch_block(Serial, COBID, IX, SI)
   when ?is_index(IX), ?is_subind(SI) ->
     gen_server:call(serial_to_pid(Serial), {fetch,true,COBID,IX,SI}).
 
-%% 
+
+%%--------------------------------------------------------------------
+%% @spec dump(Serial) -> ok | {error, Error}
+%%
+%% @doc
+%% Dumps the loop data to standard output.
+%%
+%% @end
+%%--------------------------------------------------------------------
 dump(Serial) ->
     gen_server:call(serial_to_pid(Serial), dump).
 
@@ -211,10 +379,26 @@ serial_to_pid(Serial) when is_list(Serial) ->
 serial_to_pid(Pid) when is_pid(Pid); is_atom(Pid) ->
     Pid.
 
-%% Send notification (from Nid)
+%%--------------------------------------------------------------------
+%% @spec notify(Nid, Index, Value) -> ok | {error, Error}
+%%
+%% @doc
+%% Send notification (from Nid). 
+%% SubInd is set to 0.
+%%
+%% @end
+%%--------------------------------------------------------------------
 notify(Nid,Index,Value) ->
     notify(Nid,Index,0,Value).
 
+%%--------------------------------------------------------------------
+%% @spec notify(Nid, Index, SubInd, Value) -> ok | {error, Error}
+%%
+%% @doc
+%% Send notification (from Nid).
+%%
+%% @end
+%%--------------------------------------------------------------------
 notify(Nid,Index,Subind,Value) ->
     io:format("~p: notify: Nid = ~.16#, Index = ~7.16.0#:~w, Value = ~8.16.0B\n",
 	      [self(), Nid, Index, Subind, Value]),
@@ -229,13 +413,15 @@ notify(Nid,Index,Subind,Value) ->
 %%====================================================================
 %% gen_server callbacks
 %%====================================================================
-
 %%--------------------------------------------------------------------
-%% Function: init(Args) -> {ok, State} |
-%%                         {ok, State, Timeout} |
-%%                         ignore               |
-%%                         {stop, Reason}
+%% @private
+%% @spec init(Args) -> {ok, State} |
+%%                     {ok, State, Timeout} |
+%%                     ignore               |
+%%                     {stop, Reason}
+%% @doc
 %% Description: Initiates the server
+%% @end
 %%--------------------------------------------------------------------
 init([Serial,NodeId, NodeName,Opts]) ->
     Dict = create_dict(),
@@ -301,13 +487,27 @@ initialization(Ctx) ->
     Ctx#co_ctx { state = ?PreOperational }.
 
 %%--------------------------------------------------------------------
-%% Function: %% handle_call(Request, From, State) -> {reply, Reply, State} |
-%%                                      {reply, Reply, State, Timeout} |
-%%                                      {noreply, State} |
-%%                                      {noreply, State, Timeout} |
-%%                                      {stop, Reason, Reply, State} |
-%%                                      {stop, Reason, State}
-%% Description: Handling call messages
+%% @private
+%% @spec handle_call(Request, From, State) -> {reply, Reply, State} |  
+%%                                            {reply, Reply, State, Timeout} |
+%%                                            {noreply, State} |
+%%                                            {noreply, State, Timeout} |
+%%                                            {stop, Reason, Reply, State} |
+%%                                            {stop, Reason, State}
+%% Request = {set, Index, SubInd, Value} | 
+%%           {direct_set, Index, SubInd, Value} | 
+%%           {value, {index, SubInd}} | 
+%%           {value, Index} | 
+%%           {store, Block, CobId, Index, SubInd, Bin} | 
+%%           {fetch, Block, CobId, Index, SubInd} | 
+%%           {add_entry, Entry} | 
+%%           {get_entry, Entry} | 
+%%           {load_dict, File} | 
+%%           {attach, Pid} | 
+%%           {detach, Pid}  
+%% @doc
+%% Description: Handling call messages.
+%% @end
 %%--------------------------------------------------------------------
 
 handle_call({set,IX,SI,Value}, _From, Ctx) ->
@@ -503,10 +703,12 @@ handle_call(_Request, _From, Ctx) ->
     {reply, {error,bad_call}, Ctx}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% Function: handle_cast(Msg, State) -> {noreply, State} |
 %%                                      {noreply, State, Timeout} |
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
+%% @end
 %%--------------------------------------------------------------------
 handle_cast({pdo_event,I}, Ctx) ->
     Index = ?IX_TPDO_PARAM_FIRST + I,
@@ -526,10 +728,12 @@ handle_cast(_Msg, Ctx) ->
     {noreply, Ctx}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% Function: handle_info(Info, State) -> {noreply, State} |
 %%                                       {noreply, State, Timeout} |
 %%                                       {stop, Reason, State}
 %% Description: Handling all non call/cast messages
+%% @end
 %%--------------------------------------------------------------------
 handle_info(Frame, Ctx) when is_record(Frame, can_frame) ->
     Ctx1 = handle_can(Frame, Ctx),
@@ -581,11 +785,13 @@ handle_info(_Info, Ctx) ->
     {noreply, Ctx}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% Function: terminate(Reason, State) -> void()
 %% Description: This function is called by a gen_server when it is about to
 %% terminate. It should be the opposite of Module:init/1 and do any necessary
 %% cleaning up. When it returns, the gen_server terminates with Reason.
 %% The return value is ignored.
+%% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, Ctx) ->
     Self = self(),
@@ -599,8 +805,9 @@ terminate(_Reason, Ctx) ->
 		  _NotSelf ->
 		      ?dbg("~s: terminate: Killing application with pid = ~p\n", 
 			   [Ctx#co_ctx.name, Pid]),
+		      %% Or gen_server:cast(Pid, co_node_terminated) ??	 
 		      exit(Pid, co_node_terminated)
-			  %% Or gen_server:cast(Pid, co_node_terminated) ??	      end
+	      end
       end,
       subscribers(Ctx#co_ctx.sub_table)),
 
@@ -612,9 +819,9 @@ terminate(_Reason, Ctx) ->
 		  Pid -> 
 		      ?dbg("~s: terminate: Killing TPDO with pid = ~p\n", 
 			   [Ctx#co_ctx.name, Pid]),
+			  %% Or gen_server:cast(Pid, co_node_terminated) ?? 
 		      exit(Pid, co_node_terminated)
-			  %% Or gen_server:cast(Pid, co_node_terminated) ??
-		end
+	      end
       end,
       Ctx#co_ctx.tpdo_list),
 
@@ -622,8 +829,10 @@ terminate(_Reason, Ctx) ->
     ok.
 
 %%--------------------------------------------------------------------
+%% @private
 %% Func: code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% Description: Convert process state when code is changed
+%% @end
 %%--------------------------------------------------------------------
 code_change(_OldVsn, Ctx, _Extra) ->
     {ok, Ctx}.

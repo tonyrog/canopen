@@ -63,10 +63,11 @@
 %%%===================================================================
 
 %%--------------------------------------------------------------------
+%% @spec start(Dict, Param) -> {ok, Pid} | ignore | {error, Error}
+%%
 %% @doc
 %% Starts the server
 %%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
 start(Dict, Param) ->
@@ -97,13 +98,13 @@ update_map(Pid) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc
-%% Initializes the server
-%%
 %% @spec init(Args) -> {ok, State} |
 %%                     {ok, State, Timeout} |
 %%                     ignore |
 %%                     {stop, Reason}
+%% @doc
+%% Initializes the server
+%%
 %% @end
 %%--------------------------------------------------------------------
 init([Dict, Param, FromPid]) ->
@@ -149,9 +150,6 @@ init([Dict, Param, FromPid]) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc
-%% Handling call messages
-%%
 %% @spec handle_call(Request, From, State) ->
 %%                                   {reply, Reply, State} |
 %%                                   {reply, Reply, State, Timeout} |
@@ -159,6 +157,9 @@ init([Dict, Param, FromPid]) ->
 %%                                   {noreply, State, Timeout} |
 %%                                   {stop, Reason, Reply, State} |
 %%                                   {stop, Reason, State}
+%% @doc
+%% Handling call messages
+%%
 %% @end
 %%--------------------------------------------------------------------
 handle_call({update_param,Param}, _From, S) ->
@@ -245,12 +246,12 @@ handle_call(_Request, _From, S) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc
-%% Handling cast messages
-%%
 %% @spec handle_cast(Msg, State) -> {noreply, State} |
 %%                                  {noreply, State, Timeout} |
 %%                                  {stop, Reason, State}
+%% @doc
+%% Handling cast messages
+%%
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(sync, S) ->
@@ -264,12 +265,12 @@ handle_cast(_Msg, S) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc
-%% Handling all non call/cast messages
-%%
 %% @spec handle_info(Info, State) -> {noreply, State} |
 %%                                   {noreply, State, Timeout} |
 %%                                   {stop, Reason, State}
+%% @doc
+%% Handling all non call/cast messages
+%%
 %% @end
 %%--------------------------------------------------------------------
 handle_info({timeout,Ref,inhibit}, S) when S#s.itmr =:= Ref ->
@@ -282,13 +283,13 @@ handle_info(_Info, S) ->
 
 %%--------------------------------------------------------------------
 %% @private
+%% @spec terminate(Reason, State) -> void()
 %% @doc
 %% This function is called by a gen_server when it is about to
 %% terminate. It should be the opposite of Module:init/1 and do any
 %% necessary cleaning up. When it returns, the gen_server terminates
 %% with Reason. The return value is ignored.
 %%
-%% @spec terminate(Reason, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, _State) ->
@@ -296,10 +297,10 @@ terminate(_Reason, _State) ->
 
 %%--------------------------------------------------------------------
 %% @private
+%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @doc
 %% Convert process state when code is changed
 %%
-%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
 %% @end
 %%--------------------------------------------------------------------
 code_change(_OldVsn, State, _Extra) ->

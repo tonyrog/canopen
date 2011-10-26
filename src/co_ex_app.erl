@@ -40,7 +40,7 @@
 %% @doc
 %% Starts the server
 %%
-%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
+%% @spec start(CoNode) -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
 start(CoNode) ->
@@ -61,13 +61,13 @@ dict() ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc
-%% Initializes the server
-%%
 %% @spec init(Args) -> {ok, LoopData} |
 %%                     {ok, LoopData, Timeout} |
 %%                     ignore |
 %%                     {stop, Reason}
+%% @doc
+%% Initializes the server
+%%
 %% @end
 %%--------------------------------------------------------------------
 init([CoNode]) ->
@@ -85,9 +85,6 @@ load_dict(CoNode, Dict) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc
-%% Handling call messages
-%%
 %% @spec handle_call(Request, From, LoopData) ->
 %%                                   {reply, Reply, LoopData} |
 %%                                   {reply, Reply, LoopData, Timeout} |
@@ -95,6 +92,9 @@ load_dict(CoNode, Dict) ->
 %%                                   {noreply, LoopData, Timeout} |
 %%                                   {stop, Reason, Reply, LoopData} |
 %%                                   {stop, Reason, LoopData}
+%%
+%% @doc
+%% Handling call messages
 %%
 %% Request = {get, Index, SubIndex} |
 %%           {set, Index, SubInd, Value}
@@ -134,12 +134,12 @@ handle_call(_Request, _From, LoopData) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc
-%% Handling cast messages
-%%
 %% @spec handle_cast(Msg, LoopData) -> {noreply, LoopData} |
 %%                                  {noreply, LoopData, Timeout} |
 %%                                  {stop, Reason, LoopData}
+%% @doc
+%% Handling cast messages
+%%
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({object_changed, Ix}, LoopData) ->
@@ -150,14 +150,15 @@ handle_cast(_Msg, LoopData) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc
-%% Handling all non call/cast messages
-%%
 %% @spec handle_info(Info, LoopData) -> {noreply, LoopData} |
 %%                                   {noreply, LoopData, Timeout} |
 %%                                   {stop, Reason, LoopData}
 %%
 %% Info = {notify, RemoteId, Index, SubInd, Value}
+%%
+%% @doc
+%% Handling all non call/cast messages
+%%
 %% @end
 %%--------------------------------------------------------------------
 handle_info({notify, RemoteId, Index, SubInd, Value}, LoopData) ->
@@ -170,13 +171,14 @@ handle_info(Info, LoopData) ->
 
 %%--------------------------------------------------------------------
 %% @private
+%% @spec terminate(Reason, LoopData) -> void()
+%%
 %% @doc
 %% This function is called by a gen_server when it is about to
 %% terminate. It should be the opposite of Module:init/1 and do any
 %% necessary cleaning up. When it returns, the gen_server terminates
 %% with Reason. The return value is ignored.
 %%
-%% @spec terminate(Reason, LoopData) -> void()
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, LoopData) ->
@@ -188,10 +190,11 @@ terminate(_Reason, LoopData) ->
 
 %%--------------------------------------------------------------------
 %% @private
+%% @spec code_change(OldVsn, LoopData, Extra) -> {ok, NewLoopData}
+%%
 %% @doc
 %% Convert process state when code is changed
 %%
-%% @spec code_change(OldVsn, LoopData, Extra) -> {ok, NewLoopData}
 %% @end
 %%--------------------------------------------------------------------
 code_change(_OldVsn, LoopData, _Extra) ->

@@ -1,7 +1,11 @@
-%%% File    : co_format.erl
-%%% Author  : Tony Rogvall <tony@rogvall.se>
-%%% Description : Formatting
-%%% Created : 13 Feb 2009 by Tony Rogvall <tony@rogvall.se>
+%%%-------------------------------------------------------------------
+%%% @author Tony Rogvall <tony@rogvall.se>
+%%% @copyright (C) 2010, Tony Rogvall
+%%% @doc
+%%%    Formatting
+%%% @end
+%%% Created : 13 Feb 2009 by Tony Rogvall <tony@rogvall.se> 
+%%%-------------------------------------------------------------------
 
 -module(co_format).
 
@@ -50,7 +54,6 @@ format_field(R, I, subind) ->
 %% General case
 format_field(R, I, F) ->
     [atom_to_list(F), "=", io_lib:format("~p", [element(I,R)])].
-
 
 -define(FREC(R,Rn),
 	#Rn{} -> format_record(R,record_info(fields,Rn))).

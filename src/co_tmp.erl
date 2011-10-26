@@ -1,3 +1,6 @@
+-module(co_tmp).
+
+%% @private
 %%
 %% find_sdo_client:
 %%  Lookup COBID (Tx/Rx) in client side table 
