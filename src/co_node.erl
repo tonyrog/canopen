@@ -30,11 +30,10 @@
 %% CANopen application internal
 -export([add_entry/2, get_entry/2]).
 -export([load_dict/2]).
-
 -export([set/3, value/2]).
 -export([store/5, fetch/4]).
 -export([store_block/5, fetch_block/4]).
-
+-export([subscribers/2]).
 -export([tpdo_mapping/2, rpdo_mapping/2]).
 
 %% Debug interface
@@ -456,7 +455,7 @@ tpdo_mapping(I, Dict) ->
 %% Description: Initiates the server
 %% @end
 %%--------------------------------------------------------------------
-init([Serial,NodeId, NodeName,Opts]) ->
+init([Serial, NodeId, NodeName, Opts]) ->
     Dict = create_dict(),
     SubTable = create_sub_table(),
     SdoCtx = #sdo_ctx {
@@ -468,13 +467,14 @@ init([Serial,NodeId, NodeName,Opts]) ->
       dict            = Dict,
       sub_table       = SubTable
      },
-    ID = case proplists:get_value(extended,Opts,false) of
-	     false -> NodeId band ?NODE_ID_MASK;
-	     true  -> (NodeId band ?XNODE_ID_MASK) bor ?COBID_ENTRY_EXTENDED
+    {Nid, Extended} = 
+	case proplists:get_value(extended,Opts,false) of
+	     false -> {NodeId , false};
+	     true  -> {NodeId bor ?CAN_EFF_FLAG, true}
 	 end,
-    CobTable = create_cob_table(ID),
+    CobTable = create_cob_table(Nid, Extended),
     Ctx = #co_ctx {
-      id     = ID,
+      id     = Nid,
       name   = NodeName,
       vendor = proplists:get_value(vendor,Opts,0),
       serial = Serial,
@@ -1476,26 +1476,21 @@ create_dict() ->
 %% This match for the none extended format
 %% We may handle the mixed mode later on....
 %%
-create_cob_table(ID) ->
+create_cob_table(Nid, Extended) ->
     T = ets:new(cob_table, [public]),
-    ets:insert(T, {?COB_ID(?NMT, 0), nmt}),
-    if ?is_cobid_extended(ID) ->
-	    Nid = ?XNODE_ID(ID),
+    case Extended of
+	true ->
 	    SDORx = ?XCOB_ID(?SDO_RX,Nid),
 	    SDOTx = ?XCOB_ID(?SDO_TX,Nid),
-	    ets:insert(T, {?XCOB_ID(?NMT, 0), nmt}),
-	    ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
-	    ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
-	    T;
-       true ->
-	    Nid = ?NODE_ID(ID),
+	    ets:insert(T, {?XCOB_ID(?NMT, 0), nmt});
+	false ->
 	    SDORx = ?COB_ID(?SDO_RX,Nid),
 	    SDOTx = ?COB_ID(?SDO_TX,Nid),
-	    ets:insert(T, {?COB_ID(?NMT, 0), nmt}),
-	    ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
-	    ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
-	    T
-    end.
+	    ets:insert(T, {?COB_ID(?NMT, 0), nmt})
+    end,
+    ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
+    ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
+    T.
 
 %% Create subscription table
 create_sub_table() ->
@@ -1558,17 +1553,6 @@ subscribers(Tab, Ix) when ?is_index(Ix) ->
 	      case co_iset:member(Ix, ISet) of
 		  true -> [ID|Acc];
 		  false -> Acc
-	      end
-      end, [], Tab).
-
-subscribers(Tab, Ix1, Ix2) when ?is_index(Ix1), ?is_index(Ix2),
-				Ix1 =< Ix2 ->
-    I = co_iset:new(Ix1, Ix2),
-    ets:foldl(
-      fun({ID,ISet}, Acc) ->
-	      case co_iset:intersect(I, ISet) of
-		  [] -> Acc;
-		  _ -> [ID|Acc]
 	      end
       end, [], Tab).
 

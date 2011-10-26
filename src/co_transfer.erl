@@ -7,7 +7,9 @@
 
 -module(co_transfer).
 
+-include_lib("can/include/can.hrl").
 -include("../include/canopen.hrl").
+-include("../include/sdo.hrl").
 
 -export([write_begin/3, write/3, write_end/1]).
 -export([write_data_begin/3, write_get_data/1]).
@@ -360,15 +362,25 @@ do_call(Process, Request) ->
 	{Mref, Reply} ->
 	    erlang:demonitor(Mref, [flush]),
 	    Reply;
-	{abort, Reason} ->
-	    erlang:demonitor(Mref, [flush]),
-	    {error, Reason};
 	{'DOWN', Mref, _, _, noconnection} ->
-	    erlang:demonitor(Mref, [flush]),
 	    exit({nodedown, node()});
 	{'DOWN', Mref, _, _, Reason} ->
-	    erlang:demonitor(Mref, [flush]),
-	    exit(Reason)
+	    exit(Reason);
+	Msg when is_record(Msg, can_frame) ->
+	    %% Hmm, what to do ??
+	    case Msg#can_frame.data of
+
+		?ma_ccs_abort_transfer(_IX,_SI,_Code) ->
+		%% Session aborted from other side
+		    erlang:demonitor(Mref, [flush]),
+		    %% Resend Msg since it should be handled in fsm
+		    self() ! Msg, 
+		    {error, aborted};
+		_OtherMsg ->
+		    %% Should not happen ???
+		    exit(internal_error)
+	    end
+		    
     after ?default_timeout ->
 	    erlang:demonitor(Mref),
 	    receive

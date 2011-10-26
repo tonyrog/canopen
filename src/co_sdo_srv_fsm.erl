@@ -589,6 +589,7 @@ abort(S, Reason) ->
     Code = co_sdo:encode_abort_code(Reason),
     R = ?mk_scs_abort_transfer(S#co_session.index, S#co_session.subind, Code),
     send(S, R),
+    
     {stop, normal, S}.
     
 
