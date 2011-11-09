@@ -13,8 +13,12 @@
 
 -behaviour(gen_server).
 
+-include_lib("can/include/can.hrl").
+-include("../include/canopen.hrl").
+-include("../include/co_app.hrl").
+
 %% API
--export([start/1, start/2, stop/1]).
+-export([start/1, start_link/1, start_link/2, stop/1]).
 -export([attach/1, detach/1]).
 
 %% gen_server callbacks
@@ -22,9 +26,10 @@
 	 terminate/2, code_change/3]).
 
 %% Application interface
--export([subscribe/2, unsubscribe/2]).
+-export([subscribe/2, subscribe/3, unsubscribe/2]).
 -export([my_subscriptions/1, my_subscriptions/2]).
 -export([all_subscribers/1, all_subscribers/2]).
+-export([subscribers_with_options/2]).
 -export([notify/3, notify/4]). %% To send MPOs
 
 %% CANopen application internal
@@ -38,11 +43,9 @@
 
 %% Debug interface
 -export([dump/1]).
+-export([change_session_timeout/2]).
 
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
-
--include_lib("can/include/can.hrl").
--include("../include/canopen.hrl").
 
 -ifdef(debug).
 -define(dbg(Fmt,As), io:format(Fmt, As)).
@@ -70,10 +73,10 @@
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @spec start(Serial, [Opts]) -> {ok,Pid} | ignore | {error,Error}
+%% @spec start_links(Args) -> {ok,Pid} | ignore | {error,Error}
 %%
-%%   Opts = {name,   Name} |
-%%          {vendor, VendorID} |
+%%   Args = [{serial, Serial}, {options, Opts}]
+%%   Opts = {vendor, VendorID} |
 %%          extended |                  
 %%          {time_stamp,  timeout()} |  
 %%          {sdo_timeout, timeout()} |  
@@ -96,13 +99,25 @@
 %%         
 %% @end
 %%--------------------------------------------------------------------
-start(Serial,Opts) ->
+start_link(Args) ->
+    ?dbg("~p: start_link: Args = ~p\n", [?MODULE, Args]),
+        
+    Serial = proplists:get_value(serial, Args, 0),
+    Opts = proplists:get_value(options, Args, []),
+
     S = serial(Serial),
-    NodeId = (S bsr 8) bor ?CAN_EFF_FLAG,
+    NodeId = 
+	case proplists:get_value(extended,Opts,false) of
+	     false -> S bsr 8;
+	     true  -> (S bsr 8) bor ?COBID_ENTRY_EXTENDED
+	 end,
+
     Name = name(Opts, S),
     ?dbg("~p: Starting co_node with Name = ~p, Serial = ~.16#, NodeId = ~.16#\n",
 	 [?MODULE, Name, S, NodeId]),
     gen_server:start({local, Name}, ?MODULE, [S,NodeId,Name,Opts], []).
+start_link(Serial, Opts) ->
+    start_link([Serial, Opts]).
 
 %%--------------------------------------------------------------------
 %% @spec start(Serial) -> {ok,Pid} | ignore | {error,Error}
@@ -113,7 +128,7 @@ start(Serial,Opts) ->
 %% @end
 %%--------------------------------------------------------------------
 start(Serial) ->
-    start(Serial, []).
+    start_link([{serial, Serial}, {options, [extended]}]).
 
 %%
 %% Get serial number, accepts both string and number
@@ -122,7 +137,7 @@ start(Serial) ->
 serial(Serial) when is_integer(Serial) ->
     Serial band 16#FFFFFFFF;
 serial(Serial) when is_list(Serial) ->
-    canopen:string_to_serial(Serial) band 16#FFFFFFFF;
+    co_lib:string_to_serial(Serial) band 16#FFFFFFFF;
 serial(_Serial) ->
     erlang:error(badarg).
     
@@ -131,7 +146,7 @@ name(Opts, Serial) ->
 	{name,Name} when is_atom(Name) ->
 	    Name;
 	none ->
-	    list_to_atom(canopen:serial_to_string(Serial))
+	    list_to_atom(co_lib:serial_to_string(Serial))
     end.
 
 %%--------------------------------------------------------------------
@@ -177,7 +192,26 @@ detach(Serial) ->
 %% @end
 %%--------------------------------------------------------------------
 subscribe(Serial, Ix) ->
-    gen_server:call(serial_to_pid(Serial), {subscribe, Ix, self()}).
+    gen_server:call(serial_to_pid(Serial), {subscribe, Ix, [], self()}).
+
+%%--------------------------------------------------------------------
+%% @spec subscribe(Serial, Index, [Option]) -> ok | {error, Error}
+%%   where
+%%       Option = {storage, Storage} | 
+%%                {transfer, Transfe} |
+%%                {mode, Mode}
+%%       Storage = application | central | application_and_central
+%%       Transfer = atomic | streamed
+%%       Mode = notify | all
+%%
+%% @doc
+%% Adds a subscription to changes of the Dictionary Object in position Index.
+%% Index can also be a range [Index1 - Index2].
+%%
+%% @end
+%%--------------------------------------------------------------------
+subscribe(Serial, Ix, Opts) ->
+    gen_server:call(serial_to_pid(Serial), {subscribe, Ix, Opts, self()}).
 
 %%--------------------------------------------------------------------
 %% @spec unsubscribe(Serial, Index) -> ok | {error, Error}
@@ -373,11 +407,22 @@ fetch_block(Serial, COBID, IX, SI)
 dump(Serial) ->
     gen_server:call(serial_to_pid(Serial), dump).
 
+%%--------------------------------------------------------------------
+%% @spec change_session_timeout(Serial, NewTimeout::integer()) -> ok | {error, Error}
+%%
+%% @doc
+%% Changes the session time out. (For testing)
+%%
+%% @end
+%%--------------------------------------------------------------------
+change_session_timeout(Serial, NewTimeout) ->
+    gen_server:call(serial_to_pid(Serial), {change_session_timeout, NewTimeout}).
+
 %% convert a node serial name to a local name
 serial_to_pid(Sn) when is_integer(Sn) ->
-    list_to_atom(canopen:serial_to_string(Sn));
+    list_to_atom(co_lib:serial_to_string(Sn));
 serial_to_pid(Serial) when is_list(Serial) ->
-    serial_to_pid(canopen:string_to_serial(Serial));
+    serial_to_pid(co_lib:string_to_serial(Serial));
 serial_to_pid(Pid) when is_pid(Pid); is_atom(Pid) ->
     Pid.
 
@@ -409,7 +454,14 @@ notify(Nid,Index,Value) ->
 notify(Nid,Index,Subind,Value) ->
     io:format("~p: notify: Nid = ~.16#, Index = ~7.16.0#:~w, Value = ~8.16.0B\n",
 	      [self(), Nid, Index, Subind, Value]),
-    CobId = ?PDO1_TX_ID(Nid),
+
+    if ?is_nodeid_extended(Nid) ->
+	    ?dbg("~p: notify: Nid ~.16# is extended\n",[self(), Nid]),
+	    CobId = ?XCOB_ID(?PDO1_TX, Nid);
+	true ->
+	    ?dbg("~p: notify: Nid ~.16# is not extended\n",[self(), Nid]),
+	    CobId = ?COB_ID(?PDO1_TX, Nid)
+    end,
     FrameID = ?COBID_TO_CANID(CobId),
     Frame = #can_frame { id=FrameID, len=0, 
 			 data=(<<16#80,Index:16/little,Subind:8,Value:32/little>>) },
@@ -421,7 +473,7 @@ notify(Nid,Index,Subind,Value) ->
 %% @spec rpdo_mapping(I, Dixt) -> Map | {error, Error}
 %%
 %% @doc
-%% Get the RPDO mapping
+%% Get the RPDO mapping. <br/>
 %% Executing in calling process context.<br/>
 %%
 %% @end
@@ -433,13 +485,44 @@ rpdo_mapping(I, Dict) ->
 %% @spec tpdo_mapping(I, Dixt) -> Map | {error, Error}
 %%
 %% @doc
-%% Get the TPDO mapping
+%% Get the TPDO mapping. <br/>
 %% Executing in calling process context.<br/>
 %%
 %% @end
 %%--------------------------------------------------------------------
 tpdo_mapping(I, Dict) ->
     pdo_mapping(I+?IX_TPDO_MAPPING_FIRST,Dict).
+
+%%--------------------------------------------------------------------
+%% @spec subscribers(Tab, Index) -> [Pid] | {error, Error}
+%%
+%% @doc
+%% Get all subscribers in Tab for Index. <br/>
+%% Executing in calling process context.<br/>
+%%
+%% @end
+%%--------------------------------------------------------------------
+subscribers(Tab, Ix) when ?is_index(Ix) ->
+    ets:foldl(
+      fun({{ID,ISet},Storage, Transfer, Mode}, Acc) ->
+	      case co_iset:member(Ix, ISet) of
+		  true -> [ID|Acc];
+		  false -> Acc
+	      end
+      end, [], Tab).
+
+subscribers(Tab) ->
+    lists:usort([Pid || {{Pid, _Ixs}, _S, _T, _M} <- ets:tab2list(Tab)]).
+
+subscribers_with_options(Tab, Ix) when ?is_index(Ix) ->
+    ets:foldl(
+      fun({{ID,ISet},Storage, Transfer, Mode}, Acc) ->
+	      case co_iset:member(Ix, ISet) of
+		  true -> [{ID, Storage, Transfer, Mode}|Acc];
+		  false -> Acc
+	      end
+      end, [], Tab).
+
 
 
 %%====================================================================
@@ -456,6 +539,9 @@ tpdo_mapping(I, Dict) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Serial, NodeId, NodeName, Opts]) ->
+    can_router:start(),
+    can_udp:start(0),
+
     Dict = create_dict(),
     SubTable = create_sub_table(),
     SdoCtx = #sdo_ctx {
@@ -467,14 +553,9 @@ init([Serial, NodeId, NodeName, Opts]) ->
       dict            = Dict,
       sub_table       = SubTable
      },
-    {Nid, Extended} = 
-	case proplists:get_value(extended,Opts,false) of
-	     false -> {NodeId , false};
-	     true  -> {NodeId bor ?CAN_EFF_FLAG, true}
-	 end,
-    CobTable = create_cob_table(Nid, Extended),
+    CobTable = create_cob_table(NodeId),
     Ctx = #co_ctx {
-      id     = Nid,
+      id     = NodeId,
       name   = NodeName,
       vendor = proplists:get_value(vendor,Opts,0),
       serial = Serial,
@@ -493,11 +574,21 @@ init([Serial, NodeId, NodeName, Opts]) ->
       time_stamp_time = proplists:get_value(time_stamp, Opts, 60000)
      },
     can_router:attach(),
+    Ctx1 = case load_dict_internal(
+		  filename:join(code:priv_dir(canopen),
+				proplists:get_value(dict_file, Opts, "test.dict")),
+		  Ctx) of
+	       {ok, NewCtx} -> NewCtx;
+	       {error, Error, OldCtx} -> OldCtx %% ????
+	   end,
+
+    process_flag(trap_exit, true),
     if NodeId =:= 0 ->
-	    {ok, Ctx#co_ctx { state = ?Operational }};
+	    {ok, Ctx1#co_ctx { state = ?Operational }};
        true ->
-	    {ok, reset_application(Ctx)}
+	    {ok, reset_application(Ctx1)}
     end.
+
 
 %%
 %%
@@ -610,26 +701,11 @@ handle_call({get_entry,Index}, _From, Ctx) ->
     {reply, Result, Ctx};
 
 handle_call({load_dict, File}, _From, Ctx) ->
-    try co_file:load(File) of
-	{ok,Os} ->
-	    %% Install all objects
-	    foreach(
-	      fun({Obj,Es}) ->
-		      foreach(fun(E) -> ets:insert(Ctx#co_ctx.dict, E) end, Es),
-		      ets:insert(Ctx#co_ctx.dict, Obj)
-	      end, Os),
-	    %% Now update cob table
-	    Ctx1 = 
-		foldl(fun({Obj,_Es},Ctx0) ->
-			      I = Obj#dict_object.index,
-			      handle_notify(I, Ctx0)
-		      end, Ctx, Os),
+    case load_dict_internal(File, Ctx) of
+	{ok, Ctx1} ->
 	    {reply, ok, Ctx1};
-	Error ->
-	    {reply, Error, Ctx}
-    catch
-	error:Reason ->
-	    {reply, {error,Reason}, Ctx}
+	{error, Error, Ctx1} ->
+	    {reply, Error, Ctx1}
     end;
 
 handle_call({attach,Pid}, _From, Ctx) when is_pid(Pid) ->
@@ -638,9 +714,9 @@ handle_call({attach,Pid}, _From, Ctx) when is_pid(Pid) ->
 	    Mon = erlang:monitor(process, Pid),
 	    App = #app { pid=Pid, mon=Mon },
 	    Ctx1 = Ctx#co_ctx { app_list = [App |Ctx#co_ctx.app_list] },
-	    {reply, ok, Ctx1};
+	    {reply, {ok, Ctx1#co_ctx.id}, Ctx1};
 	{value,_} ->
-	    {reply, {error, already_attached}, Ctx}
+	    {reply, {error, already_attached, Ctx#co_ctx.id}, Ctx}
     end;
 
 handle_call({detach,Pid}, _From, Ctx) when is_pid(Pid) ->
@@ -654,21 +730,21 @@ handle_call({detach,Pid}, _From, Ctx) when is_pid(Pid) ->
 	    {reply, ok, Ctx1}
     end;
 
-handle_call({subscribe,{Ix1, Ix2},Pid}, _From, Ctx) when is_pid(Pid) ->
-    add_subscription(Ctx#co_ctx.sub_table, Ix1, Ix2, Pid),
-    {reply, ok, Ctx};
+handle_call({subscribe,{Ix1, Ix2},Opts,Pid}, _From, Ctx) when is_pid(Pid) ->
+    Res = add_subscription(Ctx#co_ctx.sub_table, Ix1, Ix2, Opts, Pid),
+    {reply, Res, Ctx};
 
-handle_call({subscribe,Ix,Pid}, _From, Ctx) when is_pid(Pid) ->
-    add_subscription(Ctx#co_ctx.sub_table, Ix, Pid),
-    {reply, ok, Ctx};
+handle_call({subscribe,Ix,Opts,Pid}, _From, Ctx) when is_pid(Pid) ->
+    Res = add_subscription(Ctx#co_ctx.sub_table, Ix, Opts, Pid),
+    {reply, Res, Ctx};
 
 handle_call({unsubscribe,{Ix1, Ix2},Pid}, _From, Ctx) when is_pid(Pid) ->
-    remove_subscription(Ctx#co_ctx.sub_table, Ix1, Ix2, Pid),
-    {reply, ok, Ctx};
+    Res = remove_subscription(Ctx#co_ctx.sub_table, Ix1, Ix2, Pid),
+    {reply, Res, Ctx};
 
 handle_call({unsubscribe,Ix,Pid}, _From, Ctx) when is_pid(Pid) ->
-    remove_subscription(Ctx#co_ctx.sub_table, Ix, Pid),
-    {reply, ok, Ctx};
+    Res = remove_subscription(Ctx#co_ctx.sub_table, Ix, Pid),
+    {reply, Res, Ctx};
 
 handle_call({subscriptions,Pid}, _From, Ctx) when is_pid(Pid) ->
     Subs = subscriptions(Ctx#co_ctx.sub_table, Pid),
@@ -713,7 +789,7 @@ handle_call(dump, _From, Ctx) ->
       end, ok, Ctx#co_ctx.cob_table),
     io:format("---- SUB TABLE ----\n"),
     ets:foldl(
-      fun({Pid, IxList},_) ->
+      fun({{Pid, IxList}, Storage, Transfer, Mode},_) ->
 	      io:format("~p => ", [Pid]),
 	      lists:foreach(
 		fun(Ixs) ->
@@ -725,11 +801,14 @@ handle_call(dump, _From, Ctx) ->
 			end
 		end,
 		IxList),
-	      io:format("\n")
+	      io:format(" ~p, ~p, ~p\n", [Storage, Transfer, Mode])
       end, ok, Ctx#co_ctx.sub_table),
     io:format("------------------------\n"),
     {reply, ok, Ctx};
 
+handle_call({change_session_timeout, NewTimeout}, _From, Ctx) ->
+    Sdo = Ctx#co_ctx.sdo#sdo_ctx {timeout = NewTimeout},
+    {reply, ok, Ctx#co_ctx {sdo = Sdo}};
 handle_call(stop, _From, Ctx) ->
     {stop, normal, ok, Ctx};
 handle_call(_Request, _From, Ctx) ->
@@ -840,6 +919,7 @@ terminate(_Reason, Ctx) ->
 			   [Ctx#co_ctx.name, Pid]),
 		      %% Or gen_server:cast(Pid, co_node_terminated) ??	 
 		      exit(Pid, co_node_terminated)
+
 	      end
       end,
       subscribers(Ctx#co_ctx.sub_table)),
@@ -873,6 +953,36 @@ code_change(_OldVsn, Ctx, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
+
+%%
+%% Load a dictionary
+%% 
+load_dict_internal(File, Ctx) ->
+    ?dbg("~p: load_dict_internal: Loading file = ~p\n", [?MODULE, File]),
+    try co_file:load(File) of
+	{ok,Os} ->
+	    %% Install all objects
+	    foreach(
+	      fun({Obj,Es}) ->
+		      foreach(fun(E) -> ets:insert(Ctx#co_ctx.dict, E) end, Es),
+		      ets:insert(Ctx#co_ctx.dict, Obj)
+	      end, Os),
+	    %% Now update cob table
+	    Ctx1 = 
+		foldl(fun({Obj,_Es},Ctx0) ->
+			      I = Obj#dict_object.index,
+			      handle_notify(I, Ctx0)
+		      end, Ctx, Os),
+	    {ok, Ctx1};
+	Error ->
+	    {error, Error, Ctx}
+    catch
+	error:Reason ->
+	    ?dbg("~p: load_dict_internal: Failed Loading file, reason = ~p\n", 
+		 [?MODULE, Reason]),
+
+	    {error, Reason, Ctx}
+    end.
 
 %%
 %% Handle can messages
@@ -1063,6 +1173,8 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
     Sessions = Ctx#co_ctx.sdo_list,
     case lists:keysearch(ID,#sdo.id,Sessions) of
 	{value, S} ->
+	    ?dbg("~s: handle_sdo_rx: Frame sent to old process ~p\n", 
+		 [Ctx#co_ctx.name,S#sdo.pid]),
 	    gen_fsm:send_event(S#sdo.pid, Frame),
 	    Ctx;
 	false ->
@@ -1070,12 +1182,14 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
 	    %% like late aborts etc here !!!
 	    case co_sdo_srv_fsm:start(Ctx#co_ctx.sdo,Rx,Tx) of
 		{error, Reason} ->
-		    io:format("unable to start co_sdo_cli_fsm: ~p\n",
+		    io:format("unable to start co_sdo_srv_fsm: ~p\n",
 			      [Reason]),
 		    Ctx;
 		{ok,Pid} ->
 		    Mon = erlang:monitor(process, Pid),
 		    sys:trace(Pid, true),
+		    ?dbg("~s: handle_sdo_rx: Frame sent to new process ~p\n", 
+			 [Ctx#co_ctx.name,Pid]),		    
 		    gen_fsm:send_event(Pid, Frame),
 		    S = #sdo { id=ID, pid=Pid, mon=Mon },
 		    Ctx#co_ctx { sdo_list = [S|Sessions]}
@@ -1476,14 +1590,13 @@ create_dict() ->
 %% This match for the none extended format
 %% We may handle the mixed mode later on....
 %%
-create_cob_table(Nid, Extended) ->
+create_cob_table(Nid) ->
     T = ets:new(cob_table, [public]),
-    case Extended of
-	true ->
+    if ?is_nodeid_extended(Nid) ->
 	    SDORx = ?XCOB_ID(?SDO_RX,Nid),
 	    SDOTx = ?XCOB_ID(?SDO_TX,Nid),
 	    ets:insert(T, {?XCOB_ID(?NMT, 0), nmt});
-	false ->
+	true ->
 	    SDORx = ?COB_ID(?SDO_RX,Nid),
 	    SDOTx = ?COB_ID(?SDO_TX,Nid),
 	    ets:insert(T, {?COB_ID(?NMT, 0), nmt})
@@ -1495,32 +1608,76 @@ create_cob_table(Nid, Extended) ->
 %% Create subscription table
 create_sub_table() ->
     T = ets:new(sub_table, [public,ordered_set]),
-    add_subscription(T, ?IX_COB_ID_SYNC_MESSAGE, self()),
-    add_subscription(T, ?IX_COM_CYCLE_PERIOD, self()),
-    add_subscription(T, ?IX_COB_ID_TIME_STAMP, self()),
-    add_subscription(T, ?IX_COB_ID_EMERGENCY, self()),
-    add_subscription(T, ?IX_SDO_SERVER_FIRST,?IX_SDO_SERVER_LAST,self()),
-    add_subscription(T, ?IX_SDO_CLIENT_FIRST,?IX_SDO_CLIENT_LAST,self()),
-    add_subscription(T, ?IX_RPDO_PARAM_FIRST, ?IX_RPDO_PARAM_LAST,self()),
-    add_subscription(T, ?IX_TPDO_PARAM_FIRST, ?IX_TPDO_PARAM_LAST,self()),
-    add_subscription(T, ?IX_TPDO_MAPPING_FIRST, ?IX_TPDO_MAPPING_LAST,self()),
+    add_subscription(T, ?IX_COB_ID_SYNC_MESSAGE, 
+		     [{storage, central}, {mode, notify}], self()),
+    add_subscription(T, ?IX_COM_CYCLE_PERIOD, 
+		     [{storage, central}, {mode, notify}], self()),
+    add_subscription(T, ?IX_COB_ID_TIME_STAMP, 
+		     [{storage, central}, {mode, notify}], self()),
+    add_subscription(T, ?IX_COB_ID_EMERGENCY, 
+		     [{storage, central}, {mode, notify}], self()),
+    add_subscription(T, ?IX_SDO_SERVER_FIRST,?IX_SDO_SERVER_LAST, 
+		     [{storage, central}, {mode, notify}],self()),
+    add_subscription(T, ?IX_SDO_CLIENT_FIRST,?IX_SDO_CLIENT_LAST, 
+		     [{storage, central}, {mode, notify}],self()),
+    add_subscription(T, ?IX_RPDO_PARAM_FIRST, ?IX_RPDO_PARAM_LAST, 
+		     [{storage, central}, {mode, notify}],self()),
+    add_subscription(T, ?IX_TPDO_PARAM_FIRST, ?IX_TPDO_PARAM_LAST, 
+		     [{storage, central}, {mode, notify}],self()),
+    add_subscription(T, ?IX_TPDO_MAPPING_FIRST, ?IX_TPDO_MAPPING_LAST, 
+		     [{storage, central}, {mode, notify}],self()),
     T.
     
-add_subscription(Tab, Ix, Pid) ->
-    add_subscription(Tab, Ix, Ix, Pid).
+add_subscription(Tab, Ix, Opts, Pid) ->
+    add_subscription(Tab, Ix, Ix, Opts, Pid).
 
-add_subscription(Tab, Ix1, Ix2, Pid) when ?is_index(Ix1), ?is_index(Ix2), 
-					  Ix1 =< Ix2, 
-					  (is_pid(Pid) orelse is_atom(Pid)) ->
-    ?dbg("~p: add_subscription: ~7.16.0#:~7.16.0# for ~w\n", 
-	 [?MODULE, Ix1, Ix2, Pid]),
-    I = co_iset:new(Ix1, Ix2),
-
-    case ets:lookup(Tab, Pid) of
-	[] -> ets:insert(Tab, {Pid, I});
-	[{_,ISet}] -> ets:insert(Tab, {Pid, co_iset:union(ISet, I)})
+add_subscription(Tab, Ix1, Ix2, Opts, Pid) when ?is_index(Ix1), ?is_index(Ix2), 
+						Ix1 =< Ix2, 
+						(is_pid(Pid) orelse is_atom(Pid)) ->
+    ?dbg("~p: add_subscription: ~7.16.0#:~7.16.0# with options ~p for ~w\n", 
+	 [?MODULE, Ix1, Ix2, Opts, Pid]),
+    Storage = proplists:get_value(storage, Opts, application),
+    Transfer = proplists:get_value(transfer, Opts, atomic),
+    Mode = proplists:get_value(mode, Opts, notify),
+    case index_ok(Tab, Ix1, Ix2, Mode) of
+	{error, Reason} ->
+	    {error, Reason};
+	I ->
+	    case ets:lookup(Tab, {Pid, I}) of
+		[] -> do_nothing;
+		_Entry -> ets:delete(Tab, {Pid, I}) %% ???
+	    end,
+	    ets:insert(Tab, {{Pid, I}, Storage, Transfer, Mode}),
+	    ok
     end.
 
+%%    case ets:lookup(Tab, Pid) of
+%%	[] -> ets:insert(Tab, {Pid, I});
+%%	[{_,ISet}] -> ets:insert(Tab, {Pid, co_iset:union(ISet, I)})
+%%    end.
+
+index_ok(_Tab, Ix1, Ix2, all) when Ix1 =< ?MAN_SPEC_MAX;
+				      Ix2 =< ?MAN_SPEC_MAX->
+    {error, not_possible_to_reserve};
+index_ok(_Tab, Ix1, Ix2, notify) ->
+    co_iset:new(Ix1, Ix2);
+index_ok(Tab, Ix1, Ix2, all) ->
+    ISet = co_iset:new(Ix1, Ix2),
+    case ets:foldl(
+	   fun({{Pid, OtherISet}, _Storage, _Transfer, Mode}, Acc) ->
+	      case {co_iset:intersect(ISet, OtherISet), Mode} of
+		  {[], _Any} -> Acc;
+		  {_Set, all} -> [Pid|Acc];
+		  _ -> Acc
+	      end
+	   end, [], Tab) of
+	[] -> ISet;
+	List -> 
+	    ?dbg("~p: add_subscription: index already reserved\n", [?MODULE]),
+	    {error, index_already_reserved}
+    end.
+
+    
 remove_subscriptions(Tab, Pid) ->
     ets:delete(Tab, Pid).
 
@@ -1528,39 +1685,30 @@ remove_subscription(Tab, Ix, Pid) ->
     remove_subscription(Tab, Ix, Ix, Pid).
 
 remove_subscription(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
-    ?dbg("~p: remove_subscription: ~w:~w for ~w\n", [?MODULE, Ix1, Ix2, Pid]),
-    case ets:lookup(Tab, Pid) of
+    ?dbg("~p: remove_subscription: ~7.16.0#:~7.16.0# for ~w\n", 
+	 [?MODULE, Ix1, Ix2, Pid]),
+    I = co_iset:new(Ix1, Ix2),
+    case ets:lookup(Tab, {Pid, I}) of
 	[] -> ok;
-	[{Pid,ISet}] ->
-	    case co_iset:difference(ISet, co_iset:new(Ix1, Ix2)) of
-		[] ->
-		    ?dbg("~p: remove_subscription: last index for ~w\n", 
-			 [?MODULE, Pid]),
-		    ets:delete(Tab, Pid);
-		ISet1 -> 
-		    ?dbg("~p: remove_subscription: new index set ~p for ~w\n", 
-			 [?MODULE, ISet1,Pid]),
-		    ets:insert(Tab, {Pid,ISet1})
-	    end
+	[{{Pid,ISet},S,T,M}] -> ets:delete(Tab, {Pid, I})
+%%	    case co_iset:difference(ISet, co_iset:new(Ix1, Ix2)) of
+%%		[] ->
+%%		    ?dbg("~p: remove_subscription: last index for ~w\n", 
+%%			 [?MODULE, Pid]),
+%%		    ets:delete(Tab, Pid);
+%%		ISet1 -> 
+%%		    ?dbg("~p: remove_subscription: new index set ~p for ~w\n", 
+%%			 [?MODULE, ISet1,Pid]),
+%%		    ets:insert(Tab, {Pid,ISet1})
+%%	    end
     end.
-
-subscribers(Tab) ->
-    [Pid || {Pid, _Ixs} <- ets:tab2list(Tab)].
-
-subscribers(Tab, Ix) when ?is_index(Ix) ->
-    ets:foldl(
-      fun({ID,ISet}, Acc) ->
-	      case co_iset:member(Ix, ISet) of
-		  true -> [ID|Acc];
-		  false -> Acc
-	      end
-      end, [], Tab).
 
 subscriptions(Tab, Pid) when is_pid(Pid) ->
-    case ets:lookup(Tab, Pid) of
-	[] -> [];
-	[{Pid, Iset}] -> Iset
-    end.
+    [Iset || {{P, Iset}, _Opts} <- ets:tab2list(Tab), P == Pid].
+%%    case ets:lookup(Tab, Pid) of
+%%	[] -> [];
+%%	[{Pid, Iset, _Opts}] -> Iset
+%%    end.
 		
 inform_subscribers(I, Ctx) ->			
     lists:foreach(

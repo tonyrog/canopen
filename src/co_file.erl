@@ -112,7 +112,7 @@ load_objects([{tpdo,I,ID,Opts}|Es],Os) ->
 			  access=?ACCESS_RW, value=COBID },
 	    #dict_entry { index={Index,2}, type=?UNSIGNED8,
 			  access=?ACCESS_RW, 
-			  value=canopen:encode_transmission(Trans)},
+			  value=co_lib:encode_transmission(Trans)},
 	    #dict_entry { index={Index,3}, type=?UNSIGNED16,
 			  access=?ACCESS_RW, value=InhibitTime},
 	    #dict_entry { index={Index,4}, type=?UNSIGNED8,
@@ -158,7 +158,7 @@ load_objects([{rpdo,I,ID,Opts}|Es],Os) ->
 			  access=?ACCESS_RW, value=COBID},
 	    #dict_entry { index={Index,2}, type=?UNSIGNED8,
 			  access=?ACCESS_RW,
-			  value=canopen:encode_transmission(Trans)},
+			  value=co_lib:encode_transmission(Trans)},
 	    #dict_entry { index={Index,3}, type=?UNSIGNED16,
 			  access=?ACCESS_RW, value=InhibitTime},
 	    #dict_entry { index={Index,4}, type=?UNSIGNED8,
@@ -227,13 +227,13 @@ load_objects([], Os) ->
 load_object([Opt|Opts],O,V,Es) ->
     case Opt of
 	{access,Access} ->
-	    A = canopen:encode_access(Access),
+	    A = co_lib:encode_access(Access),
 	    load_object(Opts,O#dict_object {access=A}, V, Es);
 	{type,Type} ->
-	    T = canopen:encode_type(Type),
+	    T = co_lib:encode_type(Type),
 	    load_object(Opts,O#dict_object {type=T}, V, Es);
 	{struct,Struct} ->
-	    S = canopen:encode_struct(Struct),
+	    S = co_lib:encode_struct(Struct),
 	    load_object(Opts,O#dict_object {struct=S}, V, Es);
 	{value,V1} ->
 	    load_object(Opts,O,V1,Es);
@@ -263,13 +263,13 @@ load_object([],O,_V,Es) ->
 load_entry([Opt|Opts],Entry) ->
     case Opt of
 	{access,Access} ->
-	    A = canopen:encode_access(Access),
+	    A = co_lib:encode_access(Access),
 	    load_entry(Opts,Entry#dict_entry {access=A});
 	{name,_Name} ->
 	    %% just as comment for real entries
 	    load_entry(Opts,Entry);
 	{type,Type} ->
-	    T = canopen:encode_type(Type),
+	    T = co_lib:encode_type(Type),
 	    load_entry(Opts,Entry#dict_entry {type=T});
 	{value,V} ->
 	    load_entry(Opts,Entry#dict_entry {value=V})

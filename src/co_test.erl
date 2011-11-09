@@ -5,11 +5,9 @@
 
 -module(co_test).
 
--compile(export_all).
+-export([run/0]).
 
 run() ->
-    can_router:start(),
-    can_udp:start(0),
-    {ok, Pid} = co_node:start(16#03000301, [extended, {vendor,0}]),
-    co_node:load_dict(Pid, filename:join(code:priv_dir(canopen), "test.dict")).
+    {ok, _Pid} = co_node:start([{serial,16#03000301}, 
+			       {options, [extended, {vendor,0}]}]).
 

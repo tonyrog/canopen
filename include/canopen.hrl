@@ -402,6 +402,8 @@
 	  dst    :: cobid(),       %% Receiver COBID
 	  index  :: index(),       %% object being transfered
 	  subind :: subind(),      %% sub-index of object
+	  pst    :: uint8(),       %% Protocol switch threshold (for block request)
+	  clientcrc :: uint1(),    %% Client CRC support (for block request)
 	  t      :: uint1(),       %% session toggle bit (0|1)
 	  crc    :: boolean(),     %% generate/check CRC for block data
 	  blksize :: uint8(),      %% Max number of segment per block
@@ -412,7 +414,8 @@
 	  node_pid :: pid(),       %% Pid of the node
 	  node_from :: term(),     %% Delayed gen_server:reply caller
 	  ctx      :: record(sdo_ctx),  %% general parameters
-	  th       :: term()            %% transfer handle
+	  th       :: term(),      %% transfer handle
+	  mref     :: term()       %% Ref to application
       }).
 
 -record(app,

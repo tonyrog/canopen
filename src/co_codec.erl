@@ -77,7 +77,7 @@ encode_e(Data, {Type,Size}, E) ->
 encode_e(Data, TypeList, E) when is_list(TypeList) ->
     encode_compound_e(Data, TypeList, E);
 encode_e(Data, Type, E) when is_atom(Type) ->
-    encode_e(Data, canopen:encode_type(Type), E).
+    encode_e(Data, co_lib:encode_type(Type), E).
 
 
 encode_e(Data, ?INTEGER8,  S, E) when S=<8 -> encode_signed(Data, S, E);
@@ -109,7 +109,7 @@ encode_e(Data, ?DOMAIN, S, _E) when is_binary(Data) ->
 encode_e(Data, ?DOMAIN, S, _E) when is_list(Data) -> 
         encode_binary(list_to_binary(Data), S);
 encode_e(Data, Type, S, E) when is_atom(Type) ->
-    encode_e(Data, canopen:encode_type(Type), S, E).
+    encode_e(Data, co_lib:encode_type(Type), S, E).
 
 encode_compound_e(Ds, Ts, little) ->
     Bin = encode_compound_little(Ds, Ts),
@@ -199,7 +199,7 @@ decode_e(Data, {Type,Size}, E) ->
 decode_e(Data, TypeList, E) when is_list(TypeList) ->
     decode_compound_e(Data, TypeList, E);
 decode_e(Data, Type, E) when is_atom(Type) ->
-    decode_e(Data, canopen:encode_type(Type), E).
+    decode_e(Data, co_lib:encode_type(Type), E).
 
 %% decode parts of data types
 decode_e(Data, ?INTEGER8,  S, E) when S=<8 -> decode_signed(Data, S, E);
@@ -231,7 +231,7 @@ decode_e(Data, ?DOMAIN, S, _E) when is_binary(Data) ->
 decode_e(Data, ?DOMAIN, S, _E) when is_list(Data) -> 
         decode_binary(list_to_binary(Data), S);
 decode_e(Data, Type, S, E) when is_atom(Type) ->
-    decode_e(Data, canopen:encode_type(Type), S, E).
+    decode_e(Data, co_lib:encode_type(Type), S, E).
 
     
 
@@ -324,7 +324,7 @@ bitsize_e({_Type,Size}) -> Size;
 bitsize_e(TypeList) when is_list(TypeList) ->
     bitsize_compound_e(TypeList);
 bitsize_e(Type) when is_atom(Type) ->
-    bitsize_e(canopen:encode_type(Type)).
+    bitsize_e(co_lib:encode_type(Type)).
 
 bitsize_compound_e([{_T,Size}|Ts]) ->
     Size + bitsize_compound_e(Ts);

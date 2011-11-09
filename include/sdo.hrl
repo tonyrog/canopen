@@ -359,7 +359,7 @@
 	  index,         %% :16/little object index 
 	  subind,        %% :8  entry sub-index
 	  blksize,       %% :8  number of segments/block [1,127]
-	  pst            %% :8  Protocol switch threhold
+	  pst            %% :8  Protocol switch threshold
 	  %% _reserved  :16 - not used
 	 }).
 

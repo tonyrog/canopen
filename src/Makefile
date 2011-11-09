@@ -4,6 +4,7 @@
 
 MODULES = \
 	canopen \
+	canopen_sup \
 	co_crc \
 	co_iset \
 	co_probe \
@@ -11,6 +12,7 @@ MODULES = \
 	co_format \
 	co_file \
 	eds_file \
+	co_lib \
 	co_sdo \
 	co_mgr \
 	co_transfer \

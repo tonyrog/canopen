@@ -1,7 +1,17 @@
-%%% File    : co_ex_app.erl
-%%% Author  : Malotte W Lönne <malotte@malotte.net>
-%%% Description : Example canopen application
-%%% Created : 19 October 2011 by Malotte W Lönne
+%%-------------------------------------------------------------------
+%% @author Malotte W Lonne <malotte@malotte.net>
+%% @copyright (C) 2011, Tony Rogvall
+%% @doc
+%%    Example CANopen application.
+%% 
+%% Required minimum API:
+%% <ul>
+%% <li>handle_call - get</li>
+%% <li>handle_call - set</li>
+%% <li>handle_info - notify</li>
+%% </ul>
+%% @end
+%%===================================================================
 
 -module(co_ex_app).
 -include_lib("canopen/include/canopen.hrl").
@@ -18,10 +28,11 @@
 
 -define(SERVER, ?MODULE). 
 -define(TEST_IX, 16#2003).
--define(DICT,[{{16#2003, 0}, ?VISIBLE_STRING, "Mine"},
-	      {{16#3003, 0}, ?INTEGER, 7},
-	      {{16#3004, 0}, ?VISIBLE_STRING, "Long string"},
-	      {{16#3333, 2}, ?INTEGER, 0},
+-define(DICT,[{{16#6033, 0}, ?VISIBLE_STRING, "Mine"},
+	      {{16#6033, 0}, ?INTEGER, 7},
+	      {{16#6034, 0}, ?VISIBLE_STRING, "Long string"},
+	      {{16#7333, 2}, ?INTEGER, 0},
+	      {{16#7334, 0}, ?INTEGER, 0}, %% To test timeout
 	      {{16#6000, 0}, ?INTEGER, 0}]).
 
 -record(loop_data,
@@ -32,20 +43,25 @@
 	}).
 
 
-%%%===================================================================
-%%% API
-%%%===================================================================
-
 %%--------------------------------------------------------------------
+%% @spec start(CoSerial) -> {ok, Pid} | ignore | {error, Error}
 %% @doc
-%% Starts the server
 %%
-%% @spec start(CoNode) -> {ok, Pid} | ignore | {error, Error}
+%% Starts the server.
+%%
 %% @end
 %%--------------------------------------------------------------------
-start(CoNode) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [CoNode], []).
+start(CoSerial) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [CoSerial], []).
 
+%%--------------------------------------------------------------------
+%% @spec stop() -> ok | {error, Error}
+%% @doc
+%%
+%% Stops the server.
+%%
+%% @end
+%%--------------------------------------------------------------------
 stop() ->
     gen_server:call(co_ex_app, stop).
 
@@ -70,21 +86,24 @@ dict() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-init([CoNode]) ->
+init([CoSerial]) ->
     Dict = ets:new(my_dict, [public, ordered_set]),
-    co_node:attach(CoNode),
-    load_dict(CoNode, Dict),
-    co_node:subscribe(CoNode, {?IX_RPDO_PARAM_FIRST, ?IX_RPDO_PARAM_LAST}),
-    {ok, #loop_data {state=init, co_node = CoNode, dict=Dict}}.
+    {ok, _NodeId} = co_node:attach(CoSerial),
+    load_dict(CoSerial, Dict),
+    co_node:subscribe(CoSerial, {?IX_RPDO_PARAM_FIRST, ?IX_RPDO_PARAM_LAST}),
+    {ok, #loop_data {state=init, co_node = CoSerial, dict=Dict}}.
 
-load_dict(CoNode, Dict) ->
+load_dict(CoSerial, Dict) ->
     lists:foreach(fun({{Index, _SubInd}, _Type, _Value} = Entry) ->
 			  ets:insert(Dict, Entry),
-			  co_node:subscribe(CoNode, Index)
+			  if Index =/= 16#6000 ->			      
+				  co_node:subscribe(CoSerial, Index, [{mode, all}]);
+			     true ->
+				  co_node:subscribe(CoSerial, Index)
+			  end
 		  end, ?DICT).
 
 %%--------------------------------------------------------------------
-%% @private
 %% @spec handle_call(Request, From, LoopData) ->
 %%                                   {reply, Reply, LoopData} |
 %%                                   {reply, Reply, LoopData, Timeout} |
@@ -93,13 +112,29 @@ load_dict(CoNode, Dict) ->
 %%                                   {stop, Reason, Reply, LoopData} |
 %%                                   {stop, Reason, LoopData}
 %%
-%% @doc
-%% Handling call messages
-%%
 %% Request = {get, Index, SubIndex} |
 %%           {set, Index, SubInd, Value}
+%% LoopData = term()
+%% Index = integer()
+%% SubInd = integer()
+%% Value = term()
+%%
+%% @doc
+%% Handling call messages.
+%% Required to at least handle get and set requests as specified above.
+%% Handling all non call/cast messages.
+%% Required to at least handle a notify msg as specified above. <br/>
+%% RemoteId = Id of remote CANnode initiating the msg. <br/>
+%% Index = Index in Object Dictionary <br/>
+%% SubInd = Sub index in Object Disctionary  <br/>
+%% Value = Any value the node chooses to send.
+%% 
 %% @end
 %%--------------------------------------------------------------------
+%%handle_call({get, 16#3334, SubInd}, _From, LoopData) ->
+    %% To test timeout
+%%    timer:sleep(2000),
+%%    {reply, {ok, 0}, LoopData};
 handle_call({get, Index, SubInd}, _From, LoopData) ->
     io:format("~p: get ~.16B:~.8B \n",[self(), Index, SubInd]),
     case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
@@ -108,6 +143,10 @@ handle_call({get, Index, SubInd}, _From, LoopData) ->
 	[{{Index, SubInd}, Type, Value}] ->
 	    {reply, {value, Type, Value}, LoopData}
     end;
+%%handle_call({set, 16#3334, SubInd, NewValue}, _From, LoopData) ->
+    %% To test timeout
+%%    timer:sleep(2000),
+%%    {reply, ok, LoopData};
 handle_call({set, Index, SubInd, NewValue}, _From, LoopData) ->
     io:format("~p: set ~.16B:~.8B to ~p\n",[self(), Index, SubInd, NewValue]),
     case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
@@ -119,6 +158,14 @@ handle_call({set, Index, SubInd, NewValue}, _From, LoopData) ->
 	[{{Index, SubInd}, Type, _OldValue}] ->
 	    ets:insert(LoopData#loop_data.dict, {{Index, SubInd}, Type, NewValue}),
 	    {reply, ok, LoopData}
+    end;
+handle_call({get_type, Index, SubInd}, _From, LoopData) ->
+    io:format("~p: get_type ~.16B:~.8B \n",[self(), Index, SubInd]),
+    case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
+	[] ->
+	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
+	[{{Index, SubInd}, Type, _Value}] ->
+	    {reply, {type, Type}, LoopData}
     end;
 handle_call(loop_data, _From, LoopData) ->
     io:format("LoopData = ~p\n", [LoopData]),
@@ -149,16 +196,25 @@ handle_cast(_Msg, LoopData) ->
     {noreply, LoopData}.
 
 %%--------------------------------------------------------------------
-%% @private
 %% @spec handle_info(Info, LoopData) -> {noreply, LoopData} |
 %%                                   {noreply, LoopData, Timeout} |
 %%                                   {stop, Reason, LoopData}
 %%
 %% Info = {notify, RemoteId, Index, SubInd, Value}
+%% LoopData = term()
+%% RemoteId = integer()
+%% Index = integer()
+%% SubInd = integer()
+%% Value = term()
 %%
 %% @doc
-%% Handling all non call/cast messages
-%%
+%% Handling all non call/cast messages.
+%% Required to at least handle a notify msg as specified above. <br/>
+%% RemoteId = Id of remote CANnode initiating the msg. <br/>
+%% Index = Index in Object Dictionary <br/>
+%% SubInd = Sub index in Object Disctionary  <br/>
+%% Value = Any value the node chooses to send.
+%% 
 %% @end
 %%--------------------------------------------------------------------
 handle_info({notify, RemoteId, Index, SubInd, Value}, LoopData) ->

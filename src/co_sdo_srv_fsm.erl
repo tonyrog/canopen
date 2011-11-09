@@ -22,6 +22,9 @@
 	 handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
 -export([s_initial/2]).
+-export([s_writing/2]).
+-export([s_reading_segment/2]).
+-export([s_reading_block/2]).
 -export([s_segmented_download/2]).
 -export([s_segmented_upload/2]).
 
@@ -131,6 +134,9 @@ s_initial(M, S) when is_record(M, can_frame) ->
 				    abort(S1, Reason);
 				{ok,TH1,_NWrBytes} ->
 				    case co_transfer:write_end(TH1) of
+					{ok, Mref} ->
+					    S2 = S1#co_session {mref = Mref},
+					    {next_state, s_writing, S2, ?TMO(S2)};
 					ok ->
 					    R = ?mk_scs_initiate_download_response(IX,SI),
 					    send(S, R),
@@ -185,11 +191,14 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		{error,Reason} ->
 		    abort(S1, Reason);
 		{ok, TH, NBytes} ->
-		    start_segmented_upload(S1, IX, SI, TH, NBytes)
+		    start_segmented_upload(S1, IX, SI, TH, NBytes);
+		{ok, Mref} ->
+		    S2 = S1#co_session {mref = Mref},
+		    {next_state, s_reading_segment, S2, ?TMO(S2)}
 	    end;
 
 	?ma_ccs_block_upload_request(GenCrc,IX,SI,BlkSize,Pst) ->
-	    S1 = S#co_session {index=IX,subind=SI},
+	    S1 = S#co_session {index=IX, subind=SI, pst=Pst, blksize=BlkSize, clientcrc=GenCrc},
 	    case co_transfer:read_begin(S1#co_session.ctx, IX, SI) of
 		{error,Reason} ->
 		    ?dbg("start block upload error=~p\n", [Reason]),
@@ -198,15 +207,10 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    ?dbg("protocol switch\n",[]),
 		    start_segmented_upload(S1, IX, SI, TH, NBytes);
 		{ok, TH, NBytes} ->
-		    ?dbg("starting block upload bytes=~p\n", [NBytes]),
-		    SizeInd = ?UINT1(NBytes > 0),
-		    DoCrc = (S1#co_session.ctx)#sdo_ctx.use_crc andalso (GenCrc =:= 1),
-		    CrcSup = ?UINT1(DoCrc),
-		    R = ?mk_scs_block_upload_response(CrcSup,SizeInd,IX,SI,NBytes),
-		    S2 = S1#co_session { crc=DoCrc, blksize=BlkSize,
-					 blkcrc=co_crc:init(), blkbytes=0, th=TH },
-		    send(S2, R),
-		    {next_state, s_block_upload_start,S2,?TMO(S2)}
+		    start_block_upload(S1, IX, SI, TH, NBytes);
+		{ok, Mref} ->
+		    S2 = S1#co_session {mref = Mref},
+		    {next_state, s_reading_block, S2, ?TMO(S2)}
 	    end;
 	_ ->
 	    {stop, garbage, S}
@@ -214,6 +218,58 @@ s_initial(M, S) when is_record(M, can_frame) ->
 s_initial(timeout, S) ->
     {stop, timeout, S}.
 
+s_writing({Mref, Reply} = M, S)  ->
+    ?dbg("~p: s_writing: Got event = ~p\n", [?MODULE, M]),
+    case {S#co_session.mref, Reply} of
+	{Mref, ok} ->
+	    erlang:demonitor(Mref, [flush]),
+	    R = ?mk_scs_initiate_download_response(S#co_session.index, S#co_session.subind),
+	    send(S,R),
+	    {stop, normal, S};
+	_Other ->
+	    l_abort(M, S, s_writing)
+    end;
+s_writing(M, S)  ->
+    ?dbg("~p: s_writing: Got event = ~p, aborting\n", [?MODULE, M]),
+    demonitor_and_abort(M, S).
+
+s_reading_segment({Mref, Reply} = M, S)  ->
+    ?dbg("~p: s_reading_segment: Got event = ~p\n", [?MODULE, M]),
+    case {S#co_session.mref, Reply} of
+	{Mref, {value, Type, Value}} ->
+	    erlang:demonitor(Mref, [flush]),
+	    Data = co_codec:encode(Value, Type),
+	    {ok, TH, NBytes} = 
+		co_transfer:app_t_handle(Data, S#co_session.index, S#co_session.subind),
+	    start_segmented_upload(S, S#co_session.index, S#co_session.subind, TH, NBytes);
+
+	_Other ->
+	    l_abort(M, S, s_reading_segment)
+    end;
+s_reading_segment(M, S)  ->
+    ?dbg("~p: s_reading_segment: Got event = ~p, aborting\n", [?MODULE, M]),
+    demonitor_and_abort(M, S).
+
+s_reading_block({Mref, Reply} = M, S)  ->
+    ?dbg("~p: s_reading_block: Got event = ~p\n", [?MODULE, M]),
+   case {S#co_session.mref, Reply} of
+	{Mref, {value, Type, Value}} ->
+	    erlang:demonitor(Mref, [flush]),
+	    Data = co_codec:encode(Value, Type),
+	    {ok, TH, NBytes} = 
+		co_transfer:app_t_handle(Data, S#co_session.index, S#co_session.subind),	    
+	    if S#co_session.pst =/= 0, NBytes > 0, NBytes =< S#co_session.pst ->
+		    ?dbg("protocol switch\n",[]),
+		    start_segmented_upload(S, S#co_session.index, S#co_session.subind, TH, NBytes);
+	       true ->
+		    start_block_upload(S, S#co_session.index, S#co_session.subind, TH, NBytes)
+	    end;
+	_Other ->
+	    l_abort(M, S, s_reading_block)
+    end;
+s_reading_block(M, S)  ->
+    ?dbg("~p: s_reading_block: Got event = ~p, aborting\n", [?MODULE, M]),
+    demonitor_and_abort(M, S).
 
 start_segmented_upload(S, IX, SI, TH, NBytes) ->
     if NBytes =/= 0, NBytes =< 4 ->
@@ -250,6 +306,16 @@ start_segmented_upload(S, IX, SI, TH, NBytes) ->
 	    {next_state, s_segmented_upload, S1, ?TMO(S1)}
     end.
     
+start_block_upload(S, IX, SI, TH, NBytes) ->
+    ?dbg("starting block upload bytes=~p\n", [NBytes]),
+    SizeInd = ?UINT1(NBytes > 0),
+    DoCrc = (S#co_session.ctx)#sdo_ctx.use_crc andalso 
+						 (S#co_session.clientcrc =:= 1),
+    CrcSup = ?UINT1(DoCrc),
+    R = ?mk_scs_block_upload_response(CrcSup,SizeInd,IX,SI,NBytes),
+    S1 = S#co_session { crc=DoCrc, blkcrc=co_crc:init(), blkbytes=0, th=TH },
+    send(S1, R),
+    {next_state, s_block_upload_start,S1,?TMO(S1)}.
 
 %%
 %% state: segmented_download
@@ -270,6 +336,9 @@ s_segmented_download(M, S) when is_record(M, can_frame) ->
 		    %% reply with same toggle value as the request
 		    if Last =:= 1 ->
 			    case co_transfer:write_end(TH1) of
+				{ok, Mref} ->
+				    S1 = S#co_session {mref = Mref},
+				    {next_state, s_writing, S1, ?TMO(S1)};
 				ok ->
 				    R = ?mk_scs_download_segment_response(T),
 				    send(S,R),
@@ -466,6 +535,11 @@ s_block_download_end(M, S) when is_record(M, can_frame) ->
 					     S#co_session.crc) of	    
 		{error,Reason} ->
 		    abort(S, Reason);
+		{ok, Mref} ->
+		    %% Called an application
+		    S1 = S#co_session {mref = Mref},
+		    {next_state, s_writing, S1, ?TMO(S1)};
+		    
 		_ -> %% this can be any thing ok | true ..
 		    R = ?mk_scs_block_download_end_response(),
 		    send(S, R),
@@ -491,17 +565,13 @@ s_block_download_end(timeout, S) ->
 %%                   {stop, Reason, NewState}
 %% @end
 %%--------------------------------------------------------------------
-handle_event(_Event, StateName, S) ->
+handle_event(Event, StateName, S) ->
+    ?dbg("~p: handle_event: Got event ~p\n",[?MODULE, Event]),
     %% FIXME: handle abort here!!!
-    {next_state, StateName, S, ?TMO(S)}.
+    apply(?MODULE, StateName, [Event, S]).
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc
-%% Whenever a gen_fsm receives an event sent using
-%% gen_fsm:sync_send_all_state_event/[2,3], this function is called
-%% to handle the event.
-%%
 %% @spec handle_sync_event(Event, From, StateName, State) ->
 %%                   {next_state, NextStateName, NextState} |
 %%                   {next_state, NextStateName, NextState, Timeout} |
@@ -509,37 +579,44 @@ handle_event(_Event, StateName, S) ->
 %%                   {reply, Reply, NextStateName, NextState, Timeout} |
 %%                   {stop, Reason, NewState} |
 %%                   {stop, Reason, Reply, NewState}
+%% @doc
+%% Whenever a gen_fsm receives an event sent using
+%% gen_fsm:sync_send_all_state_event/[2,3], this function is called
+%% to handle the event.
+%%
 %% @end
 %%--------------------------------------------------------------------
-handle_sync_event(_Event, _From, StateName, State) ->
+handle_sync_event(Event, _From, StateName, State) ->
+    ?dbg("~p: handle_sync_event: Got event ~p\n",[?MODULE, Event]),
     Reply = ok,
     {reply, Reply, StateName, State}.
 
 %%--------------------------------------------------------------------
 %% @private
+%% @spec handle_info(Info,StateName,State)->
+%%                   {next_state, NextStateName, NextState} |
+%%                   {next_state, NextStateName, NextState, Timeout} |
+%%                   {stop, Reason, NewState}
 %% @doc
 %% This function is called by a gen_fsm when it receives any
 %% message other than a synchronous or asynchronous event
 %% (or a system message).
 %%
-%% @spec handle_info(Info,StateName,State)->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(_Info, StateName, State) ->
-    {next_state, StateName, State}.
+handle_info(Info, StateName, State) ->
+    ?dbg("~p: handle_info: Got info ~p\n",[?MODULE, Info]),
+    apply(?MODULE, StateName, [Info, State]).
 
 %%--------------------------------------------------------------------
 %% @private
+%% @spec terminate(Reason, StateName, State) -> void()
 %% @doc
 %% This function is called by a gen_fsm when it is about to
 %% terminate. It should be the opposite of Module:init/1 and do any
 %% necessary cleaning up. When it returns, the gen_fsm terminates with
 %% Reason. The return value is ignored.
 %%
-%% @spec terminate(Reason, StateName, State) -> void()
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, _StateName, _State) ->
@@ -565,27 +642,48 @@ next_blksize(S) ->
     %% We may want to alter this ...
     (S#co_session.ctx)#sdo_ctx.max_blksize.
 
-l_abort(M, S, State) ->
+demonitor_and_abort(M, S) ->
+    case S#co_session.mref of
+	Mref when is_reference(Mref)->
+	    erlang:demonitor(Mref, [flush]);
+	_NoRef ->
+	    do_nothing
+    end,
+    l_abort(M, S, s_reading).
+
+
+l_abort(M, S, State) when is_record(M, can_frame)->
     case M#can_frame.data of
 	?ma_ccs_abort_transfer(IX,SI,Code) when
 	      IX =:= S#co_session.index,
 	      SI =:= S#co_session.subind ->
 	    Reason = co_sdo:decode_abort_code(Code),
 	    %% remote party has aborted
-	    gen_server:reply(S#co_session.node_from, {error,Reason}),
+	    %% gen_server:reply(S#co_session.node_from, {error,Reason}),
+	    ?dbg("~p: l_abort: Abort = ~p received in state = ~p, terminating\n", 
+		 [?MODULE, Reason, State]),
 	    {stop, normal, S};
 	?ma_ccs_abort_transfer(_IX,_SI,_Code) ->
 	    %% probably a delayed abort for an old session ignore
+	    ?dbg("~p: l_abort: Abort for ~7.16.0#:~w received in state = ~p, ignoring\n", 
+		 [?MODULE, _IX, _SI, State]),
 	    {next_state, State, S, ?TMO(S)};
 	_ ->
 	    %% we did not expect this command abort
+	    ?dbg("~p: l_abort: Unexpected command = ~p received in state = ~p\n", 
+		 [?MODULE, M, State]),
 	    abort(S, ?abort_command_specifier)
-    end.
+    end;
+l_abort(timeout, S, _State) ->
+    abort(S, ?abort_timed_out);
+l_abort(M, S, State) ->
+    ?dbg("~p: l_abort: Event = ~p received in state = ~p\n", [?MODULE, M, State]),
+    abort(S, ?abort_internal_error).
 
 
 abort(S, Reason) ->
-    ?dbg("co_sdo_srv_fsm: ix=~p, subind=~p, abort reason=~p\n", 
-	      [S#co_session.index, S#co_session.subind, Reason]),
+    ?dbg("~p: ix=~p, subind=~p, abort reason=~p\n", 
+	      [?MODULE, S#co_session.index, S#co_session.subind, Reason]),
     Code = co_sdo:encode_abort_code(Reason),
     R = ?mk_scs_abort_transfer(S#co_session.index, S#co_session.subind, Code),
     send(S, R),
@@ -606,3 +704,4 @@ send(S, Data) when is_binary(Data) ->
     can:send_from(S#co_session.node_pid,ID,8,Data).
 
     
+

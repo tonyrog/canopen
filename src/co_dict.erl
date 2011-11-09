@@ -141,17 +141,17 @@ to_fd(Dict, Ix, Fd) ->
 		end,
 	    Var = {object,Ix,
 		   [{struct,var},
-		    {access,canopen:decode_access(O#dict_object.access)},
-		    {type,canopen:decode_type(O#dict_object.type)} |
+		    {access,co_lib:decode_access(O#dict_object.access)},
+		    {type,co_lib:decode_type(O#dict_object.type)} |
 		    Value]},
 	    io:format(Fd, "~p\n", [Var]),
 	    to_fd(Dict, next_object(Dict, Ix), Fd);
 	[O] ->
 	    Es = read_entries(Dict, Ix, -1, []),
 	    Obj = {object,Ix,
-		   [{struct,canopen:decode_struct(O#dict_object.struct)},
-		    {access,canopen:decode_access(O#dict_object.access)},
-		    {type,canopen:decode_type(O#dict_object.type)} |
+		   [{struct,co_lib:decode_struct(O#dict_object.struct)},
+		    {access,co_lib:decode_access(O#dict_object.access)},
+		    {type,co_lib:decode_type(O#dict_object.type)} |
 		    Es]},
 	    io:format(Fd, "~p\n", [Obj]),
 	    to_fd(Dict, next_object(Dict, Ix), Fd);
@@ -167,8 +167,8 @@ read_entries(Dict, Ix, Sx, Es) ->
 	{Ix,Sx1} ->
 	    [D] = ets:lookup(Dict, {Ix,Sx1}),
 	    E = {entry,Sx1,
-		 [{access,canopen:decode_access(D#dict_entry.access)},
-		  {type,canopen:decode_type(D#dict_entry.type)},
+		 [{access,co_lib:decode_access(D#dict_entry.access)},
+		  {type,co_lib:decode_type(D#dict_entry.type)},
 		  {value,D#dict_entry.value}]},
 	    read_entries(Dict,Ix,Sx1,[E|Es]);
 	_ ->

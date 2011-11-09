@@ -20,6 +20,8 @@
 -export([read_begin/3, read/2, read_end/1]).
 -export([read_data_begin/4]).
 
+-export([app_t_handle/3]).
+
 -export([get_block_seqno/1]).
 -export([get_max_size/1]).
 -export([get_size/1]).
@@ -53,16 +55,48 @@
 %%
 %%
 write_begin(Ctx, Index, SubInd) ->
-    case co_node:subscribers(Ctx#sdo_ctx.sub_table, Index) of
+    case co_node:subscribers_with_options(Ctx#sdo_ctx.sub_table, Index) of
 	[] ->
-	    ?dbg("No subscribers for index ~p\n", [Index]),
-	    local_write_begin(Ctx, Index, SubInd);
-	[Pid | _Tail] ->
-	    ?dbg("Process ~p subscribes to index ~p\n", [Pid, Index]),
-	    app_write_begin(Index, SubInd, Pid)
+	    ?dbg("~p: write_begin: No subscribers for index ~p\n", [?MODULE,Index]),
+	    central_write_begin(Ctx, Index, SubInd);
+	SubList ->
+	    ?dbg("~p: write_begin: Process(es) ~p subscribes to index ~p\n", 
+		 [?MODULE, SubList, Index]),
+	    AppsToWrite = [Sub || {Pid, S, T, M} = Sub <- SubList, 
+				  S == application, M == all],
+	    
+	    WriteToDict = case SubList -- AppsToWrite of
+			      [] -> false; %% Or ???
+			      List -> true
+			  end,
+
+	    case {AppsToWrite, WriteToDict} of
+		{[], true} -> 
+		    central_write_begin(Ctx, Index, SubInd);
+		{[], false} ->
+		    %% ???
+		    central_write_begin(Ctx, Index, SubInd);
+		{[{Pid, _S, atomic, _M}], false}  ->
+		    app_write_begin(Index, SubInd, Pid);
+		{[{Pid, _S, atomic, _M}], true}  ->
+		    write_both_begin(Ctx, Index, SubInd, Pid);
+		{[{Pid, _S, streamed, _M}], false} ->
+		    %% Not implemented yet
+		    ?dbg("~p: write_begin: Streamed transfer not implemented yet, " 
+			 ++ "using atomic.\n", [?MODULE]),
+		    app_write_begin(Index, SubInd, Pid);
+		{[{Pid, _S, streamed, _M}], true} ->
+		    ?dbg("~p: write_begin: Streamed transfer not implemented yet, " 
+			 ++ "using atomic.\n", [?MODULE]),
+		    write_both_begin(Ctx, Index, SubInd, Pid);
+		Other ->
+		    ?dbg("~p: write_begin: Other case = ~p\n", [?MODULE,Other]),
+		    {error, ?abort_internal_error}
+	    end
     end.
 
-local_write_begin(Ctx, Index, SubInd) ->
+
+central_write_begin(Ctx, Index, SubInd) ->
     Dict = Ctx#sdo_ctx.dict,
     case co_dict:lookup_entry(Dict, {Index,SubInd}) of
 	Err = {error,_} ->
@@ -82,8 +116,8 @@ local_write_begin(Ctx, Index, SubInd) ->
     end.
 
 app_write_begin(Index, SubInd, Pid) ->
-    case app_call(Pid, {get, Index, SubInd}) of
-	{value, Type, _OldValue} ->
+    case app_call(Pid, {get_type, Index, SubInd}) of
+	{type, Type} ->
 	    MaxSize = co_codec:bytesize(Type),
 	    Handle = #t_handle { dict = Pid, type=Type,
 				 index=Index, subind=SubInd,
@@ -94,6 +128,11 @@ app_write_begin(Index, SubInd, Pid) ->
 	{error, Reason}  ->
 	    {error, Reason}
     end.
+    
+write_both_begin(Ctx, Index, SubInd, Pid) ->
+    ?dbg("~p: write_both_begin: Not implemented yet, writing to app.\n", [?MODULE]),
+    app_write_begin(Index, SubInd, Pid).
+
     
     
 %% 
@@ -224,8 +263,8 @@ write_end(Handle) ->
 		    case Handle#t_handle.dict of
 			Pid when is_pid(Pid) ->
 			    %% An application is responsible for the data
-			    ?dbg("write_to_app: Index = ~p, SubInd = ~p, Value = ~p\n", 
-				 [Index, SubInd, Value]),
+			    ?dbg("~p: write_to_app: Index = ~p, SubInd = ~p, Value = ~p\n", 
+				 [?MODULE, Index, SubInd, Value]),
 			    app_call(Pid, {set, Index, SubInd, Value});
 			Dict ->
 			    co_dict:direct_set(Dict, Index, SubInd, Value)
@@ -248,14 +287,46 @@ write_end(Handle) ->
 %%
 
 read_begin(Ctx, Index, SubInd) ->
-    case co_node:subscribers(Ctx#sdo_ctx.sub_table, Index) of
+    case co_node:subscribers_with_options(Ctx#sdo_ctx.sub_table, Index) of
 	[] ->
-	    local_read_begin(Ctx, Index, SubInd);
-	[ Pid | _Tail ] ->
-	    app_read_begin(Index, SubInd, Pid)
+	    central_read_begin(Ctx, Index, SubInd);
+	SubList ->
+	    ?dbg("~p: read_begin: Process(es) ~p subscribes to index ~p\n", 
+		 [?MODULE, SubList, Index]),
+	    AppsToRead = [Sub || {Pid, S, T, M} = Sub <- SubList, 
+				  S == application, M == all],
+	    
+	    ReadFromDict = case SubList -- AppsToRead of
+			      [] -> false; %% Or ???
+			      List -> true
+			  end,
+
+	    case {AppsToRead, ReadFromDict} of
+		{[], true} -> 
+		    central_read_begin(Ctx, Index, SubInd);
+		{[], false} ->
+		    %% ???
+		    central_read_begin(Ctx, Index, SubInd);
+		{[{Pid, _S, atomic, _M}], false}  ->
+		    app_read_begin(Index, SubInd, Pid);
+		{[{Pid, _S, atomic, _M}], true}  ->
+		    read_both_begin(Ctx, Index, SubInd, Pid);
+		{[{Pid, _S, streamed, _M}], false} ->
+		    %% Not implemented yet
+		    ?dbg("~p: read_begin: Streamed transfer not implemented yet, " 
+			 ++ "using atomic.\n", [?MODULE]),
+		    app_read_begin(Index, SubInd, Pid);
+		{[{Pid, _S, streamed, _M}], true} ->
+		    ?dbg("~p: read_begin: Streamed transfer not implemented yet, " 
+			 ++ "using atomic.\n", [?MODULE]),
+		    read_both_begin(Ctx, Index, SubInd, Pid);
+		Other ->
+		    ?dbg("~p: read_begin: Other case = ~p\n", [?MODULE,Other]),
+		    {error, ?abort_internal_error}
+	    end
     end.
 
-local_read_begin(Ctx, Index, SubInd) ->
+central_read_begin(Ctx, Index, SubInd) ->
     Dict = Ctx#sdo_ctx.dict,
     case co_dict:lookup_entry(Dict, {Index,SubInd}) of
 	Err = {error,_} ->
@@ -276,21 +347,21 @@ local_read_begin(Ctx, Index, SubInd) ->
     end.
 
 app_read_begin(Index, SubInd, Pid) ->
-    case app_call(Pid, {get, Index, SubInd}) of
-	{value, Type, Value} ->
-	    Data = co_codec:encode(Value, Type),
-	    MaxSize = byte_size(Data),
-	    TH = #t_handle { dict = Pid, type=Type,
-			     index=Index, subind=SubInd,
-			     data=Data, size=MaxSize,
-			     max_size=MaxSize },
-	    
-	    {ok, TH, MaxSize};
+    app_call(Pid, {get, Index, SubInd}).
 
-	{error, Reason}  ->
-	    {error, Reason}
-    end.
+read_both_begin(Ctx, Index, SubInd, Pid) ->
+    ?dbg("~p: read_both_begin: Not implemented yet, reading from app.\n", [?MODULE]),
+    app_read_begin(Index, SubInd, Pid).
+    
 	
+app_t_handle(Data, Index, SubInd) when is_binary(Data) ->
+    MaxSize = byte_size(Data),
+    TH = #t_handle { dict = application,
+		     index=Index, subind=SubInd,
+		     data=Data, size=MaxSize,
+		     max_size=MaxSize
+		   },
+    {ok, TH, MaxSize}.
 %% 
 %%  Start a read operation with just a value no dcitionary 
 %% 
@@ -341,51 +412,20 @@ get_size(Handle) ->
     Handle#t_handle.size.
 
 
--define(default_timeout, 5000).
-
+app_call(Pid, {get_type, _Index, _SubInd} = Msg) ->
+    gen_server:call(Pid, Msg);
 app_call(Pid, Msg) ->
     case catch do_call(Pid, Msg) of 
 	{'EXIT', Reason} ->
 	    io:format("app_call: catch error ~p\n",[Reason]), 
 	    {error, ?ABORT_INTERNAL_ERROR};
-	Answer ->
-	    Answer
+	Mref ->
+	    {ok, Mref}
     end.
 
 
 do_call(Process, Request) ->
     Mref = erlang:monitor(process, Process),
 
-    catch erlang:send(Process, {'$gen_call', {self(), Mref}, Request},
-		      [noconnect]),
-    receive
-	{Mref, Reply} ->
-	    erlang:demonitor(Mref, [flush]),
-	    Reply;
-	{'DOWN', Mref, _, _, noconnection} ->
-	    exit({nodedown, node()});
-	{'DOWN', Mref, _, _, Reason} ->
-	    exit(Reason);
-	Msg when is_record(Msg, can_frame) ->
-	    %% Hmm, what to do ??
-	    case Msg#can_frame.data of
-
-		?ma_ccs_abort_transfer(_IX,_SI,_Code) ->
-		%% Session aborted from other side
-		    erlang:demonitor(Mref, [flush]),
-		    %% Resend Msg since it should be handled in fsm
-		    self() ! Msg, 
-		    {error, aborted};
-		_OtherMsg ->
-		    %% Should not happen ???
-		    exit(internal_error)
-	    end
-		    
-    after ?default_timeout ->
-	    erlang:demonitor(Mref),
-	    receive
-		{'DOWN', Mref, _, _, _} -> true
-	    after 0 -> true
-	    end,
-	    exit(timeout)
-    end.
+    erlang:send(Process, {'$gen_call', {self(), Mref}, Request}, [noconnect]),
+    Mref.
