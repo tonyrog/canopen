@@ -10,6 +10,7 @@
 -include_lib("can/include/can.hrl").
 -include("../include/canopen.hrl").
 -include("../include/sdo.hrl").
+-include("../include/co_app.hrl").
 
 -export([write_begin/3, write/3, write_end/1]).
 -export([write_data_begin/3, write_get_data/1]).
@@ -19,7 +20,6 @@
 
 -export([read_begin/3, read/2, read_end/1]).
 -export([read_data_begin/4]).
-
 -export([app_t_handle/3]).
 
 -export([get_block_seqno/1]).
@@ -55,44 +55,17 @@
 %%
 %%
 write_begin(Ctx, Index, SubInd) ->
-    case co_node:subscribers_with_options(Ctx#sdo_ctx.sub_table, Index) of
+    case co_node:reserver(Ctx#sdo_ctx.res_table, Index) of
 	[] ->
-	    ?dbg("~p: write_begin: No subscribers for index ~p\n", [?MODULE,Index]),
+	    ?dbg("~p: write_begin: No reserver for index ~7.16.0#\n", [?MODULE,Index]),
 	    central_write_begin(Ctx, Index, SubInd);
-	SubList ->
-	    ?dbg("~p: write_begin: Process(es) ~p subscribes to index ~p\n", 
-		 [?MODULE, SubList, Index]),
-	    AppsToWrite = [Sub || {Pid, S, T, M} = Sub <- SubList, 
-				  S == application, M == all],
-	    
-	    WriteToDict = case SubList -- AppsToWrite of
-			      [] -> false; %% Or ???
-			      List -> true
-			  end,
-
-	    case {AppsToWrite, WriteToDict} of
-		{[], true} -> 
-		    central_write_begin(Ctx, Index, SubInd);
-		{[], false} ->
-		    %% ???
-		    central_write_begin(Ctx, Index, SubInd);
-		{[{Pid, _S, atomic, _M}], false}  ->
-		    app_write_begin(Index, SubInd, Pid);
-		{[{Pid, _S, atomic, _M}], true}  ->
-		    write_both_begin(Ctx, Index, SubInd, Pid);
-		{[{Pid, _S, streamed, _M}], false} ->
-		    %% Not implemented yet
-		    ?dbg("~p: write_begin: Streamed transfer not implemented yet, " 
-			 ++ "using atomic.\n", [?MODULE]),
-		    app_write_begin(Index, SubInd, Pid);
-		{[{Pid, _S, streamed, _M}], true} ->
-		    ?dbg("~p: write_begin: Streamed transfer not implemented yet, " 
-			 ++ "using atomic.\n", [?MODULE]),
-		    write_both_begin(Ctx, Index, SubInd, Pid);
-		Other ->
-		    ?dbg("~p: write_begin: Other case = ~p\n", [?MODULE,Other]),
-		    {error, ?abort_internal_error}
-	    end
+	{Pid, Mod} when is_pid(Pid) ->
+	    ?dbg("~p: write_begin: Process ~p has reserved index ~7.16.0#\n", 
+		 [?MODULE, Pid, Index]),
+		    app_write_begin(Index, SubInd, Pid, Mod);
+	Other ->
+	    ?dbg("~p: write_begin: Other case = ~p\n", [?MODULE,Other]),
+	    {error, ?abort_internal_error}
     end.
 
 
@@ -115,11 +88,11 @@ central_write_begin(Ctx, Index, SubInd) ->
 	    end
     end.
 
-app_write_begin(Index, SubInd, Pid) ->
-    case app_call(Pid, {get_type, Index, SubInd}) of
-	{type, Type} ->
-	    MaxSize = co_codec:bytesize(Type),
-	    Handle = #t_handle { dict = Pid, type=Type,
+app_write_begin(Index, SubInd, Pid, Mod) ->
+    case app_call(Pid, {get_entry, Index, SubInd}) of
+	{entry, Entry} ->
+	    MaxSize = co_codec:bytesize(Entry#app_entry.type),
+	    Handle = #t_handle { dict = Pid, type=Entry#app_entry.type,
 				 index=Index, subind=SubInd,
 				 data=(<<>>), size=0,
 				 max_size=MaxSize },
@@ -128,11 +101,6 @@ app_write_begin(Index, SubInd, Pid) ->
 	{error, Reason}  ->
 	    {error, Reason}
     end.
-    
-write_both_begin(Ctx, Index, SubInd, Pid) ->
-    ?dbg("~p: write_both_begin: Not implemented yet, writing to app.\n", [?MODULE]),
-    app_write_begin(Index, SubInd, Pid).
-
     
     
 %% 
@@ -287,43 +255,17 @@ write_end(Handle) ->
 %%
 
 read_begin(Ctx, Index, SubInd) ->
-    case co_node:subscribers_with_options(Ctx#sdo_ctx.sub_table, Index) of
+    case co_node:reserver(Ctx#sdo_ctx.res_table, Index) of
 	[] ->
+	    ?dbg("~p: write_begin: No reserver for index ~7.16.0#\n", [?MODULE,Index]),
 	    central_read_begin(Ctx, Index, SubInd);
-	SubList ->
-	    ?dbg("~p: read_begin: Process(es) ~p subscribes to index ~p\n", 
-		 [?MODULE, SubList, Index]),
-	    AppsToRead = [Sub || {Pid, S, T, M} = Sub <- SubList, 
-				  S == application, M == all],
-	    
-	    ReadFromDict = case SubList -- AppsToRead of
-			      [] -> false; %% Or ???
-			      List -> true
-			  end,
-
-	    case {AppsToRead, ReadFromDict} of
-		{[], true} -> 
-		    central_read_begin(Ctx, Index, SubInd);
-		{[], false} ->
-		    %% ???
-		    central_read_begin(Ctx, Index, SubInd);
-		{[{Pid, _S, atomic, _M}], false}  ->
-		    app_read_begin(Index, SubInd, Pid);
-		{[{Pid, _S, atomic, _M}], true}  ->
-		    read_both_begin(Ctx, Index, SubInd, Pid);
-		{[{Pid, _S, streamed, _M}], false} ->
-		    %% Not implemented yet
-		    ?dbg("~p: read_begin: Streamed transfer not implemented yet, " 
-			 ++ "using atomic.\n", [?MODULE]),
-		    app_read_begin(Index, SubInd, Pid);
-		{[{Pid, _S, streamed, _M}], true} ->
-		    ?dbg("~p: read_begin: Streamed transfer not implemented yet, " 
-			 ++ "using atomic.\n", [?MODULE]),
-		    read_both_begin(Ctx, Index, SubInd, Pid);
-		Other ->
-		    ?dbg("~p: read_begin: Other case = ~p\n", [?MODULE,Other]),
-		    {error, ?abort_internal_error}
-	    end
+	{Pid, Mod} when is_pid(Pid)->
+	    ?dbg("~p: read_begin: Process ~p subscribes to index ~7.16.0#\n", 
+		 [?MODULE, Pid, Index]),
+	    app_read_begin(Index, SubInd, Pid, Mod);
+	Other ->
+	    ?dbg("~p: read_begin: Other case = ~p\n", [?MODULE,Other]),
+	    {error, ?abort_internal_error}
     end.
 
 central_read_begin(Ctx, Index, SubInd) ->
@@ -346,13 +288,9 @@ central_read_begin(Ctx, Index, SubInd) ->
 	    end
     end.
 
-app_read_begin(Index, SubInd, Pid) ->
+app_read_begin(Index, SubInd, Pid, Mod) ->
     app_call(Pid, {get, Index, SubInd}).
 
-read_both_begin(Ctx, Index, SubInd, Pid) ->
-    ?dbg("~p: read_both_begin: Not implemented yet, reading from app.\n", [?MODULE]),
-    app_read_begin(Index, SubInd, Pid).
-    
 	
 app_t_handle(Data, Index, SubInd) when is_binary(Data) ->
     MaxSize = byte_size(Data),
@@ -412,7 +350,7 @@ get_size(Handle) ->
     Handle#t_handle.size.
 
 
-app_call(Pid, {get_type, _Index, _SubInd} = Msg) ->
+app_call(Pid, {get_entry, _Index, _SubInd} = Msg) ->
     gen_server:call(Pid, Msg);
 app_call(Pid, Msg) ->
     case catch do_call(Pid, Msg) of 

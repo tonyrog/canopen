@@ -221,4 +221,14 @@
 -define(ALARM_CAUSE_HIS_LEV, 16#86).  %% fatal his level (internal)
 -define(ALARM_CAUSE_HIS,     16#87).  %% fatal his < vin (internal)
 
+
+%% Application get_entry return data
+-record(app_entry,
+	{
+	  index,
+	  type,
+	  access,
+	  transfer
+	}).
+
 -endif.

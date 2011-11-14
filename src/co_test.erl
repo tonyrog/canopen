@@ -8,6 +8,6 @@
 -export([run/0]).
 
 run() ->
-    {ok, _Pid} = co_node:start([{serial,16#03000301}, 
+    {ok, _Pid} = co_node:start_link([{serial,16#03000301}, 
 			       {options, [extended, {vendor,0}]}]).
 

@@ -15,6 +15,7 @@
 
 -module(co_ex_app).
 -include_lib("canopen/include/canopen.hrl").
+-include("co_app.hrl").
 
 -behaviour(gen_server).
 
@@ -25,6 +26,13 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
+
+%% Testing
+-ifdef(debug).
+-define(dbg(Fmt,As), io:format((Fmt), (As))).
+-else.
+-define(dbg(Fmt,As), ok).
+-endif.
 
 -define(SERVER, ?MODULE). 
 -define(TEST_IX, 16#2003).
@@ -97,7 +105,7 @@ load_dict(CoSerial, Dict) ->
     lists:foreach(fun({{Index, _SubInd}, _Type, _Value} = Entry) ->
 			  ets:insert(Dict, Entry),
 			  if Index =/= 16#6000 ->			      
-				  co_node:subscribe(CoSerial, Index, [{mode, all}]);
+				  co_node:reserve(CoSerial, Index, ?MODULE);
 			     true ->
 				  co_node:subscribe(CoSerial, Index)
 			  end
@@ -136,7 +144,7 @@ load_dict(CoSerial, Dict) ->
 %%    timer:sleep(2000),
 %%    {reply, {ok, 0}, LoopData};
 handle_call({get, Index, SubInd}, _From, LoopData) ->
-    io:format("~p: get ~.16B:~.8B \n",[self(), Index, SubInd]),
+    ?dbg("~p: get ~.16B:~.8B \n",[self(), Index, SubInd]),
     case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
 	[] ->
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
@@ -148,7 +156,7 @@ handle_call({get, Index, SubInd}, _From, LoopData) ->
 %%    timer:sleep(2000),
 %%    {reply, ok, LoopData};
 handle_call({set, Index, SubInd, NewValue}, _From, LoopData) ->
-    io:format("~p: set ~.16B:~.8B to ~p\n",[self(), Index, SubInd, NewValue]),
+    ?dbg("~p: set ~.16B:~.8B to ~p\n",[self(), Index, SubInd, NewValue]),
     case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
 	[] ->
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
@@ -159,22 +167,39 @@ handle_call({set, Index, SubInd, NewValue}, _From, LoopData) ->
 	    ets:insert(LoopData#loop_data.dict, {{Index, SubInd}, Type, NewValue}),
 	    {reply, ok, LoopData}
     end;
-handle_call({get_type, Index, SubInd}, _From, LoopData) ->
-    io:format("~p: get_type ~.16B:~.8B \n",[self(), Index, SubInd]),
+handle_call({get_entry, Index, SubInd}, _From, LoopData) ->
+    ?dbg("~p: get_entry ~.16B:~.8B \n",[self(), Index, SubInd]),
     case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
 	[] ->
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
 	[{{Index, SubInd}, Type, _Value}] ->
-	    {reply, {type, Type}, LoopData}
+	    Entry = #app_entry{index = Index,
+			       type = Type,
+			       access = rw,
+			       transfer = undefined},
+	    {reply, {entry, Entry}, LoopData}
     end;
 handle_call(loop_data, _From, LoopData) ->
-    io:format("LoopData = ~p\n", [LoopData]),
+    ?dbg("LoopData = ~p\n", [LoopData]),
     {reply, ok, LoopData};
 handle_call(dict, _From, LoopData) ->
     Dict = ets:tab2list(LoopData#loop_data.dict),
     io:format("Dictionary = ~p\n", [Dict]),
     {reply, ok, LoopData};    
 handle_call(stop, _From, LoopData) ->
+    ?dbg("~p: stop:\n",[?MODULE]),
+    case whereis(list_to_atom(co_lib:serial_to_string(LoopData#loop_data.co_node))) of
+	undefined -> 
+	    do_nothing; %% Not possible to detach and unsubscribe
+	_Pid ->
+	    lists:foreach(
+	      fun({{Index, _SubInd}, _Type, _Value}) ->
+		      co_node:unsubscribe(LoopData#loop_data.co_node, Index)
+	      end, ?DICT),
+	    ?dbg("~p: stop: unsubscribed.\n",[?MODULE]),
+	    co_node:detach(LoopData#loop_data.co_node)
+    end,
+    ?dbg("~p: stop: detached.\n",[?MODULE]),
     {stop, normal, ok, LoopData};
 handle_call(_Request, _From, LoopData) ->
     {reply, {error,bad_call}, LoopData}.
@@ -190,7 +215,7 @@ handle_call(_Request, _From, LoopData) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({object_changed, Ix}, LoopData) ->
-    io:format("My object ~w has changed\n", [Ix]),
+    ?dbg("My object ~w has changed\n", [Ix]),
     {noreply, LoopData};
 handle_cast(_Msg, LoopData) ->
     {noreply, LoopData}.
@@ -218,11 +243,11 @@ handle_cast(_Msg, LoopData) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info({notify, RemoteId, Index, SubInd, Value}, LoopData) ->
-    io:format("handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w \n", 
+    ?dbg("handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w \n", 
 	      [RemoteId, Index, SubInd, Value]),
     {noreply, LoopData};
 handle_info(Info, LoopData) ->
-    io:format("handle_info: Unknown Info ~p\n", [Info]),
+    ?dbg("handle_info: Unknown Info ~p\n", [Info]),
     {noreply, LoopData}.
 
 %%--------------------------------------------------------------------
@@ -237,11 +262,7 @@ handle_info(Info, LoopData) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, LoopData) ->
-    lists:foreach(fun({{Index, _SubInd}, _Type, _Value}) ->
-			  co_node:unsubscribe(LoopData#loop_data.co_node, Index)
-		  end, ?DICT),
-    co_node:detach(LoopData#loop_data.co_node),
+terminate(_Reason, _LoopData) ->
     ok.
 
 %%--------------------------------------------------------------------

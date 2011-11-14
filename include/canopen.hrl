@@ -393,7 +393,8 @@
 	  max_blksize,  %% max block size to use when sending blocks
 	  use_crc,      %% use crc
 	  dict,         %% copy of can dictionary in co_ctx
-	  sub_table     %% copy of subscriber table in co_ctx
+	  sub_table,    %% copy of subscriber table in co_ctx
+	  res_table     %% copy of reserver table in co_ctx
 	}).
 
 -record(co_session,
@@ -461,6 +462,7 @@
 	  node_map,         %% serial to node id mapping
 	  nmt_table,        %% node states,  #nmt_entry {}
 	  dict,             %% can dictionary
+	  res_table,        %% dictionary reservations
 	  sub_table,        %% dictionary subscriptions
 	  cob_table,        %% COB lookup table
 	  tpdo_list=[],     %% [#tpdo{}]
