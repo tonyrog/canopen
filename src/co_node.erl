@@ -8,7 +8,6 @@
 %%% Created : 10 Jan 2008 
 %%% @end
 %%%-------------------------------------------------------------------
-
 -module(co_node).
 
 -behaviour(gen_server).
@@ -18,7 +17,7 @@
 -include("../include/co_app.hrl").
 
 %% API
--export([start/1, start_link/1, start_link/2, stop/1]).
+-export([start_link/1, stop/1]).
 -export([attach/1, detach/1]).
 
 %% gen_server callbacks
@@ -116,19 +115,6 @@ start_link(Args) ->
     ?dbg("~p: Starting co_node with Name = ~p, Serial = ~.16#, NodeId = ~.16#\n",
 	 [?MODULE, Name, S, NodeId]),
     gen_server:start({local, Name}, ?MODULE, [S,NodeId,Name,Opts], []).
-start_link(Serial, Opts) ->
-    start_link([Serial, Opts]).
-
-%%--------------------------------------------------------------------
-%% @spec start(Serial) -> {ok,Pid} | ignore | {error,Error}
-%%
-%% @doc
-%% Description: Starts the server.
-%%
-%% @end
-%%--------------------------------------------------------------------
-start(Serial) ->
-    start_link([{serial, Serial}, {options, [extended]}]).
 
 %%
 %% Get serial number, accepts both string and number
@@ -136,8 +122,6 @@ start(Serial) ->
 
 serial(Serial) when is_integer(Serial) ->
     Serial band 16#FFFFFFFF;
-serial(Serial) when is_list(Serial) ->
-    co_lib:string_to_serial(Serial) band 16#FFFFFFFF;
 serial(_Serial) ->
     erlang:error(badarg).
     
@@ -504,7 +488,7 @@ tpdo_mapping(I, Dict) ->
 %%--------------------------------------------------------------------
 subscribers(Tab, Ix) when ?is_index(Ix) ->
     ets:foldl(
-      fun({{ID,ISet},Storage, Transfer, Mode}, Acc) ->
+      fun({{ID,ISet},_Storage, _Transfer, _Mode}, Acc) ->
 	      case co_iset:member(Ix, ISet) of
 		  true -> [ID|Acc];
 		  false -> Acc
@@ -579,7 +563,7 @@ init([Serial, NodeId, NodeName, Opts]) ->
 				proplists:get_value(dict_file, Opts, "test.dict")),
 		  Ctx) of
 	       {ok, NewCtx} -> NewCtx;
-	       {error, Error, OldCtx} -> OldCtx %% ????
+	       {error, _Error, OldCtx} -> OldCtx %% ????
 	   end,
 
     process_flag(trap_exit, true),
@@ -1639,16 +1623,22 @@ add_subscription(Tab, Ix1, Ix2, Opts, Pid) when ?is_index(Ix1), ?is_index(Ix2),
     Storage = proplists:get_value(storage, Opts, application),
     Transfer = proplists:get_value(transfer, Opts, atomic),
     Mode = proplists:get_value(mode, Opts, notify),
-    case index_ok(Tab, Ix1, Ix2, Mode) of
-	{error, Reason} ->
-	    {error, Reason};
-	I ->
-	    case ets:lookup(Tab, {Pid, I}) of
-		[] -> do_nothing;
-		_Entry -> ets:delete(Tab, {Pid, I}) %% ???
-	    end,
-	    ets:insert(Tab, {{Pid, I}, Storage, Transfer, Mode}),
-	    ok
+    case options_ok(Ix1, Ix2, Storage, Transfer, Mode) of
+	ok ->
+	    I = co_iset:new(Ix1, Ix2),
+	    case index_ok(Tab, I, Mode) of
+		ok ->
+		    case ets:lookup(Tab, {Pid, I}) of
+			[] -> do_nothing;
+			_Entry -> ets:delete(Tab, {Pid, I}) %% ???
+		    end,
+		    ets:insert(Tab, {{Pid, I}, Storage, Transfer, Mode}),
+		    ok;
+		{error, Reason} ->
+		    {error, Reason}
+	    end;
+	Error ->
+	    Error
     end.
 
 %%    case ets:lookup(Tab, Pid) of
@@ -1656,13 +1646,17 @@ add_subscription(Tab, Ix1, Ix2, Opts, Pid) when ?is_index(Ix1), ?is_index(Ix2),
 %%	[{_,ISet}] -> ets:insert(Tab, {Pid, co_iset:union(ISet, I)})
 %%    end.
 
-index_ok(_Tab, Ix1, Ix2, all) when Ix1 =< ?MAN_SPEC_MAX;
-				      Ix2 =< ?MAN_SPEC_MAX->
+options_ok(Ix1, Ix2, _S, _T, all) when Ix1 =< ?MAN_SPEC_MAX;
+				       Ix2 =< ?MAN_SPEC_MAX->
     {error, not_possible_to_reserve};
-index_ok(_Tab, Ix1, Ix2, notify) ->
-    co_iset:new(Ix1, Ix2);
-index_ok(Tab, Ix1, Ix2, all) ->
-    ISet = co_iset:new(Ix1, Ix2),
+options_ok(_Ix1, _Ix2, central, streamed, _M) ->
+    {error, illegal_option_combination};
+options_ok(_Ix1, _Ix2, _S, _T, _M) ->
+    ok.
+
+index_ok(_Tab, _ISet, notify) ->
+    ok;
+index_ok(Tab, ISet, all) ->
     case ets:foldl(
 	   fun({{Pid, OtherISet}, _Storage, _Transfer, Mode}, Acc) ->
 	      case {co_iset:intersect(ISet, OtherISet), Mode} of
@@ -1671,8 +1665,8 @@ index_ok(Tab, Ix1, Ix2, all) ->
 		  _ -> Acc
 	      end
 	   end, [], Tab) of
-	[] -> ISet;
-	List -> 
+	[] -> ok;
+	_List -> 
 	    ?dbg("~p: add_subscription: index already reserved\n", [?MODULE]),
 	    {error, index_already_reserved}
     end.
@@ -1690,7 +1684,7 @@ remove_subscription(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
     I = co_iset:new(Ix1, Ix2),
     case ets:lookup(Tab, {Pid, I}) of
 	[] -> ok;
-	[{{Pid,ISet},S,T,M}] -> ets:delete(Tab, {Pid, I})
+	[{{Pid,_ISet},_S,_T,_M}] -> ets:delete(Tab, {Pid, I})
 %%	    case co_iset:difference(ISet, co_iset:new(Ix1, Ix2)) of
 %%		[] ->
 %%		    ?dbg("~p: remove_subscription: last index for ~w\n", 

@@ -32,7 +32,7 @@ EBIN = ../ebin
 ERLC = erlc
 
 include ../vsn.mk
-VSN=$(CAN_VSN)
+VSN=$(CANOPEN_VSN)
 
 APP_FILE= canopen.app
 APP_SRC= $(APP_FILE).src

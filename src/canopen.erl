@@ -32,15 +32,18 @@
 %%--------------------------------------------------------------------
 start(_StartType, _StartArgs) ->
     io:format("~p: Starting up\n", [?MODULE]),
-    Args = 
-	case application:get_env(canopen) of
-%%	    undefined -> []; For some reason always undefined ???
-	    undefined -> [{serial, 16#03000301}, 
-			  {options, [extended, {vendor, 9}]}] ;
-	    {ok,As} -> As
-	end,
-    io:format("~p: Args=~p\n", [?MODULE,Args]),
-    canopen_sup:start_link(Args).
+    case application:get_env(serial) of
+	undefined -> 
+	    {error, no_serial_specified};
+	{ok,Serial} ->
+	    Opts = case application:get_env(options) of
+		       undefined -> [];
+		       {ok, O} -> O
+		   end,
+	    Args = [{serial, Serial}, {options, Opts}],
+	    io:format("~p: Args=~p\n", [?MODULE,Args]),
+	    canopen_sup:start_link(Args)
+    end.
 
 start() ->
     start(normal, []).

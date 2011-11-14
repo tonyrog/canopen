@@ -6,20 +6,21 @@ in a CAN network.
 
 See .. for a detailed description of CANopen.
 
-The central concept i CANopen is an object dictionary ...
+The central concept i CANopen is the object dictionary ...
 
 Applications can attach to the co_node and subscribe to indexes in the object dictionary. CANopen frames connected to that index will then be relayed to the application by means of a simplified api.
-
-Indexes are of several types:
-<ul>
-<li>16#0000 - 16#1FFF are defined by the standard.</li>
-<li>16#2000 - 16#5FFF are manufacture specific and can be shared by many applications.</li>
-<li>16#6000 - 16#9FFF are device specific and can be reserved by an application.</li>
-</ul>
 
 There are several options to the subscription.
 <ul>
 <li> storage = application | central | application_and_central - The object's value will be handled either exclusively by the application or stored in the central co_node dictionary or both. </li>
 <li> transfer = atomic | streamed - Atomic means that at set/get the whole object value will be transfered at once, regardless of how many CANopen frames it requires. Streamed means that in case of an object value that is transferred in more than one CANopen frame each frame will result in an application call.</li>
-<li> mode = all | notify - All means all commands, including set and get (SDOs), are sent on to the application. Notify means only notifications (PDOs) are sent on. For manufacture specific indexes only notify is possible. Only one process can have all, any other process must use notify.</li>
+<li> mode = all | notify - All means all commands, including set and get (SDOs), are sent on to the application. This means the application have reserved the index. <br/>Notify means only notifications (PDOs) are sent on. For standard and manufacture specific indexes only notify is possible. <br/>Only one process can have all, any other process must use notify.</li>
 </ul>
+
+Indexes are of several types:
+<ul>
+<li>16#0000 - 16#1FFF are defined by the standard and can be subscribed to by many applications but reserved by none.</li>
+<li>16#2000 - 16#5FFF are manufacture specific and can be subscribed to by many applications but reserved by none.</li>
+<li>16#6000 - 16#9FFF are device specific and can be subscribed to by many applications and reserved by at most one application.</li>
+</ul>
+
