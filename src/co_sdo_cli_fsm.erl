@@ -227,7 +227,7 @@ s_segmented_upload_response(M, S) when is_record(M, can_frame) ->
 			{error, Reason} ->
 			    abort(S, Reason);
 			{ok,TH1,_NWrBytes} ->
-			    co_transfer:write_end(TH1),
+			    co_transfer:write_end(S#co_session.ctx, TH1),
 			    {stop, normal, S}
 		    end;
 	       true ->
@@ -262,7 +262,7 @@ s_segmented_upload(M, S) when is_record(M, can_frame) ->
 		    abort(S, Reason);
 		{ok,TH1,_NWrBytes} ->
 		    if C =:= 1 ->
-			    co_transfer:write_end(TH1),
+			    co_transfer:write_end(S#co_session.ctx, TH1),
 			    {stop, normal, S};
 		       true ->
 			    T1 = 1-T,
@@ -449,7 +449,8 @@ s_block_upload(timeout, S) ->
 s_block_upload_end(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
 	?ma_scs_block_upload_end_request(N,CRC) ->
-	    case co_transfer:write_block_end(S#co_session.th,N,CRC,
+	    case co_transfer:write_block_end(S#co_session.ctx, 
+					     S#co_session.th,N,CRC,
 					     S#co_session.crc) of
 		{error,Reason} ->
 		    abort(S, Reason);

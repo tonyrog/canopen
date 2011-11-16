@@ -133,7 +133,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 				{error,Reason} ->
 				    abort(S1, Reason);
 				{ok,TH1,_NWrBytes} ->
-				    case co_transfer:write_end(TH1) of
+				    case co_transfer:write_end(S1#co_session.ctx, TH1) of
 					{ok, Mref} ->
 					    S2 = S1#co_session {mref = Mref},
 					    {next_state, s_writing, S2, ?TMO(S2)};
@@ -213,7 +213,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    {next_state, s_reading_block, S2, ?TMO(S2)}
 	    end;
 	_ ->
-	    {stop, garbage, S}
+	    l_abort(M, S, s_initial)
     end;
 s_initial(timeout, S) ->
     {stop, timeout, S}.
@@ -335,7 +335,7 @@ s_segmented_download(M, S) when is_record(M, can_frame) ->
 		{ok,TH1,_NWrBytes} ->
 		    %% reply with same toggle value as the request
 		    if Last =:= 1 ->
-			    case co_transfer:write_end(TH1) of
+			    case co_transfer:write_end(S#co_session.ctx, TH1) of
 				{ok, Mref} ->
 				    S1 = S#co_session {mref = Mref},
 				    {next_state, s_writing, S1, ?TMO(S1)};
@@ -531,7 +531,8 @@ s_block_download(timeout, S) ->
 s_block_download_end(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
 	?ma_ccs_block_download_end_request(N,CRC) ->
-	    case co_transfer:write_block_end(S#co_session.th,N,CRC,
+	    case co_transfer:write_block_end(S#co_session.ctx,
+					     S#co_session.th,N,CRC,
 					     S#co_session.crc) of	    
 		{error,Reason} ->
 		    abort(S, Reason);

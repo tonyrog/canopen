@@ -26,6 +26,8 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
+%% CO node callbacks
+-export([get_entry/2]).
 
 %% Testing
 -ifdef(debug).
@@ -36,12 +38,13 @@
 
 -define(SERVER, ?MODULE). 
 -define(TEST_IX, 16#2003).
--define(DICT,[{{16#6033, 0}, ?VISIBLE_STRING, "Mine"},
-	      {{16#6033, 0}, ?INTEGER, 7},
+-define(DICT,[{{16#2003, 0}, undef, undef}, %% To test notify after central set
+	      {{16#6033, 0}, ?VISIBLE_STRING, "Mine"},
 	      {{16#6034, 0}, ?VISIBLE_STRING, "Long string"},
+	      {{16#7033, 0}, ?INTEGER, 7},
 	      {{16#7333, 2}, ?INTEGER, 0},
 	      {{16#7334, 0}, ?INTEGER, 0}, %% To test timeout
-	      {{16#6000, 0}, ?INTEGER, 0}]).
+	      {{16#6000, 0}, undef, undef}]). %% To test notify of mpdo
 
 -record(loop_data,
 	{
@@ -98,16 +101,18 @@ init([CoSerial]) ->
     Dict = ets:new(my_dict, [public, ordered_set]),
     {ok, _NodeId} = co_node:attach(CoSerial),
     load_dict(CoSerial, Dict),
-    co_node:subscribe(CoSerial, {?IX_RPDO_PARAM_FIRST, ?IX_RPDO_PARAM_LAST}),
     {ok, #loop_data {state=init, co_node = CoSerial, dict=Dict}}.
 
 load_dict(CoSerial, Dict) ->
     lists:foreach(fun({{Index, _SubInd}, _Type, _Value} = Entry) ->
 			  ets:insert(Dict, Entry),
-			  if Index =/= 16#6000 ->			      
-				  co_node:reserve(CoSerial, Index, ?MODULE);
-			     true ->
-				  co_node:subscribe(CoSerial, Index)
+			  case Index of
+			      16#6000 ->			      
+				  co_node:subscribe(CoSerial, Index);
+			      16#2003 ->			      
+				  co_node:subscribe(CoSerial, Index);
+			      _Other ->
+				  co_node:reserve(CoSerial, Index, ?MODULE)
 			  end
 		  end, ?DICT).
 
@@ -139,10 +144,10 @@ load_dict(CoSerial, Dict) ->
 %% 
 %% @end
 %%--------------------------------------------------------------------
-%%handle_call({get, 16#3334, SubInd}, _From, LoopData) ->
+handle_call({get, 16#7334, _SubInd}, _From, LoopData) ->
     %% To test timeout
-%%    timer:sleep(2000),
-%%    {reply, {ok, 0}, LoopData};
+    timer:sleep(2000),
+    {reply, {ok, 0}, LoopData};
 handle_call({get, Index, SubInd}, _From, LoopData) ->
     ?dbg("~p: get ~.16B:~.8B \n",[self(), Index, SubInd]),
     case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
@@ -151,10 +156,10 @@ handle_call({get, Index, SubInd}, _From, LoopData) ->
 	[{{Index, SubInd}, Type, Value}] ->
 	    {reply, {value, Type, Value}, LoopData}
     end;
-%%handle_call({set, 16#3334, SubInd, NewValue}, _From, LoopData) ->
+handle_call({set, 16#7334, _SubInd, _NewValue}, _From, LoopData) ->
     %% To test timeout
-%%    timer:sleep(2000),
-%%    {reply, ok, LoopData};
+    timer:sleep(2000),
+    {reply, ok, LoopData};
 handle_call({set, Index, SubInd, NewValue}, _From, LoopData) ->
     ?dbg("~p: set ~.16B:~.8B to ~p\n",[self(), Index, SubInd, NewValue]),
     case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
@@ -166,18 +171,6 @@ handle_call({set, Index, SubInd, NewValue}, _From, LoopData) ->
 	[{{Index, SubInd}, Type, _OldValue}] ->
 	    ets:insert(LoopData#loop_data.dict, {{Index, SubInd}, Type, NewValue}),
 	    {reply, ok, LoopData}
-    end;
-handle_call({get_entry, Index, SubInd}, _From, LoopData) ->
-    ?dbg("~p: get_entry ~.16B:~.8B \n",[self(), Index, SubInd]),
-    case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
-	[] ->
-	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{{Index, SubInd}, Type, _Value}] ->
-	    Entry = #app_entry{index = Index,
-			       type = Type,
-			       access = rw,
-			       transfer = undefined},
-	    {reply, {entry, Entry}, LoopData}
     end;
 handle_call(loop_data, _From, LoopData) ->
     ?dbg("LoopData = ~p\n", [LoopData]),
@@ -215,7 +208,9 @@ handle_call(_Request, _From, LoopData) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({object_changed, Ix}, LoopData) ->
-    ?dbg("My object ~w has changed\n", [Ix]),
+    ?dbg("My object ~w has changed. ", [Ix]),
+    {ok, Val} = co_node:value(LoopData#loop_data.co_node, Ix),
+    ?dbg("New value is ~p\n", [Val]),
     {noreply, LoopData};
 handle_cast(_Msg, LoopData) ->
     {noreply, LoopData}.
@@ -275,5 +270,31 @@ terminate(_Reason, _LoopData) ->
 %% @end
 %%--------------------------------------------------------------------
 code_change(_OldVsn, LoopData, _Extra) ->
+    %% Note!
+    %% If the code change includes a change in which indexes that should be
+    %% reserved it is vital to unreserve the indexes no longer used.
     {ok, LoopData}.
 
+%%--------------------------------------------------------------------
+%% @spec get_entry(Pid, {Index, SubInd}) -> {entry, Entry::record()} | false
+%%
+%% @doc
+%% Returns the data structure for {Index, SubInd}.
+%% Should if possible be implemented without process context switch.
+%%
+%% @end
+%%--------------------------------------------------------------------
+get_entry(_Pid, {Index, SubInd}) ->
+    ?dbg("~p: get_entry ~.16B:~.8B \n",[self(), Index, SubInd]),
+    case lists:keyfind({Index, SubInd}, 1, ?DICT) of
+	{{Index, SubInd}, Type, _Value} ->
+	    Entry = #app_entry{index = Index,
+			       type = Type,
+			       access = ?ACCESS_RW,
+			       transfer = undefined},
+	    {entry, Entry};
+	false ->
+	    {error, ?ABORT_NO_SUCH_OBJECT}
+    end;
+get_entry(Pid, Index) ->
+    get_entry(Pid, {Index, 0}).

@@ -12,11 +12,11 @@
 -include("../include/sdo.hrl").
 -include("../include/co_app.hrl").
 
--export([write_begin/3, write/3, write_end/1]).
+-export([write_begin/3, write/3, write_end/2]).
 -export([write_data_begin/3, write_get_data/1]).
 -export([write_size/2]).
 -export([write_block_segment/3, write_block_segment_end/1,
-	 write_block_end/4]).
+	 write_block_end/5]).
 
 -export([read_begin/3, read/2, read_end/1]).
 -export([read_data_begin/4]).
@@ -55,14 +55,17 @@
 %%
 %%
 write_begin(Ctx, Index, SubInd) ->
-    case co_node:reserver(Ctx#sdo_ctx.res_table, Index) of
+    case co_node:reserver_with_module(Ctx#sdo_ctx.res_table, Index) of
 	[] ->
 	    ?dbg("~p: write_begin: No reserver for index ~7.16.0#\n", [?MODULE,Index]),
 	    central_write_begin(Ctx, Index, SubInd);
 	{Pid, Mod} when is_pid(Pid) ->
 	    ?dbg("~p: write_begin: Process ~p has reserved index ~7.16.0#\n", 
 		 [?MODULE, Pid, Index]),
-		    app_write_begin(Index, SubInd, Pid, Mod);
+	    app_write_begin(Index, SubInd, Pid, Mod);
+	{dead, _Mod} ->
+	    ?dbg("~p: write_begin: Reserver process dead.\n", [?MODULE]),
+	    {error, ?abort_internal_error}; %% ???
 	Other ->
 	    ?dbg("~p: write_begin: Other case = ~p\n", [?MODULE,Other]),
 	    {error, ?abort_internal_error}
@@ -89,15 +92,18 @@ central_write_begin(Ctx, Index, SubInd) ->
     end.
 
 app_write_begin(Index, SubInd, Pid, Mod) ->
-    case app_call(Pid, {get_entry, Index, SubInd}) of
+    case Mod:get_entry(Pid, {Index, SubInd}) of
 	{entry, Entry} ->
-	    MaxSize = co_codec:bytesize(Entry#app_entry.type),
-	    Handle = #t_handle { dict = Pid, type=Entry#app_entry.type,
-				 index=Index, subind=SubInd,
-				 data=(<<>>), size=0,
-				 max_size=MaxSize },
-	    {ok, Handle, MaxSize};
-
+	    if (Entry#app_entry.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
+		    MaxSize = co_codec:bytesize(Entry#app_entry.type),
+		    Handle = #t_handle { dict = Pid, type=Entry#app_entry.type,
+					 index=Index, subind=SubInd,
+					 data=(<<>>), size=0,
+					 max_size=MaxSize },
+		    {ok, Handle, MaxSize};
+	       true ->
+		    {entry, ?abort_unsupported_access}
+	    end;
 	{error, Reason}  ->
 	    {error, Reason}
     end.
@@ -185,7 +191,7 @@ write_block_segment_end(TH) ->
 %% Handle the end of block data
 %% Check CRC if needed.
 
-write_block_end(Handle,N,CRC,CheckCrc) ->
+write_block_end(Ctx,Handle,N,CRC,CheckCrc) ->
     Handle1 =
 	if N =:= 0 ->
 		Handle;
@@ -202,12 +208,12 @@ write_block_end(Handle,N,CRC,CheckCrc) ->
 	    io:format("co_transfer: data0=~p, size=~w, data=~p\n", [Handle#t_handle.data,size(Data),Data]),
 	    case co_crc:checksum(Handle1#t_handle.data) of
 		CRC ->
-		    write_end(Handle1);
+		    write_end(Ctx, Handle1);
 		_ ->
 		    {error, ?abort_crc_error}
 	    end;
        true ->
-	    write_end(Handle1)
+	    write_end(Ctx, Handle1)
     end.
     
 
@@ -217,9 +223,9 @@ write_block_end(Handle,N,CRC,CheckCrc) ->
 %%  | ok
 %%  | {ok, Data}   - no dictionary
 %%
-write_end(Handle) when Handle#t_handle.dict == undefined ->
+write_end(_Ctx, Handle) when Handle#t_handle.dict == undefined ->
     (Handle#t_handle.endf)(Handle#t_handle.data);
-write_end(Handle) ->
+write_end(Ctx, Handle) ->
     if Handle#t_handle.max_size =:= 0;
        Handle#t_handle.size == Handle#t_handle.max_size ->
 	    try co_codec:decode(Handle#t_handle.data, 
@@ -235,7 +241,8 @@ write_end(Handle) ->
 				 [?MODULE, Index, SubInd, Value]),
 			    app_call(Pid, {set, Index, SubInd, Value});
 			Dict ->
-			    co_dict:direct_set(Dict, Index, SubInd, Value)
+			    co_dict:direct_set(Dict, Index, SubInd, Value),
+			    inform_subscribers(Index, Ctx)
 		    end
 	    catch
 		error:_ ->
@@ -245,6 +252,14 @@ write_end(Handle) ->
 	    {error, ?abort_data_length_too_low}
     end.
        
+inform_subscribers(I, Ctx) ->
+    lists:foreach(
+      fun(Pid) ->
+	      ?dbg("~s: inform_subscribers: Sending object changed to ~p\n", 
+		   [?MODULE, Pid]),
+	      gen_server:cast(Pid, {object_changed, I}) 
+      end,
+      co_node:subscribers(Ctx#sdo_ctx.sub_table, I)).
 
 %%
 %% Start a read operation 
@@ -255,7 +270,7 @@ write_end(Handle) ->
 %%
 
 read_begin(Ctx, Index, SubInd) ->
-    case co_node:reserver(Ctx#sdo_ctx.res_table, Index) of
+    case co_node:reserver_with_module(Ctx#sdo_ctx.res_table, Index) of
 	[] ->
 	    ?dbg("~p: write_begin: No reserver for index ~7.16.0#\n", [?MODULE,Index]),
 	    central_read_begin(Ctx, Index, SubInd);
@@ -263,6 +278,9 @@ read_begin(Ctx, Index, SubInd) ->
 	    ?dbg("~p: read_begin: Process ~p subscribes to index ~7.16.0#\n", 
 		 [?MODULE, Pid, Index]),
 	    app_read_begin(Index, SubInd, Pid, Mod);
+	{dead, _Mod} ->
+	    ?dbg("~p: read_begin: Reserver process dead.\n", [?MODULE]),
+	    {error, ?abort_internal_error}; %% ???
 	Other ->
 	    ?dbg("~p: read_begin: Other case = ~p\n", [?MODULE,Other]),
 	    {error, ?abort_internal_error}
@@ -274,7 +292,7 @@ central_read_begin(Ctx, Index, SubInd) ->
 	Err = {error,_} ->
 	    Err;
 	{ok,E=#dict_entry{type=Type,value=Value}} ->
-	    if E#dict_entry.access == ?ACCESS_WO ->
+	    if E#dict_entry.access =:= ?ACCESS_WO ->
 		    {error, ?abort_read_not_allowed};
 	       true ->
 		    Data = co_codec:encode(Value, Type),
@@ -289,8 +307,15 @@ central_read_begin(Ctx, Index, SubInd) ->
     end.
 
 app_read_begin(Index, SubInd, Pid, Mod) ->
-    app_call(Pid, {get, Index, SubInd}).
-
+    case Mod:get_entry(Pid, {Index, SubInd}) of
+	{entry, Entry} ->
+	    if (Entry#app_entry.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
+		    ?dbg("~p: app_read_begin: Read access ok\n", [?MODULE]),
+		    app_call(Pid, {get, Index, SubInd});
+	       true ->
+		    {entry, ?abort_read_not_allowed}
+	    end
+    end.
 	
 app_t_handle(Data, Index, SubInd) when is_binary(Data) ->
     MaxSize = byte_size(Data),

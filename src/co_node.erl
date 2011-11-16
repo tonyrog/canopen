@@ -21,8 +21,12 @@
 -export([attach/1, detach/1]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
+-export([init/1, 
+	 handle_call/3, 
+	 handle_cast/2, 
+	 handle_info/2,
+	 terminate/2,
+	 code_change/3]).
 
 %% Application interface
 -export([subscribe/2, unsubscribe/2]).
@@ -30,7 +34,7 @@
 -export([my_subscriptions/1, my_subscriptions/2]).
 -export([my_reservations/1, my_reservations/2]).
 -export([all_subscribers/1, all_subscribers/2]).
--export([all_reservers/1, index_reserver/2]).
+-export([all_reservers/1, reserver/2]).
 -export([notify/3, notify/4]). %% To send MPOs
 
 %% CANopen application internal
@@ -40,7 +44,7 @@
 -export([store/5, fetch/4]).
 -export([store_block/5, fetch_block/4]).
 -export([subscribers/2]).
--export([reserver/2]).
+-export([reserver_with_module/2]).
 -export([tpdo_mapping/2, rpdo_mapping/2]).
 
 %% Debug interface
@@ -179,7 +183,7 @@ detach(Serial) ->
 %% @end
 %%--------------------------------------------------------------------
 subscribe(Serial, Ix) ->
-    gen_server:call(serial_to_pid(Serial), {subscribe, Ix, [], self()}).
+    gen_server:call(serial_to_pid(Serial), {subscribe, Ix, self()}).
 
 %%--------------------------------------------------------------------
 %% @spec unsubscribe(Serial, Index) -> ok | {error, Error}
@@ -242,8 +246,8 @@ all_subscribers(Serial, Ix) ->
 %%
 %% @doc
 %% Adds a reservation to an index.
-%% Module:set/get/get_entry will be called if needed.
-%% Index can also be a range [Index1 - Index2].
+%% Module:get_entry will be called if needed.
+%% Index can also be a range {Index1, Index2}.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -255,7 +259,7 @@ reserve(Serial, Ix, Module) ->
 %%
 %% @doc
 %% Removes a reservation to changes of the Dictionary Object in position Index.
-%% Index can also be a range [Index1 - Index2].
+%% Index can also be a range {Index1, Index2}.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -288,7 +292,7 @@ my_reservations(Serial) ->
 %% @spec all_reservers(Serial) -> [Pid] | {error, Error}
 %%
 %% @doc
-%% Returns the Pids that subscribes to any Index.
+%% Returns the Pids that has reserved any index.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -296,14 +300,14 @@ all_reservers(Serial) ->
     gen_server:call(serial_to_pid(Serial), {reservers}).
 
 %%--------------------------------------------------------------------
-%% @spec index_reserver(Serial, Ix) -> [Pid] | {error, Error}
+%% @spec reserver(Serial, Ix) -> [Pid] | {error, Error}
 %%
 %% @doc
-%% Returns the Pids that subscribes to Index.
+%% Returns the Pid that has reserved index if any.
 %%
 %% @end
 %%--------------------------------------------------------------------
-index_reserver(Serial, Ix) ->
+reserver(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {reserver, Ix}).
 
 %%--------------------------------------------------------------------
@@ -548,11 +552,8 @@ subscribers(Tab, Ix) when ?is_index(Ix) ->
 	      end
       end, [], Tab).
 
-subscribers(Tab) ->
-    lists:usort([Pid || {Pid, _Ixs} <- ets:tab2list(Tab)]).
-
 %%--------------------------------------------------------------------
-%% @spec reserver(Tab, Index) -> {Pid, Mod} | []
+%% @spec reserver_with_module(Tab, Index) -> {Pid, Mod} | []
 %%
 %% @doc
 %% Get the reserver in Tab for Index if any. <br/>
@@ -560,14 +561,11 @@ subscribers(Tab) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-reserver(Tab, Ix) when ?is_index(Ix) ->
+reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
     case ets:lookup(Tab, Ix) of
 	[] -> [];
 	[{Ix, Mod, Pid}] -> {Pid, Mod}
     end.
-
-reservers(Tab) ->
-    lists:usort([Pid || {_Ix, _M, Pid} <- ets:tab2list(Tab)]).
 
 %%====================================================================
 %% gen_server callbacks
@@ -620,13 +618,16 @@ init([Serial, NodeId, NodeName, Opts]) ->
       sdo_list = [],
       time_stamp_time = proplists:get_value(time_stamp, Opts, 60000)
      },
+
     can_router:attach(),
-    Ctx1 = case load_dict_internal(
-		  filename:join(code:priv_dir(canopen),
-				proplists:get_value(dict_file, Opts, "test.dict")),
-		  Ctx) of
-	       {ok, NewCtx} -> NewCtx;
-	       {error, _Error, OldCtx} -> OldCtx %% ????
+
+    Ctx1 = case proplists:get_value(dict_file, Opts) of
+	       undefined -> Ctx;
+	       File -> 
+		   case load_dict_internal(filename:join(code:priv_dir(canopen), File), Ctx) of
+		       {ok, NewCtx} -> NewCtx;
+		       {error, _Error, OldCtx} -> Ctx %% or exit ???
+		   end
 	   end,
 
     process_flag(trap_exit, true),
@@ -827,12 +828,12 @@ handle_call({reservations,Pid}, _From, Ctx) when is_pid(Pid) ->
     {reply, Res, Ctx};
 
 handle_call({reserver,Ix}, _From, Ctx)  ->
-    Res = reserver(Ctx#co_ctx.res_table, Ix),
-    {reply, Res, Ctx};
+    PidInList = reserver_pid(Ctx#co_ctx.res_table, Ix),
+    {reply, PidInList, Ctx};
 
 handle_call({reservers}, _From, Ctx)  ->
-    Subs = reservers(Ctx#co_ctx.res_table),
-    {reply, Subs, Ctx};
+    Res = reservers(Ctx#co_ctx.res_table),
+    {reply, Res, Ctx};
 
 handle_call(dump, _From, Ctx) ->
     io:format("  NAME: ~p\n", [Ctx#co_ctx.name]),
@@ -866,7 +867,7 @@ handle_call(dump, _From, Ctx) ->
     io:format("---- SUB TABLE ----\n"),
     ets:foldl(
       fun({Pid, IxList},_) ->
-	      io:format("~p => ", [Pid]),
+	      io:format("~p => \n", [Pid]),
 	      lists:foreach(
 		fun(Ixs) ->
 			case Ixs of
@@ -968,8 +969,8 @@ handle_info({'DOWN',Ref,process,_Pid,Reason}, Ctx) ->
 		    {noreply, Ctx};
 		{value,A} ->
 		    io:format("can_node: id=~w application died\n", [A#app.pid]),
-		    remove_subscriptions(Ctx#co_ctx.sub_table, A#app.pid),
-		    remove_reservations(Ctx#co_ctx.res_table, A#app.pid),
+		    remove_subscriptions(Ctx#co_ctx.sub_table, A#app.pid), %% Or reset ??
+		    reset_reservations(Ctx#co_ctx.res_table, A#app.pid),
 		    %% FIXME: restart application? application_mod ?
 		    {noreply, Ctx#co_ctx { app_list = Ctx#co_ctx.app_list--[A]}}
 	    end
@@ -1282,7 +1283,8 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
 %%
 handle_dam_mpdo(Ctx, RId, Ix, Si, Data) ->
     ?dbg("~s: handle_dam_mpdo: Index = ~7.16.0#\n", [Ctx#co_ctx.name,Ix]),
-    case subscribers(Ctx#co_ctx.sub_table, Ix) of
+    case lists:usort(subscribers(Ctx#co_ctx.sub_table, Ix) ++
+		     reserver_pid(Ctx#co_ctx.res_table, Ix)) of
 	[] ->
 	    ?dbg("~s: No subscribers for index ~7.16.0#\n", [Ctx#co_ctx.name, Ix]);
 	PidList ->
@@ -1744,29 +1746,47 @@ subscriptions(Tab, Pid) when is_pid(Pid) ->
 	[] -> [];
 	[{Pid, Iset, _Opts}] -> Iset
     end.
-		
+
+subscribers(Tab) ->
+    lists:usort([Pid || {Pid, _Ixs} <- ets:tab2list(Tab)]).
+
 inform_subscribers(I, Ctx) ->			
     lists:foreach(
       fun(Pid) ->
 	      case self() of
 		  Pid -> do_nothing;
 		  _OtherPid ->
-		      ?dbg("~s: inform_subscribers: Sending object changed to ~p", 
+		      ?dbg("~s: inform_subscribers: Sending object changed to ~p\n", 
 			   [Ctx#co_ctx.name, Pid]),
 		      gen_server:cast(Pid, {object_changed, I}) 
 	      end
       end,
-      subscribers(Ctx#co_ctx.sub_table, I)).
+      lists:usort(subscribers(Ctx#co_ctx.sub_table, I) ++ 
+		  reserver_pid(Ctx#co_ctx.res_table, I))).
 
 create_res_table() ->
     ets:new(res_table, [public,ordered_set]).
 
+reservations(Tab, Pid) when is_pid(Pid) ->
+    lists:usort([Ix || {Ix, _M, P} <- ets:tab2list(Tab), P == Pid]).
+
+	
 add_reservation(_Tab, [], _Mod, _Pid) ->
     ok;
 add_reservation(Tab, [Ix | Tail], Mod, Pid) ->
     case ets:lookup(Tab, Ix) of
-	[] -> ets:insert(Tab, {Ix, Mod, Pid}), add_reservation(Tab, Tail, Mod, Pid);
-	[{Ix, _M, Pid}] -> ok, add_reservation(Tab, Tail, Mod, Pid);
+	[] -> 
+	    ?dbg("~p: add_reservation: ~7.16.0# for ~w\n",[?MODULE, Ix, Pid]), 
+	    ets:insert(Tab, {Ix, Mod, Pid}), 
+	    add_reservation(Tab, Tail, Mod, Pid);
+	[{Ix, Mod, dead}] ->  %% M or Mod ???
+	    ok, 
+	    ?dbg("~p: add_reservation: renewing ~7.16.0# for ~w\n",[?MODULE, Ix, Pid]), 
+	    ets:insert(Tab, {Ix, Mod, Pid}), 
+	    add_reservation(Tab, Tail, Mod, Pid);
+	[{Ix, _M, Pid}] -> 
+	    ok, 
+	    add_reservation(Tab, Tail, Mod, Pid);
 	[{Ix, _M, OtherPid}] ->        
 	    ?dbg("~p: add_reservation: index already reserved  by ~p\n", 
 		 [?MODULE, OtherPid]),
@@ -1794,8 +1814,12 @@ remove_reservation(_Tab, [], _Pid) ->
 remove_reservation(Tab, [Ix | Tail], Pid) ->
     ?dbg("~p: remove_reservation: ~7.16.0# for ~w\n", [?MODULE, Ix, Pid]),
     case ets:lookup(Tab, Ix) of
-	[] -> ok, remove_reservation(Tab, Tail, Pid);
-	[{Ix, _M, Pid}] -> ets:delete(Tab, Ix), remove_reservation(Tab, Tail, Pid);
+	[] -> 
+	    ok, 
+	    remove_reservation(Tab, Tail, Pid);
+	[{Ix, _M, Pid}] -> 
+	    ets:delete(Tab, Ix), 
+	    remove_reservation(Tab, Tail, Pid);
 	[{Ix, _M, OtherPid}] -> 	    
 	    ?dbg("~p: remove_reservation: index reserved by other pid ~p\n", 
 		 [?MODULE, OtherPid]),
@@ -1807,10 +1831,36 @@ remove_reservation(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
 	 [?MODULE, Ix1, Ix2, Pid]),
     remove_reservation(Tab, lists:seq(Ix1, Ix2), Pid).
 
-reservations(Tab, Pid) when is_pid(Pid) ->
-    lists:usort([Ix || {Ix, _M, P} <- ets:tab2list(Tab), P == Pid]).
+reset_reservations(Tab, Pid) ->
+    reset_reservation(Tab, reservations(Tab, Pid), Pid).
 
-	
+reset_reservation(_Tab, [], _Pid) ->
+    ok;
+reset_reservation(Tab, [Ix | Tail], Pid) ->
+    ?dbg("~p: reset_reservation: ~7.16.0# for ~w\n", [?MODULE, Ix, Pid]),
+    case ets:lookup(Tab, Ix) of
+	[] -> 
+	    ok, 
+	    reset_reservation(Tab, Tail, Pid);
+	[{Ix, M, Pid}] -> 
+	    ets:delete(Tab, Ix), 
+	    ets:insert(Tab, {Ix, M, dead}),
+	    reset_reservation(Tab, Tail, Pid);
+	[{Ix, _M, OtherPid}] -> 	    
+	    ?dbg("~p: reset_reservation: index reserved by other pid ~p\n", 
+		 [?MODULE, OtherPid]),
+	    {error, index_reservered_by_other}
+    end.
+
+reservers(Tab) ->
+    lists:usort([Pid || {_Ix, _M, Pid} <- ets:tab2list(Tab)]).
+
+reserver_pid(Tab, Ix) when ?is_index(Ix) ->
+    case ets:lookup(Tab, Ix) of
+	[] -> [];
+	[{Ix, _Mod, Pid}] -> [Pid]
+    end.
+
 lookup_sdo_server(COBID, Ctx) ->
     case lookup_cobid(COBID, Ctx) of
 	{sdo_rx, SDOTx} -> 
