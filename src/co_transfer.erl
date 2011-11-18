@@ -29,7 +29,7 @@
 
 -record(t_handle,
 	{
-	  dict,         %% copy of dictionary handle
+	  storage,      %% copy of dictionary handle or pid
 	  type,         %% item type
 	  index,        %% item index
 	  subind,       %% item sub-index
@@ -37,6 +37,7 @@
 	  size,         %% current item size
 	  block=[],     %% block segment list [{1,Bin},...{127,Bin}]
 	  max_size,     %% item max size
+	  transfer_mode,%% mode for transfer to application 
 	  endf          %% transfer end callback
 	}).
    
@@ -83,7 +84,7 @@ central_write_begin(Ctx, Index, SubInd) ->
 		    {error,?abort_write_not_allowed};
 	       true ->
 		    MaxSize = co_codec:bytesize(Type),
-		    Handle = #t_handle { dict = Dict, type=Type,
+		    Handle = #t_handle { storage = Dict, type=Type,
 					 index=Index, subind=SubInd,
 					 data=(<<>>), size=0, 
 					 max_size=MaxSize },
@@ -96,10 +97,24 @@ app_write_begin(Index, SubInd, Pid, Mod) ->
 	{entry, Entry} ->
 	    if (Entry#app_entry.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
 		    MaxSize = co_codec:bytesize(Entry#app_entry.type),
-		    Handle = #t_handle { dict = Pid, type=Entry#app_entry.type,
+		    Transfer = case Entry#app_entry.transfer of
+				   streamed -> 
+				       Ref = make_ref(),
+				       gen_server:cast(Pid, {write_begin, {Index, SubInd}, Ref}),
+				       {streamed, Ref};
+				   {streamed, Module} -> 
+				       Ref = make_ref(),
+				       Module:write_begin(Pid, {Index, SubInd}, Ref),
+				       {streamed, Module, Ref};
+				   Other ->
+				       Other
+			       end,
+		    ?dbg("~p: app_write_begin: Transfer mode = ~p\n", [?MODULE, Transfer]),
+		    Handle = #t_handle { storage = Pid,  type=Entry#app_entry.type,
 					 index=Index, subind=SubInd,
 					 data=(<<>>), size=0,
-					 max_size=MaxSize },
+					 max_size=MaxSize,
+				         transfer_mode=Transfer },
 		    {ok, Handle, MaxSize};
 	       true ->
 		    {entry, ?abort_unsupported_access}
@@ -150,6 +165,16 @@ write(Handle, Data, NBytes) ->
     NewSize = Handle#t_handle.size + NBytes,
     if Handle#t_handle.max_size =:= 0;
        NewSize =< Handle#t_handle.max_size ->
+	    %% Check if streaming to application
+	    case Handle#t_handle.transfer_mode of
+		{streamed, Ref} ->
+		    gen_server:cast(Handle#t_handle.storage, {write, Ref, Data1});
+		{streamed, Mod, Ref} ->
+		    Mod:write(Handle#t_handle.storage, Ref, Data1);
+		_Other ->
+		    do_nothing %% atomic
+	    end,
+
 	    {ok, Handle#t_handle { size=NewSize, data=NewData}, NBytes};
        true ->
 	    {error, ?abort_unsupported_access}
@@ -223,7 +248,7 @@ write_block_end(Ctx,Handle,N,CRC,CheckCrc) ->
 %%  | ok
 %%  | {ok, Data}   - no dictionary
 %%
-write_end(_Ctx, Handle) when Handle#t_handle.dict == undefined ->
+write_end(_Ctx, Handle) when Handle#t_handle.storage == undefined ->
     (Handle#t_handle.endf)(Handle#t_handle.data);
 write_end(Ctx, Handle) ->
     if Handle#t_handle.max_size =:= 0;
@@ -234,15 +259,29 @@ write_end(Ctx, Handle) ->
 		    Index = Handle#t_handle.index,
 		    SubInd = Handle#t_handle.subind,
 						  
-		    case Handle#t_handle.dict of
+		    case Handle#t_handle.storage of
 			Pid when is_pid(Pid) ->
 			    %% An application is responsible for the data
-			    ?dbg("~p: write_to_app: Index = ~p, SubInd = ~p, Value = ~p\n", 
+			    ?dbg("~p: write_to_app: ~.16B:~.8B, Value = ~p\n", 
 				 [?MODULE, Index, SubInd, Value]),
-			    app_call(Pid, {set, Index, SubInd, Value});
+			    %% Check if streaming to application
+			    case Handle#t_handle.transfer_mode of
+				{streamed, Ref} ->
+				    app_call(Pid, {write_end, Ref});
+				{streamed, Mod, Ref} ->
+				    Mod:write_end(Pid, Ref);
+				atomic ->
+				    app_call(Pid, {set, {Index, SubInd}, Value});
+				{atomic, Module} ->
+				    Module:set(Pid, {Index, SubInd}, Value)
+			    end;
+
 			Dict ->
-			    co_dict:direct_set(Dict, Index, SubInd, Value),
-			    inform_subscribers(Index, Ctx)
+			    ?dbg("~p: write_to_dict: Index = ~p, SubInd = ~p, Value = ~p\n", 
+				 [?MODULE, Index, SubInd, Value]),
+			    Res = co_dict:direct_set(Dict, Index, SubInd, Value),
+			    inform_subscribers(Index, Ctx),
+			    Res
 		    end
 	    catch
 		error:_ ->
@@ -253,6 +292,7 @@ write_end(Ctx, Handle) ->
     end.
        
 inform_subscribers(I, Ctx) ->
+    ?dbg("~s: inform_subscribers: Searching for subscribers for ~p\n", [?MODULE, I]),
     lists:foreach(
       fun(Pid) ->
 	      ?dbg("~s: inform_subscribers: Sending object changed to ~p\n", 
@@ -272,7 +312,7 @@ inform_subscribers(I, Ctx) ->
 read_begin(Ctx, Index, SubInd) ->
     case co_node:reserver_with_module(Ctx#sdo_ctx.res_table, Index) of
 	[] ->
-	    ?dbg("~p: write_begin: No reserver for index ~7.16.0#\n", [?MODULE,Index]),
+	    ?dbg("~p: read_begin: No reserver for index ~7.16.0#\n", [?MODULE,Index]),
 	    central_read_begin(Ctx, Index, SubInd);
 	{Pid, Mod} when is_pid(Pid)->
 	    ?dbg("~p: read_begin: Process ~p subscribes to index ~7.16.0#\n", 
@@ -295,9 +335,10 @@ central_read_begin(Ctx, Index, SubInd) ->
 	    if E#dict_entry.access =:= ?ACCESS_WO ->
 		    {error, ?abort_read_not_allowed};
 	       true ->
+		    ?dbg("~p: central_read_begin: Read access ok\n", [?MODULE]),
 		    Data = co_codec:encode(Value, Type),
 		    MaxSize = byte_size(Data),
-		    TH = #t_handle { dict = Dict, type=Type,
+		    TH = #t_handle { storage = Dict, type=Type,
 				     index=Index, subind=SubInd,
 				     data=Data, size=MaxSize,
 				     max_size=MaxSize },
@@ -311,7 +352,7 @@ app_read_begin(Index, SubInd, Pid, Mod) ->
 	{entry, Entry} ->
 	    if (Entry#app_entry.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
 		    ?dbg("~p: app_read_begin: Read access ok\n", [?MODULE]),
-		    app_call(Pid, {get, Index, SubInd});
+		    app_call(Pid, {get, {Index, SubInd}});
 	       true ->
 		    {entry, ?abort_read_not_allowed}
 	    end
@@ -319,7 +360,7 @@ app_read_begin(Index, SubInd, Pid, Mod) ->
 	
 app_t_handle(Data, Index, SubInd) when is_binary(Data) ->
     MaxSize = byte_size(Data),
-    TH = #t_handle { dict = application,
+    TH = #t_handle { storage = application,
 		     index=Index, subind=SubInd,
 		     data=Data, size=MaxSize,
 		     max_size=MaxSize
@@ -354,7 +395,7 @@ read(Handle, NBytes) ->
     end.
 
 
-read_end(Handle) when Handle#t_handle.dict == undefined ->
+read_end(Handle) when Handle#t_handle.storage == undefined ->
     (Handle#t_handle.endf)(Handle#t_handle.data);
 read_end(_Handle) ->
     ok.
@@ -375,8 +416,6 @@ get_size(Handle) ->
     Handle#t_handle.size.
 
 
-app_call(Pid, {get_entry, _Index, _SubInd} = Msg) ->
-    gen_server:call(Pid, Msg);
 app_call(Pid, Msg) ->
     case catch do_call(Pid, Msg) of 
 	{'EXIT', Reason} ->

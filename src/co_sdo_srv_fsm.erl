@@ -23,6 +23,7 @@
 
 -export([s_initial/2]).
 -export([s_writing/2]).
+-export([s_writing_segment/2]).
 -export([s_reading_segment/2]).
 -export([s_reading_block/2]).
 -export([s_segmented_download/2]).
@@ -233,6 +234,21 @@ s_writing(M, S)  ->
     ?dbg("~p: s_writing: Got event = ~p, aborting\n", [?MODULE, M]),
     demonitor_and_abort(M, S).
 
+s_writing_segment({Mref, Reply} = M, S)  ->
+    ?dbg("~p: s_writing: Got event = ~p\n", [?MODULE, M]),
+    case {S#co_session.mref, Reply} of
+	{Mref, ok} ->
+	    erlang:demonitor(Mref, [flush]),
+	    R = ?mk_scs_download_segment_response(1-S#co_session.t),
+	    send(S,R),
+	    {stop, normal, S};
+	_Other ->
+	    l_abort(M, S, s_writing)
+    end;
+s_writing_segment(M, S)  ->
+    ?dbg("~p: s_writing: Got event = ~p, aborting\n", [?MODULE, M]),
+    demonitor_and_abort(M, S).
+
 s_reading_segment({Mref, Reply} = M, S)  ->
     ?dbg("~p: s_reading_segment: Got event = ~p\n", [?MODULE, M]),
     case {S#co_session.mref, Reply} of
@@ -338,7 +354,7 @@ s_segmented_download(M, S) when is_record(M, can_frame) ->
 			    case co_transfer:write_end(S#co_session.ctx, TH1) of
 				{ok, Mref} ->
 				    S1 = S#co_session {mref = Mref},
-				    {next_state, s_writing, S1, ?TMO(S1)};
+				    {next_state, s_writing_segment, S1, ?TMO(S1)};
 				ok ->
 				    R = ?mk_scs_download_segment_response(T),
 				    send(S,R),
@@ -693,7 +709,7 @@ abort(S, Reason) ->
     
 
 send(S, Data) when is_binary(Data) ->
-    ?dbg("send: ~s\n", [co_format:format_sdo(co_sdo:decode_tx(Data))]),
+    ?dbg("~p: send: ~s\n", [?MODULE, co_format:format_sdo(co_sdo:decode_tx(Data))]),
     Dst = S#co_session.dst,
     ID = if ?is_cobid_extended(Dst) ->
 		 (Dst band ?CAN_EFF_MASK) bor ?CAN_EFF_FLAG;

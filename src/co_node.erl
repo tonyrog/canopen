@@ -40,7 +40,7 @@
 %% CANopen application internal
 -export([add_entry/2, get_entry/2]).
 -export([load_dict/2]).
--export([set/3, value/2]).
+-export([set/3, set/4, value/2]).
 -export([store/5, fetch/4]).
 -export([store_block/5, fetch_block/4]).
 -export([subscribers/2]).
@@ -1451,7 +1451,7 @@ handle_notify1(I, Ctx) ->
 			{existing,T} ->
 			    ?dbg("~s: handle_notify: TPDO:existing\n",
 				 [Ctx#co_ctx.name]),
-			    co_tpdo:update(T#tpdo.pid, Param),
+			    co_tpdo:update_param(T#tpdo.pid, Param),
 			    Ctx;
 			{deleted,Ctx1} ->
 			    ?dbg("~s: handle_notify: TPDO:deleted\n",
@@ -1477,7 +1477,7 @@ handle_notify1(I, Ctx) ->
 		    Ctx
 	    end;
 	_ ->
-	    ?dbg("~s: handle_notfy: item not subscribed for ix=~7.16.0#\n", 
+	    ?dbg("~s: handle_notify: index not in cob table ix=~7.16.0#\n", 
 		 [Ctx#co_ctx.name, I]),
 	    Ctx
     end.
