@@ -13,8 +13,8 @@
 -behaviour(gen_server).
 
 -include_lib("can/include/can.hrl").
--include("../include/canopen.hrl").
--include("../include/co_app.hrl").
+-include("canopen.hrl").
+-include("co_app.hrl").
 
 %% API
 -export([start_link/1, stop/1]).

@@ -403,10 +403,15 @@
 	  dst    :: cobid(),       %% Receiver COBID
 	  index  :: index(),       %% object being transfered
 	  subind :: subind(),      %% sub-index of object
-	  pst    :: uint8(),       %% Protocol switch threshold (for block request)
-	  clientcrc :: uint1(),    %% Client CRC support (for block request)
+	  data   :: binary(),      %% Data if expedited
+	  exp    :: uint1(),       %% Expedited flag
+	  n      :: uint8(),       %% bytes not used in data section
+	  size_ind :: uint1(),     %% Size indication
 	  t      :: uint1(),       %% session toggle bit (0|1)
+	  pst    :: uint8(),       %% Protocol switch threshold (for block request)
 	  crc    :: boolean(),     %% generate/check CRC for block data
+	  clientcrc :: uint1(),    %% Client CRC support (for block request)
+	  size    :: uint32(),     %% Total data size (for block request)
 	  blksize :: uint8(),      %% Max number of segment per block
 	  blkseq  :: uint8(),      %% Block number to expect or to send
 	  blkseg  :: binary(),     %% last received block segment (7 bytes)

@@ -11,8 +11,8 @@
 -behaviour(gen_fsm).
 
 -include_lib("can/include/can.hrl").
--include("../include/canopen.hrl").
--include("../include/sdo.hrl").
+-include("canopen.hrl").
+-include("sdo.hrl").
 
 %% API
 -export([start/3]).
@@ -23,7 +23,10 @@
 
 -export([s_initial/2]).
 -export([s_writing/2]).
+-export([s_writing_segment_begin/2]).
 -export([s_writing_segment/2]).
+-export([s_writing_block_begin/2]).
+-export([s_writing_block/2]).
 -export([s_reading_segment/2]).
 -export([s_reading_block/2]).
 -export([s_segmented_download/2]).
@@ -87,6 +90,10 @@ init([Ctx,NodePid,Src,Dst]) ->
       dst    = Dst,
       index  = undefined,
       subind = undefined,
+      exp    = 0,
+      size_ind = 0,
+      pst    = 0,
+      clientcrc = 0,
       t      = 0,         %% Toggle value
       crc    = false,     %% Check or Generate CRC
       blksize  = 0,
@@ -94,7 +101,7 @@ init([Ctx,NodePid,Src,Dst]) ->
       blkbytes = 0,
       node_pid = NodePid,
       ctx      = Ctx
-      %% th is not the transefer handle
+      %% th is not the transfer handle
       %% transfer is setup when we know the item
      },
     {ok, s_initial, S0, ?TMO(S0)}.
@@ -120,70 +127,31 @@ state_name(_Event, _State) ->
 s_initial(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
 	?ma_ccs_initiate_download_request(N,Expedited,SizeInd,IX,SI,Data) ->
-	    S1 = S#co_session { index=IX, subind=SI },
+	    S1 = S#co_session{index=IX, subind=SI, exp=Expedited, 
+			      data=Data, size_ind=SizeInd, n=N},
 	    case co_transfer:write_begin(S#co_session.ctx,IX,SI) of
 		{error,Reason} ->
 		    abort(S1, Reason);
-		{ok, TH, _MaxSize} -> %% transfer handle
-		    if Expedited =:= 1 ->
-			    NBytes = if SizeInd =:= 1 -> 4-N;
-					true -> 0
-				     end,
-			    %% FIXME: async transfer function with sub-state
-			    case co_transfer:write(TH, Data, NBytes) of
-				{error,Reason} ->
-				    abort(S1, Reason);
-				{ok,TH1,_NWrBytes} ->
-				    case co_transfer:write_end(S1#co_session.ctx, TH1) of
-					{ok, Mref} ->
-					    S2 = S1#co_session {mref = Mref},
-					    {next_state, s_writing, S2, ?TMO(S2)};
-					ok ->
-					    R = ?mk_scs_initiate_download_response(IX,SI),
-					    send(S, R),
-					    {stop, normal, S1};
-					{error,Reason} ->
-					    abort(S1, Reason)
-				    end
-			    end;
-		       true ->
-			    %% FIXME: check if max_size already set
-			    %% reject if bad!
-			    TH1 = if SizeInd =:= 1 -> 
-					  <<Size:32/?SDO_ENDIAN>> = Data,
-					  co_transfer:write_size(TH, Size);
-				     true ->
-					  co_transfer:write_size(TH, 0)
-				  end,
-			    %% set T=1 since client will start with 0
-			    S2 = S1#co_session { th=TH1, t=1 },
-			    R  = ?mk_scs_initiate_download_response(IX,SI),
-			    send(S2, R),
-			    {next_state, s_segmented_download,S2,?TMO(S2)}
-		    end
+		{ok, TH, MaxSize}  when is_integer(MaxSize) ->
+		    %% FIXME: check if max_size already set, reject if bad
+		    start_segment_write(S1, TH, IX, SI);
+		{ok, TH, Mref} when is_reference(Mref) ->
+		    S2 = S1#co_session { th=TH, mref=Mref },
+		    {next_state, s_writing_segment_begin,S2,?TMO(S2)}
 	    end;
 
 	?ma_ccs_block_download_request(ChkCrc,SizeInd,IX,SI,Size) ->
-	    S1 = S#co_session { index=IX, subind=SI },
+	    S1 = S#co_session { index=IX, subind=SI, 
+				size_ind=SizeInd, crc=ChkCrc, size=Size},
 	    case co_transfer:write_begin(S1#co_session.ctx,IX,SI) of
 		{error,Reason} ->
 		    abort(S1, Reason);
-		{ok,TH, _MaxSize} -> %% transfer handle
+		{ok, TH, MaxSize} when is_integer(MaxSize) -> 
 		    %% FIXME: check if max_size already set, reject if bad
-		    TH1 = if SizeInd =:= 1 ->
-				  co_transfer:write_size(TH, Size);
-			     true ->
-				  co_transfer:write_size(TH, 0)
-			  end,				  
-		    DoCrc = (S#co_session.ctx)#sdo_ctx.use_crc andalso (ChkCrc =:= 1),
-		    GenCrc = ?UINT1(DoCrc),
-		    %% FIXME: Calculate the BlkSize from data
-		    BlkSize = next_blksize(S1),
-		    S2 = S1#co_session { crc=DoCrc, blkcrc=co_crc:init(),
-					 blksize=BlkSize, th=TH1 },
-		    R = ?mk_scs_block_initiate_download_response(GenCrc,IX,SI,BlkSize),
-		    send(S2, R),
-		    {next_state, s_block_download,S2,?TMO(S2)}
+		    start_block_write(S1, TH, IX, SI);
+		{ok, TH, Mref} ->
+		    S2 = S1#co_session { th=TH, mref=Mref },
+		    {next_state, s_writing_block_begin,S2,?TMO(S2)}
 	    end;
 
 	?ma_ccs_initiate_upload_request(IX,SI) ->
@@ -191,10 +159,10 @@ s_initial(M, S) when is_record(M, can_frame) ->
 	    case co_transfer:read_begin(S1#co_session.ctx, IX, SI) of
 		{error,Reason} ->
 		    abort(S1, Reason);
-		{ok, TH, NBytes} ->
+		{ok, TH, NBytes} when is_integer(NBytes) ->
 		    start_segmented_upload(S1, IX, SI, TH, NBytes);
-		{ok, Mref} ->
-		    S2 = S1#co_session {mref = Mref},
+		{ok, TH, Mref} when is_reference(Mref) ->
+		    S2 = S1#co_session {mref = Mref, th = TH},
 		    {next_state, s_reading_segment, S2, ?TMO(S2)}
 	    end;
 
@@ -207,10 +175,10 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		{ok, TH, NBytes} when Pst =/= 0, NBytes > 0, NBytes =< Pst ->
 		    ?dbg("protocol switch\n",[]),
 		    start_segmented_upload(S1, IX, SI, TH, NBytes);
-		{ok, TH, NBytes} ->
+		{ok, TH, NBytes} when is_integer(NBytes) ->
 		    start_block_upload(S1, IX, SI, TH, NBytes);
-		{ok, Mref} ->
-		    S2 = S1#co_session {mref = Mref},
+		{ok, TH, Mref} when is_reference(Mref) ->
+		    S2 = S1#co_session {mref = Mref, th = TH},
 		    {next_state, s_reading_block, S2, ?TMO(S2)}
 	    end;
 	_ ->
@@ -219,12 +187,81 @@ s_initial(M, S) when is_record(M, can_frame) ->
 s_initial(timeout, S) ->
     {stop, timeout, S}.
 
+start_segment_write(S, TH, IX, SI) ->
+    if S#co_session.exp =:= 1 ->
+	    %% Only one segment to write
+	    NBytes = if S#co_session.size_ind =:= 1 -> 4-S#co_session.n;
+			true -> 0
+		     end,
+	    %% FIXME: async transfer function with sub-state
+	    co_transfer:write_size(TH, NBytes),
+	    write_one_segment_and_respond(S, TH, IX, SI, NBytes);
+       true ->
+	    respond(S, TH, IX, SI)
+    end.
+
+write_one_segment_and_respond(S, TH, IX, SI, NBytes) ->
+    ?dbg("~p: write_one_segment_and_respond:\n", [?MODULE]),
+    case co_transfer:write(TH, S#co_session.data, NBytes) of
+	{error,Reason} ->
+	    abort(S, Reason);
+	{ok,TH1,_NWrBytes} ->
+	    case co_transfer:write_end(S#co_session.ctx, TH1) of
+		{ok, Mref} ->
+		    S1 = S#co_session {mref = Mref},
+		    {next_state, s_writing, S1, ?TMO(S1)};
+		ok ->
+		    R = ?mk_scs_initiate_download_response(IX,SI),
+		    send(S, R),
+		    {stop, normal, S};
+		{error,Reason} ->
+		    abort(S, Reason)
+	    end
+    end.
+
+respond(S, TH, IX, SI) ->
+    ?dbg("~p: respond:\n", [?MODULE]),
+    %% FIXME: check if max_size already set
+    %% reject if bad!
+    TH1 = if S#co_session.size_ind =:= 1 -> 
+		  <<Size:32/?SDO_ENDIAN>> = S#co_session.data,
+		  co_transfer:write_max_size(TH, Size);
+	     true ->
+		  co_transfer:write_max_size(TH, 0)
+	  end,
+    %% set T=1 since client will start with 0
+    S1 = S#co_session { th=TH1, t=1 },
+    R  = ?mk_scs_initiate_download_response(IX,SI),
+    send(S1, R),
+    {next_state, s_segmented_download, S1, ?TMO(S1)}.
+
+start_block_write(S, TH, IX, SI) ->
+    TH1 = if S#co_session.size_ind =:= 1 ->
+		  co_transfer:write_max_size(TH, S#co_session.size);
+	     true ->
+		  co_transfer:write_max_size(TH, 0)
+	  end,				  
+    DoCrc = (S#co_session.ctx)#sdo_ctx.use_crc andalso (S#co_session.crc =:= 1),
+    GenCrc = ?UINT1(DoCrc),
+    %% FIXME: Calculate the BlkSize from data
+    BlkSize = next_blksize(S),
+    S1 = S#co_session { crc=DoCrc, blkcrc=co_crc:init(), blksize=BlkSize, th=TH1 },
+    R = ?mk_scs_block_initiate_download_response(GenCrc,IX,SI,BlkSize),
+    send(S1, R),
+    {next_state, s_block_download, S1, ?TMO(S1)}.
+
+
+%%
+%% state: writing
+%%    next_state:  no state
+%%
 s_writing({Mref, Reply} = M, S)  ->
     ?dbg("~p: s_writing: Got event = ~p\n", [?MODULE, M]),
     case {S#co_session.mref, Reply} of
 	{Mref, ok} ->
 	    erlang:demonitor(Mref, [flush]),
-	    R = ?mk_scs_initiate_download_response(S#co_session.index, S#co_session.subind),
+	    R = ?mk_scs_initiate_download_response(S#co_session.index, 
+						   S#co_session.subind),
 	    send(S,R),
 	    {stop, normal, S};
 	_Other ->
@@ -234,29 +271,54 @@ s_writing(M, S)  ->
     ?dbg("~p: s_writing: Got event = ~p, aborting\n", [?MODULE, M]),
     demonitor_and_abort(M, S).
 
-s_writing_segment({Mref, Reply} = M, S)  ->
-    ?dbg("~p: s_writing: Got event = ~p\n", [?MODULE, M]),
+%%
+%% state: writing_segment_begin
+%%    next_state:  s_writing
+%%
+s_writing_segment_begin({Mref, Reply} = M, S)  ->
+    ?dbg("~p: s_writing_segment_begin: Got event = ~p\n", [?MODULE, M]),
     case {S#co_session.mref, Reply} of
 	{Mref, ok} ->
 	    erlang:demonitor(Mref, [flush]),
-	    R = ?mk_scs_download_segment_response(1-S#co_session.t),
-	    send(S,R),
-	    {stop, normal, S};
+	    start_segment_write(S, S#co_session.th, 
+				S#co_session.index, S#co_session.subind);
 	_Other ->
-	    l_abort(M, S, s_writing)
+	    l_abort(M, S, s_writing_segment_begin)
     end;
-s_writing_segment(M, S)  ->
-    ?dbg("~p: s_writing: Got event = ~p, aborting\n", [?MODULE, M]),
+s_writing_segment_begin(M, S)  ->
+    ?dbg("~p: s_writing_segment_begin: Got event = ~p, aborting\n", [?MODULE, M]),
     demonitor_and_abort(M, S).
 
+%%
+%% state: writing_block_begin
+%%    next_state:  s_writing
+%%
+s_writing_block_begin({Mref, Reply} = M, S)  ->
+    ?dbg("~p: s_writing_block_begin: Got event = ~p\n", [?MODULE, M]),
+    case {S#co_session.mref, Reply} of
+	{Mref, ok} ->
+	    erlang:demonitor(Mref, [flush]),
+	    start_block_write(S, S#co_session.th, 
+			      S#co_session.index, S#co_session.subind);
+	_Other ->
+	    l_abort(M, S, s_writing_block_begin)
+    end;
+s_writing_block_begin(M, S)  ->
+    ?dbg("~p: s_writing_block_begin: Got event = ~p, aborting\n", [?MODULE, M]),
+    demonitor_and_abort(M, S).
+
+%%
+%% state: reading_segment
+%%    next_state:  segmented_upload
+%%
 s_reading_segment({Mref, Reply} = M, S)  ->
     ?dbg("~p: s_reading_segment: Got event = ~p\n", [?MODULE, M]),
     case {S#co_session.mref, Reply} of
-	{Mref, {value, Type, Value}} ->
+	{Mref, {ok, Value}} ->
 	    erlang:demonitor(Mref, [flush]),
-	    Data = co_codec:encode(Value, Type),
+	    Data = co_codec:encode(Value, co_transfer:get_type(S#co_session.th)),
 	    {ok, TH, NBytes} = 
-		co_transfer:app_t_handle(Data, S#co_session.index, S#co_session.subind),
+		co_transfer:add_data_to_handle(S#co_session.th, Data),
 	    start_segmented_upload(S, S#co_session.index, S#co_session.subind, TH, NBytes);
 
 	_Other ->
@@ -264,27 +326,6 @@ s_reading_segment({Mref, Reply} = M, S)  ->
     end;
 s_reading_segment(M, S)  ->
     ?dbg("~p: s_reading_segment: Got event = ~p, aborting\n", [?MODULE, M]),
-    demonitor_and_abort(M, S).
-
-s_reading_block({Mref, Reply} = M, S)  ->
-    ?dbg("~p: s_reading_block: Got event = ~p\n", [?MODULE, M]),
-   case {S#co_session.mref, Reply} of
-	{Mref, {value, Type, Value}} ->
-	    erlang:demonitor(Mref, [flush]),
-	    Data = co_codec:encode(Value, Type),
-	    {ok, TH, NBytes} = 
-		co_transfer:app_t_handle(Data, S#co_session.index, S#co_session.subind),	    
-	    if S#co_session.pst =/= 0, NBytes > 0, NBytes =< S#co_session.pst ->
-		    ?dbg("protocol switch\n",[]),
-		    start_segmented_upload(S, S#co_session.index, S#co_session.subind, TH, NBytes);
-	       true ->
-		    start_block_upload(S, S#co_session.index, S#co_session.subind, TH, NBytes)
-	    end;
-	_Other ->
-	    l_abort(M, S, s_reading_block)
-    end;
-s_reading_block(M, S)  ->
-    ?dbg("~p: s_reading_block: Got event = ~p, aborting\n", [?MODULE, M]),
     demonitor_and_abort(M, S).
 
 start_segmented_upload(S, IX, SI, TH, NBytes) ->
@@ -321,6 +362,32 @@ start_segmented_upload(S, IX, SI, TH, NBytes) ->
 	    S1 = S#co_session { th=TH },
 	    {next_state, s_segmented_upload, S1, ?TMO(S1)}
     end.
+
+%%
+%% state: reading_block
+%%    next_state:  block_upload_start
+%%
+s_reading_block({Mref, Reply} = M, S)  ->
+    ?dbg("~p: s_reading_block: Got event = ~p\n", [?MODULE, M]),
+   case {S#co_session.mref, Reply} of
+	{Mref, {ok, Value}} ->
+	    erlang:demonitor(Mref, [flush]),
+	    Data = co_codec:encode(Value, co_transfer:get_type(S#co_session.th)),
+	    {ok, TH, NBytes} = 
+		co_transfer:add_data_to_handle(S#co_session.th, Data),
+	    if S#co_session.pst =/= 0, NBytes > 0, NBytes =< S#co_session.pst ->
+		    ?dbg("protocol switch\n",[]),
+		    start_segmented_upload(S, S#co_session.index, S#co_session.subind, TH, NBytes);
+	       true ->
+		    start_block_upload(S, S#co_session.index, S#co_session.subind, TH, NBytes)
+	    end;
+	_Other ->
+	    l_abort(M, S, s_reading_block)
+    end;
+s_reading_block(M, S)  ->
+    ?dbg("~p: s_reading_block: Got event = ~p, aborting\n", [?MODULE, M]),
+    demonitor_and_abort(M, S).
+
     
 start_block_upload(S, IX, SI, TH, NBytes) ->
     ?dbg("starting block upload bytes=~p\n", [NBytes]),
@@ -335,7 +402,7 @@ start_block_upload(S, IX, SI, TH, NBytes) ->
 
 %%
 %% state: segmented_download
-%%    next_state:  segmented_download
+%%    next_state:  segmented_download or s_writing_segment
 %%
 s_segmented_download(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
@@ -374,6 +441,25 @@ s_segmented_download(M, S) when is_record(M, can_frame) ->
     end;
 s_segmented_download(timeout, S) ->
     abort(S, ?abort_timed_out).
+
+%%
+%% state: s_writing_segment
+%%    next_state:  No state
+%%
+s_writing_segment({Mref, Reply} = M, S)  ->
+    ?dbg("~p: s_writing_segement: Got event = ~p\n", [?MODULE, M]),
+    case {S#co_session.mref, Reply} of
+	{Mref, ok} ->
+	    erlang:demonitor(Mref, [flush]),
+	    R = ?mk_scs_download_segment_response(1-S#co_session.t),
+	    send(S,R),
+	    {stop, normal, S};
+	_Other ->
+	    l_abort(M, S, s_writing)
+    end;
+s_writing_segment(M, S)  ->
+    ?dbg("~p: s_writing_segment: Got event = ~p, aborting\n", [?MODULE, M]),
+    demonitor_and_abort(M, S).
 
 
 s_segmented_upload(M, S) when is_record(M, can_frame) ->
@@ -529,6 +615,7 @@ s_block_download(M, S) when is_record(M, can_frame) ->
 		       true ->
 			    {next_state, s_block_download, S1, ?BLKTMO(S1)}
 		    end
+			
 	    end;
 	?ma_block_segment(_Last,Seq,_Data) when Seq =:= 0; Seq > S#co_session.blksize ->
 	    abort(S, ?abort_invalid_sequence_number);
@@ -555,7 +642,7 @@ s_block_download_end(M, S) when is_record(M, can_frame) ->
 		{ok, Mref} ->
 		    %% Called an application
 		    S1 = S#co_session {mref = Mref},
-		    {next_state, s_writing, S1, ?TMO(S1)};
+		    {next_state, s_writing_block, S1, ?TMO(S1)};
 		    
 		_ -> %% this can be any thing ok | true ..
 		    R = ?mk_scs_block_download_end_response(),
@@ -567,6 +654,21 @@ s_block_download_end(M, S) when is_record(M, can_frame) ->
     end;
 s_block_download_end(timeout, S) ->
     abort(S, ?abort_timed_out).    
+
+s_writing_block({Mref, Reply} = M, S)  ->
+    ?dbg("~p: s_writing_block: Got event = ~p\n", [?MODULE, M]),
+    case {S#co_session.mref, Reply} of
+	{Mref, ok} ->
+	    erlang:demonitor(Mref, [flush]),
+	    R = ?mk_scs_block_download_end_response(),
+	    send(S, R),
+	    {stop, normal, S};
+	_Other ->
+	    l_abort(M, S, s_writing)
+    end;
+s_writing_block(M, S)  ->
+    ?dbg("~p: s_writing_block: Got event = ~p, aborting\n", [?MODULE, M]),
+    demonitor_and_abort(M, S).
 
 
 %%--------------------------------------------------------------------

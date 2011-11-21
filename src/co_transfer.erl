@@ -8,23 +8,27 @@
 -module(co_transfer).
 
 -include_lib("can/include/can.hrl").
--include("../include/canopen.hrl").
--include("../include/sdo.hrl").
--include("../include/co_app.hrl").
+-include("canopen.hrl").
+-include("sdo.hrl").
+-include("co_app.hrl").
 
 -export([write_begin/3, write/3, write_end/2]).
 -export([write_data_begin/3, write_get_data/1]).
+-export([write_max_size/2]).
 -export([write_size/2]).
+-export([write_data/2]).
 -export([write_block_segment/3, write_block_segment_end/1,
 	 write_block_end/5]).
 
 -export([read_begin/3, read/2, read_end/1]).
 -export([read_data_begin/4]).
 -export([app_t_handle/3]).
+-export([add_data_to_handle/2]).
 
 -export([get_block_seqno/1]).
 -export([get_max_size/1]).
 -export([get_size/1]).
+-export([get_type/1]).
 
 
 -record(t_handle,
@@ -97,25 +101,11 @@ app_write_begin(Index, SubInd, Pid, Mod) ->
 	{entry, Entry} ->
 	    if (Entry#app_entry.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
 		    MaxSize = co_codec:bytesize(Entry#app_entry.type),
-		    Transfer = case Entry#app_entry.transfer of
-				   streamed -> 
-				       Ref = make_ref(),
-				       gen_server:cast(Pid, {write_begin, {Index, SubInd}, Ref}),
-				       {streamed, Ref};
-				   {streamed, Module} -> 
-				       Ref = make_ref(),
-				       Module:write_begin(Pid, {Index, SubInd}, Ref),
-				       {streamed, Module, Ref};
-				   Other ->
-				       Other
-			       end,
-		    ?dbg("~p: app_write_begin: Transfer mode = ~p\n", [?MODULE, Transfer]),
-		    Handle = #t_handle { storage = Pid,  type=Entry#app_entry.type,
-					 index=Index, subind=SubInd,
-					 data=(<<>>), size=0,
-					 max_size=MaxSize,
-				         transfer_mode=Transfer },
-		    {ok, Handle, MaxSize};
+		    ?dbg("~p: app_write_begin: transfer=~p\n",
+			 [?MODULE, Entry#app_entry.transfer]),
+		    app_transfer_begin(Entry#app_entry.transfer, 
+				       Pid, {Index, SubInd}, MaxSize, 
+				       Entry#app_entry.type);
 	       true ->
 		    {entry, ?abort_unsupported_access}
 	    end;
@@ -123,6 +113,29 @@ app_write_begin(Index, SubInd, Pid, Mod) ->
 	    {error, Reason}
     end.
     
+app_transfer_begin(streamed, Pid, {Index, SubInd}, MaxSize, Type) ->
+    Ref = make_ref(),
+    case app_call(Pid, {write_begin, {Index, SubInd}, Ref}) of
+	{ok, Mref} -> {ok, handle(Pid, {Index, SubInd}, MaxSize, Type, {streamed, Ref}), Mref};
+	Other -> Other
+    end;
+app_transfer_begin({streamed, Module} = Transfer, Pid, {Index, SubInd}, MaxSize, Type) ->
+    ?dbg("~p: app_write_begin: Transfer mode = ~p\n", [?MODULE, Transfer]),    Ref = make_ref(),
+    case Module:write_begin(Pid, {Index, SubInd}, Ref) of
+	ok -> {ok, handle(Pid, {Index, SubInd}, MaxSize, Type, {streamed, Module, Ref}), MaxSize};
+	_Other -> {error, ?abort_internal_error}
+    end;
+app_transfer_begin(Other, Pid, {Index, SubInd}, MaxSize, Type) ->
+    ?dbg("~p: app_write_begin: Transfer mode = ~p\n", [?MODULE, Other]),
+    {ok, handle(Pid, {Index, SubInd}, MaxSize, Type, Other), MaxSize}.
+
+handle(Pid, {Index, SubInd}, MaxSize, Type, Transfer) ->
+    #t_handle { storage = Pid,  type=Type,
+		index=Index, subind=SubInd,
+		max_size=MaxSize,
+		data=(<<>>), size=0,
+		transfer_mode=Transfer }.
+
     
 %% 
 %%  Start a write operation with just a value no dictionary
@@ -139,14 +152,19 @@ write_data_begin(Index, SubInd, EndF) ->
 %%
 %% Set maximum write size if not set already
 %%
-write_size(TH, Size) when TH#t_handle.size =:= Size ->
+write_max_size(TH, Size) when TH#t_handle.size =:= Size ->
     TH;
-write_size(TH, Size) when 
+write_max_size(TH, Size) when 
       TH#t_handle.size =:= 0; TH#t_handle.size =:= undefined ->
     TH#t_handle { max_size=Size };
-write_size(_TH, _Size) ->
+write_max_size(_TH, _Size) ->
     {error, ?abort_data_length_error}.
 
+write_size(TH, Size) ->
+    TH#t_handle {size=Size}.
+
+write_data(TH, Data) ->
+    TH#t_handle {data=Data}.
 %%
 %% Fetch current data
 %%
@@ -160,6 +178,8 @@ write_get_data(Handle) ->
 %%   | {ok, Handle', NBytesWritten}
 %%
 write(Handle, Data, NBytes) ->
+    ?dbg("~p: write: handle = ~p, data = ~p, nbytes = ~p\n",
+	 [?MODULE, Handle, Data, NBytes]),
     <<Data1:NBytes/binary, _/binary>> = Data,
     NewData = <<(Handle#t_handle.data)/binary, Data1/binary>>,
     NewSize = Handle#t_handle.size + NBytes,
@@ -186,17 +206,26 @@ write(Handle, Data, NBytes) ->
 write_block_segment(Handle, Seq, Data) when ?is_seq(Seq),
 					    byte_size(Data) =:= 7 ->
     Block = [{Seq,Data} | Handle#t_handle.block],
+    case Handle#t_handle.transfer_mode of
+	{streamed, Ref} ->
+	    gen_server:cast(Handle#t_handle.storage, {write, Ref, Data});
+	{streamed, Mod, Ref} ->
+	    Mod:write(Handle#t_handle.storage, Ref, Data);
+	_Other ->
+	    do_nothing %% atomic
+    end,
     {ok, Handle#t_handle { block = Block}, 7};
 write_block_segment(_Handle, _Seq, _Data) ->
     {error, ?abort_invalid_sequence_number}.
 
-%% Concatinate and write all segments
+%% Concatenate and write all segments
 write_block_segment_end(TH) ->
     Bin = list_to_binary(lists:map(fun({_,Data}) -> Data end,
 				   lists:reverse(TH#t_handle.block))),
     MaxSize = TH#t_handle.max_size,
     Size = byte_size(Bin),
-    %% io:format("write_block_segment_end: max=~w, sz=~w, bin=~p\n", [MaxSize, size(Bin), Bin]),
+    ?dbg("~p: write_block_segment_end: max=~w, sz=~w, bin=~p\n", 
+	 [?MODULE, MaxSize, size(Bin), Bin]),
     if MaxSize =:= 0 ->
 	    write(TH, Bin, Size);
        true ->
@@ -352,7 +381,46 @@ app_read_begin(Index, SubInd, Pid, Mod) ->
 	{entry, Entry} ->
 	    if (Entry#app_entry.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
 		    ?dbg("~p: app_read_begin: Read access ok\n", [?MODULE]),
-		    app_call(Pid, {get, {Index, SubInd}});
+		    ?dbg("~p: app_read_begin: Transfer mode = ~p\n", 
+			 [?MODULE, Entry#app_entry.transfer]),
+		    case Entry#app_entry.transfer of
+			streamed -> 
+			    Ref = make_ref(),
+			    gen_server:cast(Pid, {read_begin, {Index, SubInd}, Ref}),
+			    {streamed, Ref};
+			{streamed, Module} -> 
+			    Ref = make_ref(),
+			    Module:read_begin(Pid, {Index, SubInd}, Ref),
+			    {streamed, Module, Ref};
+			atomic ->
+			    TH = #t_handle { storage = reading,
+					     index=Index, subind=SubInd,
+					     type=Entry#app_entry.type,
+					     transfer_mode=atomic
+					   },
+			    
+			    case app_call(Pid, {get, {Index, SubInd}}) of
+				{ok, Mref} -> {ok, TH, Mref};
+				Other -> Other
+			    end;
+			{atomic, Module} ->
+			    case Module:get(Pid, {Index, SubInd}) of
+				{ok, Value} ->
+				    Data = co_codec:encode(Value, Entry#app_entry.type),
+				    MaxSize = byte_size(Data),
+				    TH = #t_handle { storage = reading,
+						     index=Index, subind=SubInd,
+						     type=Entry#app_entry.type,
+						     data=Data, size=MaxSize,
+						     max_size=MaxSize,
+						     transfer_mode={atomic, Module}
+					   },
+				    {ok, TH, MaxSize};
+				Other ->
+				    Other
+			    end
+		    end;
+
 	       true ->
 		    {entry, ?abort_read_not_allowed}
 	    end
@@ -366,6 +434,13 @@ app_t_handle(Data, Index, SubInd) when is_binary(Data) ->
 		     max_size=MaxSize
 		   },
     {ok, TH, MaxSize}.
+
+add_data_to_handle(TH, Data) when is_binary(Data) ->
+    MaxSize = byte_size(Data),
+    TH1 = TH#t_handle { data=Data, size=MaxSize,
+			max_size=MaxSize
+		      },
+    {ok, TH1, MaxSize}.
 %% 
 %%  Start a read operation with just a value no dcitionary 
 %% 
@@ -414,6 +489,9 @@ get_max_size(Handle) ->
 %% Return bytes remain to be read
 get_size(Handle) ->
     Handle#t_handle.size.
+
+get_type(Handle) ->
+    Handle#t_handle.type.
 
 
 app_call(Pid, Msg) ->

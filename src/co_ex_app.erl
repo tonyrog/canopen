@@ -28,7 +28,7 @@
 	 terminate/2, code_change/3]).
 %% CO node callbacks
 -export([get_entry/2,
-	set/3]).
+	set/3, get/2]).
 
 %% Testing
 -ifdef(debug).
@@ -95,15 +95,25 @@ dict() ->
 
 %% transfer_mode == {atomic, Module}
 set(Pid, {Index, SubInd}, NewValue) ->
+    ?dbg("~p: set ~.16B:~.8B to ~p\n",[?MODULE, Index, SubInd, NewValue]),
     gen_server:call(Pid, {set, {Index, SubInd}, NewValue}).
+get(Pid, {Index, SubInd}) ->
+    ?dbg("~p: get ~.16B:~.8B\n",[?MODULE, Index, SubInd]),
+    case gen_server:call(Pid, {get, {Index, SubInd}}) of
+	{value, _Type, Value} -> {ok, Value};
+	Other -> Other
+    end.
 
 %% transfer_mode = {streamed, Module}
 write_begin(Pid, {Index, SubInd}, Ref) ->
-    gen_server:cast(Pid, {write_begin, {Index, SubInd}, Ref}).
+    ?dbg("~p: write_begin ~.16B:~.8B, ref = ~p\n",[?MODULE, Index, SubInd, Ref]),
+    gen_server:call(Pid, {write_begin, {Index, SubInd}, Ref}).
 write(Pid, Ref, Data) ->
+    ?dbg("~p: write ref = ~p, data = ~p\n",[?MODULE, Ref, Data]),
     gen_server:cast(Pid, {write, Ref, Data}).
 write_end(Pid, Ref) ->
-    gen_server:call(Pid, {write_end, Ref}).
+    ?dbg("~p: write_end ref = ~p\n",[?MODULE, Ref]),
+     gen_server:call(Pid, {write_end, Ref}).
 
 
 %%%===================================================================
@@ -169,29 +179,47 @@ load_dict(CoSerial, Dict) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({get, {16#7334, _SubInd}}, _From, LoopData) ->
-    %% To test timeout
+    ?dbg("~p: handle_call: sleeping for 2 secs\n", [?MODULE]), %% To test timeout
     timer:sleep(2000),
     {reply, {ok, 0}, LoopData};
 handle_call({get, {Index, SubInd}}, _From, LoopData) ->
-    ?dbg("~p: get ~.16B:~.8B \n",[self(), Index, SubInd]),
+    ?dbg("~p: handle_call: get ~.16B:~.8B \n",[?MODULE, Index, SubInd]),
     case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
 	[] ->
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{{Index, SubInd}, Type, Value}] ->
-	    {reply, {value, Type, Value}, LoopData}
+	[{{Index, SubInd}, _Type, Value}] ->
+	    {reply, {ok, Value}, LoopData}
     end;
 handle_call({set, {16#7334, _SubInd}, _NewValue}, _From, LoopData) ->
     %% To test timeout
     timer:sleep(2000),
     {reply, ok, LoopData};
 handle_call({set, {Index, SubInd}, NewValue}, _From, LoopData) ->
-    ?dbg("~p: set ~.16B:~.8B to ~p\n",[self(), Index, SubInd, NewValue]),
+    ?dbg("~p: handle_call: set ~.16B:~.8B to ~p\n",
+	 [?MODULE, Index, SubInd, NewValue]),
     handle_set(LoopData, {Index, SubInd}, NewValue);
+handle_call({write_begin, {Index, SubInd} = I, Ref}, _From, LoopData) ->
+    ?dbg("~p: handle_call: write_begin ~.16B:~.8B, ref = ~p\n",
+	 [?MODULE, Index, SubInd, Ref]),
+    case ets:lookup(LoopData#loop_data.dict, I) of
+	[] ->
+	    ?dbg("~p: handle_call: write_begin error = ~.16B\n", 
+		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
+	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
+	[{I, Type, _OldValue}] ->
+	    Write = #write {ref = Ref, index = I, type = Type},
+	    {reply, ok, LoopData#loop_data {write = Write}}
+    end;
 handle_call({write_end, Ref}, _From, LoopData) ->
-    ?dbg("~p: write_end ref = ~p\n",[?MODULE, Ref]),
+    ?dbg("~p: handle_call: write_end ref = ~p\n",[?MODULE, Ref]),
     Write = LoopData#loop_data.write,
-    NewValue = Write#write.data,
+    ?dbg("~p: handle_call: write_end data = ~p, type ~p\n",
+	 [?MODULE, Write#write.data, Write#write.type]),
+    NewValue = co_codec:decode(Write#write.data, Write#write.type),
     handle_set(LoopData,Write#write.index, NewValue);
+handle_call({read_begin, {Index, SubInd}, Ref}, _From, LoopData) ->
+    ?dbg("~p: handle_call: read_begin ref = ~p\n",[?MODULE, Ref]),
+    {reply, ok, LoopData};
 handle_call(loop_data, _From, LoopData) ->
     io:format("~p: LoopData = ~p\n", [?MODULE, LoopData]),
     {reply, ok, LoopData};
@@ -200,7 +228,7 @@ handle_call(dict, _From, LoopData) ->
     io:format("~p: Dictionary = ~p\n", [?MODULE, Dict]),
     {reply, ok, LoopData};    
 handle_call(stop, _From, LoopData) ->
-    ?dbg("~p: stop:\n",[?MODULE]),
+    ?dbg("~p: handle_call: stop\n",[?MODULE]),
     case whereis(list_to_atom(co_lib:serial_to_string(LoopData#loop_data.co_node))) of
 	undefined -> 
 	    do_nothing; %% Not possible to detach and unsubscribe
@@ -212,7 +240,7 @@ handle_call(stop, _From, LoopData) ->
 	    ?dbg("~p: stop: unsubscribed.\n",[?MODULE]),
 	    co_node:detach(LoopData#loop_data.co_node)
     end,
-    ?dbg("~p: stop: detached.\n",[?MODULE]),
+    ?dbg("~p: handle_call: stop detached.\n",[?MODULE]),
     {stop, normal, ok, LoopData};
 handle_call(_Request, _From, LoopData) ->
     {reply, {error,bad_call}, LoopData}.
@@ -220,15 +248,16 @@ handle_call(_Request, _From, LoopData) ->
 handle_set(LoopData, I, NewValue) ->
     case ets:lookup(LoopData#loop_data.dict, I) of
 	[] ->
-	    ?dbg("~p: set error = ~.16B\n", [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
+	    ?dbg("~p: handle_set: set error = ~.16B\n", 
+		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
 	[{I, _Type, NewValue}] ->
 	    %% No change
-	    ?dbg("~p: set no change\n", [?MODULE]),
+	    ?dbg("~p: handle_set: set no change\n", [?MODULE]),
 	    {reply, ok, LoopData};
 	[{{Index, SubInd}, Type, _OldValue}] ->
 	    ets:insert(LoopData#loop_data.dict, {I, Type, NewValue}),
-	    ?dbg("~p: set ~.16B:~.8B updated to ~p\n",[self(), Index, SubInd, NewValue]),
+	    ?dbg("~p: handle_set: set ~.16B:~.8B updated to ~p\n",[?MODULE, Index, SubInd, NewValue]),
 	    {reply, ok, LoopData}
     end.
 
@@ -243,24 +272,21 @@ handle_set(LoopData, I, NewValue) ->
 %% @end
 %%--------------------------------------------------------------------
 %% transfer_mode == atomic
-handle_cast({set, {Index, SubInd}, NewValue}, LoopData) ->
-    ?dbg("~p: set ~.16B:~.8B to ~p\n",[self(), Index, SubInd, NewValue]),
-    case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
+handle_cast({set, {Index, SubInd} = I, NewValue}, LoopData) ->
+    ?dbg("~p: handle_cast: set ~.16B:~.8B to ~p\n",
+	 [?MODULE, Index, SubInd, NewValue]),
+    case ets:lookup(LoopData#loop_data.dict, I) of
 	[] ->
 	    ?dbg("~p: set error = ~.16B\n", [?MODULE, ?ABORT_NO_SUCH_OBJECT]);
-	[{{Index, SubInd}, _Type, NewValue}] ->
+	[{I, _Type, NewValue}] ->
 	    ok; %% No change
-	[{{Index, SubInd}, Type, _OldValue}] ->
-	    ets:insert(LoopData#loop_data.dict, {{Index, SubInd}, Type, NewValue})
+	[{I, Type, _OldValue}] ->
+	    ets:insert(LoopData#loop_data.dict, {I, Type, NewValue})
     end,
     {noreply, LoopData};
 %% transfer_mode == streamed
-handle_cast({write_begin, {Index, SubInd}, Ref}, LoopData) ->
-    ?dbg("~p: write_begin ~.16B:~.8B, ref = ~p\n",[?MODULE, Index, SubInd, Ref]),
-    Write = #write {ref = Ref, index = {Index, SubInd}},
-    {noreply, LoopData#loop_data {write = Write}};
 handle_cast({write, Ref, Data}, LoopData) ->
-    ?dbg("~p: write ref = ~p, data = ~p\n",[?MODULE, Ref, Data]),
+    ?dbg("~p: handle_cast: write ref = ~p, data = ~p\n",[?MODULE, Ref, Data]),
     Write = case LoopData#loop_data.write#write.data of
 		undefined ->
 		    LoopData#loop_data.write#write {data = <<Data/binary>>};
@@ -269,7 +295,7 @@ handle_cast({write, Ref, Data}, LoopData) ->
 	    end,
     {noreply, LoopData#loop_data {write = Write}};
 handle_cast({object_changed, Ix}, LoopData) ->
-    ?dbg("~p: My object ~w has changed. ", [?MODULE, Ix]),
+    ?dbg("~p: handle_cast: My object ~w has changed. ", [?MODULE, Ix]),
     {ok, Val} = co_node:value(LoopData#loop_data.co_node, Ix),
     ?dbg("New value is ~p\n", [Val]),
     {noreply, LoopData};
