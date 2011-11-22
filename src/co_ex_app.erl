@@ -28,7 +28,8 @@
 	 terminate/2, code_change/3]).
 %% CO node callbacks
 -export([get_entry/2,
-	set/3, get/2]).
+	set/3, get/2,
+	abort/2]).
 
 %% Testing
 -ifdef(debug).
@@ -39,15 +40,15 @@
 
 -define(SERVER, ?MODULE). 
 -define(TEST_IX, 16#2003).
--define(DICT,[{{16#2003, 0}, undef, undef}, %% To test notify after central set
-	      {{16#6033, 0}, ?VISIBLE_STRING, "Mine"},
-	      {{16#6034, 0}, ?VISIBLE_STRING, "Long string"},
-	      {{16#6035, 0}, ?VISIBLE_STRING, "Mine2"},
-	      {{16#6036, 0}, ?VISIBLE_STRING, "Long string2"},
-	      {{16#7033, 0}, ?INTEGER, 7},
-	      {{16#7333, 2}, ?INTEGER, 0},
-	      {{16#7334, 0}, ?INTEGER, 0}, %% To test timeout
-	      {{16#6000, 0}, undef, undef}]). %% To test notify of mpdo
+-define(DICT,[{{16#2003, 0}, undef, atomic, undef}, %% To test notify after central set
+	      {{16#6033, 0}, ?VISIBLE_STRING, atomic, "Mine"},
+	      {{16#6034, 0}, ?VISIBLE_STRING, streamed, "Long string"},
+	      {{16#6035, 0}, ?VISIBLE_STRING, {atomic, ?MODULE}, "Mine2"},
+	      {{16#6036, 0}, ?VISIBLE_STRING, {streamed, ?MODULE}, "Long string2"},
+	      {{16#7033, 0}, ?INTEGER, atomic, 7},
+	      {{16#7333, 2}, ?INTEGER, atomic, 0},
+	      {{16#7334, 0}, ?INTEGER, atomic, 0}, %% To test timeout
+	      {{16#6000, 0}, undef, atomic, undef}]). %% To test notify of mpdo
 
 -record(loop_data,
 	{
@@ -111,11 +112,14 @@ write_begin(Pid, {Index, SubInd}, Ref) ->
 write(Pid, Ref, Data) ->
     ?dbg("~p: write ref = ~p, data = ~p\n",[?MODULE, Ref, Data]),
     gen_server:cast(Pid, {write, Ref, Data}).
-write_end(Pid, Ref) ->
-    ?dbg("~p: write_end ref = ~p\n",[?MODULE, Ref]),
-     gen_server:call(Pid, {write_end, Ref}).
+write_end(Pid, Ref, N) ->
+    ?dbg("~p: write_end ref = ~p, n = ~p\n",[?MODULE, Ref, N]),
+    gen_server:call(Pid, {write_end, Ref, N}).
 
-
+abort(Pid, Ref) ->
+    ?dbg("~p: abort ref = ~p\n",[?MODULE, Ref]),
+    gen_server:call(Pid, {abort, Ref}).
+    
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -138,7 +142,7 @@ init([CoSerial]) ->
     {ok, #loop_data {state=init, co_node = CoSerial, dict=Dict}}.
 
 load_dict(CoSerial, Dict) ->
-    lists:foreach(fun({{Index, _SubInd}, _Type, _Value} = Entry) ->
+    lists:foreach(fun({{Index, _SubInd}, _Type, _Transfer, _Value} = Entry) ->
 			  ets:insert(Dict, Entry),
 			  case Index of
 			      16#6000 ->			      
@@ -187,7 +191,7 @@ handle_call({get, {Index, SubInd}}, _From, LoopData) ->
     case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
 	[] ->
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{{Index, SubInd}, _Type, Value}] ->
+	[{{Index, SubInd}, _Type, _Transfer, Value}] ->
 	    {reply, {ok, Value}, LoopData}
     end;
 handle_call({set, {16#7334, _SubInd}, _NewValue}, _From, LoopData) ->
@@ -206,19 +210,33 @@ handle_call({write_begin, {Index, SubInd} = I, Ref}, _From, LoopData) ->
 	    ?dbg("~p: handle_call: write_begin error = ~.16B\n", 
 		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{I, Type, _OldValue}] ->
+	[{I, Type, _Transfer, _OldValue}] ->
 	    Write = #write {ref = Ref, index = I, type = Type},
 	    {reply, ok, LoopData#loop_data {write = Write}}
     end;
-handle_call({write_end, Ref}, _From, LoopData) ->
+handle_call({write_end, Ref, N}, _From, LoopData) ->
     ?dbg("~p: handle_call: write_end ref = ~p\n",[?MODULE, Ref]),
     Write = LoopData#loop_data.write,
     ?dbg("~p: handle_call: write_end data = ~p, type ~p\n",
 	 [?MODULE, Write#write.data, Write#write.type]),
-    NewValue = co_codec:decode(Write#write.data, Write#write.type),
+    AccData = Write#write.data,
+
+    %% Check if all downloaded bytes should be used
+    Data = if N =:= 0 ->
+		AccData;
+	   true ->
+		Size1 = size(AccData) - N,
+		<<TruncData:Size1/binary,_/binary>> = AccData,
+		TruncData
+	end,
+    {NewValue, _} = co_codec:decode(Data, Write#write.type),
+    ?dbg("~p: handle_call: write_end decoded data = ~p\n",[?MODULE, NewValue]),
     handle_set(LoopData,Write#write.index, NewValue);
 handle_call({read_begin, {Index, SubInd}, Ref}, _From, LoopData) ->
     ?dbg("~p: handle_call: read_begin ref = ~p\n",[?MODULE, Ref]),
+    {reply, ok, LoopData};
+handle_call({abort, Ref}, _From, LoopData) ->
+    ?dbg("~p: handle_call: abort ref = ~p\n",[?MODULE, Ref]),
     {reply, ok, LoopData};
 handle_call(loop_data, _From, LoopData) ->
     io:format("~p: LoopData = ~p\n", [?MODULE, LoopData]),
@@ -251,12 +269,12 @@ handle_set(LoopData, I, NewValue) ->
 	    ?dbg("~p: handle_set: set error = ~.16B\n", 
 		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{I, _Type, NewValue}] ->
+	[{I, _Type, _Transfer, NewValue}] ->
 	    %% No change
 	    ?dbg("~p: handle_set: set no change\n", [?MODULE]),
 	    {reply, ok, LoopData};
-	[{{Index, SubInd}, Type, _OldValue}] ->
-	    ets:insert(LoopData#loop_data.dict, {I, Type, NewValue}),
+	[{{Index, SubInd}, Type, Transfer, _OldValue}] ->
+	    ets:insert(LoopData#loop_data.dict, {I, Type, Transfer, NewValue}),
 	    ?dbg("~p: handle_set: set ~.16B:~.8B updated to ~p\n",[?MODULE, Index, SubInd, NewValue]),
 	    {reply, ok, LoopData}
     end.
@@ -278,9 +296,9 @@ handle_cast({set, {Index, SubInd} = I, NewValue}, LoopData) ->
     case ets:lookup(LoopData#loop_data.dict, I) of
 	[] ->
 	    ?dbg("~p: set error = ~.16B\n", [?MODULE, ?ABORT_NO_SUCH_OBJECT]);
-	[{I, _Type, NewValue}] ->
+	[{I, _Type, _Transfer, NewValue}] ->
 	    ok; %% No change
-	[{I, Type, _OldValue}] ->
+	[{I, Type, _Transfer, _OldValue}] ->
 	    ets:insert(LoopData#loop_data.dict, {I, Type, NewValue})
     end,
     {noreply, LoopData};
@@ -374,17 +392,11 @@ code_change(_OldVsn, LoopData, _Extra) ->
 get_entry(_Pid, {Index, SubInd}) ->
     ?dbg("~p: get_entry ~.16B:~.8B \n",[?MODULE, Index, SubInd]),
     case lists:keyfind({Index, SubInd}, 1, ?DICT) of
-	{{Index, SubInd}, Type, _Value} ->
+	{{Index, SubInd}, Type, Transfer, _Value} ->
 	    Entry = #app_entry{index = Index,
 			       type = Type,
 			       access = ?ACCESS_RW,
-			       transfer = case Index of
-					      16#6033 -> atomic;
-					      16#6034 -> streamed;
-					      16#6035 -> {atomic, ?MODULE};
-					      16#6036 -> {streamed, ?MODULE};
-					      _I ->      atomic
-					  end},
+			       transfer = Transfer},
 	    {entry, Entry};
 	false ->
 	    {error, ?ABORT_NO_SUCH_OBJECT}

@@ -12,7 +12,7 @@
 -include("sdo.hrl").
 -include("co_app.hrl").
 
--export([write_begin/3, write/3, write_end/2]).
+-export([write_begin/3, write/3, write_end/3]).
 -export([write_data_begin/3, write_get_data/1]).
 -export([write_max_size/2]).
 -export([write_size/2]).
@@ -197,6 +197,7 @@ write(Handle, Data, NBytes) ->
 
 	    {ok, Handle#t_handle { size=NewSize, data=NewData}, NBytes};
        true ->
+	    abort_transfer(Handle),
 	    {error, ?abort_unsupported_access}
     end.
 
@@ -206,6 +207,7 @@ write(Handle, Data, NBytes) ->
 write_block_segment(Handle, Seq, Data) when ?is_seq(Seq),
 					    byte_size(Data) =:= 7 ->
     Block = [{Seq,Data} | Handle#t_handle.block],
+    ?dbg("~p: write_block_segment: block = ~p\n", [?MODULE, Block]),
     case Handle#t_handle.transfer_mode of
 	{streamed, Ref} ->
 	    gen_server:cast(Handle#t_handle.storage, {write, Ref, Data});
@@ -215,7 +217,8 @@ write_block_segment(Handle, Seq, Data) when ?is_seq(Seq),
 	    do_nothing %% atomic
     end,
     {ok, Handle#t_handle { block = Block}, 7};
-write_block_segment(_Handle, _Seq, _Data) ->
+write_block_segment(Handle, _Seq, _Data) ->
+    abort_transfer(Handle),
     {error, ?abort_invalid_sequence_number}.
 
 %% Concatenate and write all segments
@@ -224,13 +227,14 @@ write_block_segment_end(TH) ->
 				   lists:reverse(TH#t_handle.block))),
     MaxSize = TH#t_handle.max_size,
     Size = byte_size(Bin),
-    ?dbg("~p: write_block_segment_end: max=~w, sz=~w, bin=~p\n", 
-	 [?MODULE, MaxSize, size(Bin), Bin]),
+    ?dbg("~p: write_block_segment_end: max=~w, szofbin=~w, bin=~p, size=~p\n", 
+	 [?MODULE, MaxSize, size(Bin), Bin, TH#t_handle.size]),
     if MaxSize =:= 0 ->
 	    write(TH, Bin, Size);
        true ->
 	    Remain = MaxSize - TH#t_handle.size,
 	    if Remain =< 0 ->
+		    abort_transfer(TH),
 		    {error, ?abort_data_length_too_high};
 	       Size =< Remain; (Size-Remain) < 7 ->
 		    NewData = <<(TH#t_handle.data)/binary, Bin/binary>>,
@@ -238,6 +242,7 @@ write_block_segment_end(TH) ->
 		    TH1 = TH#t_handle { size=NewSize,data=NewData,block=[]},
 		    {ok, TH1, Size};
 	       true ->
+		    abort_transfer(TH),
 		    {error, ?abort_data_length_too_high}
 	    end
     end.
@@ -256,18 +261,21 @@ write_block_end(Ctx,Handle,N,CRC,CheckCrc) ->
 	end,
     if Handle1#t_handle.max_size > 0,
        Handle1#t_handle.size > Handle1#t_handle.max_size ->
+	    abort_transfer(Handle1),
 	    {error, ?abort_data_length_too_high};
        CheckCrc ->
 	    Data = Handle1#t_handle.data,
-	    io:format("co_transfer: data0=~p, size=~w, data=~p\n", [Handle#t_handle.data,size(Data),Data]),
+	    ?dbg("~p: write_block_end: data0=~p, size=~w, data=~p\n", 
+		 [?MODULE, Handle#t_handle.data,size(Data),Data]),
 	    case co_crc:checksum(Handle1#t_handle.data) of
 		CRC ->
-		    write_end(Ctx, Handle1);
+		    write_end(Ctx, Handle1, N);
 		_ ->
+		    abort_transfer(Handle1),
 		    {error, ?abort_crc_error}
 	    end;
        true ->
-	    write_end(Ctx, Handle1)
+	    write_end(Ctx, Handle1, N)
     end.
     
 
@@ -277,9 +285,9 @@ write_block_end(Ctx,Handle,N,CRC,CheckCrc) ->
 %%  | ok
 %%  | {ok, Data}   - no dictionary
 %%
-write_end(_Ctx, Handle) when Handle#t_handle.storage == undefined ->
+write_end(_Ctx, Handle, _N) when Handle#t_handle.storage == undefined ->
     (Handle#t_handle.endf)(Handle#t_handle.data);
-write_end(Ctx, Handle) ->
+write_end(Ctx, Handle, N) ->
     if Handle#t_handle.max_size =:= 0;
        Handle#t_handle.size == Handle#t_handle.max_size ->
 	    try co_codec:decode(Handle#t_handle.data, 
@@ -296,9 +304,9 @@ write_end(Ctx, Handle) ->
 			    %% Check if streaming to application
 			    case Handle#t_handle.transfer_mode of
 				{streamed, Ref} ->
-				    app_call(Pid, {write_end, Ref});
+				    app_call(Pid, {write_end, Ref, N});
 				{streamed, Mod, Ref} ->
-				    Mod:write_end(Pid, Ref);
+				    Mod:write_end(Pid, Ref, N);
 				atomic ->
 				    app_call(Pid, {set, {Index, SubInd}, Value});
 				{atomic, Module} ->
@@ -306,7 +314,7 @@ write_end(Ctx, Handle) ->
 			    end;
 
 			Dict ->
-			    ?dbg("~p: write_to_dict: Index = ~p, SubInd = ~p, Value = ~p\n", 
+			    ?dbg("~p: write_to_dict: ~.16B:~.8B, Value = ~p\n", 
 				 [?MODULE, Index, SubInd, Value]),
 			    Res = co_dict:direct_set(Dict, Index, SubInd, Value),
 			    inform_subscribers(Index, Ctx),
@@ -314,9 +322,11 @@ write_end(Ctx, Handle) ->
 		    end
 	    catch
 		error:_ ->
+		    abort_transfer(Handle),
 		    {error, ?abort_internal_error}
 	    end;
        true ->
+	    abort_transfer(Handle),
 	    {error, ?abort_data_length_too_low}
     end.
        
@@ -498,7 +508,7 @@ app_call(Pid, Msg) ->
     case catch do_call(Pid, Msg) of 
 	{'EXIT', Reason} ->
 	    io:format("app_call: catch error ~p\n",[Reason]), 
-	    {error, ?ABORT_INTERNAL_ERROR};
+	    {error, ?abort_internal_error};
 	Mref ->
 	    {ok, Mref}
     end.
@@ -509,3 +519,16 @@ do_call(Process, Request) ->
 
     erlang:send(Process, {'$gen_call', {self(), Mref}, Request}, [noconnect]),
     Mref.
+
+abort_transfer(Handle) ->
+    case Handle#t_handle.storage of
+	Pid when is_pid(Pid) ->
+	    case Handle#t_handle.transfer_mode of
+		{streamed, Ref} ->
+		    gen_server:cast(Pid, {abort, Ref});
+		{streamed, Mod, Ref} ->
+		    Mod:abort(Pid, Ref)
+	    end;
+	_Other ->
+	    do_nothing
+    end.

@@ -585,7 +585,7 @@ s_block_upload_end_response(timeout, S) ->
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% Here wew receice the block segments
+%% Here we receice the block segments
 s_block_download(M, S) when is_record(M, can_frame) ->
     NextSeq = S#co_session.blkseq+1,
     case M#can_frame.data of
@@ -615,7 +615,6 @@ s_block_download(M, S) when is_record(M, can_frame) ->
 		       true ->
 			    {next_state, s_block_download, S1, ?BLKTMO(S1)}
 		    end
-			
 	    end;
 	?ma_block_segment(_Last,Seq,_Data) when Seq =:= 0; Seq > S#co_session.blksize ->
 	    abort(S, ?abort_invalid_sequence_number);
