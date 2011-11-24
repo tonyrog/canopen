@@ -28,8 +28,10 @@
 	 terminate/2, code_change/3]).
 %% CO node callbacks
 -export([get_entry/2,
-	set/3, get/2,
-	abort/2]).
+	 set/3, get/2,
+	 write_begin/3, write/3, write_end/3,
+	 read_begin/3, read/3,
+	 abort/2]).
 
 %% Testing
 -ifdef(debug).
@@ -45,6 +47,8 @@
 	      {{16#6034, 0}, ?VISIBLE_STRING, streamed, "Long string"},
 	      {{16#6035, 0}, ?VISIBLE_STRING, {atomic, ?MODULE}, "Mine2"},
 	      {{16#6036, 0}, ?VISIBLE_STRING, {streamed, ?MODULE}, "Long string2"},
+	      {{16#6037, 0}, ?VISIBLE_STRING, streamed, 
+	       "Indefinite string"},
 	      {{16#7033, 0}, ?INTEGER, atomic, 7},
 	      {{16#7333, 2}, ?INTEGER, atomic, 0},
 	      {{16#7334, 0}, ?INTEGER, atomic, 0}, %% To test timeout
@@ -55,10 +59,10 @@
 	  state,
 	  co_node,
 	  dict,
-	  write
+	  store
 	}).
 
--record(write,
+-record(store,
 	{
 	  ref,
 	  index,
@@ -101,7 +105,7 @@ set(Pid, {Index, SubInd}, NewValue) ->
 get(Pid, {Index, SubInd}) ->
     ?dbg("~p: get ~.16B:~.8B\n",[?MODULE, Index, SubInd]),
     case gen_server:call(Pid, {get, {Index, SubInd}}) of
-	{value, _Type, Value} -> {ok, Value};
+	{ok, _Type, Value} -> {ok, Value};
 	Other -> Other
     end.
 
@@ -115,6 +119,13 @@ write(Pid, Ref, Data) ->
 write_end(Pid, Ref, N) ->
     ?dbg("~p: write_end ref = ~p, n = ~p\n",[?MODULE, Ref, N]),
     gen_server:call(Pid, {write_end, Ref, N}).
+
+read_begin(Pid, {Index, SubInd}, Ref) ->
+    ?dbg("~p: read_begin ~.16B:~.8B, ref = ~p\n",[?MODULE, Index, SubInd, Ref]),
+    gen_server:call(Pid, {read_begin, {Index, SubInd}, Ref}).
+read(Pid, Bytes, Ref) ->
+    ?dbg("~p: read ref = ~p, \n",[?MODULE, Ref]),
+    gen_server:call(Pid, {read, Bytes, Ref}).
 
 abort(Pid, Ref) ->
     ?dbg("~p: abort ref = ~p\n",[?MODULE, Ref]),
@@ -183,7 +194,8 @@ load_dict(CoSerial, Dict) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({get, {16#7334, _SubInd}}, _From, LoopData) ->
-    ?dbg("~p: handle_call: sleeping for 2 secs\n", [?MODULE]), %% To test timeout
+    %% To test timeout
+    ?dbg("~p: handle_call: sleeping for 2 secs\n", [?MODULE]), 
     timer:sleep(2000),
     {reply, {ok, 0}, LoopData};
 handle_call({get, {Index, SubInd}}, _From, LoopData) ->
@@ -211,15 +223,15 @@ handle_call({write_begin, {Index, SubInd} = I, Ref}, _From, LoopData) ->
 		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
 	[{I, Type, _Transfer, _OldValue}] ->
-	    Write = #write {ref = Ref, index = I, type = Type},
-	    {reply, ok, LoopData#loop_data {write = Write}}
+	    Store = #store {ref = Ref, index = I, type = Type},
+	    {reply, ok, LoopData#loop_data {store = Store}}
     end;
 handle_call({write_end, Ref, N}, _From, LoopData) ->
     ?dbg("~p: handle_call: write_end ref = ~p\n",[?MODULE, Ref]),
-    Write = LoopData#loop_data.write,
+    Store = LoopData#loop_data.store,
     ?dbg("~p: handle_call: write_end data = ~p, type ~p\n",
-	 [?MODULE, Write#write.data, Write#write.type]),
-    AccData = Write#write.data,
+	 [?MODULE, Store#store.data, Store#store.type]),
+    AccData = Store#store.data,
 
     %% Check if all downloaded bytes should be used
     Data = if N =:= 0 ->
@@ -228,13 +240,52 @@ handle_call({write_end, Ref, N}, _From, LoopData) ->
 		Size1 = size(AccData) - N,
 		<<TruncData:Size1/binary,_/binary>> = AccData,
 		TruncData
-	end,
-    {NewValue, _} = co_codec:decode(Data, Write#write.type),
+	   end,
+    {NewValue, _} = co_codec:decode(Data, Store#store.type),
     ?dbg("~p: handle_call: write_end decoded data = ~p\n",[?MODULE, NewValue]),
-    handle_set(LoopData,Write#write.index, NewValue);
-handle_call({read_begin, {Index, SubInd}, Ref}, _From, LoopData) ->
-    ?dbg("~p: handle_call: read_begin ref = ~p\n",[?MODULE, Ref]),
-    {reply, ok, LoopData};
+    handle_set(LoopData,Store#store.index, NewValue);
+handle_call({read_begin, {16#6037 = Index, SubInd} = I, Ref}, _From, LoopData) ->
+    %% To test 'real' streaming
+    ?dbg("~p: handle_call: read_begin ~.16B:~.8B, ref = ~p\n",
+	 [?MODULE, Index, SubInd, Ref]),
+    case ets:lookup(LoopData#loop_data.dict, I) of
+	[] ->
+	    ?dbg("~p: handle_call: read_begin error = ~.16B\n", 
+		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
+	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
+	[{I, Type, _Transfer, Value}] ->
+	    Data = co_codec:encode(Value, Type),
+	    Store = #store {ref = Ref, index = I, type = Type, data = Data},
+	    {reply, {ok, Ref, unknown}, LoopData#loop_data {store = Store}}
+    end;
+handle_call({read_begin, {Index, SubInd} = I, Ref}, _From, LoopData) ->
+    ?dbg("~p: handle_call: read_begin ~.16B:~.8B, ref = ~p\n",
+	 [?MODULE, Index, SubInd, Ref]),
+    case ets:lookup(LoopData#loop_data.dict, I) of
+	[] ->
+	    ?dbg("~p: handle_call: read_begin error = ~.16B\n", 
+		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
+	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
+	[{I, Type, _Transfer, Value}] ->
+	    Data = co_codec:encode(Value, Type),
+	    Size = size(Data),
+	    Store = #store {ref = Ref, index = I, type = Type, data = Data},
+	    {reply, {ok, Ref, Size}, LoopData#loop_data {store = Store}}
+    end;
+handle_call({read, Bytes, Ref}, _From, LoopData) ->
+    ?dbg("~p: handle_call: read ref = ~p\n",[?MODULE, Ref]),
+    Store = LoopData#loop_data.store,
+    Data = Store#store.data,
+    Size = size(Data),
+    case Size - Bytes of
+	RestSize when RestSize > 0 -> 
+	    <<DataToSend:Bytes/binary, RestData/binary>> = Data,
+	    Store1 = Store#store {data = RestData},
+	    {reply, {ok, Ref, DataToSend}, LoopData#loop_data {store = Store1}};
+	RestSize when RestSize =< 0 ->
+	    Store1 = Store#store {data = (<<>>)},
+	    {reply, {ok, Ref, Data}, LoopData#loop_data {store = Store1}}
+    end;
 handle_call({abort, Ref}, _From, LoopData) ->
     ?dbg("~p: handle_call: abort ref = ~p\n",[?MODULE, Ref]),
     {reply, ok, LoopData};
@@ -260,7 +311,8 @@ handle_call(stop, _From, LoopData) ->
     end,
     ?dbg("~p: handle_call: stop detached.\n",[?MODULE]),
     {stop, normal, ok, LoopData};
-handle_call(_Request, _From, LoopData) ->
+handle_call(Request, _From, LoopData) ->
+    ?dbg("~p: handle_call: bad call ~p.\n",[?MODULE, Request]),
     {reply, {error,bad_call}, LoopData}.
 
 handle_set(LoopData, I, NewValue) ->
@@ -305,13 +357,13 @@ handle_cast({set, {Index, SubInd} = I, NewValue}, LoopData) ->
 %% transfer_mode == streamed
 handle_cast({write, Ref, Data}, LoopData) ->
     ?dbg("~p: handle_cast: write ref = ~p, data = ~p\n",[?MODULE, Ref, Data]),
-    Write = case LoopData#loop_data.write#write.data of
+    Store = case LoopData#loop_data.store#store.data of
 		undefined ->
-		    LoopData#loop_data.write#write {data = <<Data/binary>>};
+		    LoopData#loop_data.store#store {data = <<Data/binary>>};
 		OldData ->
-		    LoopData#loop_data.write#write {data = <<OldData/binary, Data/binary>>}
+		    LoopData#loop_data.store#store {data = <<OldData/binary, Data/binary>>}
 	    end,
-    {noreply, LoopData#loop_data {write = Write}};
+    {noreply, LoopData#loop_data {store = Store}};
 handle_cast({object_changed, Ix}, LoopData) ->
     ?dbg("~p: handle_cast: My object ~w has changed. ", [?MODULE, Ix]),
     {ok, Val} = co_node:value(LoopData#loop_data.co_node, Ix),

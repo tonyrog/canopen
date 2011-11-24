@@ -232,7 +232,7 @@ decode_abort_code(Code) ->
 	?ABORT_LOCAL_STATE_ERROR -> ?abort_local_state_error;
 	?ABORT_DICTIONARY_ERROR -> ?abort_dictionary_error;
 	_ ->
-	    co_log("abort code ~p not defined\n", [Code]),
+	    co_log("~p: abort code ~p not defined\n", [self(), Code]),
 	    ?abort_internal_error
     end.
     
@@ -270,7 +270,7 @@ encode_abort_code(Code) ->
 	?abort_local_state_error -> ?ABORT_LOCAL_STATE_ERROR;
 	?abort_dictionary_error -> ?ABORT_DICTIONARY_ERROR;
 	_ ->
-	    co_log("abort code ~p not defined\n", [Code]),
+	    co_log("~p: abort code ~p not defined\n", [self(),Code]),
 	    ?ABORT_INTERNAL_ERROR
     end.
 

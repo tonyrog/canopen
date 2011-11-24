@@ -408,7 +408,7 @@
 	  n      :: uint8(),       %% bytes not used in data section
 	  size_ind :: uint1(),     %% Size indication
 	  t      :: uint1(),       %% session toggle bit (0|1)
-	  pst    :: uint8(),       %% Protocol switch threshold (for block request)
+	  pst    :: uint8(),       %% Protocol switch threshold (block request)
 	  crc    :: boolean(),     %% generate/check CRC for block data
 	  clientcrc :: uint1(),    %% Client CRC support (for block request)
 	  size    :: uint32(),     %% Total data size (for block request)
