@@ -35,7 +35,7 @@
 
 %% Testing
 -ifdef(debug).
--define(dbg(Fmt,As), io:format((Fmt), (As))).
+-define(dbg(Fmt,As), ct:pal((Fmt), (As))).
 -else.
 -define(dbg(Fmt,As), ok).
 -endif.
@@ -90,13 +90,13 @@ start(CoSerial) ->
 %% @end
 %%--------------------------------------------------------------------
 stop() ->
-    gen_server:call(co_ex_app, stop).
+    gen_server:call(?MODULE, stop).
 
 loop_data() ->
-    gen_server:call(co_ex_app, loop_data).
+    gen_server:call(?MODULE, loop_data).
 
 dict() ->
-    gen_server:call(co_ex_app, dict).
+    gen_server:call(?MODULE, dict).
 
 %% transfer_mode == {atomic, Module}
 set(Pid, {Index, SubInd}, NewValue) ->
@@ -295,7 +295,7 @@ handle_call(loop_data, _From, LoopData) ->
 handle_call(dict, _From, LoopData) ->
     Dict = ets:tab2list(LoopData#loop_data.dict),
     io:format("~p: Dictionary = ~p\n", [?MODULE, Dict]),
-    {reply, ok, LoopData};    
+    {reply, Dict, LoopData};    
 handle_call(stop, _From, LoopData) ->
     ?dbg("~p: handle_call: stop\n",[?MODULE]),
     case whereis(list_to_atom(co_lib:serial_to_string(LoopData#loop_data.co_node))) of
@@ -303,7 +303,7 @@ handle_call(stop, _From, LoopData) ->
 	    do_nothing; %% Not possible to detach and unsubscribe
 	_Pid ->
 	    lists:foreach(
-	      fun({{Index, _SubInd}, _Type, _Value}) ->
+	      fun({{Index, _SubInd}, _Type, _Transfer, _Value}) ->
 		      co_node:unsubscribe(LoopData#loop_data.co_node, Index)
 	      end, ?DICT),
 	    ?dbg("~p: stop: unsubscribed.\n",[?MODULE]),

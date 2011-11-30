@@ -190,7 +190,7 @@ s_segmented_download(timeout, S) ->
     abort(S, ?abort_timed_out).
 
 segmented_download(S) ->
-    case co_transfer:get_size(S#co_session.th) of
+    case co_transfer:size(S#co_session.th) of
 	0 ->
 	    co_transfer:read_end(S#co_session.th),
 	    {stop, normal, S};
@@ -305,7 +305,7 @@ send_block(S, Seq) when Seq =< S#co_session.blksize ->
 	{error,Reason} ->
 	    abort(S,Reason);
 	{ok,TH,Data} ->
-	    Remain = co_transfer:get_size(TH),
+	    Remain = co_transfer:size(TH),
 	    Last = ?UINT1(Remain =:= 0),
 	    Data1 = co_sdo:pad(Data, 7),
 	    R = ?mk_block_segment(Last,Seq,Data1),

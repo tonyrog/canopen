@@ -8,7 +8,6 @@ MODULES = \
 	co_crc \
 	co_iset \
 	co_probe \
-	co_test \
 	co_format \
 	co_file \
 	eds_file \
@@ -22,9 +21,7 @@ MODULES = \
 	co_tpdo \
 	co_dict \
 	co_codec \
-	co_node \
-	co_sdo_test \
-	co_ex_app
+	co_node 
 
 
 

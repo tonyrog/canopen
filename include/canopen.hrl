@@ -421,7 +421,8 @@
 	  node_from :: term(),     %% Delayed gen_server:reply caller
 	  ctx      :: record(sdo_ctx),  %% general parameters
 	  th       :: term(),      %% transfer handle
-	  mref     :: term()       %% Ref to application
+	  mref     :: term(),      %% Ref to application
+	  streamed :: boolean()    %% True if data is streamed from application
       }).
 
 -record(app,

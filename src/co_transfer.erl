@@ -20,15 +20,15 @@
 -export([write_block_segment/3, write_block_segment_end/1,
 	 write_block_end/5]).
 
--export([read_begin/3, read/2, read_end/1]).
+-export([read_begin/3, read_block/2, read/2, read_end/1]).
 -export([read_data_begin/4]).
--export([add_data_to_handle/3, add_data_to_handle/4]).
+-export([add_data_to_handle/2, add_data_to_handle/3]).
 -export([update_data_in_handle/2, update_data_in_handle/3]).
 
--export([get_block_seqno/1]).
--export([get_max_size/1]).
--export([get_size/1]).
--export([get_type/1]).
+-export([block_seqno/1]).
+-export([max_size/1]).
+-export([data_size/1]).
+-export([type/1]).
 
 
 -record(t_handle,
@@ -159,10 +159,11 @@ write_data_begin(Index, SubInd, EndF) ->
 %%
 %% Set maximum write size if not set already
 %%
-write_max_size(TH, Size) when TH#t_handle.size =:= Size ->
+write_max_size(TH, Size) when TH#t_handle.max_size =:= Size ->
     TH;
 write_max_size(TH, Size) when 
-      TH#t_handle.size =:= 0; TH#t_handle.size =:= undefined ->
+      TH#t_handle.size =:= 0; 
+      TH#t_handle.max_size =:= undefined ->
     TH#t_handle { max_size=Size };
 write_max_size(_TH, _Size) ->
     {error, ?abort_data_length_error}.
@@ -235,7 +236,7 @@ write_block_segment_end(TH) ->
     MaxSize = TH#t_handle.max_size,
     Size = byte_size(Bin),
     ?dbg("~p: write_block_segment_end: max=~w, szofbin=~w, bin=~p, size=~p\n", 
-	 [?MODULE, MaxSize, size(Bin), Bin, TH#t_handle.size]),
+	 [?MODULE, MaxSize, Size, Bin, TH#t_handle.size]),
     if MaxSize =:= 0 ->
 	    write(TH, Bin, Size);
        true ->
@@ -273,7 +274,7 @@ write_block_end(Ctx,Handle,N,CRC,CheckCrc) ->
        CheckCrc ->
 	    Data = Handle1#t_handle.data,
 	    ?dbg("~p: write_block_end: data0=~p, size=~w, data=~p\n", 
-		 [?MODULE, Handle#t_handle.data,size(Data),Data]),
+		 [?MODULE, Handle#t_handle.data, size(Data), Data]),
 	    case co_crc:checksum(Handle1#t_handle.data) of
 		CRC ->
 		    write_end(Ctx, Handle1, N);
@@ -451,16 +452,14 @@ app_read_begin(Index, SubInd, Pid, Mod) ->
 	    end
     end.
 	
-add_data_to_handle(TH, Size, Data) when is_binary(Data) ->
-    TH1 = TH#t_handle { data=Data, size=Size,
-			max_size=Size
-		      },
+add_data_to_handle(TH, Data) when is_binary(Data) ->
+    TH1 = TH#t_handle { data=Data, size=size(Data) },
     {ok, TH1}.
 
-add_data_to_handle(TH, Ref, Size, Data) when is_binary(Data) ->
+add_data_to_handle(TH, Ref, Data) when is_binary(Data) ->
     case ref(TH) of
 	Ref -> 
-	    add_data_to_handle(TH, Size, Data);
+	    add_data_to_handle(TH, Data);
 	_OtherRef ->
 	    {error, ?abort_internal_error}
     end.
@@ -508,43 +507,52 @@ read(Handle, NBytes) ->
 	Pid when is_pid(Pid) ->
 	    ?dbg("~p: read: Storage pid ~p, NBytes = ~p\n",
 		 [?MODULE, Handle#t_handle.storage, NBytes]),
-	    case Handle#t_handle.mode of
-		{streamed, Ref} ->
-		    app_call(Handle#t_handle.storage, {read, 7, Ref});
-		{streamed, Module, Ref} ->
-		    case Module:read(Handle#t_handle.storage, 7, Ref) of
-			{ok, Ref, Data} ->
-			    Size = size(Data),
-			    NewSize = case Handle#t_handle.size of
-					  OldSize when is_integer(OldSize) -> 
-					      OldSize - Size;
-					  unknown -> 
-					      unknown
-				      end,
-			    ?dbg("~p: read: data = ~p size = ~p, rem size = ~p\n", 
-				 [?MODULE, Data, Size, NewSize]),
-			    {ok, Handle#t_handle { size = NewSize }, Data};
-			Other -> 
-			    Other
-		    end;
-		_Other ->
-		    %% Atomic
-		    read_retreived_data(Handle, NBytes)
-	    end;
+	    read_retreived_data(Handle, NBytes);
 	_Dict ->
 	    ?dbg("~p: read: Storage dict ~p, NBytes = ~p\n",
 		 [?MODULE, Handle#t_handle.storage, NBytes]),
 	    read_retreived_data(Handle, NBytes)
     end.
 
+read_block(Handle, NBytes) ->
+    case Handle#t_handle.mode of
+	{streamed, Ref} ->
+	    app_call(Handle#t_handle.storage, {read, NBytes, Ref});
+	{streamed, Module, Ref} ->
+	    case Module:read(Handle#t_handle.storage, NBytes, Ref) of
+		{ok, Ref, Data} ->
+		    Size = size(Data),
+		    NewSize = case Handle#t_handle.size of
+				  OldSize when is_integer(OldSize) -> 
+				      OldSize - Size;
+				  unknown -> 
+				      unknown
+			      end,
+		    ?dbg("~p: read_block: data = ~p size = ~p, rem size = ~p\n", 
+			 [?MODULE, Data, Size, NewSize]),
+		    {ok, Handle#t_handle { size = NewSize , data = Data}};
+		Other ->
+		    Other
+			end;
+	OtherMode -> 
+	    ?dbg("~p: read_block: mode = ~p should not be possible\n",
+		 [?MODULE, OtherMode]),
+	    {error, ?abort_internal_error}
+    end.
+
+
 read_retreived_data(Handle, NBytes) ->
     if NBytes =< Handle#t_handle.size ->
 	    <<Data:NBytes/binary, NewData/binary>> = Handle#t_handle.data,
 	    NewSize = Handle#t_handle.size - NBytes,
-	    {ok, Handle#t_handle { data=NewData, size=NewSize }, Data};
+	    NewMax = case Handle#t_handle.max_size of
+			     unknown -> unknown;
+			     MaxSize -> MaxSize - NBytes
+			 end,
+	    {ok, Handle#t_handle { data=NewData, size=NewSize, max_size=NewMax }, Data};
        true ->
 	    Data = Handle#t_handle.data,
-	    {ok, Handle#t_handle { data=(<<>>), size=0 }, Data }
+	    {ok, Handle#t_handle { data=(<<>>), size=0, max_size=0}, Data }
     end.
 	       
 		    
@@ -556,20 +564,20 @@ read_end(_Handle) ->
 
 
 %% Return the last received sequence number
-get_block_seqno(Handle) ->
+block_seqno(Handle) ->
     case Handle#t_handle.block of
 	[{Seq,_}|_] -> Seq;
 	_ -> 0
     end.
 
-get_max_size(Handle) ->
+max_size(Handle) ->
     Handle#t_handle.max_size.
     
 %% Return bytes remain to be read
-get_size(Handle) ->
+data_size(Handle) ->
     Handle#t_handle.size.
 
-get_type(Handle) ->
+type(Handle) ->
     Handle#t_handle.type.
 
 
