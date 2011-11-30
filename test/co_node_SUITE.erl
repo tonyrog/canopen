@@ -68,6 +68,10 @@ all() ->
      set_atomic_block,
      set_streamed_segment,
      set_streamed_block,
+     get_atomic_segment,
+     get_atomic_block,
+     get_streamed_segment,
+     get_streamed_block,
      stream_app].
 %%     break].
 
@@ -192,10 +196,16 @@ end_per_group(_GroupName, _Config) ->
 init_per_testcase(Case, Config) when Case == set_atomic_segment;
 				     Case == set_atomic_block;
 				     Case == set_streamed_segment;
-				     Case == set_streamed_block ->
+				     Case == set_streamed_block;
+				     Case == get_atomic_segment;
+				     Case == get_atomic_block;
+				     Case == get_streamed_segment;
+				     Case == get_streamed_block ->
+    ct:pal("Testcase: ~p", [Case]),
     {ok, _Pid} = co_ex_app:start(?SERIAL),
     Config;
 init_per_testcase(_TestCase, Config) ->
+    ct:pal("Testcase: ~p", [_TestCase]),
     Config.
 
 %%--------------------------------------------------------------------
@@ -214,7 +224,11 @@ init_per_testcase(_TestCase, Config) ->
 end_per_testcase(Case, _Config) when Case == set_atomic_segment;
 				     Case == set_atomic_block;
 				     Case == set_streamed_segment;
-				     Case == set_streamed_block ->
+				     Case == set_streamed_block;
+				     Case == get_atomic_segment;
+				     Case == get_atomic_block;
+				     Case == get_streamed_segment;
+				     Case == get_streamed_block ->
     ok = co_ex_app:stop(),
     ok;
 end_per_testcase(_TestCase, _Config) ->
@@ -302,6 +316,31 @@ set({Index, NewValue}, BlockOrSegment) ->
     {Index, _Type, _Transfer, OldValue} = lists:keyfind(Index, 1, co_ex_app:dict()),
 
     ok.
+
+get_atomic_segment(_Config) ->
+    get(?atomic, segment).
+
+get_atomic_block(_Config) ->
+    get(?atomic, block).
+
+
+get_streamed_segment(_Config) ->
+    get(?streamed, segment).
+
+get_streamed_block(_Config) ->
+    get(?streamed, block).
+
+
+get({Index, _NewValue}, BlockOrSegment) ->
+
+    %% Get value from cocli and compare with dict
+    Res = os:cmd(get_cmd(Index, BlockOrSegment)),
+    ct:pal("Result = ~p", [Res]),
+    %% {Index, _Type, _Transfer, Value} = lists:keyfind(Index, 1, co_ex_app:dict()),
+    
+    ok.
+
+
 
 stream_app(_Config) ->
     generate_file(?ram_file),

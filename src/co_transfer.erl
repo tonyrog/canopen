@@ -20,7 +20,7 @@
 -export([write_block_segment/3, write_block_segment_end/1,
 	 write_block_end/5]).
 
--export([read_begin/3, read_block/2, read/2, read_end/1]).
+-export([read_begin/3, read_block/2, read/2, read_from_app/2, read_end/1]).
 -export([read_data_begin/4]).
 -export([add_data_to_handle/2, add_data_to_handle/3]).
 -export([update_data_in_handle/2, update_data_in_handle/3]).
@@ -419,9 +419,8 @@ app_read_begin(Index, SubInd, Pid, Mod) ->
 			    Ref = make_ref(),
 			    case Module:read_begin(Pid, {Index, SubInd}, Ref) of
 				{ok, Ref, Size} ->
-				    {ok, TH#t_handle {data=(<<>>), size=Size,
-						     max_size=Size,
-						     mode={streamed, Module, Ref}},
+				    {ok, TH#t_handle {max_size=Size,
+						      mode={streamed, Module, Ref}},
 				     Size};
 				Other -> 
 				    Other
@@ -453,8 +452,9 @@ app_read_begin(Index, SubInd, Pid, Mod) ->
     end.
 	
 add_data_to_handle(TH, Data) when is_binary(Data) ->
-    TH1 = TH#t_handle { data=Data, size=size(Data) },
-    {ok, TH1}.
+    ?dbg("~p: add_data_to_handle: Data = ~p, size = ~p\n",[?MODULE, Data, size(Data)]),
+    TH#t_handle { data=Data, size=size(Data) }.
+
 
 add_data_to_handle(TH, Ref, Data) when is_binary(Data) ->
     case ref(TH) of
@@ -467,8 +467,7 @@ add_data_to_handle(TH, Ref, Data) when is_binary(Data) ->
 update_data_in_handle(TH, Data) when is_binary(Data) ->
     OldData = TH#t_handle.data,
     NewData = <<OldData/binary, Data/binary>>,
-    TH1 = TH#t_handle { data=NewData }, %% Size ??
-    {ok, TH1}.
+    TH#t_handle { data=NewData }. %% Size ?
 
 update_data_in_handle(TH, Ref, Data) when is_binary(Data) ->
     case ref(TH) of
@@ -514,6 +513,32 @@ read(Handle, NBytes) ->
 	    read_retreived_data(Handle, NBytes)
     end.
 
+read_from_app(Handle, NBytes) ->
+    case Handle#t_handle.mode of
+	{streamed, Ref} ->
+	    app_call(Handle#t_handle.storage, {read, NBytes, Ref});
+	{streamed, Module, Ref} ->
+	    case Module:read(Handle#t_handle.storage, NBytes, Ref) of
+		{ok, Ref, Data} ->
+		    Size = size(Data),
+		    NewSize = case Handle#t_handle.size of
+				  OldSize when is_integer(OldSize) -> 
+				      OldSize - Size;
+				  unknown -> 
+				      unknown
+			      end,
+		    ?dbg("~p: read_from_app: data = ~p size = ~p, rem size = ~p\n", 
+			 [?MODULE, Data, Size, NewSize]),
+		    {ok, Handle#t_handle { size = NewSize , data = Data}};
+		Other ->
+		    Other
+	    end;
+	OtherMode -> 
+	    ?dbg("~p: read_from_app: mode = ~p should not be possible\n",
+		 [?MODULE, OtherMode]),
+	    {error, ?abort_internal_error}
+    end.
+
 read_block(Handle, NBytes) ->
     case Handle#t_handle.mode of
 	{streamed, Ref} ->
@@ -542,6 +567,7 @@ read_block(Handle, NBytes) ->
 
 
 read_retreived_data(Handle, NBytes) ->
+    ?dbg("~p: read_retreived_data NBytes = ~p\n", [?MODULE, NBytes]),
     if NBytes =< Handle#t_handle.size ->
 	    <<Data:NBytes/binary, NewData/binary>> = Handle#t_handle.data,
 	    NewSize = Handle#t_handle.size - NBytes,

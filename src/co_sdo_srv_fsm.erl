@@ -25,27 +25,28 @@
 -export([s_initial/2]).
 -export([s_writing/2]).
 -export([s_segmented_download/2]).
--export([s_writing_segment_started/2]).
--export([s_writing_segment/2]).
+-export([s_writing_segment_started/2]). %% Streamed
+-export([s_writing_segment/2]).         %% Streamed
 
-%% Segment download
+%% Segment upload
 -export([s_segmented_upload/2]).
--export([s_reading_segment_started/2]).
--export([s_reading_segment/2]).
+-export([s_reading_segment_started/2]). %% Streamed
+-export([s_reading_segment_first/2]).   %% Streamed
+-export([s_reading_segment/2]).         %% Streamed
 
 %% Block upload
 -export([s_block_upload_start/2]).
 -export([s_block_upload_response/2]).
 -export([s_block_upload_response_last/2]).
 -export([s_block_upload_end_response/2]).
--export([s_reading_block_started/2]).
--export([s_reading_block/2]).
+-export([s_reading_block_started/2]).   %% Streamed
+-export([s_reading_block/2]).           %% Streamed
 
 %% Block download
 -export([s_block_download/2]).
 -export([s_block_download_end/2]).
--export([s_writing_block_started/2]).
--export([s_writing_block/2]).
+-export([s_writing_block_started/2]).   %% Streamed
+-export([s_writing_block/2]).           %% Streamed
 
 -define(TMO(S), ((S)#co_session.ctx)#sdo_ctx.timeout).
 -define(BLKTMO(S), ((S)#co_session.ctx)#sdo_ctx.blk_timeout).
@@ -107,7 +108,8 @@ init([Ctx,NodePid,Src,Dst]) ->
       blkseq   = 0,
       blkbytes = 0,
       node_pid = NodePid,
-      ctx      = Ctx
+      ctx      = Ctx,
+      streamed = false
       %% th is not the transfer handle
       %% transfer is setup when we know the item
      },
@@ -167,7 +169,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		{error,Reason} ->
 		    abort(S1, Reason);
 		{ok, TH, NBytes} when is_integer(NBytes) ->
-		    start_segmented_upload(S1, IX, SI, TH);
+		    start_segmented_upload(S1#co_session {th = TH});
 		{ok, TH, Mref} when is_reference(Mref) ->
 		    S2 = S1#co_session {mref = Mref, th = TH},
 		    {next_state, s_reading_segment_started, S2, ?TMO(S2)}
@@ -183,9 +185,9 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    abort(S1, Reason);
 		{ok, TH, NBytes} when Pst =/= 0, NBytes > 0, NBytes =< Pst ->
 		    ?dbg("protocol switch\n",[]),
-		    start_segmented_upload(S1, IX, SI, TH);
+		    start_segmented_upload(S1#co_session {th = TH});
 		{ok, TH, NBytes} when is_integer(NBytes) ->
-		    start_block_upload(S1, IX, SI, TH);
+		    start_block_upload(S1#co_session {th = TH});
 		{ok, TH, Mref} when is_reference(Mref) ->
 		    S2 = S1#co_session {mref = Mref, th = TH},
 		    {next_state, s_reading_block_started, S2, ?TMO(S2)}
@@ -359,13 +361,19 @@ s_writing_segment(M, S)  ->
 %% SEGMENT UPLOAD
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-start_segmented_upload(S, IX, SI, TH) ->
-    NBytes = co_transfer:data_size(TH),
+start_segmented_upload(S) ->
+    ?dbg("~p: start_segmented_upload\n", [?MODULE]),
+    TH = S#co_session.th,
+    IX = S#co_session.index,
+    SI = S#co_session.subind,
+    NBytes = co_transfer:max_size(TH),
+    ?dbg("~p: start_segmented_upload, nbytes = ~p\n", [?MODULE,NBytes]),
     if NBytes =/= 0, NBytes =< 4 ->
 	    case co_transfer:read(TH, NBytes) of
 		{error,Reason} ->
 		    abort(S, Reason);
 		{ok,TH1,Data} ->
+		    ?dbg("~p: start_segmented_upload, atomic.\n", [?MODULE]),
 		    NRdBytes = size(Data),
 		    Data1 = co_sdo:pad(Data, 4),
 		    N = 4-NRdBytes,E=1,SizeInd=1,
@@ -375,11 +383,7 @@ start_segmented_upload(S, IX, SI, TH) ->
 						       Data1),
 		    send(S, R),
 		    co_transfer:read_end(TH1),
-		    {stop, normal, S};
-		{ok, Mref} ->
-		    %% Called an application
-		    S1 = S#co_session {mref = Mref},		    
-		    {next_state, s_reading_segment, S1, ?TMO(S1)}
+		    {stop, normal, S}
 	    end;
        NBytes > 4 ->
 	    N=0, E=0, SizeInd=1,
@@ -408,17 +412,33 @@ s_segmented_upload(M, S) when is_record(M, can_frame) ->
 	?ma_ccs_upload_segment_request(T) when T =/= S#co_session.t ->
 	    abort(S, ?abort_toggle_not_alternated);
 	?ma_ccs_upload_segment_request(T) ->
-	    case co_transfer:read(S#co_session.th,7) of
-		{error,Reason} ->
-		    abort(S,Reason);
-		{ok,TH1,Data} ->
-		    ?dbg("~p: s_segmented_upload: data=~p\n", [?MODULE, Data]),
-		    upload_segment(S#co_session {t = T}, TH1, Data);
-		{ok, Mref} ->
-		    %% Called an application
-		    ?dbg("~p: s_segmented_upload: mref=~p\n", [?MODULE, Mref]),
-		    S1 = S#co_session {mref = Mref},
-		    {next_state, s_reading_segment, S1, ?TMO(S1)}
+	    case S#co_session.streamed of
+		true ->
+		    case co_transfer:read_from_app(S#co_session.th,7) of
+			{ok, Mref} ->
+			    %% Called an application
+			    ?dbg("~p: s_segmented_upload: mref=~p\n", 
+				 [?MODULE, Mref]),
+			    S1 = S#co_session {mref = Mref},
+			    {next_state, s_reading_segment, S1, ?TMO(S1)};
+			{error,Reason} ->
+			    abort(S,Reason)
+		    end;
+		_NotStreamed ->
+		    case co_transfer:read(S#co_session.th,7) of
+			{ok,TH1,Data} ->
+			    ?dbg("~p: s_segmented_upload: data=~p\n", 
+				 [?MODULE, Data]),
+			    upload_segment(S#co_session {t = T}, TH1, Data);
+			{ok, Mref} ->
+			    %% Called an application
+			    ?dbg("~p: s_segmented_upload: mref=~p\n", 
+				 [?MODULE, Mref]),
+			    S1 = S#co_session {mref = Mref},
+			    {next_state, s_reading_segment, S1, ?TMO(S1)};
+			{error,Reason} ->
+			    abort(S,Reason)
+		    end
 	    end;
 	_ ->
 	    l_abort(M, S, s_segmented_upload)
@@ -446,7 +466,7 @@ upload_segment(S, TH, Data) ->
 
 %%
 %% state: reading_segment_started (for application stored data)
-%%    next_state:  segmented_upload
+%%    next_state:  reading_segment_first
 %%
 s_reading_segment_started({Mref, Reply} = M, S)  ->
     ?dbg("~p: s_reading_segment_started: Got event = ~p\n", [?MODULE, M]),
@@ -454,20 +474,52 @@ s_reading_segment_started({Mref, Reply} = M, S)  ->
 	{Mref, {ok, Value}} ->
 	    erlang:demonitor(Mref, [flush]),
 	    Data = co_codec:encode(Value, co_transfer:type(S#co_session.th)),
-	    {ok, TH} = 
-		co_transfer:add_data_to_handle(S#co_session.th, Data),
-	    start_segmented_upload(S, S#co_session.index, S#co_session.subind, TH);
+	    TH = co_transfer:write_max_size(S#co_session.th, size(Data)),
+	    TH1 = co_transfer:add_data_to_handle(TH, Data),
+	    start_segmented_upload(S#co_session {th = TH1});
 	{Mref, {ok, Ref, Size}} ->
 	    %% Check Ref ???
 	    erlang:demonitor(Mref, [flush]),
-	    TH = co_transfer:write_size(S#co_session.th, Size),
-	    start_segmented_upload(S, S#co_session.index, S#co_session.subind, TH);
+	    S1 = S#co_session {streamed = true},
+	    TH = co_transfer:write_max_size(S1#co_session.th, Size),
+	    case co_transfer:read_from_app(TH, 7) of
+		{ok, NewMref} ->
+		    %% Called an application
+		    ?dbg("~p: s_reading_segment_started: mref=~p\n", 
+			 [?MODULE, NewMref]),
+		    S2 = S1#co_session {th = TH, mref = NewMref},
+		    {next_state, s_reading_segment_first, S2, ?TMO(S2)};
+		Other ->
+		    %% Should not be possible
+		    ?dbg("~p: s_reading_segment_started: got=~p\n", [?MODULE, Other]),
+		    l_abort(M, S1, s_reading_segment_started)
+	    end;
 	_Other ->
 	    l_abort(M, S, s_reading_segment_started)
     end;
 s_reading_segment_started(M, S)  ->
     ?dbg("~p: s_reading_segment_started: Got event = ~p, aborting\n", [?MODULE, M]),
     demonitor_and_abort(M, S).
+
+%%
+%% state: reading_segment_first (for application stored data)
+%%    next_state:  segmented_upload
+%%
+s_reading_segment_first({Mref, Reply} = M, S)  ->
+    ?dbg("~p: s_reading_segment_first: Got event = ~p\n", [?MODULE, M]),
+    case {S#co_session.mref, Reply} of
+	{Mref, {ok, Ref, Data}} ->
+	    %% Check Ref ???
+	    erlang:demonitor(Mref, [flush]),
+	    TH = co_transfer:add_data_to_handle(S#co_session.th, Data),
+	    start_segmented_upload(S#co_session {th = TH});
+	_Other ->
+	    l_abort(M, S, s_reading_segment_first)
+    end;
+s_reading_segment_first(M, S)  ->
+    ?dbg("~p: s_reading_segment_first: Got event = ~p, aborting\n", [?MODULE, M]),
+    demonitor_and_abort(M, S).
+
 
 %%
 %% state: reading_segment (for application stored data)
@@ -478,16 +530,10 @@ s_reading_segment({Mref, Reply} = M, S)  ->
     case {S#co_session.mref, Reply} of
 	{Mref, {ok, Ref, Data}} ->
 	    erlang:demonitor(Mref, [flush]),
-	    TH = S#co_session.th,
-	    Size = size(Data),
-	    NewSize = case co_transfer:data_size(TH) of
-			  OldSize when is_integer(OldSize) -> OldSize - Size;
-			  unknown -> unknown
-		      end,
-	    ?dbg("~p: s_reading_segment: data = ~p size = ~p, rem size = ~p\n", 
-		 [?MODULE, Data, Size, NewSize]),
-	    TH1 = co_transfer:write_size(TH, NewSize),
-	    upload_segment(S, TH1, Data);
+	    ?dbg("~p: s_reading_segment: data = ~p, size = ~p\n", 
+		 [?MODULE, Data, size(Data)]),
+	    TH = co_transfer:add_data_to_handle(S#co_session.th, Ref, Data),
+	    upload_segment(S, TH, Data);
 	_Other ->
 	    l_abort(M, S, s_reading_segment)
     end.
@@ -498,7 +544,10 @@ s_reading_segment({Mref, Reply} = M, S)  ->
 %% BLOCK UPLOAD
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-start_block_upload(S, IX, SI, TH) ->
+start_block_upload(S) ->
+    TH = S#co_session.th,
+    IX = S#co_session.index,
+    SI = S#co_session.subind,
     NBytes = case co_transfer:max_size(TH) of
 		 unknown -> 0;
 		 N -> N
@@ -552,11 +601,7 @@ read_and_upload_block_segments(S, Seq) when Seq =< S#co_session.blksize ->
 	    abort(S,Reason);
 	{ok,TH,Data} ->
 	    S1 = S#co_session { blkseq=Seq },
-	    upload_block_segment(S1, TH, Data);
-	{ok, Mref}  ->
-	    %% Called an application
-	    S1 = S#co_session {mref = Mref},
-	    {next_state, s_reading_block, S1, ?TMO(S1)}
+	    upload_block_segment(S1, TH, Data)
     end.
 
 upload_block_segment(S, TH, Data) ->
@@ -655,18 +700,15 @@ s_reading_block_started({Mref, Reply} = M, S)  ->
 	{Mref, {ok, Value}} ->
 	    erlang:demonitor(Mref, [flush]),
 	    Data = co_codec:encode(Value, co_transfer:type(S#co_session.th)),
-	    case co_transfer:add_data_to_handle(S#co_session.th, Data) of
-		{ok, TH} ->
-		    segment_or_block(S, TH);
-		_Other ->
-		    l_abort(M, S, s_reading_block)
-	    end;		
+	    TH = co_transfer:write_max_size(S#co_session.th, size(Data)),
+	    TH1 = co_transfer:add_data_to_handle(TH, Data),
+	    segment_or_block(S, TH1);
 	{Mref, {ok, Ref, Size}} ->
 	    %% Check Ref ???
 	    erlang:demonitor(Mref, [flush]),
-	    TH = co_transfer:write_max_size(S#co_session.th, Size),
 	    S1 = S#co_session {streamed = true},
-	    start_block_upload(S1, S1#co_session.index, S1#co_session.subind, TH);
+	    TH = co_transfer:write_max_size(S1#co_session.th, Size),
+	    start_block_upload(S1#co_session {th = TH});
 	_Other ->
 	    l_abort(M, S, s_reading_block_started)
     end;
@@ -684,13 +726,9 @@ s_reading_block({Mref, Reply} = M, S)  ->
 	{Mref, {ok, Value}} ->
 	    erlang:demonitor(Mref, [flush]),
 	    Data = co_codec:encode(Value, co_transfer:type(S#co_session.th)),
-	    Size = size(Data),
-	    case co_transfer:add_data_to_handle(S#co_session.th, Data) of
-		{ok, TH} ->
-		    segment_or_block(S, TH);
-		_Other ->
-		    l_abort(M, S, s_reading_block)
-	    end;		
+	    TH = co_transfer:write_max_size(S#co_session.th, size(Data)),
+	    TH1 = co_transfer:add_data_to_handle(TH, Data),
+	    segment_or_block(S, TH1);
 	{Mref, {ok, Ref, (<<>>)}} ->
 	    ?dbg("~p: s_reading_block: empty data received\n",[?MODULE]),
 	    CRC = co_crc:final(S#co_session.blkcrc),
@@ -703,12 +741,8 @@ s_reading_block({Mref, Reply} = M, S)  ->
 	    erlang:demonitor(Mref, [flush]),
 	    ?dbg("~p: s_reading_block: data = ~p size = ~p\n", 
 		 [?MODULE, Data, size(Data)]),
-	    case co_transfer:add_data_to_handle(S#co_session.th, Data) of
-		{ok, TH} ->
-		    read_and_upload_block_segments(S#co_session {th = TH}, 1);
-		_Other ->
-		    l_abort(M, S, s_reading_block)
-	    end;		
+	    TH = co_transfer:add_data_to_handle(S#co_session.th, Data),
+	    read_and_upload_block_segments(S#co_session {th = TH}, 1);
 	_Other ->
 	    l_abort(M, S, s_reading_block)
     end;
@@ -725,9 +759,9 @@ segment_or_block(S, TH) ->
     if S#co_session.pst =/= 0, NBytes > 0, 
        NBytes =< S#co_session.pst ->
 	    ?dbg("protocol switch\n",[]),
-	    start_segmented_upload(S, S#co_session.index, S#co_session.subind, TH);
+	    start_segmented_upload(S#co_session {th = TH});
        true ->
-	    start_block_upload(S, S#co_session.index, S#co_session.subind, TH)
+	    start_block_upload(S#co_session {th =TH})
     end.
 
     
