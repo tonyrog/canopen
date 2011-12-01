@@ -32,6 +32,7 @@
 	  dict,
 	  index,
 	  ref,
+	  filename,
 	  file
 	}).
 
@@ -90,11 +91,11 @@ get_entry(_Pid, {Index, SubInd} = I) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-init({CoSerial, {Index, File}, Starter}) ->
+init({CoSerial, {Index, FileName}, Starter}) ->
     {ok, _NodeId} = co_node:attach(CoSerial),
     ok = co_node:reserve(CoSerial, Index, ?MODULE),
-    {ok, F} = file:open(File, [read, raw, binary, read_ahead]),
-    {ok, #loop_data {starter = Starter, co_node = CoSerial, index = Index, file = F}}.
+    {ok, #loop_data {starter = Starter, co_node = CoSerial, index = Index,
+		    filename = FileName}}.
 
 %%--------------------------------------------------------------------
 %% @spec handle_call(Request, From, LoopData) ->
@@ -143,7 +144,9 @@ handle_call({read_begin, {Index, SubInd}, Ref}, _From, LoopData) ->
 	 [?MODULE, Index, SubInd, Ref]),
     case LoopData#loop_data.index of
 	Index ->
-	    {reply, {ok, Ref, unknown}, LoopData#loop_data {ref = Ref}};
+	    {ok, F} = file:open(LoopData#loop_data.filename, 
+				[read, raw, binary, read_ahead]),
+	    {reply, {ok, Ref, unknown}, LoopData#loop_data {ref = Ref, file = F}};
 	_OtherIndex ->
 	    ct:pal("~p: handle_call: read_begin error = ~.16B\n", 
 		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
@@ -160,6 +163,7 @@ handle_call({read, Bytes, Ref}, _From, LoopData) ->
 		    {reply, {ok, Ref, Data}, LoopData};
 		eof ->
 		    ct:pal("~p: handle_call: read  eof reached\n", [?MODULE]), 
+		    file:close(LoopData#loop_data.file),    
 		    LoopData#loop_data.starter ! eof,
 		    {reply, {ok, Ref, <<>>}, LoopData}
 	    end;
@@ -261,8 +265,7 @@ handle_info(Info, LoopData) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, LoopData) ->
-    file:close(LoopData#loop_data.file),    
+terminate(_Reason, _LoopData) ->
     ok.
 
 %%--------------------------------------------------------------------

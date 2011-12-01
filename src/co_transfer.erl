@@ -22,12 +22,16 @@
 
 -export([read_begin/3, read_block/2, read/2, read_from_app/2, read_end/1]).
 -export([read_data_begin/4]).
--export([add_data_to_handle/2, add_data_to_handle/3]).
--export([update_data_in_handle/2, update_data_in_handle/3]).
+
+-export([add_data/2, add_data/3]).
+-export([add_bufdata/2, add_bufdata/3]).
+-export([move_and_add_bufdata/2, move_and_add_bufdata/3]).
+-export([update_data/2, update_data/3]).
 
 -export([block_seqno/1]).
 -export([max_size/1]).
 -export([data_size/1]).
+-export([bufdata_size/1]).
 -export([type/1]).
 
 
@@ -38,6 +42,7 @@
 	  index,        %% item index
 	  subind,       %% item sub-index
 	  data,         %% item data
+	  bufdata,      %% Buffered data, used when streaming blocks
 	  size,         %% current item size
 	  block=[],     %% block segment list [{1,Bin},...{127,Bin}]
 	  max_size,     %% item max size
@@ -401,7 +406,7 @@ app_read_begin(Index, SubInd, Pid, Mod) ->
 		    ?dbg("~p: app_read_begin: Read access ok\n", [?MODULE]),
 		    ?dbg("~p: app_read_begin: Transfer mode = ~p\n", 
 			 [?MODULE, Entry#app_entry.transfer]),
-		    TH = #t_handle { storage = Pid,
+		    TH = #t_handle { storage = Pid, bufdata=(<<>>),
 				     index=Index, subind=SubInd,
 				     type=Entry#app_entry.type
 				   },
@@ -451,38 +456,6 @@ app_read_begin(Index, SubInd, Pid, Mod) ->
 	    end
     end.
 	
-add_data_to_handle(TH, Data) when is_binary(Data) ->
-    ?dbg("~p: add_data_to_handle: Data = ~p, size = ~p\n",[?MODULE, Data, size(Data)]),
-    TH#t_handle { data=Data, size=size(Data) }.
-
-
-add_data_to_handle(TH, Ref, Data) when is_binary(Data) ->
-    case ref(TH) of
-	Ref -> 
-	    add_data_to_handle(TH, Data);
-	_OtherRef ->
-	    {error, ?abort_internal_error}
-    end.
-
-update_data_in_handle(TH, Data) when is_binary(Data) ->
-    OldData = TH#t_handle.data,
-    NewData = <<OldData/binary, Data/binary>>,
-    TH#t_handle { data=NewData }. %% Size ?
-
-update_data_in_handle(TH, Ref, Data) when is_binary(Data) ->
-    case ref(TH) of
-	Ref -> 
-	    update_data_in_handle(TH, Data);
-	_OtherRef ->
-	    {error, ?abort_internal_error}
-    end.
-
-ref(TH) when is_record(TH, t_handle) ->
-    case TH#t_handle.mode of
-	{streamed, Ref} -> Ref;
-	{streamed, _Mod, Ref} -> Ref
-    end.
-    
 %% 
 %%  Start a read operation with just a value no dcitionary 
 %% 
@@ -505,13 +478,25 @@ read(Handle, NBytes) ->
     case Handle#t_handle.storage of 
 	Pid when is_pid(Pid) ->
 	    ?dbg("~p: read: Storage pid ~p, NBytes = ~p\n",
-		 [?MODULE, Handle#t_handle.storage, NBytes]),
-	    read_retreived_data(Handle, NBytes);
+		 [?MODULE, Handle#t_handle.storage, NBytes]);
 	_Dict ->
 	    ?dbg("~p: read: Storage dict ~p, NBytes = ~p\n",
-		 [?MODULE, Handle#t_handle.storage, NBytes]),
-	    read_retreived_data(Handle, NBytes)
+		 [?MODULE, Handle#t_handle.storage, NBytes])
+    end,
+    if NBytes =< Handle#t_handle.size ->
+	    <<Data:NBytes/binary, NewData/binary>> = Handle#t_handle.data,
+	    NewSize = Handle#t_handle.size - NBytes,
+	    NewMax = case Handle#t_handle.max_size of
+			     unknown -> unknown;
+			     MaxSize -> MaxSize - NBytes
+			 end,
+	    {ok, Handle#t_handle { data=NewData, size=NewSize, max_size=NewMax }, Data};
+       true ->
+	    Data = Handle#t_handle.data,
+	    {ok, Handle#t_handle { data=(<<>>), size=0, max_size=0}, Data }
     end.
+	       
+		           
 
 read_from_app(Handle, NBytes) ->
     case Handle#t_handle.mode of
@@ -566,22 +551,6 @@ read_block(Handle, NBytes) ->
     end.
 
 
-read_retreived_data(Handle, NBytes) ->
-    ?dbg("~p: read_retreived_data NBytes = ~p\n", [?MODULE, NBytes]),
-    if NBytes =< Handle#t_handle.size ->
-	    <<Data:NBytes/binary, NewData/binary>> = Handle#t_handle.data,
-	    NewSize = Handle#t_handle.size - NBytes,
-	    NewMax = case Handle#t_handle.max_size of
-			     unknown -> unknown;
-			     MaxSize -> MaxSize - NBytes
-			 end,
-	    {ok, Handle#t_handle { data=NewData, size=NewSize, max_size=NewMax }, Data};
-       true ->
-	    Data = Handle#t_handle.data,
-	    {ok, Handle#t_handle { data=(<<>>), size=0, max_size=0}, Data }
-    end.
-	       
-		    
 
 read_end(Handle) when Handle#t_handle.storage == undefined ->
     (Handle#t_handle.endf)(Handle#t_handle.data);
@@ -599,12 +568,76 @@ block_seqno(Handle) ->
 max_size(Handle) ->
     Handle#t_handle.max_size.
     
-%% Return bytes remain to be read
+
 data_size(Handle) ->
     Handle#t_handle.size.
 
+bufdata_size(Handle) ->
+    size(Handle#t_handle.bufdata).
+
 type(Handle) ->
     Handle#t_handle.type.
+
+add_data(TH, Data) when is_binary(Data) ->
+    ?dbg("~p: add_data: Data = ~p, size = ~p\n",[?MODULE, Data, size(Data)]),
+    TH#t_handle { data=Data, size=size(Data) }.
+
+
+add_data(TH, Ref, Data) when is_binary(Data) ->
+    case ref(TH) of
+	Ref -> 
+	    add_data(TH, Data);
+	_OtherRef ->
+	    {error, ?abort_internal_error}
+    end.
+
+add_bufdata(TH, Data) when is_binary(Data) ->
+    ?dbg("~p: add_data: Data = ~p, size = ~p\n",[?MODULE, Data, size(Data)]),
+    TH#t_handle { bufdata=Data }.
+
+
+add_bufdata(TH, Ref, Data) when is_binary(Data) ->
+    case ref(TH) of
+	Ref -> 
+	    add_data(TH, Data);
+	_OtherRef ->
+	    {error, ?abort_internal_error}
+    end.
+
+move_and_add_bufdata(TH, Data) when is_binary(Data) ->
+    ?dbg("~p: move_and_add_data: Data = ~p, size = ~p\n",
+	 [?MODULE, Data, size(Data)]),
+    BufData = TH#t_handle.bufdata,
+    TH#t_handle { data=BufData, size=size(BufData), bufdata=Data }.
+
+
+move_and_add_bufdata(TH, Ref, Data) when is_binary(Data) ->
+    case ref(TH) of
+	Ref -> 
+	    add_data(TH, Data);
+	_OtherRef ->
+	    {error, ?abort_internal_error}
+    end.
+
+update_data(TH, Data) when is_binary(Data) ->
+    OldData = TH#t_handle.data,
+    NewData = <<OldData/binary, Data/binary>>,
+    TH#t_handle { data=NewData }. %% Size ?
+
+update_data(TH, Ref, Data) when is_binary(Data) ->
+    case ref(TH) of
+	Ref -> 
+	    update_data(TH, Data);
+	_OtherRef ->
+	    {error, ?abort_internal_error}
+    end.
+
+ref(TH) when is_record(TH, t_handle) ->
+    case TH#t_handle.mode of
+	{streamed, Ref} -> Ref;
+	{streamed, _Mod, Ref} -> Ref
+    end.
+    
 
 
 app_call(Pid, Msg) ->

@@ -417,6 +417,7 @@
 	  blkseg  :: binary(),     %% last received block segment (7 bytes)
 	  blkbytes :: uint16(),    %% Number of bytes transfered so far
 	  blkcrc   :: uint16(),    %% Current block CRC value
+	  first    :: boolean(),   %% True for first block
 	  node_pid :: pid(),       %% Pid of the node
 	  node_from :: term(),     %% Delayed gen_server:reply caller
 	  ctx      :: record(sdo_ctx),  %% general parameters

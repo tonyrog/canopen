@@ -107,6 +107,7 @@ init([Ctx,NodePid,Src,Dst]) ->
       blksize  = 0,
       blkseq   = 0,
       blkbytes = 0,
+      first = true,
       node_pid = NodePid,
       ctx      = Ctx,
       streamed = false
@@ -475,7 +476,7 @@ s_reading_segment_started({Mref, Reply} = M, S)  ->
 	    erlang:demonitor(Mref, [flush]),
 	    Data = co_codec:encode(Value, co_transfer:type(S#co_session.th)),
 	    TH = co_transfer:write_max_size(S#co_session.th, size(Data)),
-	    TH1 = co_transfer:add_data_to_handle(TH, Data),
+	    TH1 = co_transfer:add_data(TH, Data),
 	    start_segmented_upload(S#co_session {th = TH1});
 	{Mref, {ok, Ref, Size}} ->
 	    %% Check Ref ???
@@ -511,7 +512,7 @@ s_reading_segment_first({Mref, Reply} = M, S)  ->
 	{Mref, {ok, Ref, Data}} ->
 	    %% Check Ref ???
 	    erlang:demonitor(Mref, [flush]),
-	    TH = co_transfer:add_data_to_handle(S#co_session.th, Data),
+	    TH = co_transfer:add_data(S#co_session.th, Data),
 	    start_segmented_upload(S#co_session {th = TH});
 	_Other ->
 	    l_abort(M, S, s_reading_segment_first)
@@ -532,7 +533,7 @@ s_reading_segment({Mref, Reply} = M, S)  ->
 	    erlang:demonitor(Mref, [flush]),
 	    ?dbg("~p: s_reading_segment: data = ~p, size = ~p\n", 
 		 [?MODULE, Data, size(Data)]),
-	    TH = co_transfer:add_data_to_handle(S#co_session.th, Ref, Data),
+	    TH = co_transfer:add_data(S#co_session.th, Ref, Data),
 	    upload_segment(S, TH, Data);
 	_Other ->
 	    l_abort(M, S, s_reading_segment)
@@ -605,10 +606,27 @@ read_and_upload_block_segments(S, Seq) when Seq =< S#co_session.blksize ->
     end.
 
 upload_block_segment(S, TH, Data) ->
-    ?dbg("~p: upload_block: Data = ~p\n", [?MODULE, Data]),
+    ?dbg("~p: upload_block_segment: Data = ~p\n", [?MODULE, Data]),
     Seq = S#co_session.blkseq,
-    Remain = co_transfer:max_size(TH),
-    Last = ?UINT1(Remain =:= 0),
+    Last = case co_transfer:max_size(TH) of
+	       unknown ->
+		   case {co_transfer:data_size(TH),
+			 S#co_session.blksize,
+			 co_transfer:bufdata_size(TH)} of
+		       {0, BS, _} when BS > Seq ->
+			   %% No more data even though block isn't full
+			   %% indicates end of data
+			   1;
+		       {0, _BS, 0} ->
+			   %% No buffered data
+			   %% indicates end of data
+			   1;
+		       _Other ->
+			   %% We don't know :-(
+			   0
+		   end;
+	       Remain -> ?UINT1(Remain =:= 0)
+	   end,
     Data1 = co_sdo:pad(Data, 7),
     R = ?mk_block_segment(Last,Seq,Data1),
     NBytes = S#co_session.blkbytes + byte_size(Data),
@@ -701,7 +719,7 @@ s_reading_block_started({Mref, Reply} = M, S)  ->
 	    erlang:demonitor(Mref, [flush]),
 	    Data = co_codec:encode(Value, co_transfer:type(S#co_session.th)),
 	    TH = co_transfer:write_max_size(S#co_session.th, size(Data)),
-	    TH1 = co_transfer:add_data_to_handle(TH, Data),
+	    TH1 = co_transfer:add_data(TH, Data),
 	    segment_or_block(S, TH1);
 	{Mref, {ok, Ref, Size}} ->
 	    %% Check Ref ???
@@ -727,22 +745,36 @@ s_reading_block({Mref, Reply} = M, S)  ->
 	    erlang:demonitor(Mref, [flush]),
 	    Data = co_codec:encode(Value, co_transfer:type(S#co_session.th)),
 	    TH = co_transfer:write_max_size(S#co_session.th, size(Data)),
-	    TH1 = co_transfer:add_data_to_handle(TH, Data),
+	    TH1 = co_transfer:add_data(TH, Data),
 	    segment_or_block(S, TH1);
-	{Mref, {ok, Ref, (<<>>)}} ->
-	    ?dbg("~p: s_reading_block: empty data received\n",[?MODULE]),
-	    CRC = co_crc:final(S#co_session.blkcrc),
-	    N   = (7- (S#co_session.blkbytes rem 7)) rem 7,
-	    R = ?mk_scs_block_upload_end_request(N,CRC),
-	    send(S, R),
-	    {next_state, s_block_upload_end_response, S, ?TMO(S)};
 	{Mref, {ok, Ref, Data}} ->
 	    %% Check Ref ???
 	    erlang:demonitor(Mref, [flush]),
 	    ?dbg("~p: s_reading_block: data = ~p size = ~p\n", 
 		 [?MODULE, Data, size(Data)]),
-	    TH = co_transfer:add_data_to_handle(S#co_session.th, Data),
-	    read_and_upload_block_segments(S#co_session {th = TH}, 1);
+	    
+	    if S#co_session.first =:= true andalso
+	       Data =:= (<<>>) ->
+		    %% No data at all ???
+		    ?dbg("~p: s_reading_block: first & no data\n", [?MODULE]),
+		    abort(S, ?abort_internal_error);
+	       S#co_session.first =:= true andalso
+	       (7 * S#co_session.blksize) =:= size(Data) ->
+		    %% Full block, buffer it and get the next
+		    ?dbg("~p: s_reading_block: first & full\n", [?MODULE]),
+		    TH = co_transfer:add_bufdata(S#co_session.th, Data),
+		    read_block(S#co_session {th = TH, first = false});
+	       S#co_session.first =:= true ->
+		    %% Not full block, eof reached in first block
+		    ?dbg("~p: s_reading_block: first & not full\n", [?MODULE]),
+		    TH = co_transfer:add_data(S#co_session.th, Data),
+		    read_and_upload_block_segments(S#co_session {th = TH}, 1);
+	       true ->
+		    %% Not first so move buffered data to data
+		    ?dbg("~p: s_reading_block: not first\n", [?MODULE]),
+		    TH = co_transfer:move_and_add_bufdata(S#co_session.th,Data),
+		    read_and_upload_block_segments(S#co_session {th = TH}, 1)
+	    end;
 	_Other ->
 	    l_abort(M, S, s_reading_block)
     end;
@@ -1003,6 +1035,8 @@ demonitor_and_abort(M, S) ->
 
 
 l_abort(M, S, State) when is_record(M, can_frame)->
+    ?dbg("~p: l_abort: Msg = ~p received in state = ~p\n", 
+		 [?MODULE, M, State]),
     case M#can_frame.data of
 	?ma_ccs_abort_transfer(IX,SI,Code) when
 	      IX =:= S#co_session.index,

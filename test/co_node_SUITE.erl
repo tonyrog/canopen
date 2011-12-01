@@ -357,8 +357,7 @@ stream_app(_Config) ->
 	    ct:pal("Stopped stream app"),
 	    ok
     after 5000 ->
-	    ct:pal("Application stuck",[]),
-	    error
+	    ct:fail("Application stuck")
     end.
 
 break(Config) ->
