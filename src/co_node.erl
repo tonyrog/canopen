@@ -1230,13 +1230,18 @@ handle_can(Frame, Ctx) ->
 		    Ctx
 	    end;
 	_NotKnown ->
-	    %% Test if MPDO
-	    <<F:1, Addr:7, Ix:16/little, Si:8, Data:32/little>> = 
-		Frame#can_frame.data,
-	    case {F, Addr} of
-		{1, 0} ->
-		    %% DAM-MPDO, destination is a group
-		    handle_dam_mpdo(Ctx, ?XNODE_ID(COBID), Ix, Si, Data);
+	    case Frame#can_frame.data of
+		%% Test if MPDO
+		<<F:1, Addr:7, Ix:16/little, Si:8, Data:32/little>> ->
+		    case {F, Addr} of
+			{1, 0} ->
+			    %% DAM-MPDO, destination is a group
+			    handle_dam_mpdo(Ctx, ?XNODE_ID(COBID), Ix, Si, Data);
+			_Other ->
+			    ?dbg("~s: handle_can: frame not handled: Frame = ~p\n", 
+				 [Ctx#co_ctx.name, Frame]),
+			    Ctx
+		    end;
 		_Other ->
 		    ?dbg("~s: handle_can: frame not handled: Frame = ~p\n", 
 			 [Ctx#co_ctx.name, Frame]),
@@ -1796,7 +1801,7 @@ create_dict() ->
 %% We may handle the mixed mode later on....
 %%
 create_cob_table(Nid) ->
-    T = ets:new(cob_table, [public]),
+    T = ets:new(cob_table, [named_table,public]),
     if ?is_nodeid_extended(Nid) ->
 	    SDORx = ?XCOB_ID(?SDO_RX,Nid),
 	    SDOTx = ?XCOB_ID(?SDO_TX,Nid),
@@ -1806,6 +1811,7 @@ create_cob_table(Nid) ->
 	    SDOTx = ?COB_ID(?SDO_TX,Nid),
 	    ets:insert(T, {?COB_ID(?NMT, 0), nmt})
     end,
+    ?dbg("install Nid=~w, SDORx=~w, SDOTx=~w\n", [Nid,SDORx,SDOTx]),
     ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
     ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
     T.

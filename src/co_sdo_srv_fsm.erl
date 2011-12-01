@@ -312,7 +312,7 @@ central_read_begin(Ctx, Index, SubInd) ->
     Dict = Ctx#sdo_ctx.dict,
     case co_dict:lookup_entry(Dict, {Index,SubInd}) of
 	{ok,E} ->
-	    if (E#dict_entry.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
+	    if (E#dict_entry.access band ?ACCESS_RO) =:= 0 ->
 		    {error, ?abort_read_not_allowed};
 	       true ->
 		    ?dbg(srv, "central_read_begin: Read access ok\n", []),

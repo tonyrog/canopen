@@ -18,10 +18,13 @@
 load(File) ->
     case file:consult(File) of
 	{ok,Objects} ->
+	    io:format("object=~p\n", [Objects]),
 	    try load_objects(Objects, []) of
 		Os -> {ok,Os}
 	    catch
 		error:Error ->
+		    io:format("load error: ~p\n~w\n",
+			      [Error,erlang:get_stacktrace()]),
 		    {error,Error}
 	    end;
 	Error ->
@@ -300,9 +303,10 @@ sdo_record(Index,Access,COB1,COB2,NodeID) ->
 
 
 %% derive entry type, when missing and possible
-entry_type(undefined,{_,0},_,?OBJECT_ARRAY)  -> unsigned8;
-entry_type(undefined,{_,0},_,?OBJECT_RECORD) -> unsigned8;
+entry_type(undefined,{_,0},_,?OBJECT_ARRAY)  -> ?UNSIGNED8;
+entry_type(undefined,{_,0},_,?OBJECT_RECORD) -> ?UNSIGNED8;
 entry_type(undefined,{_,I},Type,?OBJECT_ARRAY) when I>0 -> Type;
+entry_type(undefined,{_,I},Type,?OBJECT_RECORD) when I>0 -> Type;
 entry_type(Type,_,_,_) when Type =/= undefined -> Type.
 
 %% Construct and check a cobid

@@ -13,6 +13,7 @@
 -export([object_by_name/2]).
 -export([object_by_id/2]).
 -export([object_by_index/2]).
+-compile(export_all).
 
 -include("../include/canopen.hrl").
 

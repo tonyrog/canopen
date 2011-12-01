@@ -51,11 +51,10 @@
 		  {ok, #data_buf{}} |
 		  {error, Error::atom()}.
 
-init(Access, Pid, E=#app_entry{index = I, type = Type, transfer = M}, 
-     BSize, LLevel) ->
+init(Access, Pid, E, BSize, LLevel) ->
     ?dbg(data_buf, 
-	 "init: access = ~p, i = ~p, type = ~p, mode = ~p, blocksize = ~p, load_level ~p",
-	 [Access, I, Type, M, BSize, LLevel]),
+	 "init: access = ~p, e = ~p, blocksize = ~p, load_level ~p",
+	 [Access, E, BSize, LLevel]),
     init_i(Access, Pid, E, BSize, LLevel).
 
 init_i(read, Pid, #app_entry{index = I, type = Type, transfer = {value, Value} = M},
