@@ -591,7 +591,7 @@ init([Serial, NodeId, NodeName, Opts]) ->
       timeout         = proplists:get_value(sdo_timeout,Opts,1000),
       blk_timeout     = proplists:get_value(blk_timeout,Opts,500),
       pst             = proplists:get_value(pst,Opts,16),
-      max_blksize     = proplists:get_value(max_blksize,Opts,74),
+      max_blksize     = proplists:get_value(max_blksize,Opts,7),
       use_crc         = proplists:get_value(use_crc,Opts,true),
       dict            = Dict,
       sub_table       = SubTable,
@@ -1794,8 +1794,10 @@ add_reservation(Tab, [Ix | Tail], Mod, Pid) ->
     end.
 
 
-add_reservation(_Tab, Ix1, Ix2, _Mod, _Pis) when Ix1 < ?MAN_SPEC_MIN;
-					 Ix2 < ?MAN_SPEC_MIN->
+add_reservation(_Tab, Ix1, Ix2, _Mod, Pid) when Ix1 < ?MAN_SPEC_MIN;
+						Ix2 < ?MAN_SPEC_MIN->
+    ?dbg("~p: add_reservation: not possible for ~7.16.0#:~7.16.0# for ~w\n", 
+	 [?MODULE, Ix1, Ix2, Pid]),
     {error, not_possible_to_reserve};
 add_reservation(Tab, Ix1, Ix2, Mod, Pid) when ?is_index(Ix1), ?is_index(Ix2), 
 					      Ix1 =< Ix2, 

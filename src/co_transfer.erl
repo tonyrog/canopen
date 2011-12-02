@@ -13,7 +13,7 @@
 -include("co_app.hrl").
 
 -export([write_begin/3, write/3, write_end/3]).
--export([write_data_begin/3, write_get_data/1]).
+-export([write_data_begin/3]).
 -export([write_max_size/2]).
 -export([write_size/2]).
 -export([write_data/2]).
@@ -178,12 +178,6 @@ write_size(TH, Size) ->
 
 write_data(TH, Data) ->
     TH#t_handle {data=Data}.
-%%
-%% Fetch current data
-%%
-
-write_get_data(Handle) ->
-    Handle#t_handle.data.
 
 %% Write data
 %%  return 
@@ -191,13 +185,13 @@ write_get_data(Handle) ->
 %%   | {ok, Handle', NBytesWritten}
 %%
 write(Handle, Data, NBytes) ->
-    ?dbg("~p: write: handle = ~p, data = ~p, nbytes = ~p\n",
-	 [?MODULE, Handle, Data, NBytes]),
+    ?dbg("~p: write: data = ~p, nbytes = ~p\n", [?MODULE, Data, NBytes]),
     <<Data1:NBytes/binary, _/binary>> = Data,
-    NewData = <<(Handle#t_handle.data)/binary, Data1/binary>>,
     NewSize = Handle#t_handle.size + NBytes,
+    NewData = <<(Handle#t_handle.data)/binary, Data1/binary>>,
     if Handle#t_handle.max_size =:= 0;
        NewSize =< Handle#t_handle.max_size ->
+
 	    %% Check if streaming to application
 	    case Handle#t_handle.mode of
 		{streamed, Ref} ->
@@ -205,14 +199,31 @@ write(Handle, Data, NBytes) ->
 		{streamed, Mod, Ref} ->
 		    Mod:write(Handle#t_handle.storage, Ref, Data1);
 		_Other ->
-		    do_nothing %% atomic
+		    %% Atomic
+		    do_nothing
 	    end,
-
-	    {ok, Handle#t_handle { size=NewSize, data=NewData}, NBytes};
+	    {ok, Handle#t_handle {size=NewSize, data=NewData}, NBytes};
+       
        true ->
 	    abort_transfer(Handle),
 	    {error, ?abort_unsupported_access}
+
     end.
+
+stream_data(Handle, Data) ->
+    ?dbg("~p: stream_data: data = ~p\n", [?MODULE, Data]),
+    case Handle#t_handle.mode of
+	{streamed, Ref} ->
+	    gen_server:cast(Handle#t_handle.storage, {write, Ref, Data}),
+	    ok;
+	{streamed, Mod, Ref} ->
+	    Mod:write(Handle#t_handle.storage, Ref, Data),
+	    ok;
+	_Other ->
+	    %% Should not happen
+	    {error, ?abort_internal_error}
+    end.
+
 
 
 %% Write block segment data (7 bytes) Seq=1..127 
@@ -220,15 +231,7 @@ write(Handle, Data, NBytes) ->
 write_block_segment(Handle, Seq, Data) when ?is_seq(Seq),
 					    byte_size(Data) =:= 7 ->
     Block = [{Seq,Data} | Handle#t_handle.block],
-    ?dbg("~p: write_block_segment: block = ~p\n", [?MODULE, Block]),
-    case Handle#t_handle.mode of
-	{streamed, Ref} ->
-	    gen_server:cast(Handle#t_handle.storage, {write, Ref, Data});
-	{streamed, Mod, Ref} ->
-	    Mod:write(Handle#t_handle.storage, Ref, Data);
-	_Other ->
-	    do_nothing %% atomic
-    end,
+    ?dbg("~p: write_block_segment: data = ~p\n", [?MODULE, Data]),
     {ok, Handle#t_handle { block = Block}, 7};
 write_block_segment(Handle, _Seq, _Data) ->
     abort_transfer(Handle),
@@ -240,30 +243,76 @@ write_block_segment_end(TH) ->
 				   lists:reverse(TH#t_handle.block))),
     MaxSize = TH#t_handle.max_size,
     Size = byte_size(Bin),
-    ?dbg("~p: write_block_segment_end: max=~w, szofbin=~w, bin=~p, size=~p\n", 
-	 [?MODULE, MaxSize, Size, Bin, TH#t_handle.size]),
-    if MaxSize =:= 0 ->
-	    write(TH, Bin, Size);
-       true ->
-	    Remain = MaxSize - TH#t_handle.size,
-	    if Remain =< 0 ->
-		    abort_transfer(TH),
-		    {error, ?abort_data_length_too_high};
-	       Size =< Remain; (Size-Remain) < 7 ->
-		    NewData = <<(TH#t_handle.data)/binary, Bin/binary>>,
-		    NewSize = TH#t_handle.size + Size,
-		    TH1 = TH#t_handle { size=NewSize,data=NewData,block=[]},
-		    {ok, TH1, Size};
+    ?dbg("~p: write_block_segment_end: max=~w, bin=~p, szofbin=~w, size=~p\n", 
+	 [?MODULE, MaxSize, Bin, Size, TH#t_handle.size]),
+    case TH#t_handle.mode of
+	{streamed, _Ref} ->
+	    write_block_segment_end_streamed(TH, Bin, Size);
+	{streamed, _Mod, _Ref} ->
+	    write_block_segment_end_streamed(TH, Bin, Size);
+	_Other ->
+	    if MaxSize =:= 0 ->
+		    write(TH#t_handle {block = []}, Bin, Size);
 	       true ->
-		    abort_transfer(TH),
-		    {error, ?abort_data_length_too_high}
+		    Remain = MaxSize - TH#t_handle.size,
+		    if Remain =< 0 ->
+			    abort_transfer(TH),
+			    {error, ?abort_data_length_too_high};
+		       Size =< Remain; (Size-Remain) < 7 ->
+			    %% Add Bin to data
+			    NewData = <<(TH#t_handle.data)/binary, Bin/binary>>,
+			    NewSize = TH#t_handle.size + Size,
+			    TH1 = TH#t_handle {size=NewSize,data=NewData,block=[]},
+			    {ok, TH1, Size};
+		       true ->
+			    abort_transfer(TH),
+			    {error, ?abort_data_length_too_high}
+		    end		    
 	    end
+    end.
+
+write_block_segment_end_streamed(TH, Bin, Size) ->
+    if TH#t_handle.data =:= (<<>>) ->
+	    %% First block end ??
+	    %% Move bin to data
+	    {ok, TH#t_handle {data = Bin, block = []}, Size};
+       true ->
+	    %% Consequtive blocks
+	    %% Write data and move bin to data
+	    Data = TH#t_handle.data,
+	    TH1 = TH#t_handle {data = Bin, block = []},
+	    stream_data(TH1, Data),
+	    SentSize = TH#t_handle.size + size(Bin),
+	    {ok ,TH1#t_handle {size = SentSize}, Size}
     end.
 
 %% Handle the end of block data
 %% Check CRC if needed.
 
-write_block_end(Ctx,Handle,N,CRC,CheckCrc) ->
+write_block_end(Ctx,TH,N,CRC,CheckCrc) ->
+    ?dbg("~p: write_block_end\n",[?MODULE]), 
+    %% Check if streaming to application
+    case TH#t_handle.mode of
+	{streamed, _Ref} ->
+	    write_block_end_streamed(Ctx,TH,N,CRC,CheckCrc);
+	{streamed, _Mod, _Ref} ->
+	    write_block_end_streamed(Ctx,TH,N,CRC,CheckCrc);
+	_Other ->
+	    write_block_end_atomic(Ctx,TH,N,CRC,CheckCrc)
+    end.
+
+write_block_end_streamed(Ctx,TH,N,CRC,CheckCrc) ->
+    Size = size(TH#t_handle.data) - N,
+    <<TruncData:Size/binary,_/binary>> = TH#t_handle.data,
+    %% Write last stored buffer
+    stream_data(TH, TruncData),
+    %% CRC to be investigated ???
+    SentSize = TH#t_handle.size + size(TruncData),
+    write_end(Ctx, TH#t_handle {size = SentSize}, 0).
+
+    
+    
+write_block_end_atomic(Ctx,Handle,N,CRC,CheckCrc) ->
     Handle1 =
 	if N =:= 0 ->
 		Handle;
@@ -272,6 +321,7 @@ write_block_end(Ctx,Handle,N,CRC,CheckCrc) ->
 		<<Data1:Size1/binary,_/binary>> = Handle#t_handle.data,
 		Handle#t_handle { data=Data1, size=Size1 }
 	end,
+
     if Handle1#t_handle.max_size > 0,
        Handle1#t_handle.size > Handle1#t_handle.max_size ->
 	    abort_transfer(Handle1),
@@ -280,6 +330,7 @@ write_block_end(Ctx,Handle,N,CRC,CheckCrc) ->
 	    Data = Handle1#t_handle.data,
 	    ?dbg("~p: write_block_end: data0=~p, size=~w, data=~p\n", 
 		 [?MODULE, Handle#t_handle.data, size(Data), Data]),
+	    
 	    case co_crc:checksum(Handle1#t_handle.data) of
 		CRC ->
 		    write_end(Ctx, Handle1, N);
@@ -298,24 +349,30 @@ write_block_end(Ctx,Handle,N,CRC,CheckCrc) ->
 %%  | ok
 %%  | {ok, Data}   - no dictionary
 %%
-write_end(_Ctx, Handle, _N) when Handle#t_handle.storage == undefined ->
-    (Handle#t_handle.endf)(Handle#t_handle.data);
-write_end(Ctx, Handle, N) ->
-    if Handle#t_handle.max_size =:= 0;
-       Handle#t_handle.size == Handle#t_handle.max_size ->
-	    try co_codec:decode(Handle#t_handle.data, 
-				Handle#t_handle.type) of
-		{Value,_} ->
-		    Index = Handle#t_handle.index,
-		    SubInd = Handle#t_handle.subind,
-						  
-		    case Handle#t_handle.storage of
+write_end(_Ctx, TH, _N) when TH#t_handle.storage == undefined ->
+    (TH#t_handle.endf)(TH#t_handle.data);
+write_end(Ctx, TH, N) ->
+    ?dbg("~p: write_end: max_size=~p, size=~p, n=~p\n", 
+	 [?MODULE, TH#t_handle.max_size, TH#t_handle.size, N]),
+    if TH#t_handle.max_size =:= 0;
+       TH#t_handle.size == TH#t_handle.max_size ->
+	    Index = TH#t_handle.index,
+	    SubInd = TH#t_handle.subind,
+	    Value = case streaming(TH) of 
+			false -> value(TH);
+			true -> not_used
+		    end,
+	    case Value of
+		{error, E} ->
+		    {error, E};
+		_OK ->
+		    case TH#t_handle.storage of
 			Pid when is_pid(Pid) ->
 			    %% An application is responsible for the data
-			    ?dbg("~p: write_to_app: ~.16B:~.8B, Value = ~p\n", 
-				 [?MODULE, Index, SubInd, Value]),
+			    ?dbg("~p: write_end: To app ~.16B:~.8B\n", 
+				 [?MODULE, Index, SubInd]),
 			    %% Check if streaming to application
-			    case Handle#t_handle.mode of
+			    case TH#t_handle.mode of
 				{streamed, Ref} ->
 				    app_call(Pid, {write_end, Ref, N});
 				{streamed, Mod, Ref} ->
@@ -325,7 +382,6 @@ write_end(Ctx, Handle, N) ->
 				{atomic, Module} ->
 				    Module:set(Pid, {Index, SubInd}, Value)
 			    end;
-
 			Dict ->
 			    ?dbg("~p: write_to_dict: ~.16B:~.8B, Value = ~p\n", 
 				 [?MODULE, Index, SubInd, Value]),
@@ -333,16 +389,24 @@ write_end(Ctx, Handle, N) ->
 			    inform_subscribers(Index, Ctx),
 			    Res
 		    end
-	    catch
-		error:_ ->
-		    abort_transfer(Handle),
-		    {error, ?abort_internal_error}
 	    end;
+
        true ->
-	    abort_transfer(Handle),
+	    abort_transfer(TH),
 	    {error, ?abort_data_length_too_low}
     end.
-       
+
+value(Handle) ->
+    try co_codec:decode(Handle#t_handle.data, 
+			Handle#t_handle.type) of
+	{Value,_} ->
+	    Value
+    catch
+	error:_ ->
+	    abort_transfer(Handle),
+	    {error, ?abort_internal_error}
+    end.
+
 inform_subscribers(I, Ctx) ->
     ?dbg("~s: inform_subscribers: Searching for subscribers for ~p\n", [?MODULE, I]),
     lists:foreach(
@@ -557,6 +621,20 @@ read_end(Handle) when Handle#t_handle.storage == undefined ->
 read_end(_Handle) ->
     ok.
 
+true_streaming(TH) ->
+    case {TH#t_handle.max_size, TH#t_handle.mode} of
+	{0, {streamed, _Ref}} -> true;
+	{0, {streamed, _Mod, _Ref}} -> true;
+	_Other -> false
+    end.
+	     
+streaming(TH) ->
+    case TH#t_handle.mode of
+	{streamed, _Ref} -> true;
+	{streamed, _Mod, _Ref} -> true;
+	_Other -> false
+    end.
+	     
 
 %% Return the last received sequence number
 block_seqno(Handle) ->

@@ -3,6 +3,7 @@
 #
 
 MODULES = \
+	co_test \
 	co_node_SUITE \
 	co_ex_app \
 	co_stream_app

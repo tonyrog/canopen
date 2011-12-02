@@ -32,8 +32,11 @@
 	  dict,
 	  index,
 	  ref,
-	  filename,
-	  file
+	  readfilename,
+	  readfile,
+	  writefilename,
+	  writefile,
+	  writebuf
 	}).
 
 
@@ -46,8 +49,9 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start(CoSerial, {Index, File}) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, {CoSerial, {Index, File}, self()}, []).
+start(CoSerial, {Index, RFile, WFile}) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, 
+			  {CoSerial, {Index, RFile, WFile}, self()}, []).
 
 %%--------------------------------------------------------------------
 %% @spec stop() -> ok | {error, Error}
@@ -91,11 +95,14 @@ get_entry(_Pid, {Index, SubInd} = I) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-init({CoSerial, {Index, FileName}, Starter}) ->
+init({CoSerial, {Index, RFileName, WFileName}, Starter}) ->
+    ct:pal("Starting with index = ~.16B, readfile = ~p, writefile = ~p\n",
+	   [Index, RFileName, WFileName]),
     {ok, _NodeId} = co_node:attach(CoSerial),
     ok = co_node:reserve(CoSerial, Index, ?MODULE),
     {ok, #loop_data {starter = Starter, co_node = CoSerial, index = Index,
-		    filename = FileName}}.
+		     readfilename = RFileName, writefilename = WFileName,
+		     writebuf = (<<>>)}}.
 
 %%--------------------------------------------------------------------
 %% @spec handle_call(Request, From, LoopData) ->
@@ -144,9 +151,10 @@ handle_call({read_begin, {Index, SubInd}, Ref}, _From, LoopData) ->
 	 [?MODULE, Index, SubInd, Ref]),
     case LoopData#loop_data.index of
 	Index ->
-	    {ok, F} = file:open(LoopData#loop_data.filename, 
+	    {ok, F} = file:open(LoopData#loop_data.readfilename, 
 				[read, raw, binary, read_ahead]),
-	    {reply, {ok, Ref, unknown}, LoopData#loop_data {ref = Ref, file = F}};
+	    {reply, {ok, Ref, unknown}, 
+	     LoopData#loop_data {ref = Ref, readfile = F}};
 	_OtherIndex ->
 	    ct:pal("~p: handle_call: read_begin error = ~.16B\n", 
 		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
@@ -156,17 +164,47 @@ handle_call({read, Bytes, Ref}, _From, LoopData) ->
 %%    ct:pal("~p: handle_call: read ref = ~p\n",[?MODULE, Ref]),
     case LoopData#loop_data.ref of
 	Ref ->
-	    case file:read(LoopData#loop_data.file, Bytes) of
+	    case file:read(LoopData#loop_data.readfile, Bytes) of
 		{ok, Data} ->
 %%		    ct:pal("~p: handle_call: read ref = ~p, data = ~p\n",
 %%			   [?MODULE, Ref, Data]),
 		    {reply, {ok, Ref, Data}, LoopData};
 		eof ->
 		    ct:pal("~p: handle_call: read  eof reached\n", [?MODULE]), 
-		    file:close(LoopData#loop_data.file),    
+		    file:close(LoopData#loop_data.readfile),    
 		    LoopData#loop_data.starter ! eof,
 		    {reply, {ok, Ref, <<>>}, LoopData}
 	    end;
+	_OtherRef ->
+	    ct:pal("~p: handle_call: read error = wrong_ref\n", [?MODULE]), 
+	    {reply, {error, ?ABORT_INTERNAL_ERROR}, LoopData}	    
+    end;
+handle_call({write_begin, {Index, SubInd}, Ref}, _From, LoopData) ->
+    ct:pal("~p: handle_call: write_begin ~.16B:~.8B, ref = ~p\n",
+	 [?MODULE, Index, SubInd, Ref]),
+    case LoopData#loop_data.index of
+	Index ->
+	    {ok, F} = file:open(LoopData#loop_data.writefilename, 
+				[write, raw, binary, delayed_write]),
+	    {reply, ok, LoopData#loop_data {ref = Ref, writefile = F}};
+	_OtherIndex ->
+	    ct:pal("~p: handle_call: read_begin error = ~.16B\n", 
+		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
+	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData}
+    end;
+handle_call({write_end, Ref, N}, _From, LoopData) ->
+    ct:pal("~p: handle_call: write_end ref = ~p, N = ~p\n",[?MODULE, Ref, N]),
+    case LoopData#loop_data.ref of
+	Ref ->
+	    BufData = LoopData#loop_data.writebuf,
+	    if BufData =/= (<<>>) ->
+		    file:write(LoopData#loop_data.writefile, BufData);
+	       true ->
+		    do_nothing
+	    end,
+	    file:close(LoopData#loop_data.writefile),
+	    LoopData#loop_data.starter ! eof,
+	    {reply, ok, LoopData#loop_data {writebuf = (<<>>)}};
 	_OtherRef ->
 	    ct:pal("~p: handle_call: read error = wrong_ref\n", [?MODULE]), 
 	    {reply, {error, ?ABORT_INTERNAL_ERROR}, LoopData}	    
@@ -193,22 +231,6 @@ handle_call(Request, _From, LoopData) ->
     ct:pal("~p: handle_call: bad call ~p.\n",[?MODULE, Request]),
     {reply, {error,bad_call}, LoopData}.
 
-handle_set(LoopData, I, NewValue) ->
-    case ets:lookup(LoopData#loop_data.dict, I) of
-	[] ->
-	    ct:pal("~p: handle_set: set error = ~.16B\n", 
-		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
-	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{I, _Type, _Transfer, NewValue}] ->
-	    %% No change
-	    ct:pal("~p: handle_set: set no change\n", [?MODULE]),
-	    {reply, ok, LoopData};
-	[{{Index, SubInd}, Type, Transfer, _OldValue}] ->
-	    ets:insert(LoopData#loop_data.dict, {I, Type, Transfer, NewValue}),
-	    ct:pal("~p: handle_set: set ~.16B:~.8B updated to ~p\n",[?MODULE, Index, SubInd, NewValue]),
-	    {reply, ok, LoopData}
-    end.
-
 %%--------------------------------------------------------------------
 %% @private
 %% @spec handle_cast(Msg, LoopData) -> {noreply, LoopData} |
@@ -220,6 +242,21 @@ handle_set(LoopData, I, NewValue) ->
 %% @end
 %%--------------------------------------------------------------------
 %% transfer_mode == streamed
+handle_cast({write, Ref, Data}, LoopData) ->
+    %% ct:pal("~p: handle_cast: write ref = ~p, data = ~p\n",[?MODULE,Ref,Data]),
+    case LoopData#loop_data.ref of
+	Ref ->
+	    if LoopData#loop_data.writebuf =/= (<<>>) ->
+		    file:write(LoopData#loop_data.writefile, 
+			       LoopData#loop_data.writebuf);
+	       true ->
+		    do_nothing
+	    end,
+	    {noreply, LoopData#loop_data {writebuf = Data}};
+	_OtherRef ->
+	    ct:pal("~p: handle_call: read error = wrong_ref\n", [?MODULE]), 
+	    {noreply, LoopData}	    
+    end;
 handle_cast(_Msg, LoopData) ->
     {noreply, LoopData}.
 

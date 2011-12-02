@@ -227,12 +227,11 @@ handle_call({write_begin, {Index, SubInd} = I, Ref}, _From, LoopData) ->
 	    {reply, ok, LoopData#loop_data {store = Store}}
     end;
 handle_call({write_end, Ref, N}, _From, LoopData) ->
-    ?dbg("~p: handle_call: write_end ref = ~p\n",[?MODULE, Ref]),
+    ?dbg("~p: handle_call: write_end ref = ~p, n = ~p\n",[?MODULE, Ref,N]),
     Store = LoopData#loop_data.store,
     ?dbg("~p: handle_call: write_end data = ~p, type ~p\n",
 	 [?MODULE, Store#store.data, Store#store.type]),
     AccData = Store#store.data,
-
     %% Check if all downloaded bytes should be used
     Data = if N =:= 0 ->
 		AccData;
