@@ -12,6 +12,7 @@ MODULES = \
 EBIN = .
 ERLC = erlc
 
+ERLDIR  := $(shell erl -noshell -eval "io:format([126,115,126,110],[code:root_dir()])" -s erlang halt)
 
 override ERLC_FLAGS = -Wall -I ../include 
 
@@ -35,6 +36,8 @@ edoc:
 clean:
 	rm -f $(OBJS) 
 
+test:
+	$(ERLDIR)/bin/ct_run -include ../include -suite co_node_SUITE
 
 -include depend.mk
 
