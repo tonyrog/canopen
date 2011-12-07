@@ -5,10 +5,10 @@
 
 -module(co_test).
 
--export([run/0]).
+-export([run/1]).
 
-run() ->
-    {ok, _Pid} = co_node:start_link([{serial,16#03000301}, 
+run(Serial) ->
+    {ok, _Pid} = co_node:start_link([{serial,Serial}, 
 				     {options, [extended,
 						{max_blksize, 7},
 						{vendor,0},
