@@ -13,18 +13,6 @@
 
 -include_lib("common_test/include/ct.hrl").
 
--define(SERIAL, 16#03000301).
--define(cocli, "../cocli_udp").
--define(co_target, "0x80030003").
-
--define(atomic, {{16#6033, 0}, "A long string 1234567890qwertyuiop111"}).
--define(streamed, {{16#6034, 0}, "A long string 1234567890qwertyuiop222"}).
-
--define(read_file, "../read_file").
--define(write_file, "../write_file").
--define(file_stream_index, 16#6077).
-
-
 %%--------------------------------------------------------------------
 %% COMMON TEST CALLBACK FUNCTIONS
 %%--------------------------------------------------------------------
@@ -46,7 +34,9 @@
 %% @end
 %%--------------------------------------------------------------------
 suite() ->
-    [{timetrap,{minutes,10}}].
+    [{timetrap,{minutes,10}},
+     {require, serial},
+     {require, cocli}].
 
 
 %%--------------------------------------------------------------------
@@ -76,6 +66,14 @@ all() ->
      get_atomic_block,
      get_streamed_segment,
      get_streamed_block,
+     set_atomic_m_segment,
+     set_atomic_m_block,
+     set_streamed_m_segment,
+     set_streamed_m_block,
+     get_atomic_m_segment,
+     get_atomic_m_block,
+     get_streamed_m_segment,
+     get_streamed_m_block,
      stream_app].
 %%     break].
 
@@ -126,7 +124,7 @@ groups() ->
 %% @end
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
-    {ok, _Pid} = co_node:start_link([{serial,?SERIAL}, 
+    {ok, _Pid} = co_node:start_link([{serial,ct:get_config(serial)}, 
 				     {options, [extended, {vendor,0},
 						{dict_file, "test.dict"}]}]),
     ct:pal("Started co_node"),
@@ -143,7 +141,7 @@ init_per_suite(Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_suite(_Config) ->
-    co_node:stop(?SERIAL),
+    co_node:stop(ct:get_config(serial)),
     ok.
 
 %%--------------------------------------------------------------------
@@ -205,13 +203,22 @@ init_per_testcase(Case, Config) when Case == set_atomic_segment;
 				     Case == get_atomic_segment;
 				     Case == get_atomic_block;
 				     Case == get_streamed_segment;
-				     Case == get_streamed_block ->
+				     Case == get_streamed_block ;
+				     Case == set_atomic_m_segment;
+				     Case == set_atomic_m_block;
+				     Case == set_streamed_m_segment;
+				     Case == set_streamed_m_block;
+				     Case == get_atomic_m_segment;
+				     Case == get_atomic_m_block;
+				     Case == get_streamed_m_segment;
+				     Case == get_streamed_m_block ->
     ct:pal("Testcase: ~p", [Case]),
-    {ok, _Pid} = co_ex_app:start(?SERIAL),
+    {ok, _Pid} = co_test_app:start(ct:get_config(serial)),
     Config;
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
     Config.
+
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -233,8 +240,18 @@ end_per_testcase(Case, _Config) when Case == set_atomic_segment;
 				     Case == get_atomic_segment;
 				     Case == get_atomic_block;
 				     Case == get_streamed_segment;
-				     Case == get_streamed_block ->
-    ok = co_ex_app:stop(),
+				     Case == get_streamed_block ;
+				     Case == set_atomic_m_segment;
+				     Case == set_atomic_m_block;
+				     Case == set_streamed_m_segment;
+				     Case == set_streamed_m_block;
+				     Case == get_atomic_m_segment;
+				     Case == get_atomic_m_block;
+				     Case == get_streamed_m_segment;
+				     Case == get_streamed_m_block ->
+    %% Wait a little for session to terminate
+    timer:sleep(200),
+    ok = co_test_app:stop(),
     ok;
 end_per_testcase(stream_app, _Config) ->
     ok = co_stream_app:stop(),
@@ -247,37 +264,10 @@ end_per_testcase(_TestCase, _Config) ->
 %%--------------------------------------------------------------------
 
 %%--------------------------------------------------------------------
+%% @spec start_of_co_node(Config) -> ok 
 %% @doc 
-%%  Test case info function - returns list of tuples to set
-%%  properties for the test case.
-%%
-%% Info = [tuple()]
-%%   List of key/value pairs.
-%%
-%% Note: This function is only meant to be used to return a list of
-%% values, not perform any other operations.
-%%
-%% @spec TestCase() -> Info 
-%% @end
-%%--------------------------------------------------------------------
-start_of_co_node() -> 
-    [].
-
-%%--------------------------------------------------------------------
-%% @doc Test case function. (The name of it must be specified in
-%%              the all/0 list or in a test case group for the test case
-%%              to be executed).
-%%
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding the test case configuration.
-%% Reason = term()
-%%   The reason for skipping the test case.
-%% Comment = term()
-%%   A comment about the test case that will be printed in the html log.
-%%
-%% @spec TestCase(Config0) ->
-%%           ok | exit() | {skip,Reason} | {comment,Comment} |
-%%           {save_config,Config1} | {skip_and_save,Reason,Config1}
+%% Dummy testcase verifying that the co_node is up and running.
+%% The real start is done in init_per_suite.
 %% @end
 %%--------------------------------------------------------------------
 start_of_co_node(_Config) -> 
@@ -285,86 +275,211 @@ start_of_co_node(_Config) ->
     timer:sleep(1000),
     ok.
 
+%%--------------------------------------------------------------------
+%% @spec start_of_co_app(Config) -> ok 
+%% @doc 
+%% Verifies start of an app connecting to the co_node.
+%% @end
+%%--------------------------------------------------------------------
 start_of_app(_Config) ->
-    {ok, _Pid} = co_ex_app:start(?SERIAL),
+    {ok, _Pid} = co_test_app:start(ct:get_config(serial)),
     timer:sleep(1000),
     ok.
 
+%%--------------------------------------------------------------------
+%% @spec stop_of_co_app(Config) -> ok 
+%% @doc 
+%% Verifies stop of an app connected to the co_node.
+%% @end
+%%--------------------------------------------------------------------
 stop_of_app(_Config) ->
-    ok = co_ex_app:stop(),
+    ok = co_test_app:stop(),
     ok.
 
+%%--------------------------------------------------------------------
+%% @spec set_atomic_segment(Config) -> ok 
+%% @doc 
+%% Sets a value using block between cocli and co_node and atomic 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
 set_atomic_segment(_Config) ->
-    set(?atomic, segment).
+    set(ct:get_config({dict, atomic}), segment).
 
+%%--------------------------------------------------------------------
+%% @spec set_atomic_block(Config) -> ok 
+%% @doc 
+%% Sets a value using segment between cocli and co_node and atomic 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
 set_atomic_block(_Config) ->
-    set(?atomic, block).
+    set(ct:get_config({dict, atomic}), block).
 
-
+%%--------------------------------------------------------------------
+%% @spec set_streamed_segment(Config) -> ok 
+%% @doc 
+%% Sets a value using segment between cocli and co_node and streamed 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
 set_streamed_segment(_Config) ->
-    set(?streamed, segment).
+    set(ct:get_config({dict, streamed}), segment).
 
+%%--------------------------------------------------------------------
+%% @spec set_streamed_block(Config) -> ok 
+%% @doc 
+%% Sets a value using block between cocli and co_node and streamed 
+%% atomic between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
 set_streamed_block(_Config) ->
-    set(?streamed, block).
+    set(ct:get_config({dict, streamed}), block).
 
-
-set({Index, NewValue}, BlockOrSegment) ->
-    %% Get old value
-    {Index, _Type, _Transfer, OldValue} = lists:keyfind(Index, 1, co_ex_app:dict()),
-							
-    %% Change to new
-    [] = os:cmd(set_cmd(Index, NewValue, BlockOrSegment)),
-    {Index, _Type, _Transfer, NewValue} = lists:keyfind(Index, 1, co_ex_app:dict()),
-    
-    %% Restore old
-    [] = os:cmd(set_cmd(Index, OldValue, BlockOrSegment)),
-    {Index, _Type, _Transfer, OldValue} = lists:keyfind(Index, 1, co_ex_app:dict()),
-
-    ok.
-
+%%--------------------------------------------------------------------
+%% @spec get_atomic_segment(Config) -> ok 
+%% @doc 
+%% Gets a value using block between cocli and co_node and atomic 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
 get_atomic_segment(_Config) ->
-    get(?atomic, segment).
+    get(ct:get_config({dict, atomic}), segment).
 
+%%--------------------------------------------------------------------
+%% @spec get_atomic_block(Config) -> ok 
+%% @doc 
+%% Gets a value using segment between cocli and co_node and atomic 
+%% atomic between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
 get_atomic_block(_Config) ->
-    get(?atomic, block).
+    get(ct:get_config({dict, atomic}), block).
 
 
+%%--------------------------------------------------------------------
+%% @spec get_streamed_segment(Config) -> ok 
+%% @doc 
+%% Gets a value using segment between cocli and co_node and streamed 
+%% atomic between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
 get_streamed_segment(_Config) ->
-    get(?streamed, segment).
+    get(ct:get_config({dict, streamed}), segment).
 
+%%--------------------------------------------------------------------
+%% @spec get_streamed_block(Config) -> ok 
+%% @doc 
+%% Gets a value using block between cocli and co_node and streamed 
+%% atomic between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
 get_streamed_block(_Config) ->
-    get(?streamed, block).
+    get(ct:get_config({dict, streamed}), block).
 
 
-get({Index, _NewValue}, BlockOrSegment) ->
+%%--------------------------------------------------------------------
+%% @spec set_atomic_m_segment(Config) -> ok 
+%% @doc 
+%% Sets a value using block between cocli and co_node and {atomic, Module} 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+set_atomic_m_segment(_Config) ->
+    set(ct:get_config({dict, atomic_m}), segment).
 
-    Result = os:cmd(get_cmd(Index, BlockOrSegment)),
+%%--------------------------------------------------------------------
+%% @spec set_atomic_m_block(Config) -> ok 
+%% @doc 
+%% Sets a value using segment between cocli and co_node and {atomic, Module} 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+set_atomic_m_block(_Config) ->
+    set(ct:get_config({dict, atomic_m}), block).
 
-    %% For now ....
-    case Result of
-	"0x6033 = 1701734733\n" -> ok;
-	"can_cli: error: FIXME: handle strings etc\n" -> ok
-    end,
+%%--------------------------------------------------------------------
+%% @spec set_streamed_m_segment(Config) -> ok 
+%% @doc 
+%% Sets a value using segment between cocli and co_node and {streamed, Module}
+%% atomic_m between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+set_streamed_m_segment(_Config) ->
+    set(ct:get_config({dict, streamed_m}), segment).
 
-    %% ct:pal("Result = ~p", [Result]),
+%%--------------------------------------------------------------------
+%% @spec set_streamed_m_block(Config) -> ok 
+%% @doc 
+%% Sets a value using block between cocli and co_node and {streamed, Module}
+%% atomic_m between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+set_streamed_m_block(_Config) ->
+    set(ct:get_config({dict, streamed_m}), block).
 
-    %% Get value from cocli and compare with dict
-    %% {Index, _Type, _Transfer, Value} = lists:keyfind(Index, 1, co_ex_app:dict()),
-    
-    ok.
+%%--------------------------------------------------------------------
+%% @spec get_atomic_m_segment(Config) -> ok 
+%% @doc 
+%% Gets a value using block between cocli and co_node and {atomic, Module} 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+get_atomic_m_segment(_Config) ->
+    get(ct:get_config({dict, atomic_m}), segment).
 
+%%--------------------------------------------------------------------
+%% @spec get_atomic_m_block(Config) -> ok 
+%% @doc 
+%% Gets a value using segment between cocli and co_node and {atomic, Module} 
+%% atomic_m between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+get_atomic_m_block(_Config) ->
+    get(ct:get_config({dict, atomic_m}), block).
+
+
+%%--------------------------------------------------------------------
+%% @spec get_streamed_m_segment(Config) -> ok 
+%% @doc 
+%% Gets a value using segment between cocli and co_node and {streamed, Module}
+%% atomic_m between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+get_streamed_m_segment(_Config) ->
+    get(ct:get_config({dict, streamed_m}), segment).
+
+%%--------------------------------------------------------------------
+%% @spec get_streamed_m_block(Config) -> ok 
+%% @doc 
+%% Gets a value using block between cocli and co_node and {streamed, Module} 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+get_streamed_m_block(_Config) ->
+    get(ct:get_config({dict, streamed_m}), block).
+
+
+%%--------------------------------------------------------------------
+%% @spec stream_app(Config) -> ok 
+%% @doc 
+%% Tests streaming of file cocli -> co_stream_app -> cocli 
+%% @end
+%%--------------------------------------------------------------------
 stream_app(_Config) ->
-    generate_file(?read_file),
+    generate_file(ct:get_config(read_file)),
 
-    Md5Res1 = os:cmd("md5 " ++ ?read_file),
+    Md5Res1 = os:cmd("md5 " ++ ct:get_config(read_file)),
     [_,_,_,Md5] = string:tokens(Md5Res1," "),
 
-    {ok, _Pid} = co_stream_app:start(?SERIAL, {?file_stream_index, 
-					       ?read_file, ?write_file}),
+    {ok, _Pid} = co_stream_app:start(ct:get_config(serial), 
+				     {ct:get_config(file_stream_index), 
+				      ct:get_config(read_file), 
+				      ct:get_config(write_file)}),
     ct:pal("Started stream app"),
     timer:sleep(1000),
 
-    [] = os:cmd(file_cmd(?file_stream_index, "download", block)),
+    [] = os:cmd(file_cmd(ct:get_config(file_stream_index), "download", block)),
     %% ct:pal("Started download of file from stream app, result = ~p",[Res1]),
     receive 
 	eof ->
@@ -375,7 +490,7 @@ stream_app(_Config) ->
 	    ct:fail("Application stuck")
     end,
 
-    [] = os:cmd(file_cmd(?file_stream_index, "upload", block)),
+    [] = os:cmd(file_cmd(ct:get_config(file_stream_index), "upload", block)),
     %% ct:pal("Started upload of file to stream app, result = ~p",[Res2]),
     receive 
 	eof ->
@@ -387,16 +502,79 @@ stream_app(_Config) ->
     end,
 
     %% Check that file is unchanged
-    Md5Res2 = os:cmd("md5 " ++ ?write_file),
+    Md5Res2 = os:cmd("md5 " ++ ct:get_config(write_file)),
     %% Doesn't work because of cocli error
     %% [_,_,_,Md5] = string:tokens(Md5Res2," "),
     
     ok.
 
+%%--------------------------------------------------------------------
+%% @spec break(Config) -> ok 
+%% @doc 
+%% Dummy test case to have a test environment running.
+%% Stores Config in ets table.
+%% @end
+%%--------------------------------------------------------------------
 break(Config) ->
     ets:new(config, [set, public, named_table]),
-    ets:insert(config, {c, Config}),
-    test_server:break("Break for test development"),
+    ets:insert(config, Config),
+    test_server:break("Break for test development\n" ++
+		     "Get Config by ets:tab2list(config)"),
+    ok.
+
+%%--------------------------------------------------------------------
+%% Help functions
+%%--------------------------------------------------------------------
+%%--------------------------------------------------------------------
+%% @spec get({Index, _NewValue}, BlockOrSegment -> ok 
+%% @doc 
+%% sets a value using BlockOrSegment between cocli and co_node.
+%% Transfer mode is defined by application based on index.
+%% Gets the old value using cocli and compares it with the value retrieved
+%% from the apps dictionary.
+%% Sets a new value and compares it.
+%% Restores the old calue.
+%% @end
+%%--------------------------------------------------------------------
+set({Index, _T, _M, _Org, NewValue}, BlockOrSegment) ->
+    %% Get old value
+    {Index, _Type, _Transfer, OldValue, _X} = lists:keyfind(Index, 1, co_test_app:dict()),
+							
+    %% Change to new
+    [] = os:cmd(set_cmd(Index, NewValue, BlockOrSegment)),
+    {Index, _Type, _Transfer, NewValue, _Y} = lists:keyfind(Index, 1, co_test_app:dict()),
+    
+    %% Restore old
+    [] = os:cmd(set_cmd(Index, OldValue, BlockOrSegment)),
+    {Index, _Type, _Transfer, OldValue, _X} = lists:keyfind(Index, 1, co_test_app:dict()),
+
+    ok.
+
+
+%%--------------------------------------------------------------------
+%% @spec get({Index, _NewValue}, BlockOrSegment -> ok 
+%% @doc 
+%% Gets a value using BlockOrSegment between cocli and co_node.
+%% Transfer mode is defined by application based on index.
+%% Gets the value using cocli and compares it with the value retrieved
+%% from the apps dictionary.
+%% @end
+%%--------------------------------------------------------------------
+get({Index, _T, _M, _Org, _NewValue}, BlockOrSegment) ->
+
+    Result = os:cmd(get_cmd(Index, BlockOrSegment)),
+
+    %% For now ....
+    case Result of
+	"0x6033 = 1701734733\n" -> ok;
+	"can_cli: error: FIXME: handle strings etc\n" -> ok
+    end,
+
+    ct:pal("Result = ~p", [Result]),
+
+    %% Get value from cocli and compare with dict
+    %% {Index, _Type, _Transfer, Value} = lists:keyfind(Index, 1, co_test_app:dict()),
+    
     ok.
 
 generate_file(File) ->
@@ -419,14 +597,27 @@ set_cmd(Index, Value, block) ->
 set_cmd(Index, Value, segment) ->
     set_cmd(Index, Value, "");
 set_cmd(Index, Value, BFlag) ->
-    ?cocli ++ BFlag ++ " -s " ++ ?co_target ++ " set " ++ 
+    Cmd = set_cmd1(Index, Value, BFlag),
+    ct:pal("Command = ~p",[Cmd]),
+    Cmd.
+
+set_cmd1(Index, Value, BFlag) ->
+    ct:get_config(cocli) ++ BFlag ++ " -s " ++ 
+	serial_as_c_string(ct:get_config(serial)) ++ " set " ++ 
 	index_as_c_string(Index) ++ " \"" ++ Value ++ "\"".
+
 get_cmd(Index, block) ->
     get_cmd(Index, " -b");
 get_cmd(Index, segment) ->
     get_cmd(Index, "");
 get_cmd(Index, BFlag) ->
-    ?cocli ++ BFlag ++ " -s " ++ ?co_target ++ " get " ++ 
+    Cmd = get_cmd1(Index, BFlag),
+    ct:pal("Command = ~p",[Cmd]),
+    Cmd.
+
+get_cmd1(Index, BFlag) ->
+    ct:get_config(cocli) ++ BFlag ++ " -s " ++ 
+	serial_as_c_string(ct:get_config(serial)) ++ " get " ++ 
 	index_as_c_string(Index).
 
 file_cmd(Index, Direction, block) ->
@@ -434,8 +625,9 @@ file_cmd(Index, Direction, block) ->
 file_cmd(Index, Direction, segment) ->
     file_cmd(Index, Direction, "");
 file_cmd(Index, Direction, BFlag) ->
-    ?cocli ++ BFlag ++ " -s " ++ ?co_target ++ " " ++ Direction ++ " " ++
-	index_as_c_string(Index) ++ " tmp_file".
+    ct:get_config(cocli) ++ BFlag ++ " -s " ++ 
+	serial_as_c_string(ct:get_config(serial)) ++ " " ++ 
+	Direction ++ " " ++ index_as_c_string(Index) ++ " tmp_file".
     
 index_as_c_string({Index, 0}) ->
     "0x" ++ integer_to_list(Index,16);
@@ -443,3 +635,16 @@ index_as_c_string({Index, SubInd}) ->
     "0x" ++ integer_to_list(Index,16) ++ ":" ++ integer_to_list(SubInd);
 index_as_c_string(Index) when is_integer(Index)->
     "0x" ++ integer_to_list(Index,16).
+
+serial_as_c_string(Serial) ->
+    S = integer_to_list(Serial,16),
+    S1 = string:substr(S, 1, length(S) - 2), 
+    case length(S1) of
+	3 -> "0x80000" ++ S1;
+	4 -> "0x8000" ++ S1;
+	5 -> "0x800" ++ S1;
+	6 -> "0x80" ++ S1
+    end.
+	     
+    
+    

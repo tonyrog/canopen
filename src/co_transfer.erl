@@ -106,8 +106,8 @@ app_write_begin(Index, SubInd, Pid, Mod) ->
 	{entry, Entry} ->
 	    if (Entry#app_entry.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
 		    MaxSize = co_codec:bytesize(Entry#app_entry.type),
-		    ?dbg("~p: app_write_begin: transfer=~p\n",
-			 [?MODULE, Entry#app_entry.transfer]),
+		    ?dbg("~p: app_write_begin: transfer=~p, type = ~p\n",
+			 [?MODULE, Entry#app_entry.transfer, Entry#app_entry.type]),
 		    app_transfer_begin(Entry#app_entry.transfer, 
 				       Pid, {Index, SubInd}, MaxSize, 
 				       Entry#app_entry.type);
@@ -231,7 +231,8 @@ stream_data(Handle, Data) ->
 write_block_segment(Handle, Seq, Data) when ?is_seq(Seq),
 					    byte_size(Data) =:= 7 ->
     Block = [{Seq,Data} | Handle#t_handle.block],
-    ?dbg("~p: write_block_segment: data = ~p\n", [?MODULE, Data]),
+    ?dbg("~p: write_block_segment: data = ~p, size = ~p\n", 
+	 [?MODULE, Data, Handle#t_handle.size]),
     {ok, Handle#t_handle { block = Block}, 7};
 write_block_segment(Handle, _Seq, _Data) ->
     abort_transfer(Handle),
@@ -488,7 +489,7 @@ app_read_begin(Index, SubInd, Pid, Mod) ->
 			    Ref = make_ref(),
 			    case Module:read_begin(Pid, {Index, SubInd}, Ref) of
 				{ok, Ref, Size} ->
-				    {ok, TH#t_handle {max_size=Size,
+				    {ok, TH#t_handle {max_size=Size, size=Size,
 						      mode={streamed, Module, Ref}},
 				     Size};
 				Other -> 
@@ -539,14 +540,21 @@ read_data_begin(Data, Index, SubInd, EndF) when is_binary(Data) ->
 %% |  {ok,Handle',Data}
 %%
 read(Handle, NBytes) ->
-    case Handle#t_handle.storage of 
-	Pid when is_pid(Pid) ->
-	    ?dbg("~p: read: Storage pid ~p, NBytes = ~p\n",
-		 [?MODULE, Handle#t_handle.storage, NBytes]);
-	_Dict ->
-	    ?dbg("~p: read: Storage dict ~p, NBytes = ~p\n",
-		 [?MODULE, Handle#t_handle.storage, NBytes])
-    end,
+    if is_integer(Handle#t_handle.size) andalso
+       Handle#t_handle.size > 0 andalso
+       Handle#t_handle.data =/= undefined ->
+       	    read_from_handle(Handle, NBytes);
+       true ->
+	    case streaming(Handle) of
+		true -> read_from_app(Handle, NBytes);
+		false -> read_from_handle(Handle, NBytes)
+	    end
+    end.
+
+
+read_from_handle(Handle, NBytes) ->
+    ?dbg("~p: read_from_handle: NBytes = ~p, size = ~p, maxsize  = ~p, data = ~p\n", 
+	 [?MODULE, NBytes, Handle#t_handle.size, Handle#t_handle.max_size, Handle#t_handle.data]),
     if NBytes =< Handle#t_handle.size ->
 	    <<Data:NBytes/binary, NewData/binary>> = Handle#t_handle.data,
 	    NewSize = Handle#t_handle.size - NBytes,
@@ -563,6 +571,8 @@ read(Handle, NBytes) ->
 		           
 
 read_from_app(Handle, NBytes) ->
+    ?dbg("~p: read_from_app: NBytes = ~p, Mode = ~p\n", 
+	 [?MODULE, NBytes, Handle#t_handle.mode]),
     case Handle#t_handle.mode of
 	{streamed, Ref} ->
 	    app_call(Handle#t_handle.storage, {read, NBytes, Ref});
@@ -573,12 +583,11 @@ read_from_app(Handle, NBytes) ->
 		    NewSize = case Handle#t_handle.size of
 				  OldSize when is_integer(OldSize) -> 
 				      OldSize - Size;
-				  unknown -> 
-				      unknown
+				  unknown -> unknown
 			      end,
 		    ?dbg("~p: read_from_app: data = ~p size = ~p, rem size = ~p\n", 
 			 [?MODULE, Data, Size, NewSize]),
-		    {ok, Handle#t_handle { size = NewSize , data = Data}};
+		    {ok, Handle#t_handle { size = NewSize , data = Data}, Data};
 		Other ->
 		    Other
 	    end;

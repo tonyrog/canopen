@@ -413,33 +413,19 @@ s_segmented_upload(M, S) when is_record(M, can_frame) ->
 	?ma_ccs_upload_segment_request(T) when T =/= S#co_session.t ->
 	    abort(S, ?abort_toggle_not_alternated);
 	?ma_ccs_upload_segment_request(T) ->
-	    case S#co_session.streamed of
-		true ->
-		    case co_transfer:read_from_app(S#co_session.th,7) of
-			{ok, Mref} ->
-			    %% Called an application
-			    ?dbg("~p: s_segmented_upload: mref=~p\n", 
-				 [?MODULE, Mref]),
-			    S1 = S#co_session {mref = Mref},
-			    {next_state, s_reading_segment, S1, ?TMO(S1)};
-			{error,Reason} ->
-			    abort(S,Reason)
-		    end;
-		_NotStreamed ->
-		    case co_transfer:read(S#co_session.th,7) of
-			{ok,TH1,Data} ->
-			    ?dbg("~p: s_segmented_upload: data=~p\n", 
-				 [?MODULE, Data]),
-			    upload_segment(S#co_session {t = T}, TH1, Data);
-			{ok, Mref} ->
-			    %% Called an application
-			    ?dbg("~p: s_segmented_upload: mref=~p\n", 
-				 [?MODULE, Mref]),
-			    S1 = S#co_session {mref = Mref},
-			    {next_state, s_reading_segment, S1, ?TMO(S1)};
-			{error,Reason} ->
-			    abort(S,Reason)
-		    end
+	    case co_transfer:read(S#co_session.th,7) of
+		{ok,TH1,Data} ->
+		    ?dbg("~p: s_segmented_upload: data=~p\n", 
+			 [?MODULE, Data]),
+		    upload_segment(S#co_session {t = T}, TH1, Data);
+		{ok, Mref} ->
+		    %% Called an application
+		    ?dbg("~p: s_segmented_upload: mref=~p\n", 
+			 [?MODULE, Mref]),
+		    S1 = S#co_session {mref = Mref},
+		    {next_state, s_reading_segment, S1, ?TMO(S1)};
+		{error,Reason} ->
+		    abort(S,Reason)
 	    end;
 	_ ->
 	    l_abort(M, S, s_segmented_upload)
@@ -483,7 +469,7 @@ s_reading_segment_started({Mref, Reply} = M, S)  ->
 	    erlang:demonitor(Mref, [flush]),
 	    S1 = S#co_session {streamed = true},
 	    TH = co_transfer:write_max_size(S1#co_session.th, Size),
-	    case co_transfer:read_from_app(TH, 7) of
+	    case co_transfer:read(TH, 7) of
 		{ok, NewMref} ->
 		    %% Called an application
 		    ?dbg("~p: s_reading_segment_started: mref=~p\n", 
@@ -537,7 +523,11 @@ s_reading_segment({Mref, Reply} = M, S)  ->
 	    upload_segment(S, TH, Data);
 	_Other ->
 	    l_abort(M, S, s_reading_segment)
-    end.
+    end;
+s_reading_segment(M, S)  ->
+    ?dbg("~p: s_reading_segment: Got event = ~p, aborting\n", [?MODULE, M]),
+    demonitor_and_abort(M, S).
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -582,7 +572,7 @@ s_block_upload_start(timeout, S) ->
     abort(S, ?abort_timed_out).
 
 read_block(S) ->
-    ?dbg("~p: read_block: \n", [?MODULE]),
+    ?dbg("~p: read_block: size = ~p\n", [?MODULE, 7 * S#co_session.blksize]),
     case co_transfer:read_block(S#co_session.th, 7 * S#co_session.blksize) of
 	{error,Reason} ->
 	    abort(S,Reason);
