@@ -444,6 +444,20 @@ code_change(_OldVsn, LoopData, _Extra) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+get_entry(_Pid, {Index, 255}) ->
+    ?dbg("~p: get_entry type ~.16B \n",[?MODULE, Index]),
+    Dict = [Entry || {_Name, Entry} <-  ct:get_config(dict)],
+    case lists:keyfind({Index, 0}, 1, Dict) of
+	{{Index, _SubInd}, Type, Transfer, _OValue, _NValue} ->
+	    Value = (type(Type) bsl 8) bor ?OBJECT_VAR, %% VAR/ARRAY .. fixme
+	    Entry = #app_entry{index = Index,
+			       type = ?UNSIGNED32,
+			       access = ?ACCESS_RO,
+			       transfer = {value,Value}},
+	    {entry,Entry};
+	false ->
+	    {error, ?ABORT_NO_SUCH_OBJECT}
+    end;
 get_entry(_Pid, {Index, SubInd}) ->
     ?dbg("~p: get_entry ~.16B:~.8B \n",[?MODULE, Index, SubInd]),
     Dict = [Entry || {_Name, Entry} <-  ct:get_config(dict)],

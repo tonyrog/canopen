@@ -437,6 +437,7 @@ upload_segment(S, TH, Data) ->
     T1 = 1-S#co_session.t,
     Remain = co_transfer:data_size(TH),
     N = 7-size(Data),
+    %% erlang:display({T1,Remain,N,Data}),
     if Remain =:= 0 ->
 	    Data1 = co_sdo:pad(Data,7),
 	    R = ?mk_scs_upload_segment_response(S#co_session.t,N,1,Data1),
@@ -519,8 +520,13 @@ s_reading_segment({Mref, Reply} = M, S)  ->
 	    erlang:demonitor(Mref, [flush]),
 	    ?dbg("~p: s_reading_segment: data = ~p, size = ~p\n", 
 		 [?MODULE, Data, size(Data)]),
-	    TH = co_transfer:add_data(S#co_session.th, Ref, Data),
-	    upload_segment(S, TH, Data);
+	    case Data of
+		<<First:7/binary, Then/binary>> ->
+		    TH = co_transfer:add_data(S#co_session.th, Then),
+		    upload_segment(S, TH, First);
+		_ ->
+		    upload_segment(S, S#co_session.th, Data)
+	    end;
 	_Other ->
 	    l_abort(M, S, s_reading_segment)
     end;

@@ -211,7 +211,8 @@ init_per_testcase(Case, Config) when Case == set_atomic_segment;
 				     Case == get_atomic_m_segment;
 				     Case == get_atomic_m_block;
 				     Case == get_streamed_m_segment;
-				     Case == get_streamed_m_block ->
+				     Case == get_streamed_m_block;
+				     Case == break ->
     ct:pal("Testcase: ~p", [Case]),
     {ok, _Pid} = co_test_app:start(ct:get_config(serial)),
     Config;
@@ -567,7 +568,9 @@ get({Index, _T, _M, _Org, _NewValue}, BlockOrSegment) ->
     %% For now ....
     case Result of
 	"0x6033 = 1701734733\n" -> ok;
-	"can_cli: error: FIXME: handle strings etc\n" -> ok
+	"0x6034 = \"Long string\"\n" -> ok;
+	"0x6035 = \"Mine2\"\n" -> ok;
+	"0x6036 = \"Long string2\"\n" -> ok
     end,
 
     ct:pal("Result = ~p", [Result]),

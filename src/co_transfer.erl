@@ -76,8 +76,8 @@ write_begin(Ctx, Index, SubInd) ->
 	{dead, _Mod} ->
 	    ?dbg("~p: write_begin: Reserver process dead.\n", [?MODULE]),
 	    {error, ?abort_internal_error}; %% ???
-	Other ->
-	    ?dbg("~p: write_begin: Other case = ~p\n", [?MODULE,Other]),
+	_Other ->
+	    ?dbg("~p: write_begin: Other case = ~p\n", [?MODULE,_Other]),
 	    {error, ?abort_internal_error}
     end.
 
@@ -126,8 +126,8 @@ app_transfer_begin(streamed, Pid, {Index, SubInd}, MaxSize, Type) ->
 	Other -> 
 	    Other
     end;
-app_transfer_begin({streamed, Module}=T, Pid, {Index, SubInd}, MaxSize, Type) ->
-    ?dbg("~p: app_write_begin: Transfer mode = ~p\n", [?MODULE, T]),    
+app_transfer_begin(_T={streamed, Module},Pid,{Index, SubInd}, MaxSize, Type) ->
+    ?dbg("~p: app_write_begin: Transfer mode = ~p\n", [?MODULE, _T]),    
     Ref = make_ref(),
     case Module:write_begin(Pid, {Index, SubInd}, Ref) of
 	ok -> 
@@ -328,9 +328,9 @@ write_block_end_atomic(Ctx,Handle,N,CRC,CheckCrc) ->
 	    abort_transfer(Handle1),
 	    {error, ?abort_data_length_too_high};
        CheckCrc ->
-	    Data = Handle1#t_handle.data,
+	    _Data = Handle1#t_handle.data,
 	    ?dbg("~p: write_block_end: data0=~p, size=~w, data=~p\n", 
-		 [?MODULE, Handle#t_handle.data, size(Data), Data]),
+		 [?MODULE, Handle#t_handle.data, size(_Data), _Data]),
 	    
 	    case co_crc:checksum(Handle1#t_handle.data) of
 		CRC ->
@@ -438,8 +438,8 @@ read_begin(Ctx, Index, SubInd) ->
 	{dead, _Mod} ->
 	    ?dbg("~p: read_begin: Reserver process dead.\n", [?MODULE]),
 	    {error, ?abort_internal_error}; %% ???
-	Other ->
-	    ?dbg("~p: read_begin: Other case = ~p\n", [?MODULE,Other]),
+	_Other ->
+	    ?dbg("~p: read_begin: Other case = ~p\n", [?MODULE,_Other]),
 	    {error, ?abort_internal_error}
     end.
 
@@ -513,12 +513,21 @@ app_read_begin(Index, SubInd, Pid, Mod) ->
 				     MaxSize};
 				Other ->
 				    Other
-			    end
+			    end;
+			{value,Value} ->
+			    Data = co_codec:encode(Value, Entry#app_entry.type),
+			    MaxSize = byte_size(Data),
+			    {ok, TH#t_handle {data=Data, size=MaxSize,
+					      max_size=MaxSize,
+					      mode=atomic},
+			     MaxSize}
 		    end;
 
 	       true ->
 		    {entry, ?abort_read_not_allowed}
-	    end
+	    end;
+	Error ->
+	    Error
     end.
 	
 %% 
@@ -591,9 +600,9 @@ read_from_app(Handle, NBytes) ->
 		Other ->
 		    Other
 	    end;
-	OtherMode -> 
+	_OtherMode -> 
 	    ?dbg("~p: read_from_app: mode = ~p should not be possible\n",
-		 [?MODULE, OtherMode]),
+		 [?MODULE, _OtherMode]),
 	    {error, ?abort_internal_error}
     end.
 
@@ -617,9 +626,9 @@ read_block(Handle, NBytes) ->
 		Other ->
 		    Other
 			end;
-	OtherMode -> 
+	_OtherMode -> 
 	    ?dbg("~p: read_block: mode = ~p should not be possible\n",
-		 [?MODULE, OtherMode]),
+		 [?MODULE, _OtherMode]),
 	    {error, ?abort_internal_error}
     end.
 

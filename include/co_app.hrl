@@ -223,6 +223,7 @@
 
 
 %% Application get_entry return data
+%% transfer: streamed, {streamed,Mod}, atomic, {atomic,Mod}, {value,Value}
 -record(app_entry,
 	{
 	  index,
