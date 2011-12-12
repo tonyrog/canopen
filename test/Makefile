@@ -37,7 +37,7 @@ clean:
 	rm -f $(OBJS) 
 
 test:
-	$(ERLDIR)/bin/ct_run -include ../include -config canopen.cfg -suite co_node_SUITE
+	$(ERLDIR)/bin/ct_run -include ../include -config co_test.cfg -suite co_node_SUITE
 
 -include depend.mk
 

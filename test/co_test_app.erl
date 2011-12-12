@@ -22,7 +22,7 @@
 -compile(export_all).
 
 %% API
--export([start/1, stop/0]).
+-export([start/2, stop/0]).
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
@@ -67,9 +67,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start(CoSerial) ->
-    CoSerial = ct:get_config(serial),
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [CoSerial], []).
+start(CoSerial, Dict) ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [CoSerial, Dict], []).
 
 %%--------------------------------------------------------------------
 %% @spec stop() -> ok | {error, Error}
@@ -133,27 +132,29 @@ abort(Pid, Ref) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-init([CoSerial]) ->
-    Dict = ets:new(my_dict, [public, ordered_set]),
+init([CoSerial, Dict]) ->
+    DictTable = ets:new(test_dict, [public, named_table, ordered_set]),
+    NameTable = ets:new(name_to_index, [private, named_table, ordered_set]),
     {ok, _NodeId} = co_node:attach(CoSerial),
-    load_dict(CoSerial, Dict),
-    {ok, #loop_data {state=init, co_node = CoSerial, dict=Dict}}.
+    load_dict(CoSerial, Dict, DictTable, NameTable),
+    {ok, #loop_data {state=init, co_node = CoSerial, dict=DictTable}}.
 
-load_dict(CoSerial, Dict) ->
-    {{Notify, _Si}, _T1, _M1, _OV1, _NV1} = ct:get_config({dict, notify}),
-    {{Mpdo, _Si}, _T2, _M2, _OV2, _NV2} = ct:get_config({dict, mpdo}),
-    lists:foreach(fun({_Name, 
-		       {{Index, _SubInd}, _Type, _Mode, _OldValue, _NewValue} = Entry}) ->
-			  ets:insert(Dict, Entry),
-			  case Index of
-			      Notify ->			      
+load_dict(CoSerial, Dict, DictTable, NameTable) ->
+    ?dbg("Dict ~p", [Dict]),
+    lists:foreach(fun({Name, 
+		       {{Index, _SubInd}, _Type, _Mode, _Value} = Entry}) ->
+			  ets:insert(DictTable, Entry),
+			  ?dbg("Inserting entry = ~p", [Entry]),
+			  ets:insert(NameTable, {Name, Index}),
+			  case Name of
+			      notify ->			      
 				  co_node:subscribe(CoSerial, Index);
-			      Mpdo ->			      
+			      mpdo ->			      
 				  co_node:subscribe(CoSerial, Index);
 			      _Other ->
 				  co_node:reserve(CoSerial, Index, ?MODULE)
 			  end
-		  end, ct:get_config(dict)).
+		  end, Dict).
 
 %%--------------------------------------------------------------------
 %% @spec handle_call(Request, From, LoopData) ->
@@ -186,9 +187,9 @@ load_dict(CoSerial, Dict) ->
 handle_call({get, {Index, SubInd}}, _From, LoopData) ->
     ?dbg("~p: handle_call: get ~.16B:~.8B \n",[?MODULE, Index, SubInd]),
 
-    {{TimeOut, _Si}, _T2, _M2, _OV2, _NV2} = ct:get_config({dict, timeout}),
+    [{timeout, I}] = ets:lookup(name_to_index, timeout),
     case Index of
-	TimeOut ->
+	I ->
 	    %% To test timeout
 	    ?dbg("~p: handle_call: sleeping for 2 secs\n", [?MODULE]), 
 	    timer:sleep(2000);
@@ -199,16 +200,16 @@ handle_call({get, {Index, SubInd}}, _From, LoopData) ->
     case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
 	[] ->
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{{Index, SubInd}, _Type, _Transfer, Value, _X}] ->
+	[{{Index, SubInd}, _Type, _Transfer, Value}] ->
 	    {reply, {ok, Value}, LoopData}
     end;
 handle_call({set, {Index, SubInd}, NewValue}, _From, LoopData) ->
      ?dbg("~p: handle_call: set ~.16B:~.8B to ~p\n",
 	 [?MODULE, Index, SubInd, NewValue]),
 
-    {{TimeOut, _Si}, _T2, _M2, _OV2, _NV2} = ct:get_config({dict, timeout}),
+    [{timeout, I}] = ets:lookup(name_to_index, timeout),
     case Index of
-	TimeOut ->
+	I ->
 	    %% To test timeout
 	    ?dbg("~p: handle_call: sleeping for 2 secs\n", [?MODULE]), 
 	    timer:sleep(2000);
@@ -225,7 +226,7 @@ handle_call({write_begin, {Index, SubInd} = I, Ref}, _From, LoopData) ->
 	    ?dbg("~p: handle_call: write_begin error = ~.16B\n", 
 		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{I, Type, _Transfer, _OldValue, _NValue}] ->
+	[{I, Type, _Transfer, _OldValue}] ->
 	    Store = #store {ref = Ref, index = I, type = Type},
 	    {reply, ok, LoopData#loop_data {store = Store}}
     end;
@@ -255,7 +256,7 @@ handle_call({read_begin, {16#6037 = Index, SubInd} = I, Ref}, _From, LoopData) -
 	    ?dbg("~p: handle_call: read_begin error = ~.16B\n", 
 		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{I, Type, _Transfer, Value, _}] ->
+	[{I, Type, _Transfer, Value}] ->
 	    Data = co_codec:encode(Value, type(Type)),
 	    Store = #store {ref = Ref, index = I, type = Type, data = Data},
 	    {reply, {ok, Ref, unknown}, LoopData#loop_data {store = Store}}
@@ -268,7 +269,7 @@ handle_call({read_begin, {Index, SubInd} = I, Ref}, _From, LoopData) ->
 	    ?dbg("~p: handle_call: read_begin error = ~.16B\n", 
 		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{I, Type, _Transfer, Value, _}] ->
+	[{I, Type, _Transfer, Value}] ->
 	    Data = co_codec:encode(Value, type(Type)),
 	    Size = size(Data),
 	    Store = #store {ref = Ref, index = I, type = Type, data = Data},
@@ -305,10 +306,9 @@ handle_call(stop, _From, LoopData) ->
 	    do_nothing; %% Not possible to detach and unsubscribe
 	_Pid ->
 	    lists:foreach(
-	      fun({_Name, 
-		   {{Index, _SubInd}, _Type, _Transfer, _Value, _X}}) ->
+	      fun({{Index, _SubInd}, _Type, _Transfer, _Value}) ->
 		      co_node:unsubscribe(LoopData#loop_data.co_node, Index)
-	      end, ct:get_config(dict)),
+	      end, ets:tab2list(test_dict)),
 	    ?dbg("~p: stop: unsubscribed.\n",[?MODULE]),
 	    co_node:detach(LoopData#loop_data.co_node)
     end,
@@ -324,12 +324,12 @@ handle_set(LoopData, I, NewValue) ->
 	    ?dbg("~p: handle_set: set error = ~.16B\n", 
 		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{I, _Type, _Transfer, NewValue, _}] ->
+	[{I, _Type, _Transfer, NewValue}] ->
 	    %% No change
 	    ?dbg("~p: handle_set: set no change\n", [?MODULE]),
 	    {reply, ok, LoopData};
-	[{{Index, SubInd}, Type, Transfer, _OldValue, X}] ->
-	    ets:insert(LoopData#loop_data.dict, {I, Type, Transfer, NewValue, X}),
+	[{{Index, SubInd}, Type, Transfer, _OldValue}] ->
+	    ets:insert(LoopData#loop_data.dict, {I, Type, Transfer, NewValue}),
 	    ?dbg("~p: handle_set: set ~.16B:~.8B updated to ~p\n",[?MODULE, Index, SubInd, NewValue]),
 	    {reply, ok, LoopData}
     end.
@@ -351,9 +351,9 @@ handle_cast({set, {Index, SubInd} = I, NewValue}, LoopData) ->
     case ets:lookup(LoopData#loop_data.dict, I) of
 	[] ->
 	    ?dbg("~p: set error = ~.16B\n", [?MODULE, ?ABORT_NO_SUCH_OBJECT]);
-	[{I, _Type, _Transfer, NewValue, _X}] ->
+	[{I, _Type, _Transfer, NewValue}] ->
 	    ok; %% No change
-	[{I, Type, _Transfer, _OldValue, _X}] ->
+	[{I, Type, _Transfer, _OldValue}] ->
 	    ets:insert(LoopData#loop_data.dict, {I, Type, NewValue})
     end,
     {noreply, LoopData};
@@ -446,29 +446,27 @@ code_change(_OldVsn, LoopData, _Extra) ->
 %%--------------------------------------------------------------------
 get_entry(_Pid, {Index, 255}) ->
     ?dbg("~p: get_entry type ~.16B \n",[?MODULE, Index]),
-    Dict = [Entry || {_Name, Entry} <-  ct:get_config(dict)],
-    case lists:keyfind({Index, 0}, 1, Dict) of
-	{{Index, _SubInd}, Type, Transfer, _OValue, _NValue} ->
+    case ets:lookup(test_dict, {Index, 0}) of
+	[{{Index, _SubInd}, Type, _Transfer}] ->
 	    Value = (type(Type) bsl 8) bor ?OBJECT_VAR, %% VAR/ARRAY .. fixme
 	    Entry = #app_entry{index = Index,
 			       type = ?UNSIGNED32,
 			       access = ?ACCESS_RO,
-			       transfer = {value,Value}},
+			       transfer = {value, Value}},
 	    {entry,Entry};
-	false ->
+	[] ->
 	    {error, ?ABORT_NO_SUCH_OBJECT}
     end;
 get_entry(_Pid, {Index, SubInd}) ->
     ?dbg("~p: get_entry ~.16B:~.8B \n",[?MODULE, Index, SubInd]),
-    Dict = [Entry || {_Name, Entry} <-  ct:get_config(dict)],
-    case lists:keyfind({Index, SubInd}, 1, Dict) of
-	{{Index, SubInd}, Type, Transfer, _OValue, _NValue} ->
+    case ets:lookup(test_dict, {Index, SubInd}) of
+	[{{Index, SubInd}, Type, Transfer, _Value}] ->
 	    Entry = #app_entry{index = Index,
 			       type = type(Type),
 			       access = ?ACCESS_RW,
 			       transfer = Transfer},
 	    {entry, Entry};
-	false ->
+	[] ->
 	    {error, ?ABORT_NO_SUCH_OBJECT}
     end;
 get_entry(Pid, Index) ->
