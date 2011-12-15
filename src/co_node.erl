@@ -79,18 +79,6 @@
 %%====================================================================
 
 %%--------------------------------------------------------------------
-%% @spec start_links(Args) -> {ok,Pid} | ignore | {error,Error}
-%%
-%%   Args = [{serial, Serial}, {options, Opts}]
-%%   Opts = {vendor, VendorID} |
-%%          extended |                  
-%%          {time_stamp,  timeout()} |  
-%%          {sdo_timeout, timeout()} |  
-%%          {blk_timeout, timeout()} |  
-%%          {pst, integer()} |          
-%%          {max_blksize, integer()} |  
-%%          {use_crc, boolean()}        
-%%
 %% @doc
 %% Description: Starts the server.
 %%
@@ -105,6 +93,19 @@
 %%         
 %% @end
 %%--------------------------------------------------------------------
+-type option_type() :: {vendor, integer()} | 
+		       extended |
+		       {time_stamp,  timeout()} |  
+		       {sdo_timeout, timeout()} |  
+		       {blk_timeout, timeout()} |  
+		       {pst, integer()} |          
+		       {max_blksize, integer()} |  
+		       {use_crc, boolean()}.
+
+-type arg_type() :: {serial, Serial::integer()} | {options, Opts::list(option_type)}.
+
+-spec start_link(list(argtype)) -> {ok, Pid::pid()} | ignore | {error, Error::atom()}.
+
 start_link(Args) ->
     ?dbg("~p: start_link: Args = ~p\n", [?MODULE, Args]),
         
@@ -1005,6 +1006,22 @@ terminate(_Reason, Ctx) ->
 	      end
       end,
       subscribers(Ctx#co_ctx.sub_table)),
+
+    %% Stop all reservers?? or inform them ??
+    lists:foreach(
+      fun(Pid) -> 
+	      case Pid of
+		  Self -> 
+		      do_nothing;
+		  _NotSelf ->
+		      ?dbg("~s: terminate: Killing application with pid = ~p\n", 
+			   [Ctx#co_ctx.name, Pid]),
+		      %% Or gen_server:cast(Pid, co_node_terminated) ??	 
+		      exit(Pid, co_node_terminated)
+
+	      end
+      end,
+      reservers(Ctx#co_ctx.res_table)),
 
     %% Stop all tpdo-servers ??
     lists:foreach(

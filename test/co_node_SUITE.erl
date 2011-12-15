@@ -60,21 +60,17 @@ all() ->
     [start_of_co_node,
      start_stop_app,
      set_atomic_segment,
-     set_atomic_block,
-     set_streamed_segment,
-     set_streamed_block,
      get_atomic_segment,
+     set_atomic_block,
      get_atomic_block,
+     set_atomic_exp,
+     get_atomic_exp,
+     set_streamed_segment,
      get_streamed_segment,
+     set_streamed_block,
      get_streamed_block,
-     set_atomic_m_segment,
-     set_atomic_m_block,
-     set_streamed_m_segment,
-     set_streamed_m_block,
-     get_atomic_m_segment,
-     get_atomic_m_block,
-     get_streamed_m_segment,
-     get_streamed_m_block,
+     set_streamed_exp,
+     get_streamed_exp,
      stream_app].
 %%     break].
 
@@ -196,20 +192,24 @@ end_per_group(_GroupName, _Config) ->
 %% @end
 %%--------------------------------------------------------------------
 init_per_testcase(Case, Config) when Case == set_atomic_segment;
-				     Case == set_atomic_block;
-				     Case == set_streamed_segment;
-				     Case == set_streamed_block;
 				     Case == get_atomic_segment;
+				     Case == set_atomic_block;
 				     Case == get_atomic_block;
+				     Case == set_atomic_exp;
+				     Case == get_atomic_exp;
+				     Case == set_streamed_segment;
 				     Case == get_streamed_segment;
-				     Case == get_streamed_block ;
+				     Case == set_streamed_block;
+				     Case == get_streamed_block;
+				     Case == set_streamed_exp;
+				     Case == get_streamed_exp;
 				     Case == set_atomic_m_segment;
-				     Case == set_atomic_m_block;
-				     Case == set_streamed_m_segment;
-				     Case == set_streamed_m_block;
 				     Case == get_atomic_m_segment;
+				     Case == set_atomic_m_block;
 				     Case == get_atomic_m_block;
+				     Case == set_streamed_m_segment;
 				     Case == get_streamed_m_segment;
+				     Case == set_streamed_m_block;
 				     Case == get_streamed_m_block;
 				     Case == break ->
     ct:pal("Testcase: ~p", [Case]),
@@ -234,32 +234,44 @@ init_per_testcase(_TestCase, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_testcase(start_stop_app, _Config) ->
-    %% Should w test if it is up?
-    co_test_app:stop();
+    case whereis(co_test_app) of
+	undefined  -> do_nothing;
+	_Pid -> co_test_app:stop()
+    end,
+    ok;
 end_per_testcase(Case, _Config) when Case == set_atomic_segment;
-				     Case == set_atomic_block;
-				     Case == set_streamed_segment;
-				     Case == set_streamed_block;
 				     Case == get_atomic_segment;
+				     Case == set_atomic_block;
 				     Case == get_atomic_block;
+				     Case == set_atomic_exp;
+				     Case == get_atomic_exp;
+				     Case == set_streamed_segment;
 				     Case == get_streamed_segment;
-				     Case == get_streamed_block ;
+				     Case == set_streamed_block;
+				     Case == get_streamed_block;
+				     Case == set_streamed_exp;
+				     Case == get_streamed_exp;
 				     Case == set_atomic_m_segment;
-				     Case == set_atomic_m_block;
-				     Case == set_streamed_m_segment;
-				     Case == set_streamed_m_block;
 				     Case == get_atomic_m_segment;
+				     Case == set_atomic_m_block;
 				     Case == get_atomic_m_block;
+				     Case == set_streamed_m_segment;
 				     Case == get_streamed_m_segment;
+				     Case == set_streamed_m_block;
 				     Case == get_streamed_m_block;
 				     Case == break ->
     %% Wait a little for session to terminate
-    timer:sleep(200),
-    ok = co_test_app:stop(),
+    timer:sleep(1000),
+    case whereis(co_test_app) of
+	undefined  -> do_nothing;
+	_Pid -> co_test_app:stop()
+    end,
     ok;
 end_per_testcase(stream_app, _Config) ->
-    ok = co_stream_app:stop(),
-    ct:pal("Stopped stream app"),
+    case whereis(co_stream_app) of
+	undefined  -> do_nothing;
+	_Pid -> co_stream_app:stop()
+    end,
     ok;
 end_per_testcase(_TestCase, _Config) ->
     ok.
@@ -307,14 +319,56 @@ set_atomic_segment(Config) ->
     set(Config, ct:get_config({dict, atomic}), segment).
 
 %%--------------------------------------------------------------------
+%% @spec get_atomic_segment(Config) -> ok 
+%% @doc 
+%% Gets a value using block between cocli and co_node and atomic 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+get_atomic_segment(Config) ->
+    get(Config, ct:get_config({dict, atomic}), segment).
+
+%%--------------------------------------------------------------------
 %% @spec set_atomic_block(Config) -> ok 
 %% @doc 
-%% Sets a value using segment between cocli and co_node and atomic 
+%% Sets a value using block between cocli and co_node and atomic 
 %% between co_node and application.
 %% @end
 %%--------------------------------------------------------------------
 set_atomic_block(Config) ->
     set(Config, ct:get_config({dict, atomic}), block).
+
+%%--------------------------------------------------------------------
+%% @spec get_atomic_block(Config) -> ok 
+%% @doc 
+%% Gets a value using block between cocli and co_node and atomic 
+%% atomic between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+get_atomic_block(Config) ->
+    get(Config, ct:get_config({dict, atomic}), block).
+
+
+%%--------------------------------------------------------------------
+%% @spec set_atomic_exp(Config) -> ok 
+%% @doc 
+%% Sets a short value using segment between cocli and co_node and atomic 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+set_atomic_exp(Config) ->
+    set(Config, ct:get_config({dict, atomic_exp}), segment).
+
+%%--------------------------------------------------------------------
+%% @spec get_atomic_exp(Config) -> ok 
+%% @doc 
+%% Gets a short value using segment between cocli and co_node and atomic 
+%% atomic between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+get_atomic_exp(Config) ->
+    get(Config, ct:get_config({dict, atomic_exp}), segment).
+
 
 %%--------------------------------------------------------------------
 %% @spec set_streamed_segment(Config) -> ok 
@@ -327,37 +381,6 @@ set_streamed_segment(Config) ->
     set(Config, ct:get_config({dict, streamed}), segment).
 
 %%--------------------------------------------------------------------
-%% @spec set_streamed_block(Config) -> ok 
-%% @doc 
-%% Sets a value using block between cocli and co_node and streamed 
-%% atomic between co_node and application.
-%% @end
-%%--------------------------------------------------------------------
-set_streamed_block(Config) ->
-    set(Config, ct:get_config({dict, streamed}), block).
-
-%%--------------------------------------------------------------------
-%% @spec get_atomic_segment(Config) -> ok 
-%% @doc 
-%% Gets a value using block between cocli and co_node and atomic 
-%% between co_node and application.
-%% @end
-%%--------------------------------------------------------------------
-get_atomic_segment(Config) ->
-    get(Config, ct:get_config({dict, atomic}), segment).
-
-%%--------------------------------------------------------------------
-%% @spec get_atomic_block(Config) -> ok 
-%% @doc 
-%% Gets a value using segment between cocli and co_node and atomic 
-%% atomic between co_node and application.
-%% @end
-%%--------------------------------------------------------------------
-get_atomic_block(Config) ->
-    get(Config, ct:get_config({dict, atomic}), block).
-
-
-%%--------------------------------------------------------------------
 %% @spec get_streamed_segment(Config) -> ok 
 %% @doc 
 %% Gets a value using segment between cocli and co_node and streamed 
@@ -366,6 +389,16 @@ get_atomic_block(Config) ->
 %%--------------------------------------------------------------------
 get_streamed_segment(Config) ->
     get(Config, ct:get_config({dict, streamed}), segment).
+
+%%--------------------------------------------------------------------
+%% @spec set_streamed_block(Config) -> ok 
+%% @doc 
+%% Sets a value using block between cocli and co_node and streamed 
+%% atomic between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+set_streamed_block(Config) ->
+    set(Config, ct:get_config({dict, streamed}), block).
 
 %%--------------------------------------------------------------------
 %% @spec get_streamed_block(Config) -> ok 
@@ -377,16 +410,45 @@ get_streamed_segment(Config) ->
 get_streamed_block(Config) ->
     get(Config, ct:get_config({dict, streamed}), block).
 
+%%--------------------------------------------------------------------
+%% @spec set_streamed_exp(Config) -> ok 
+%% @doc 
+%% Sets a short value using segment between cocli and co_node and streamed 
+%% atomic between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+set_streamed_exp(Config) ->
+    set(Config, ct:get_config({dict, streamed_exp}), segment).
+
+%%--------------------------------------------------------------------
+%% @spec get_streamed_exp(Config) -> ok 
+%% @doc 
+%% Gets a short value using segment between cocli and co_node and streamed 
+%% atomic between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+get_streamed_exp(Config) ->
+    get(Config, ct:get_config({dict, streamed_exp}), segment).
 
 %%--------------------------------------------------------------------
 %% @spec set_atomic_m_segment(Config) -> ok 
 %% @doc 
-%% Sets a value using block between cocli and co_node and {atomic, Module} 
+%% Sets a value using segment between cocli and co_node and {atomic, Module} 
 %% between co_node and application.
 %% @end
 %%--------------------------------------------------------------------
 set_atomic_m_segment(Config) ->
     set(Config, ct:get_config({dict, atomic_m}), segment).
+
+%%--------------------------------------------------------------------
+%% @spec get_atomic_m_segment(Config) -> ok 
+%% @doc 
+%% Gets a value using segment between cocli and co_node and {atomic, Module} 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+get_atomic_m_segment(Config) ->
+    get(Config, ct:get_config({dict, atomic_m}), segment).
 
 %%--------------------------------------------------------------------
 %% @spec set_atomic_m_block(Config) -> ok 
@@ -399,6 +461,16 @@ set_atomic_m_block(Config) ->
     set(Config, ct:get_config({dict, atomic_m}), block).
 
 %%--------------------------------------------------------------------
+%% @spec get_atomic_m_block(Config) -> ok 
+%% @doc 
+%% Gets a value using segment between cocli and co_node and {atomic, Module} 
+%% atomic_m between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+get_atomic_m_block(Config) ->
+    get(Config, ct:get_config({dict, atomic_m}), block).
+
+%%--------------------------------------------------------------------
 %% @spec set_streamed_m_segment(Config) -> ok 
 %% @doc 
 %% Sets a value using segment between cocli and co_node and {streamed, Module}
@@ -409,37 +481,6 @@ set_streamed_m_segment(Config) ->
     set(Config, ct:get_config({dict, streamed_m}), segment).
 
 %%--------------------------------------------------------------------
-%% @spec set_streamed_m_block(Config) -> ok 
-%% @doc 
-%% Sets a value using block between cocli and co_node and {streamed, Module}
-%% atomic_m between co_node and application.
-%% @end
-%%--------------------------------------------------------------------
-set_streamed_m_block(Config) ->
-    set(Config, ct:get_config({dict, streamed_m}), block).
-
-%%--------------------------------------------------------------------
-%% @spec get_atomic_m_segment(Config) -> ok 
-%% @doc 
-%% Gets a value using block between cocli and co_node and {atomic, Module} 
-%% between co_node and application.
-%% @end
-%%--------------------------------------------------------------------
-get_atomic_m_segment(Config) ->
-    get(Config, ct:get_config({dict, atomic_m}), segment).
-
-%%--------------------------------------------------------------------
-%% @spec get_atomic_m_block(Config) -> ok 
-%% @doc 
-%% Gets a value using segment between cocli and co_node and {atomic, Module} 
-%% atomic_m between co_node and application.
-%% @end
-%%--------------------------------------------------------------------
-get_atomic_m_block(Config) ->
-    get(Config, ct:get_config({dict, atomic_m}), block).
-
-
-%%--------------------------------------------------------------------
 %% @spec get_streamed_m_segment(Config) -> ok 
 %% @doc 
 %% Gets a value using segment between cocli and co_node and {streamed, Module}
@@ -448,6 +489,16 @@ get_atomic_m_block(Config) ->
 %%--------------------------------------------------------------------
 get_streamed_m_segment(Config) ->
     get(Config, ct:get_config({dict, streamed_m}), segment).
+
+%%--------------------------------------------------------------------
+%% @spec set_streamed_m_block(Config) -> ok 
+%% @doc 
+%% Sets a value using block between cocli and co_node and {streamed, Module}
+%% atomic_m between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+set_streamed_m_block(Config) ->
+    set(Config, ct:get_config({dict, streamed_m}), block).
 
 %%--------------------------------------------------------------------
 %% @spec get_streamed_m_block(Config) -> ok 
@@ -467,15 +518,18 @@ get_streamed_m_block(Config) ->
 %% @end
 %%--------------------------------------------------------------------
 stream_app(Config) ->
-    generate_file(ct:get_config(read_file)),
+    PrivDir = ?config(priv_dir, Config),
+    RFile = filename:join(PrivDir, ct:get_config(read_file)),
+    WFile = filename:join(PrivDir, ct:get_config(write_file)),
 
-    Md5Res1 = os:cmd("md5 " ++ ct:get_config(read_file)),
+    generate_file(RFile),
+
+    Md5Res1 = os:cmd("md5 " ++ RFile),
     [_,_,_,Md5] = string:tokens(Md5Res1," "),
 
     {ok, _Pid} = co_stream_app:start(serial(), 
 				     {ct:get_config(file_stream_index), 
-				      ct:get_config(read_file), 
-				      ct:get_config(write_file)}),
+				      RFile, WFile}),
     ct:pal("Started stream app"),
     timer:sleep(1000),
 
@@ -502,9 +556,8 @@ stream_app(Config) ->
     end,
 
     %% Check that file is unchanged
-    Md5Res2 = os:cmd("md5 " ++ ct:get_config(write_file)),
-    %% Doesn't work because of cocli error
-    %% [_,_,_,Md5] = string:tokens(Md5Res2," "),
+    Md5Res2 = os:cmd("md5 " ++ WFile),
+    [_,_,_,Md5] = string:tokens(Md5Res2," "),
     
     ok.
 
@@ -569,7 +622,9 @@ get(Config, {{Index, _T, _M, _Org}, _NewValue}, BlockOrSegment) ->
 	"0x6033 = 1701734733\n" -> ok;
 	"0x6034 = \"Long string\"\n" -> ok;
 	"0x6035 = \"Mine2\"\n" -> ok;
-	"0x6036 = \"Long string2\"\n" -> ok
+	"0x6036 = \"Long string2\"\n" -> ok;
+	"0x6037 = 65\n" -> ok;
+	"0x6038 = 67\n" -> ok
     end,
 
     ct:pal("Result = ~p", [Result]),
@@ -629,7 +684,8 @@ file_cmd(Config, Index, Direction, segment) ->
 file_cmd(Config, Index, Direction, BFlag) ->
     cocli(Config) ++ BFlag ++ " -s " ++ 
 	serial_as_c_string(serial()) ++ " " ++ 
-	Direction ++ " " ++ index_as_c_string(Index) ++ " tmp_file".
+	Direction ++ " " ++ index_as_c_string(Index) ++ " " ++
+	filename:join(?config(priv_dir, Config), "tmp_file").
     
 index_as_c_string({Index, 0}) ->
     "0x" ++ integer_to_list(Index,16);
@@ -648,7 +704,6 @@ serial_as_c_string(Serial) ->
 	6 -> "0x80" ++ S1
     end.
 	     
-    
     
 serial() ->
     case os:getenv("SERIAL") of

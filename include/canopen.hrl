@@ -417,11 +417,12 @@
 	  blkseg  :: binary(),     %% last received block segment (7 bytes)
 	  blkbytes :: uint16(),    %% Number of bytes transfered so far
 	  blkcrc   :: uint16(),    %% Current block CRC value
+	  last     ::uint1(),      %% Flag indicating if last segment is received
 	  first    :: boolean(),   %% True for first block
 	  node_pid :: pid(),       %% Pid of the node
 	  node_from :: term(),     %% Delayed gen_server:reply caller
 	  ctx      :: record(sdo_ctx),  %% general parameters
-	  th       :: term(),      %% transfer handle
+	  buf      :: term(),      %% Data buffer
 	  mref     :: term(),      %% Ref to application
 	  streamed :: boolean()    %% True if data is streamed from application
       }).

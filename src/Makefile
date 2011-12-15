@@ -21,6 +21,7 @@ MODULES = \
 	co_tpdo \
 	co_dict \
 	co_codec \
+	co_data_buf \
 	co_node 
 
 
