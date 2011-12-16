@@ -65,13 +65,22 @@ all() ->
      get_atomic_block,
      set_atomic_exp,
      get_atomic_exp,
+     set_atomic_m_segment,
+     get_atomic_m_segment,
+     set_atomic_m_block,
+     get_atomic_m_block,
      set_streamed_segment,
      get_streamed_segment,
      set_streamed_block,
      get_streamed_block,
      set_streamed_exp,
      get_streamed_exp,
-     stream_app].
+     set_streamed_m_segment,
+     get_streamed_m_segment,
+     set_streamed_m_block,
+     get_streamed_m_block,
+     stream_file_segment,
+     stream_file_block].
 %%     break].
 
 
@@ -267,11 +276,20 @@ end_per_testcase(Case, _Config) when Case == set_atomic_segment;
 	_Pid -> co_test_app:stop()
     end,
     ok;
-end_per_testcase(stream_app, _Config) ->
+end_per_testcase(Case, Config) when Case == stream_file_segment;
+				     Case == stream_file_block->
     case whereis(co_stream_app) of
 	undefined  -> do_nothing;
 	_Pid -> co_stream_app:stop()
     end,
+
+    PrivDir = ?config(priv_dir, Config),
+    RFile = filename:join(PrivDir, ct:get_config(read_file)),
+    WFile = filename:join(PrivDir, ct:get_config(write_file)),
+
+    os:cmd("rm " ++ RFile),
+    os:cmd("rm " ++ WFile),
+
     ok;
 end_per_testcase(_TestCase, _Config) ->
     ok.
@@ -512,54 +530,24 @@ get_streamed_m_block(Config) ->
 
 
 %%--------------------------------------------------------------------
-%% @spec stream_app(Config) -> ok 
+%% @spec stream_file_segment(Config) -> ok 
 %% @doc 
 %% Tests streaming of file cocli -> co_stream_app -> cocli 
 %% @end
 %%--------------------------------------------------------------------
-stream_app(Config) ->
-    PrivDir = ?config(priv_dir, Config),
-    RFile = filename:join(PrivDir, ct:get_config(read_file)),
-    WFile = filename:join(PrivDir, ct:get_config(write_file)),
+stream_file_segment(Config) ->
+    stream_file(Config, segment).
 
-    generate_file(RFile),
+%%--------------------------------------------------------------------
+%% @spec stream_file_block(Config) -> ok 
+%% @doc 
+%% Tests streaming of file cocli -> co_stream_app -> cocli 
+%% @end
+%%--------------------------------------------------------------------
 
-    Md5Res1 = os:cmd("md5 " ++ RFile),
-    [_,_,_,Md5] = string:tokens(Md5Res1," "),
+stream_file_block(Config) ->
+    stream_file(Config, block).
 
-    {ok, _Pid} = co_stream_app:start(serial(), 
-				     {ct:get_config(file_stream_index), 
-				      RFile, WFile}),
-    ct:pal("Started stream app"),
-    timer:sleep(1000),
-
-    [] = os:cmd(file_cmd(Config, ct:get_config(file_stream_index), "download", block)),
-    %% ct:pal("Started download of file from stream app, result = ~p",[Res1]),
-    receive 
-	eof ->
-	    ct:pal("Application upload finished",[]),
-	    timer:sleep(1000),
-	    ok
-    after 5000 ->
-	    ct:fail("Application stuck")
-    end,
-
-    [] = os:cmd(file_cmd(Config, ct:get_config(file_stream_index), "upload", block)),
-    %% ct:pal("Started upload of file to stream app, result = ~p",[Res2]),
-    receive 
-	eof ->
-	    ct:pal("Application download finished",[]),
-	    timer:sleep(1000),
-	    ok
-    after 5000 ->
-	    ct:fail("Application stuck")
-    end,
-
-    %% Check that file is unchanged
-    Md5Res2 = os:cmd("md5 " ++ WFile),
-    [_,_,_,Md5] = string:tokens(Md5Res2," "),
-    
-    ok.
 
 %%--------------------------------------------------------------------
 %% @spec break(Config) -> ok 
@@ -631,6 +619,50 @@ get(Config, {{Index, _T, _M, _Org}, _NewValue}, BlockOrSegment) ->
 
     %% Get value from cocli and compare with dict
     %% {Index, _Type, _Transfer, Value} = lists:keyfind(Index, 1, co_test_app:dict()),
+    
+    ok.
+
+stream_file(Config, TransferMode) ->
+    PrivDir = ?config(priv_dir, Config),
+    RFile = filename:join(PrivDir, ct:get_config(read_file)),
+    WFile = filename:join(PrivDir, ct:get_config(write_file)),
+
+    generate_file(RFile),
+
+    Md5Res1 = os:cmd("md5 " ++ RFile),
+    [_,_,_,Md5] = string:tokens(Md5Res1," "),
+
+    {ok, _Pid} = co_stream_app:start(serial(), 
+				     {ct:get_config(file_stream_index), 
+				      RFile, WFile}),
+    ct:pal("Started stream app"),
+    timer:sleep(1000),
+
+    [] = os:cmd(file_cmd(Config, ct:get_config(file_stream_index), "download", TransferMode)),
+    %% ct:pal("Started download of file from stream app, result = ~p",[Res1]),
+    receive 
+	eof ->
+	    ct:pal("Application upload finished",[]),
+	    timer:sleep(1000),
+	    ok
+    after 5000 ->
+	    ct:fail("Application stuck")
+    end,
+
+    [] = os:cmd(file_cmd(Config, ct:get_config(file_stream_index), "upload", TransferMode)),
+    %% ct:pal("Started upload of file to stream app, result = ~p",[Res2]),
+    receive 
+	eof ->
+	    ct:pal("Application download finished",[]),
+	    timer:sleep(1000),
+	    ok
+    after 5000 ->
+	    ct:fail("Application stuck")
+    end,
+
+    %% Check that file is unchanged
+    Md5Res2 = os:cmd("md5 " ++ WFile),
+    [_,_,_,Md5] = string:tokens(Md5Res2," "),
     
     ok.
 

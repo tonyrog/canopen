@@ -50,7 +50,14 @@
 		  {ok, #data_buf{}} |
 		  {error, Error::atom()}.
 
-init(read, Pid, #app_entry{index = I, type = Type, transfer = {value, Value} = M}, BSize) ->
+init(Access, Pid, E=#app_entry{index = I, type = Type, transfer = M}, BSize) ->
+    ?dbg(data_buf, 
+	 "init: access = ~p, i = ~p, type = ~p, mode = ~p, blocksize = ~p",
+	 [Access, I, Type, M, BSize]),
+    init_i(Access, Pid, E, BSize).
+
+init_i(read, Pid, #app_entry{index = I, type = Type, transfer = {value, Value} = M},
+     BSize) ->
     Data = co_codec:encode(Value, Type),
     open(read, #data_buf {access = read,
 			  pid = Pid,
@@ -61,7 +68,7 @@ init(read, Pid, #app_entry{index = I, type = Type, transfer = {value, Value} = M
 			  type = Type,
 			  buf_size = BSize,
 			  mode = M});
-init(Access, Pid, #app_entry{index = I, type = Type, transfer = Mode}, BSize) ->
+init_i(Access, Pid, #app_entry{index = I, type = Type, transfer = Mode}, BSize) ->
     open(Access, #data_buf {access = Access,
 			    pid = Pid,
 			    i = I,
@@ -69,7 +76,7 @@ init(Access, Pid, #app_entry{index = I, type = Type, transfer = Mode}, BSize) ->
 			    eof = false,
 			    buf_size = BSize,
 			    mode = Mode});
-init(read, Dict, #dict_entry{index = I, type = Type, value = Value}, BSize) ->
+init_i(read, Dict, #dict_entry{index = I, type = Type, value = Value}, BSize) ->
     Data = co_codec:encode(Value, Type),
     {ok, #data_buf {access = read,
 		    i = I,
@@ -90,13 +97,18 @@ init(read, Dict, #dict_entry{index = I, type = Type, value = Value}, BSize) ->
 					      {ok, #data_buf{}, Mref::reference()} |
 					      {error, Error::atom()}. 
 
-open(read, Buf=#data_buf {pid = Pid, i = I, mode = atomic})  ->
+open(Access, Buf=#data_buf {pid = Pid, i = I, mode = M})  ->
+    ?dbg(data_buf, "open: access = ~p, pid = ~p, i = ~p, mode = ~p", 
+	 [Access, Pid, I, M]),
+    open_i(Access, Buf).
+
+open_i(read, Buf=#data_buf {pid = Pid, i = I, mode = atomic})  ->
     app_call(Buf#data_buf {eof = false, data = (<<>>)}, Pid, {get, I});
-open(read, Buf=#data_buf {pid = Pid, i = I, mode = streamed}) ->
+open_i(read, Buf=#data_buf {pid = Pid, i = I, mode = streamed}) ->
     %% Call app async
     Ref = make_ref(),
     app_call(Buf#data_buf {ref = Ref}, Pid, {read_begin, I, Ref});
-open(read, Buf=#data_buf {pid = Pid, i = I, type = Type, mode = {atomic, Module}}) ->
+open_i(read, Buf=#data_buf {pid = Pid, i = I, type = Type, mode = {atomic, Module}}) ->
     %% Call app sync
     case Module:get(Pid, I) of
 	{ok, Value} -> 
@@ -107,26 +119,26 @@ open(read, Buf=#data_buf {pid = Pid, i = I, type = Type, mode = {atomic, Module}
 	Other ->
 	    Other
     end;
-open(read, Buf=#data_buf {pid = Pid, i = I, mode = {streamed, Module}}) ->
+open_i(read, Buf=#data_buf {pid = Pid, i = I, mode = {streamed, Module}}) ->
     %% Call app sync
     Ref = make_ref(),
     case Module:read_begin(Pid, I, Ref) of
-	{ok, Ref} ->
-	    {ok, Buf#data_buf {ref = Ref}};
+	{ok, Ref, Size} ->
+	    {ok, Buf#data_buf {ref = Ref, size = Size}};
 	Other ->
 	    Other
     end;
-open(read, Buf=#data_buf {mode = {dict, _Dict}}) ->
+open_i(read, Buf=#data_buf {mode = {dict, _Dict}}) ->
     %% All data already fetched
     {ok, Buf};
-open(read, Buf=#data_buf {mode = {value, _Value}}) ->
+open_i(read, Buf=#data_buf {mode = {value, _Value}}) ->
     %% All data already fetched
     {ok, Buf};
-open(write, Buf=#data_buf {pid = Pid, i = I, mode = streamed}) ->
+open_i(write, Buf=#data_buf {pid = Pid, i = I, mode = streamed}) ->
     %% Call app async
     Ref = make_ref(),
     app_call(Buf#data_buf {ref = Ref}, Pid, {write_begin, I, Ref});
-open(write, Buf=#data_buf {pid = Pid, i = I, mode = {streamed, Module}}) ->
+open_i(write, Buf=#data_buf {pid = Pid, i = I, mode = {streamed, Module}}) ->
     %% Call app sync
     Ref = make_ref(),
     case Module:write_begin(Pid, I, Ref) of
@@ -135,7 +147,7 @@ open(write, Buf=#data_buf {pid = Pid, i = I, mode = {streamed, Module}}) ->
 	Other ->
 	    Other
     end;
-open(write, Buf) ->
+open_i(write, Buf) ->
     {ok, Buf}.
 
 %%--------------------------------------------------------------------
@@ -206,36 +218,73 @@ read_app_call(_Buf) ->
 
 %%%% End of Data
 %% Transfer == atomic
-write(Buf=#data_buf {mode = atomic, pid = Pid, type = Type, data = Data, tmp = TmpData, i = I}, 
-      N, true, block) ->
-    ?dbg(data_buf, "write: mode = atomic, N = ~p, Eod = ~p", [N, true]),
-    %% All data received, time to transfer to app
-    Size = size(TmpData) - N,
-    <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
-    DataToSend = <<Data/binary, DataToAdd/binary>>,
-    {Value, _} = co_codec:decode(DataToSend, Type),
-    ?dbg(data_buf, "write: Mode = atomic, eod = true, Value = ~p\n", [Value]),
-    app_call(Buf#data_buf {data = (<<>>), tmp = (<<>>), eof = true} , Pid, {set, I, Value});
-write(Buf=#data_buf {mode = atomic, pid = Pid, type = Type, data = OldData, tmp = TmpData, i = I}, 
+write(Buf=#data_buf {mode = atomic, pid = Pid, type = Type, data = OldData, 
+		     tmp = TmpData, i = I}, 
       Data, true, segment) ->
     ?dbg(data_buf, "write: mode = atomic, Data = ~p, Eod = ~p", [Data, true]),
     %% All data received, time to transfer to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     {Value, _} = co_codec:decode(DataToSend, Type),
     ?dbg(data_buf, "write: set Value = ~p\n", [Value]),
-    app_call(Buf#data_buf {data = (<<>>), tmp = (<<>>), eof = true} , Pid, {set, I, Value});
-%% Transfer == streamed
-write(Buf=#data_buf {mode = streamed, pid = Pid, data = OldData, ref = Ref, tmp = TmpData}, 
+    app_call(Buf#data_buf {data = (<<>>), tmp = (<<>>), eof = true} , 
+	     Pid, {set, I, Value});
+write(Buf=#data_buf {mode = atomic = Mode, pid = Pid, type = Type, data = Data, 
+		     tmp = TmpData, i = I}, 
+      N, true, block) ->
+    ?dbg(data_buf, "write: mode = ~p, N = ~p, Eod = ~p", [Mode, N, true]),
+    %% All data received, time to transfer to app
+    Size = size(TmpData) - N,
+    <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
+    DataToSend = <<Data/binary, DataToAdd/binary>>,
+    {Value, _} = co_codec:decode(DataToSend, Type),
+    ?dbg(data_buf, "write: set  Value = ~p\n", [Value]),
+    app_call(Buf#data_buf {data = (<<>>), tmp = (<<>>), eof = true}, 
+	     Pid, {set, I, Value});
+write(Buf=#data_buf {mode = {atomic, Module} = Mode, pid = Pid, type = Type, 
+		     data = OldData, tmp = TmpData, i = I}, 
       Data, true, segment) ->
-    ?dbg(data_buf, "write: mode = streamed,  Data = ~p, Eod = ~p", [Data, true]),
+    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", 
+	 [Mode, Data, true]),
+    %% All data received, time to transfer to app
+    DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
+    {Value, _} = co_codec:decode(DataToSend, Type),
+    ?dbg(data_buf, "write: set Value = ~p\n", [Value]),
+    case Module:set(Pid, I, Value) of
+	ok ->
+	    {ok, Buf#data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
+	Other ->
+	    Other
+    end;
+write(Buf=#data_buf {mode = {atomic, Module} = Mode, pid = Pid, type = Type, 
+		     data = Data, tmp = TmpData, i = I}, 
+      N, true, block) ->
+    ?dbg(data_buf, "write: mode = ~p, N = ~p, Eod = ~p", [Mode, N, true]),
+    %% All data received, time to transfer to app
+    Size = size(TmpData) - N,
+    <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
+    DataToSend = <<Data/binary, DataToAdd/binary>>,
+    {Value, _} = co_codec:decode(DataToSend, Type),
+    ?dbg(data_buf, "write: set  Value = ~p\n", [Value]),
+    case Module:set(Pid, I, Value) of
+	ok ->
+	    {ok, Buf#data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
+	Other ->
+	    Other
+    end;
+%% Transfer == streamed
+write(Buf=#data_buf {mode = streamed = Mode, pid = Pid, data = OldData, ref = Ref, 
+		     tmp = TmpData}, 
+      Data, true, segment) ->
+    ?dbg(data_buf, "write: mode = ~p,  Data = ~p, Eod = ~p", [Mode, Data, true]),
     %% All data received, time to transfer rest to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     ?dbg(data_buf, "write: send Data = ~p\n", [DataToSend]),
     app_call(Buf#data_buf {data = (<<>>), tmp = (<<>>), eof = true}, Pid, 
 	     {write, Ref, DataToSend, true});
-write(Buf=#data_buf {mode = streamed, pid = Pid, data = Data, ref = Ref, tmp = TmpData}, 
+write(Buf=#data_buf {mode = streamed = Mode, pid = Pid, data = Data, ref = Ref, 
+		     tmp = TmpData}, 
       N, true, block) ->
-    ?dbg(data_buf, "write: mode = streamed,  N = ~p, Eod = ~p", [N, true]),
+    ?dbg(data_buf, "write: mode = ~p,  N = ~p, Eod = ~p", [Mode, N, true]),
     %% All data received, time to transfer rest to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
@@ -243,30 +292,63 @@ write(Buf=#data_buf {mode = streamed, pid = Pid, data = Data, ref = Ref, tmp = T
     ?dbg(data_buf, "write: send Data = ~p\n", [DataToSend]),
     app_call(Buf#data_buf {data = (<<>>), tmp = (<<>>), eof = true}, Pid, 
 	     {write, Ref, DataToSend, true});
+write(Buf=#data_buf {mode = {streamed, Module} = Mode, pid = Pid, data = OldData, 
+		     ref = Ref, tmp = TmpData}, 
+      Data, true, segment) ->
+    ?dbg(data_buf, "write: mode = ~p,  Data = ~p, Eod = ~p", [Mode, Data, true]),
+    %% All data received, time to transfer rest to app
+    DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
+    ?dbg(data_buf, "write: send Data = ~p\n", [DataToSend]),
+    case Module:write(Pid, Ref, DataToSend, true) of
+	{ok ,Ref} ->
+	    {ok, Buf#data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
+	Other ->
+	    Other
+    end;
+write(Buf=#data_buf {mode = {streamed, Module} = Mode, pid = Pid, data = Data, 
+		     ref = Ref, tmp = TmpData}, 
+      N, true, block) ->
+    ?dbg(data_buf, "write: mode = ~p,  N = ~p, Eod = ~p", [Mode, N, true]),
+    %% All data received, time to transfer rest to app
+    Size = size(TmpData) - N,
+    <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
+    DataToSend = <<Data/binary, DataToAdd/binary>>,
+    ?dbg(data_buf, "write: send Data = ~p\n", [DataToSend]),
+    case Module:write(Pid, Ref, DataToSend, true) of
+	{ok ,Ref} ->
+	    {ok, Buf#data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
+	Other ->
+	    Other
+    end;
 %% Transfer == dict
-write(Buf=#data_buf {mode = {dict, Dict},  type = Type, data = OldData, i = {Index, SubInd}, 
-		     tmp = TmpData}, Data, true, segment) -> 
-    ?dbg(data_buf, "write: mode = dict, Data = ~p, Eod = ~p", [Data, true]),
+write(Buf=#data_buf {mode = {dict, Dict} = Mode, type = Type, data = OldData, 
+		     i = {Index, SubInd}, tmp = TmpData}, 
+      Data, true, segment) -> 
+    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [Mode, Data, true]),
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     {Value, _} = co_codec:decode(DataToSend, Type),
-    ?dbg(data_buf, "write:store I = ~.16B:~.8B, Value = ~p\n", [Index, SubInd, Value]),
+    ?dbg(data_buf, "write:store I = ~.16B:~.8B, Value = ~p\n", 
+	 [Index, SubInd, Value]),
     co_dict:direct_set(Dict, Index, SubInd, Value),
     {ok, Buf#data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
-write(Buf=#data_buf {mode = {dict, Dict},  type = Type, data = Data, i = {Index, SubInd}, 
-		     tmp = TmpData}, N, true, block) -> 
-    ?dbg(data_buf, "write: mode = dict, N = ~p, Eod = ~p", [N, true]),
+write(Buf=#data_buf {mode = {dict, Dict} = Mode, type = Type, data = Data, 
+		     i = {Index, SubInd}, tmp = TmpData}, 
+      N, true, block) -> 
+    ?dbg(data_buf, "write: mode = ~p, N = ~p, Eod = ~p", [Mode, N, true]),
     Size = size(Data) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<Data/binary, DataToAdd/binary>>,
     {Value, _} = co_codec:decode(DataToSend, Type),
-    ?dbg(data_buf, "write: store I = ~.16B:~.8B, Value = ~p\n", [Index, SubInd, Value]),
+    ?dbg(data_buf, "write: store I = ~.16B:~.8B, Value = ~p\n", 
+	 [Index, SubInd, Value]),
     co_dict:direct_set(Dict, Index, SubInd, Value),
     {ok, Buf#data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
 %%%% Not End of Data
 %% Transfer == streamed => maybe send
-write(Buf=#data_buf {mode = streamed, pid = Pid, data = OldData, write_size = WSize, 
-		     ref = Ref, tmp = TmpData}, Data, false, _DownloadMode) ->
-    ?dbg(data_buf, "write: mode = streamed, Data = ~p, Eod = ~p", [Data, false]),
+write(Buf=#data_buf {mode = streamed = Mode, pid = Pid, data = OldData, 
+		     write_size = WSize, ref = Ref, tmp = TmpData}, 
+      Data, false, _DownloadMode) ->
+    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [Mode, Data, false]),
     %% Not the last data, store it
     NewData = <<OldData/binary, TmpData/binary>>,
     if size(NewData) >= WSize ->
@@ -278,9 +360,30 @@ write(Buf=#data_buf {mode = streamed, pid = Pid, data = OldData, write_size = WS
        true ->
 	    {ok, Buf#data_buf {data = NewData, tmp = Data}}
     end;
+write(Buf=#data_buf {mode = {streamed, Module} = Mode, pid = Pid, data = OldData, 
+		     write_size = WSize, ref = Ref, tmp = TmpData}, 
+      Data, false, _DownloadMode) ->
+    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [Mode, Data, false]),
+    %% Not the last data, store it
+    NewData = <<OldData/binary, TmpData/binary>>,
+    if size(NewData) >= WSize ->
+	    %% Time to send to app
+	    <<TransferData:WSize/binary, RestData/binary>> = NewData,
+	    ?dbg(data_buf, "write: send Data = ~p\n", [TransferData]),
+	    case Module:write(Pid, Ref, TransferData, false) of
+		{ok, Ref} ->
+		    {ok, Buf#data_buf {data = RestData, tmp = Data}};
+		Other ->
+		    Other
+	    end;
+       true ->
+	    {ok, Buf#data_buf {data = NewData, tmp = Data}}
+    end;
 %% Transfer =/= streamed => just store
-write(Buf=#data_buf {mode = Mode, data = OldData, tmp = TmpData}, Data, false, _DownloadMode) ->
-    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p, storing", [Mode, Data, false]),
+write(Buf=#data_buf {mode = Mode, data = OldData, tmp = TmpData}, 
+      Data, false, _DownloadMode) ->
+    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p, storing", 
+	 [Mode, Data, false]),
     %% Move old from temp and store new in temp
     NewData = <<OldData/binary, TmpData/binary>>,
     {ok, Buf#data_buf {data = NewData, tmp = Data}}.
@@ -334,8 +437,8 @@ update(Buf=#data_buf {data = OldData}, {ok, Ref, Data, Eod}) ->
     end;    
 update(Buf, ok) ->
     Buf;
-update(_Buf, Other) ->
-    ?dbg(data_buf, "update: Other = ~p", [Other]),
+update(Buf, Other) ->
+    ?dbg(data_buf, "update: Buf = ~p, Other = ~p", [Buf, Other]),
     %% Error replies
     Other.
 
