@@ -50,6 +50,7 @@
 %% Debug interface
 -export([dump/1]).
 -export([change_session_timeout/2]).
+-export([get_option/2, set_option/3]).
 
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
 
@@ -90,6 +91,8 @@
 %%          {pst, integer()}         - ( 16 ) <br/>
 %%          {max_blksize, integer()} - ( 74 = 518 bytes) <br/>
 %%          {use_crc, boolean()}     - use crc for block (true) <br/>
+%%          {read_buf_size, integer()} - size of buf when reading from app <br/>
+%%          {load_ratio, float()} - ratio when time to fill read_buf <br/> 
 %%         
 %% @end
 %%--------------------------------------------------------------------
@@ -100,7 +103,9 @@
 		       {blk_timeout, timeout()} |  
 		       {pst, integer()} |          
 		       {max_blksize, integer()} |  
-		       {use_crc, boolean()}.
+		       {use_crc, boolean()} |
+		       {read_bufsize, integer()} |
+		       {load_ratio, float()}.
 
 -type arg_type() :: {serial, Serial::integer()} | {options, Opts::list(option_type)}.
 
@@ -460,6 +465,68 @@ dump(Serial) ->
 change_session_timeout(Serial, NewTimeout) ->
     gen_server:call(serial_to_pid(Serial), {change_session_timeout, NewTimeout}).
 
+%%--------------------------------------------------------------------
+%% @spec get_option(Serial, Option::atom()) -> 
+%%        {ok, {option, Value}} | {error, unkown_option}
+%%
+%% @doc
+%% Gets value of option variable. (For testing)
+%%
+%% @end
+%%--------------------------------------------------------------------
+get_option(Serial, Option) ->
+    gen_server:call(serial_to_pid(Serial), {option, Option}).
+
+%%--------------------------------------------------------------------
+%% @spec set_option(Serial, Option::atom(), NewValue) -> ok | {error, Reason}
+%%
+%% @doc
+%% Sets value of option variable. (For testing)
+%%
+%% @end
+%%--------------------------------------------------------------------
+set_option(Serial, Option, NewValue) 
+  when Option == vendor;
+       Option == max_blksize;
+       Option == read_bufsize;
+       Option == time_stamp; 
+       Option == sdo_timeout;
+       Option == blk_timeout ->
+    if is_integer(NewValue) andalso NewValue > 0 ->
+	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
+       true ->
+	    {error, "Option " ++ atom_to_list(Option) ++ 
+		 " can only be set to a positive integer value."}
+    end;
+set_option(Serial, Option, NewValue) 
+  when Option == pst ->
+    if is_integer(NewValue) andalso NewValue >= 0 ->
+	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
+       true ->
+	    {error, "Option " ++ atom_to_list(Option) ++ 
+		 " can only be set to a positive integer value or zero."}
+    end;
+set_option(Serial, Option, NewValue) 
+  when Option == use_crc ->
+    if is_boolean(NewValue) ->
+	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
+       true ->
+	    {error, "Option " ++ atom_to_list(Option) ++ 
+		 " can only be set to true or false."}
+    end;
+set_option(Serial, Option, NewValue) 
+  when Option == load_ratio ->
+    if is_float (NewValue) andalso NewValue > 0 andalso NewValue =< 1 ->
+	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
+       true ->
+	    {error, "Option " ++ atom_to_list(Option) ++ 
+		 " can only be set to a float value between 0 and 1."}
+    end;
+set_option(Serial, extended, NewValue) ->
+    {error, "Option extended can not be changed."};
+set_option(Serial, Option, NewValue) ->
+    {error, "Option " ++ atom_to_list(Option) + " unknwon."}.
+
 %% convert a node serial name to a local name
 serial_to_pid(Sn) when is_integer(Sn) ->
     list_to_atom(co_lib:serial_to_string(Sn));
@@ -594,6 +661,8 @@ init([Serial, NodeId, NodeName, Opts]) ->
       pst             = proplists:get_value(pst,Opts,16),
       max_blksize     = proplists:get_value(max_blksize,Opts,7),
       use_crc         = proplists:get_value(use_crc,Opts,true),
+      read_buf_size   = proplists:get_value(read_buf_size,Opts,1024),
+      load_ratio      = proplists:get_value(load_ratio,Opts,0.5),
       dict            = Dict,
       sub_table       = SubTable,
       res_table       = ResTable
@@ -891,6 +960,42 @@ handle_call(dump, _From, Ctx) ->
 handle_call({change_session_timeout, NewTimeout}, _From, Ctx) ->
     Sdo = Ctx#co_ctx.sdo#sdo_ctx {timeout = NewTimeout},
     {reply, ok, Ctx#co_ctx {sdo = Sdo}};
+
+handle_call({option, Option}, _From, Ctx) ->
+    Reply = case Option of
+		sdo_timeout ->  {Option, Ctx#co_ctx.sdo#sdo_ctx.timeout};
+		blk_timeout -> {Option, Ctx#co_ctx.sdo#sdo_ctx.blk_timeout};
+		pst ->  {Option, Ctx#co_ctx.sdo#sdo_ctx.pst};
+		max_blksize -> {Option, Ctx#co_ctx.sdo#sdo_ctx.max_blksize};
+		use_crc -> {Option, Ctx#co_ctx.sdo#sdo_ctx.use_crc};
+		read_buf_size -> {Option, Ctx#co_ctx.sdo#sdo_ctx.read_buf_size};
+		load_ratio -> {Option, Ctx#co_ctx.sdo#sdo_ctx.load_ratio};
+		time_stamp -> {Option, Ctx#co_ctx.time_stamp_time};
+		extended -> {Option, ?is_nodeid_extended(Ctx#co_ctx.id)};
+		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
+	    end,
+    {reply, Reply, Ctx};
+handle_call({option, Option, NewValue}, _From, Ctx) ->
+    Reply = case Option of
+		sdo_timeout -> Ctx#co_ctx.sdo#sdo_ctx {timeout = NewValue};
+		blk_timeout -> Ctx#co_ctx.sdo#sdo_ctx {blk_timeout = NewValue};
+		pst ->  Ctx#co_ctx.sdo#sdo_ctx {pst = NewValue};
+		max_blksize -> Ctx#co_ctx.sdo#sdo_ctx {max_blksize = NewValue};
+		use_crc -> Ctx#co_ctx.sdo#sdo_ctx {use_crc = NewValue};
+		read_buf_size -> Ctx#co_ctx.sdo#sdo_ctx {read_buf_size = NewValue};
+		load_ratio -> Ctx#co_ctx.sdo#sdo_ctx {load_ratio = NewValue};
+		time_stamp -> Ctx#co_ctx {time_stamp_time = NewValue};
+		extended -> {error, "Option extended not possible to change"};
+		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
+	    end,
+    case Reply of
+	SdoCtx when is_record(SdoCtx, sdo_ctx) ->
+	    {reply, ok, Ctx#co_ctx {sdo = SdoCtx}};
+	NewCtx when is_record(NewCtx, co_ctx) ->
+	    {reply, ok, NewCtx};
+	{error, Reason} ->
+	    {reply, Reply, Ctx}
+    end;
 handle_call(stop, _From, Ctx) ->
     {stop, normal, ok, Ctx};
 handle_call(_Request, _From, Ctx) ->

@@ -46,7 +46,7 @@
 -export([s_block_download/2]).
 -export([s_block_download_end/2]).
 -export([s_writing_block_started/2]).   %% Streamed
--export([s_writing_block_end/2]).           %% Streamed
+-export([s_writing_block_end/2]).       %% Streamed
 
 -define(TMO(S), ((S)#co_session.ctx)#sdo_ctx.timeout).
 -define(BLKTMO(S), ((S)#co_session.ctx)#sdo_ctx.blk_timeout).
@@ -242,7 +242,7 @@ write_begin(S) ->
 		 [Pid, Index]),
 	    app_write_begin(Index, SubInd, Pid, Mod);
 	{dead, _Mod} ->
-	    ?dbg(srv, "write_begin: Reserver process dead.\n", []),
+	    ?dbg(srv, "write_begin: Reserver process for index ~7.16.0# dead.\n", [Index]),
 	    {error, ?abort_internal_error}; %% ???
 	_Other ->
 	    ?dbg(srv, "write_begin: Other case = ~p\n", [_Other]),
@@ -260,7 +260,7 @@ central_write_begin(Ctx, Index, SubInd) ->
 		    {error,?abort_write_not_allowed};
 	       true ->
 		    ?dbg(srv, "central_write_begin: Write access ok\n", []),
-		    co_data_buf:init(write, Dict, E, ?BUF_SIZE)
+		    co_data_buf:init(write, Dict, E, undefined, undefined)
 	    end
     end.
 
@@ -270,7 +270,7 @@ app_write_begin(Index, SubInd, Pid, Mod) ->
 	    if (Entry#app_entry.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
 		    ?dbg(srv, "app_write_begin: transfer=~p, type = ~p\n",
 			 [Entry#app_entry.transfer, Entry#app_entry.type]),
-		    co_data_buf:init(write, Pid, Entry, ?BUF_SIZE);
+		    co_data_buf:init(write, Pid, Entry, undefined, undefined);
 	       true ->
 		    {entry, ?abort_unsupported_access}
 	    end;
@@ -299,9 +299,9 @@ read_begin(S) ->
 	{Pid, Mod} when is_pid(Pid)->
 	    ?dbg(srv, "read_begin: Process ~p subscribes to index ~7.16.0#\n", 
 		 [Pid, Index]),
-	    app_read_begin(Index, SubInd, Pid, Mod);
+	    app_read_begin(Ctx, Index, SubInd, Pid, Mod);
 	{dead, _Mod} ->
-	    ?dbg(srv, "read_begin: Reserver process dead.\n", []),
+	    ?dbg(srv, "read_begin: Reserver process for index ~7.16.0# dead.\n", [Index]),
 	    {error, ?abort_internal_error}; %% ???
 	_Other ->
 	    ?dbg(srv, "read_begin: Other case = ~p\n", [_Other]),
@@ -316,20 +316,26 @@ central_read_begin(Ctx, Index, SubInd) ->
 		    {error, ?abort_read_not_allowed};
 	       true ->
 		    ?dbg(srv, "central_read_begin: Read access ok\n", []),
-		    co_data_buf:init(read, Dict, E, ?BUF_SIZE)
+		    co_data_buf:init(read, Dict, E,
+				     Ctx#sdo_ctx.read_buf_size, 
+				     trunc(Ctx#sdo_ctx.read_buf_size * 
+					       Ctx#sdo_ctx.load_ratio))
 	    end;
 	Err = {error,_} ->
 	    Err
     end.
 
-app_read_begin(Index, SubInd, Pid, Mod) ->
+app_read_begin(Ctx, Index, SubInd, Pid, Mod) ->
     case Mod:get_entry(Pid, {Index, SubInd}) of
 	{entry, Entry} ->
 	    if (Entry#app_entry.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
 		    ?dbg(srv, "app_read_begin: Read access ok\n", []),
 		    ?dbg(srv, "app_read_begin: Transfer mode = ~p\n", 
 			 [Entry#app_entry.transfer]),
-		    co_data_buf:init(read, Pid, Entry, ?BUF_SIZE);
+		    co_data_buf:init(read, Pid, Entry, 
+				     Ctx#sdo_ctx.read_buf_size, 
+				     trunc(Ctx#sdo_ctx.read_buf_size * 
+					       Ctx#sdo_ctx.load_ratio));
 	       true ->
 		    {entry, ?abort_read_not_allowed}
 	    end;
@@ -603,7 +609,9 @@ s_reading_segment_started({Mref, Reply} = M, S)  ->
 		    start_segmented_upload(S#co_session {buf = Buf1});
 		{ok, Buf1, Mref1} ->
 		    %% Wait for data ??
-		    start_segmented_upload(S#co_session {buf = Buf1, mref = Mref1})
+		    start_segmented_upload(S#co_session {buf = Buf1, mref = Mref1});
+		{error, Error} ->
+		    l_abort(M, S, s_reading_segment_started)
 	    end;
 	_Other ->
 	    l_abort(M, S, s_reading_segment_started)
@@ -979,16 +987,21 @@ handle_info({Mref, {ok, _Ref, _Data, _Eod} = Reply}, StateName, S) ->
 	Mref ->
 	    erlang:demonitor(Mref, [flush]),
 	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
-	    case StateName of
-		s_reading_segment -> 
-		    read_segment(S#co_session {buf = Buf});
-		s_reading_block_segment -> 
-		    read_block_segment(S#co_session {buf = Buf});
-		State -> 
-		    {next_state, State, S#co_session {buf = Buf}}
+	    %% Fill data buffer if needed
+	    case co_data_buf:load(Buf) of
+		{ok, Buf1} ->
+		    %% Buffer loaded
+		    check_reading(StateName, S#co_session {buf = Buf1});
+		{ok, Buf1, Mref1} ->
+		    %% Wait for data ??
+		    check_reading(StateName, S#co_session {buf = Buf1, 
+							   mref = Mref1});
+		{error, Error} ->
+		    abort(S, Error)
 	    end;
 	_OtherRef ->
 	    %% Ignore reply
+	    ?dbg(srv, "handle_info: wrong mref, ignoring\n",[]),
 	    {next_state, StateName, S}
     end;
 handle_info({_Mref, ok} = Info, StateName, S) 
@@ -1010,6 +1023,15 @@ handle_info(Info, StateName, S) ->
     ?dbg(srv, "handle_info: Got info ~p\n",[Info]),
     %% "Converting" info to event
     apply(?MODULE, StateName, [Info, S]).
+
+
+check_reading(s_reading_segment, S) ->
+    read_segment(S);
+check_reading(s_reading_block_segment, S) ->
+    read_block_segment(S);
+check_reading(State, S) -> 
+    {next_state, State, S}.
+	    
 
 check_writing_block_end({Mref, Reply}, StateName, S) ->
     %% Streamed data write acknowledged

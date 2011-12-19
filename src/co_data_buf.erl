@@ -13,7 +13,7 @@
 -include("co_debug.hrl").
 
 %% API
--export([init/4,
+-export([init/5,
 	 open/2,
 	 read/2,
 	 write/4,
@@ -30,6 +30,7 @@
 	  type = undefined::integer(),
 	  size = 0        ::integer(),
 	  buf_size = 0    ::integer(),
+	  load_level      ::integer(),
 	  tmp = (<<>>)    ::binary(),
 	  write_size = 0  ::integer(),
 	  pid             ::pid(),
@@ -42,22 +43,23 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
--spec init(read | write, Pid::pid(), Entry::#app_entry{}, BufSize::integer()) -> 
+-spec init(read | write, Pid::pid(), Entry::#app_entry{}, BufSize::integer(), LLevel::integer()) -> 
 		  {ok, #data_buf{}} |
 		  {ok, Mref::reference(), #data_buf{}} |
 		  {error, Error::atom()};
-	  (read | write, Dict::term(), Entry::#dict_entry{}, BufSize::integer()) -> 
+	  (read | write, Dict::term(), Entry::#dict_entry{}, BufSize::integer(), LLevel::integer()) -> 
 		  {ok, #data_buf{}} |
 		  {error, Error::atom()}.
 
-init(Access, Pid, E=#app_entry{index = I, type = Type, transfer = M}, BSize) ->
+init(Access, Pid, E=#app_entry{index = I, type = Type, transfer = M}, 
+     BSize, LLevel) ->
     ?dbg(data_buf, 
-	 "init: access = ~p, i = ~p, type = ~p, mode = ~p, blocksize = ~p",
-	 [Access, I, Type, M, BSize]),
-    init_i(Access, Pid, E, BSize).
+	 "init: access = ~p, i = ~p, type = ~p, mode = ~p, blocksize = ~p, load_level ~p",
+	 [Access, I, Type, M, BSize, LLevel]),
+    init_i(Access, Pid, E, BSize, LLevel).
 
 init_i(read, Pid, #app_entry{index = I, type = Type, transfer = {value, Value} = M},
-     BSize) ->
+     BSize, LLevel) ->
     Data = co_codec:encode(Value, Type),
     open(read, #data_buf {access = read,
 			  pid = Pid,
@@ -67,16 +69,18 @@ init_i(read, Pid, #app_entry{index = I, type = Type, transfer = {value, Value} =
 			  eof = true,
 			  type = Type,
 			  buf_size = BSize,
+			  load_level = LLevel,
 			  mode = M});
-init_i(Access, Pid, #app_entry{index = I, type = Type, transfer = Mode}, BSize) ->
+init_i(Access, Pid, #app_entry{index = I, type = Type, transfer = Mode}, BSize, LLevel) ->
     open(Access, #data_buf {access = Access,
 			    pid = Pid,
 			    i = I,
 			    type = Type,
 			    eof = false,
 			    buf_size = BSize,
+			    load_level = LLevel,
 			    mode = Mode});
-init_i(read, Dict, #dict_entry{index = I, type = Type, value = Value}, BSize) ->
+init_i(read, Dict, #dict_entry{index = I, type = Type, value = Value}, BSize, LLevel) ->
     Data = co_codec:encode(Value, Type),
     {ok, #data_buf {access = read,
 		    i = I,
@@ -85,6 +89,7 @@ init_i(read, Dict, #dict_entry{index = I, type = Type, value = Value}, BSize) ->
 		    size = size(Data),
 		    eof = true,
 		    buf_size = BSize,
+		    load_level = LLevel,
 		    mode = {dict, Dict}}}.
 
     
@@ -155,9 +160,16 @@ open_i(write, Buf) ->
 %% @end
 %%--------------------------------------------------------------------
 load(Buf) when is_record(Buf, data_buf) ->
-    ?dbg(data_buf, "load:", []),
-    %% Get data from app
-    read_app_call(Buf).
+    ?dbg(data_buf, "load: available data = ~p, load_level = ~p", 
+	 [size(Buf#data_buf.data),  Buf#data_buf.load_level]),
+    if size(Buf#data_buf.data) =< Buf#data_buf.load_level andalso
+       Buf#data_buf.eof =/= true ->
+	    %% Time to fech more data
+	    ?dbg(data_buf, "load: loading",[]), 
+	    read_app_call(Buf);
+       true ->
+	    {ok, Buf}
+    end.
 	    
 
 %%--------------------------------------------------------------------
@@ -175,12 +187,14 @@ read(Buf, Bytes) when is_record(Buf, data_buf) ->
 	    %% Enough data is available
 	    <<Data:Bytes/binary, NewData/binary>> = Buf#data_buf.data,
 	    ?dbg(data_buf, "read: Data = ~p", [Data]),
-	    {ok, Data, Buf#data_buf.eof andalso (size(NewData) =:= 0), Buf#data_buf {data = NewData}};
+	    {ok, Data, Buf#data_buf.eof andalso (size(NewData) =:= 0),
+	     Buf#data_buf {data = NewData}};
        true ->
 	    %% More data is asked for
 	    if Buf#data_buf.eof =:= true ->
 		    %% No more data to fetch
-		    ?dbg(data_buf, "read: Data = ~p, Eod = true", [Buf#data_buf.data]),
+		    ?dbg(data_buf, "read: Data = ~p, Eod = true", 
+			 [Buf#data_buf.data]),
 		    {ok, Buf#data_buf.data, true, Buf};
 	       true ->
 		    %% Get more data from app
@@ -194,7 +208,6 @@ read(Buf, Bytes) when is_record(Buf, data_buf) ->
 	    end
     end.
 		
-
 read_app_call(Buf=#data_buf {pid=Pid, buf_size=BSize, ref=Ref, mode=streamed}) ->
     %% Async call
     app_call(Buf, Pid, {read, BSize, Ref});

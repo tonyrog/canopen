@@ -394,7 +394,9 @@
 	  use_crc,      %% use crc
 	  dict,         %% copy of can dictionary in co_ctx
 	  sub_table,    %% copy of subscriber table in co_ctx
-	  res_table     %% copy of reserver table in co_ctx
+	  res_table,    %% copy of reserver table in co_ctx
+	  read_buf_size,
+	  load_ratio   
 	}).
 
 -record(co_session,
@@ -682,8 +684,8 @@
 
 %% Is NodeID an extended node id 
 -define(is_nodeid_extended(NodeID),
-	?is_cobid_extended((NodeID)),
-	(NodeID) band 16#2E000000 =:= ?COBID_ENTRY_EXTENDED).
+	(?is_cobid_extended((NodeID)) andalso
+	((NodeID) band 16#2E000000 =:= ?COBID_ENTRY_EXTENDED))).
 
 %% Is NodeID a plain node Id
 -define(is_nodeid(NodeID),
