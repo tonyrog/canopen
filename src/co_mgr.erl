@@ -20,7 +20,7 @@ start() ->
     start([]).
 start(Opts) ->
     can_udp:start(),  %% DEMO only remove this later!
-    co_node:start(0, [{name,co_mgr}|Opts]).
+    co_node:start([{serial, 0}, {options, [{name,co_mgr}|Opts]}]).
 
 stop() ->
     co_node:stop(?CO_MGR_NAME).

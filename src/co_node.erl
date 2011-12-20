@@ -147,47 +147,47 @@ name(Opts, Serial) ->
     end.
 
 %%--------------------------------------------------------------------
-%% @spec stop(Serial) -> ok | {error, Error}
-%%
 %% @doc
 %% Stops the server.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec stop(Serial::integer()) -> ok | {error, Reason::atom()}.
+				  
 stop(Serial) ->
     gen_server:call(serial_to_pid(Serial), stop).
 
 %%--------------------------------------------------------------------
-%% @spec attach(Serial) -> ok | {error, Error}
-%%
 %% @doc
 %% Attches the calling process to the CANnode Serial.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec attach(Serial::integer()) -> {ok, Id::integer()} | {error, Error::atom()}.
+
 attach(Serial) ->
     gen_server:call(serial_to_pid(Serial), {attach, self()}).
 
 %%--------------------------------------------------------------------
-%% @spec detach(Serial) -> ok | {error, Error}
-%%
 %% @doc
 %% Detaches the calling process from the CANnode Serial.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec detach(Serial::integer()) -> ok | {error, Error::atom()}.
+
 detach(Serial) ->
     gen_server:call(serial_to_pid(Serial), {detach, self()}).
 
 %%--------------------------------------------------------------------
-%% @spec subscribe(Serial, Index) -> ok | {error, Error}
-%%
 %% @doc
 %% Adds a subscription to changes of the Dictionary Object in position Index.
 %% Index can also be a range [Index1 - Index2].
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec subscribe(Serial::integer(), Index::integer()) -> ok | {error, Error::atom()}.
+
 subscribe(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {subscribe, Ix, self()}).
 
@@ -954,6 +954,8 @@ handle_call(dump, _From, Ctx) ->
       fun({Ix, Mod, Pid},_) ->
 	      io:format("~7.16.0# reserved by ~p, module ~s\n",[Ix, Pid, Mod])
       end, ok, Ctx#co_ctx.res_table),
+    io:format("---------DICT----------\n"),
+    co_dict:to_fd(Ctx#co_ctx.dict, user),
     io:format("------------------------\n"),
     {reply, ok, Ctx};
 
@@ -1011,7 +1013,7 @@ handle_call(_Request, _From, Ctx) ->
 %%--------------------------------------------------------------------
 handle_cast({pdo_event,I}, Ctx) ->
     Index = ?IX_TPDO_PARAM_FIRST + I,
-    case co_dict:value(Ctx#co_ctx.dict, {Index,?SI_PDO_COB_ID}) of
+    case co_dict:value(Ctx#co_ctx.dict, Index,?SI_PDO_COB_ID) of
 	{ok,COBID} ->
 	    case lookup_cobid(COBID, Ctx) of
 		{tpdo,_,Pid} ->
@@ -1801,7 +1803,7 @@ create_dict() ->
 %% We may handle the mixed mode later on....
 %%
 create_cob_table(Nid) ->
-    T = ets:new(cob_table, [named_table,public]),
+    T = ets:new(cob_table, [public]),
     if ?is_nodeid_extended(Nid) ->
 	    SDORx = ?XCOB_ID(?SDO_RX,Nid),
 	    SDOTx = ?XCOB_ID(?SDO_TX,Nid),
