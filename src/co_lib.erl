@@ -13,6 +13,13 @@
 -export([object_by_name/2]).
 -export([object_by_id/2]).
 -export([object_by_index/2]).
+-export([encode_type/1]).
+-export([encode_struct/1]).
+-export([encode_access/1]).
+-export([encode_transmission/1]).
+-export([decode_type/1]).
+-export([decode_struct/1]).
+-export([decode_access/1]).
 
 -include("../include/canopen.hrl").
 

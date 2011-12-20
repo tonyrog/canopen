@@ -17,6 +17,10 @@
 	   true ->
 		ok
 	end).
+-else.
+-define(dbg(Tag, Format, Args), ok).
+
 -endif.
+
 
 -endif.
