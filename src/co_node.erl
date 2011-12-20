@@ -954,6 +954,8 @@ handle_call(dump, _From, Ctx) ->
       fun({Ix, Mod, Pid},_) ->
 	      io:format("~7.16.0# reserved by ~p, module ~s\n",[Ix, Pid, Mod])
       end, ok, Ctx#co_ctx.res_table),
+    io:format("---------DICT----------\n"),
+    co_dict:to_fd(Ctx#co_ctx.dict, user),
     io:format("------------------------\n"),
     {reply, ok, Ctx};
 
@@ -1230,13 +1232,18 @@ handle_can(Frame, Ctx) ->
 		    Ctx
 	    end;
 	_NotKnown ->
-	    %% Test if MPDO
-	    <<F:1, Addr:7, Ix:16/little, Si:8, Data:32/little>> = 
-		Frame#can_frame.data,
-	    case {F, Addr} of
-		{1, 0} ->
-		    %% DAM-MPDO, destination is a group
-		    handle_dam_mpdo(Ctx, ?XNODE_ID(COBID), Ix, Si, Data);
+	    case Frame#can_frame.data of
+		%% Test if MPDO
+		<<F:1, Addr:7, Ix:16/little, Si:8, Data:32/little>> ->
+		    case {F, Addr} of
+			{1, 0} ->
+			    %% DAM-MPDO, destination is a group
+			    handle_dam_mpdo(Ctx, ?XNODE_ID(COBID), Ix, Si, Data);
+			_Other ->
+			    ?dbg("~s: handle_can: frame not handled: Frame = ~p\n", 
+				 [Ctx#co_ctx.name, Frame]),
+			    Ctx
+		    end;
 		_Other ->
 		    ?dbg("~s: handle_can: frame not handled: Frame = ~p\n", 
 			 [Ctx#co_ctx.name, Frame]),
@@ -1806,6 +1813,7 @@ create_cob_table(Nid) ->
 	    SDOTx = ?COB_ID(?SDO_TX,Nid),
 	    ets:insert(T, {?COB_ID(?NMT, 0), nmt})
     end,
+    ?dbg("install Nid=~w, SDORx=~w, SDOTx=~w\n", [Nid,SDORx,SDOTx]),
     ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
     ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
     T.
