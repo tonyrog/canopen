@@ -257,10 +257,10 @@ central_write_begin(Ctx, Index, SubInd) ->
 	    Err;
 	{ok,E} ->
 	    if (E#dict_entry.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
-		    {error,?abort_write_not_allowed};
-	       true ->
 		    ?dbg(srv, "central_write_begin: Write access ok\n", []),
-		    co_data_buf:init(write, Dict, E, undefined, undefined)
+		    co_data_buf:init(write, Dict, E, undefined, undefined);
+	       true ->
+		    {error,?abort_write_not_allowed}
 	    end
     end.
 
@@ -312,14 +312,14 @@ central_read_begin(Ctx, Index, SubInd) ->
     Dict = Ctx#sdo_ctx.dict,
     case co_dict:lookup_entry(Dict, {Index,SubInd}) of
 	{ok,E} ->
-	    if (E#dict_entry.access band ?ACCESS_RO) =:= 0 ->
-		    {error, ?abort_read_not_allowed};
-	       true ->
+	    if (E#dict_entry.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
 		    ?dbg(srv, "central_read_begin: Read access ok\n", []),
 		    co_data_buf:init(read, Dict, E,
 				     Ctx#sdo_ctx.read_buf_size, 
 				     trunc(Ctx#sdo_ctx.read_buf_size * 
-					       Ctx#sdo_ctx.load_ratio))
+					       Ctx#sdo_ctx.load_ratio));
+	       true ->
+		    {error, ?abort_read_not_allowed}
 	    end;
 	Err = {error,_} ->
 	    Err

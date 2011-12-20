@@ -59,6 +59,10 @@ suite() ->
 all() -> 
     [start_of_co_node,
      start_stop_app,
+     set_dict_segment,
+     get_dict_segment,
+     set_dict_block,
+     get_dict_block,
      set_atomic_segment,
      get_atomic_segment,
      set_atomic_block,
@@ -327,9 +331,46 @@ start_stop_app(_Config) ->
     ok.
 
 %%--------------------------------------------------------------------
+%% @spec set_dict_segment(Config) -> ok 
+%% @doc 
+%% Sets a value in the co_node internal dict using segment between cocli and co_node.
+%% @end
+%%--------------------------------------------------------------------
+set_dict_segment(Config) ->
+    set(Config, ct:get_config(dict_index), segment).
+
+%%--------------------------------------------------------------------
+%% @spec get_dict_segment(Config) -> ok 
+%% @doc 
+%% Gets a value from the co_node internal dict using segment between cocli and co_node.
+%% @end
+%%--------------------------------------------------------------------
+get_dict_segment(Config) ->
+    get(Config, ct:get_config(dict_index), segment).
+
+%%--------------------------------------------------------------------
+%% @spec set_dict_block(Config) -> ok 
+%% @doc 
+%% Sets a value in the co_node internal dict using block between cocli and co_node
+%% @end
+%%--------------------------------------------------------------------
+set_dict_block(Config) ->
+    set(Config, ct:get_config(dict_index), block).
+
+%%--------------------------------------------------------------------
+%% @spec get_dict_block(Config) -> ok 
+%% @doc 
+%% Gets a value from the co_node internal using block between cocli and co_node.
+%% @end
+%%--------------------------------------------------------------------
+get_dict_block(Config) ->
+    get(Config, ct:get_config(dict_index), block).
+
+
+%%--------------------------------------------------------------------
 %% @spec set_atomic_segment(Config) -> ok 
 %% @doc 
-%% Sets a value using block between cocli and co_node and atomic 
+%% Sets a value using segment between cocli and co_node and atomic 
 %% between co_node and application.
 %% @end
 %%--------------------------------------------------------------------
@@ -339,7 +380,7 @@ set_atomic_segment(Config) ->
 %%--------------------------------------------------------------------
 %% @spec get_atomic_segment(Config) -> ok 
 %% @doc 
-%% Gets a value using block between cocli and co_node and atomic 
+%% Gets a value using segment between cocli and co_node and atomic 
 %% between co_node and application.
 %% @end
 %%--------------------------------------------------------------------
@@ -360,7 +401,7 @@ set_atomic_block(Config) ->
 %% @spec get_atomic_block(Config) -> ok 
 %% @doc 
 %% Gets a value using block between cocli and co_node and atomic 
-%% atomic between co_node and application.
+%% between co_node and application.
 %% @end
 %%--------------------------------------------------------------------
 get_atomic_block(Config) ->
@@ -589,7 +630,11 @@ set(Config, {{Index, _T, _M, _Org}, NewValue}, BlockOrSegment) ->
     [] = os:cmd(set_cmd(Config, Index, OldValue, BlockOrSegment)),
     {Index, _Type, _Transfer, OldValue} = lists:keyfind(Index, 1, co_test_app:dict()),
 
-    ok.
+    ok;
+set(Config, {Index, NewValue}, BlockOrSegment) ->
+    %% co_node internal dict
+    [] = os:cmd(set_cmd(Config, Index, NewValue, BlockOrSegment)).
+   
 
 
 %%--------------------------------------------------------------------
@@ -620,7 +665,14 @@ get(Config, {{Index, _T, _M, _Org}, _NewValue}, BlockOrSegment) ->
     %% Get value from cocli and compare with dict
     %% {Index, _Type, _Transfer, Value} = lists:keyfind(Index, 1, co_test_app:dict()),
     
-    ok.
+    ok;
+get(Config, {Index, _NewValue}, BlockOrSegment) ->
+    %% co_node internal dict
+    Result = os:cmd(get_cmd(Config, Index, BlockOrSegment)),
+    ct:pal("Result = ~p", [Result]),
+    
+    Result = "0x2002 = \"New string aaaaabbbbbbbccccccddddddeeeee\"\n".
+
 
 stream_file(Config, TransferMode) ->
     PrivDir = ?config(priv_dir, Config),

@@ -62,34 +62,42 @@ init_i(read, Pid, #app_entry{index = I, type = Type, transfer = {value, Value} =
     Data = co_codec:encode(Value, Type),
     open(read, #co_data_buf {access = read,
 			  pid = Pid,
-			  i = I,
-			  data = Data,
-			  size = size(Data),
-			  eof = true,
-			  type = Type,
-			  buf_size = BSize,
-			  load_level = LLevel,
-			  mode = M});
+			     i = I,
+			     data = Data,
+			     size = size(Data),
+			     eof = true,
+			     type = Type,
+			     buf_size = BSize,
+			     load_level = LLevel,
+			     mode = M});
 init_i(Access, Pid, #app_entry{index = I, type = Type, transfer = Mode}, BSize, LLevel) ->
     open(Access, #co_data_buf {access = Access,
-			    pid = Pid,
-			    i = I,
-			    type = Type,
-			    eof = false,
-			    buf_size = BSize,
-			    load_level = LLevel,
-			    mode = Mode});
+			       pid = Pid,
+			       i = I,
+			       type = Type,
+			       eof = false,
+			       buf_size = BSize,
+			       load_level = LLevel,
+			       mode = Mode});
 init_i(read, Dict, #dict_entry{index = I, type = Type, value = Value}, BSize, LLevel) ->
     Data = co_codec:encode(Value, Type),
     {ok, #co_data_buf {access = read,
-		    i = I,
-		    type = Type,
-		    data = Data,
-		    size = size(Data),
-		    eof = true,
-		    buf_size = BSize,
-		    load_level = LLevel,
-		    mode = {dict, Dict}}}.
+		       i = I,
+		       type = Type,
+		       data = Data,
+		       size = size(Data),
+		       eof = true,
+		       buf_size = BSize,
+		       load_level = LLevel,
+		       mode = {dict, Dict}}};
+init_i(write, Dict, #dict_entry{index = I, type = Type}, BSize, LLevel) ->
+    {ok, #co_data_buf {access = write,
+		       i = I,
+		       type = Type,
+		       eof = true,
+		       buf_size = BSize,
+		       load_level = LLevel,
+		       mode = {dict, Dict}}}.
 
     
 
@@ -323,7 +331,8 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = Mode, pid = Pid, data = OldD
 write(Buf=#co_data_buf {mode = {streamed, Module} = Mode, pid = Pid, data = Data, 
 		     ref = Ref, tmp = TmpData}, 
       N, true, block) ->
-    ?dbg(data_buf, "write: mode = ~p,  N = ~p, Eod = ~p", [Mode, N, true]),
+    ?dbg(data_buf, "write: mode = ~p,  N = ~p, TmpData = ~p, Eod = ~p", 
+	 [Mode, N, TmpData, true]),
     %% All data received, time to transfer rest to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
@@ -346,13 +355,14 @@ write(Buf=#co_data_buf {mode = {dict, Dict} = Mode, type = Type, data = OldData,
 	 [Index, SubInd, Value]),
     co_dict:direct_set(Dict, Index, SubInd, Value),
     {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
-write(Buf=#co_data_buf {mode = {dict, Dict} = Mode, type = Type, data = Data, 
+write(Buf=#co_data_buf {mode = {dict, Dict} = Mode, type = Type, data = OldData, 
 		     i = {Index, SubInd}, tmp = TmpData}, 
       N, true, block) -> 
-    ?dbg(data_buf, "write: mode = ~p, N = ~p, Eod = ~p", [Mode, N, true]),
-    Size = size(Data) - N,
+    ?dbg(data_buf, "write: mode = ~p, N = ~p, TmpData = ~p, Eod = ~p", 
+	 [Mode, N, TmpData, true]),
+    Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
-    DataToSend = <<Data/binary, DataToAdd/binary>>,
+    DataToSend = <<OldData/binary, DataToAdd/binary>>,
     {Value, _} = co_codec:decode(DataToSend, Type),
     ?dbg(data_buf, "write: store I = ~.16B:~.8B, Value = ~p\n", 
 	 [Index, SubInd, Value]),
