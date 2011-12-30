@@ -392,7 +392,7 @@ s_segmented_upload_response(M, S) when is_record(M, can_frame) ->
 	    ?dbg(cli, "s_segmented_upload_response", []),
 
 	    if Expedited =:= 1 ->
-		    NBytes = if SizeInd =:= 1 -> N;
+		    NBytes = if SizeInd =:= 1 -> 4 - N;
 				true -> 0
 			     end,
 		    <<Data1:NBytes/binary, _Filler/binary>> = Data,
@@ -403,6 +403,10 @@ s_segmented_upload_response(M, S) when is_record(M, can_frame) ->
 			{ok, _Buf1} ->
 			    gen_server:reply(S#co_session.node_from, {ok, Data}),
 			    {stop, normal, S};
+			{ok, Buf1, Mref} when is_reference(Mref) ->
+			    %% Called an application
+			    S1 = S#co_session {mref = Mref, buf = Buf1},
+			    {next_state, s_writing_segment, S1, ?TMO(S1)};
 			{error, Reason} ->
 			    co_session:abort(S, Reason)
 		    end;

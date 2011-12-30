@@ -487,13 +487,14 @@ start_segmented_upload(S) ->
     ?dbg(srv, "start_segmented_upload, nbytes = ~p\n", [NBytes]),
     if NBytes =/= 0, NBytes =< 4 andalso EofFlag =:= true ->
 	    case co_data_buf:read(Buf, NBytes) of
-		{ok, Data, true, Buf1} ->
-		    ?dbg(srv, "start_segmented_upload, expediated, data = ~p, size = ~p", 
-			 [Data, NBytes]),
+		{ok, Data, true, _Buf1} ->
+		    ?dbg(srv, "start_segmented_upload, expediated, data = ~p", 
+			 [Data]),
 		    Data1 = co_sdo:pad(Data, 4),
 		    E=1,
 		    SizeInd=1,
-		    R=?mk_scs_initiate_upload_response(NBytes,E,SizeInd,IX,SI,Data1),
+		    N = 4 - NBytes,
+		    R=?mk_scs_initiate_upload_response(N,E,SizeInd,IX,SI,Data1),
 		    send(S, R),
 		    {stop, normal, S};
 		{error, Reason} ->
@@ -871,6 +872,7 @@ block_segment_written(S) ->
 s_block_download_end(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
 	?ma_ccs_block_download_end_request(N,CRC) ->
+	    %% CRC ??
 	    case co_data_buf:write(S#co_session.buf,N,true,block) of	    
 		{ok, Buf, Mref} ->
 		    %% Called an application
