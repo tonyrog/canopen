@@ -22,7 +22,7 @@
 -compile(export_all).
 
 %% API
--export([start/2, stop/0]).
+-export([start/2, stop/1]).
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
@@ -40,7 +40,6 @@
 -define(dbg(Fmt,As), ok).
 -endif.
 
--define(SERVER, ?MODULE). 
 -define(WRITE_SIZE, 28).
 
 -record(loop_data,
@@ -68,8 +67,16 @@
 %% @end
 %%--------------------------------------------------------------------
 start(CoSerial, Dict) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [CoSerial, Dict], []).
+    gen_server:start_link({local, name(CoSerial)}, 
+			  ?MODULE, [CoSerial, Dict], []).
 
+name(Serial) when is_integer(Serial) ->
+    list_to_atom("co_test_app" ++ integer_to_list(Serial));
+name(Serial) when is_atom(Serial) ->
+    %% co_mgr ??
+    list_to_atom("co_test_app" ++ atom_to_list(Serial)).
+    
+	
 %%--------------------------------------------------------------------
 %% @spec stop() -> ok | {error, Error}
 %% @doc
@@ -78,14 +85,14 @@ start(CoSerial, Dict) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-stop() ->
-    gen_server:call(?MODULE, stop).
+stop(CoSerial) ->
+    gen_server:call(name(CoSerial), stop).
 
-loop_data() ->
-    gen_server:call(?MODULE, loop_data).
+loop_data(CoSerial) ->
+    gen_server:call(name(CoSerial), loop_data).
 
-dict() ->
-    gen_server:call(?MODULE, dict).
+dict(CoSerial) ->
+    gen_server:call(name(CoSerial), dict).
 
 %% transfer_mode == {atomic, Module}
 set(Pid, {Index, SubInd}, NewValue) ->

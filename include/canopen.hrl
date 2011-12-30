@@ -429,6 +429,9 @@
 	  streamed :: boolean()    %% True if data is streamed from application
       }).
 
+-define(TMO(S), ((S)#co_session.ctx)#sdo_ctx.timeout).
+-define(BLKTMO(S), ((S)#co_session.ctx)#sdo_ctx.blk_timeout).
+
 -record(app,
 	{
 	  pid,    %% application pid

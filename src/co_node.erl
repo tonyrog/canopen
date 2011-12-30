@@ -15,6 +15,7 @@
 -include_lib("can/include/can.hrl").
 -include("canopen.hrl").
 -include("co_app.hrl").
+-include("co_debug.hrl").
 
 %% API
 -export([start_link/1, stop/1]).
@@ -41,8 +42,8 @@
 -export([add_entry/2, get_entry/2]).
 -export([load_dict/2]).
 -export([set/3, set/4, value/2]).
--export([store/5, fetch/4]).
--export([store_block/5, fetch_block/4]).
+-export([store/5, fetch/4, fetch/5]).
+-export([store_block/5, fetch_block/4, fetch_block/5]).
 -export([subscribers/2]).
 -export([reserver_with_module/2]).
 -export([tpdo_mapping/2, rpdo_mapping/2]).
@@ -53,12 +54,6 @@
 -export([get_option/2, set_option/3]).
 
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
-
--ifdef(debug).
--define(dbg(Fmt,As), io:format(Fmt, As)).
--else.
--define(dbg(Fmt, As), ok).
--endif.
 
 -define(COBID_TO_CANID(ID),
 	if ?is_cobid_extended((ID)) ->
@@ -112,7 +107,7 @@
 -spec start_link(list(argtype)) -> {ok, Pid::pid()} | ignore | {error, Error::atom()}.
 
 start_link(Args) ->
-    ?dbg("~p: start_link: Args = ~p\n", [?MODULE, Args]),
+    ?dbg(node, "start_link: Args = ~p\n", [ Args]),
         
     Serial = proplists:get_value(serial, Args, 0),
     Opts = proplists:get_value(options, Args, []),
@@ -125,8 +120,8 @@ start_link(Args) ->
 	 end,
 
     Name = name(Opts, S),
-    ?dbg("~p: Starting co_node with Name = ~p, Serial = ~.16#, NodeId = ~.16#\n",
-	 [?MODULE, Name, S, NodeId]),
+    ?dbg(node, "Starting co_node with Name = ~p, Serial = ~.16#, NodeId = ~.16#\n",
+	 [Name, S, NodeId]),
     gen_server:start({local, Name}, ?MODULE, [S,NodeId,Name,Opts], []).
 
 %%
@@ -395,52 +390,80 @@ value(Serial, Ix) ->
 %%
 
 %%--------------------------------------------------------------------
-%% @spec store(Serial, CobId, Index, SubInd, Value) -> noreply | {error, Error}
-%%
 %% @doc
 %% Starts a store session to store Value at Index:Subind on remote node.
 %%
 %% @end
 %%--------------------------------------------------------------------
-store(Serial, COBID, IX, SI, Value) 
-  when ?is_index(IX), ?is_subind(SI), is_binary(Value) ->
-    gen_server:call(serial_to_pid(Serial), {store,false,COBID,IX,SI,Value}).
+-spec store(Serial::integer() | atom(), Cobid::integer(), 
+	    Index::integer(), SubInd::integer(), 
+	    Term::binary() | {Pid::pid(), Module::atom()}) ->
+		   ok | {error, Error::atom()}.
+
+store(Serial, COBID, IX, SI, Term) 
+  when ?is_index(IX), ?is_subind(SI) ->
+    ?dbg(node, "store: Serial = ~p, CobId = ~.16#, Ix = ~4.16.0B, Si = ~p, Term = ~p", 
+	 [Serial, COBID, IX, SI, Term]),
+    Pid = serial_to_pid(Serial),
+    gen_server:call(Pid, {store,false,COBID,IX,SI,Term}).
+
 
 %%--------------------------------------------------------------------
-%% @spec store_block(Serial, CobId, Index, SubInd, Value) -> noreply | {error, Error}
-%%
 %% @doc
 %% Starts a store session to store Value at Index:Subind on remote node.
 %%
 %% @end
 %%--------------------------------------------------------------------
-store_block(Serial, COBID, IX, SI, Value) 
-  when ?is_index(IX), ?is_subind(SI), is_binary(Value) ->
-    gen_server:call(serial_to_pid(Serial), {store,true,COBID,IX,SI,Value}).
+-spec store_block(Serial::integer() | atom(), Cobid::integer(), 
+		  Index::integer(), SubInd::integer(), 
+		  Term::binary() | {Pid::pid(), Module::atom()}) ->
+			 ok | {error, Error::atom()}.
+
+store_block(Serial, COBID, IX, SI, Term) 
+  when ?is_index(IX), ?is_subind(SI) ->
+    ?dbg(node, "store_block: Serial = ~p, CobId = ~.16#, Ix = ~4.16.0B, Si = ~p, Term = ~p", 
+	 [Serial, COBID, IX, SI, Term]),
+    gen_server:call(serial_to_pid(Serial), {store,true,COBID,IX,SI,Term}).
 
 %%--------------------------------------------------------------------
-%% @spec fetch(Serial, CobId, Index, SubInd) -> noreply | {error, Error}
-%%
 %% @doc
 %% Starts a fetch session to fetch Value at Index:Subind on remote node.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec fetch(Serial::integer() | atom(), Cobid::integer(), 
+	    Index::integer(), SubInd::integer(), 
+	    {Pid::pid(), Module::atom()}) ->
+		   ok | {error, Error::atom()}.
+
+
+fetch(Serial, COBID, IX, SI, Term)
+  when ?is_index(IX), ?is_subind(SI) ->
+    gen_server:call(serial_to_pid(Serial), {fetch,false,COBID,IX,SI,Term}).
+
 fetch(Serial, COBID, IX, SI)
   when ?is_index(IX), ?is_subind(SI) ->
-    gen_server:call(serial_to_pid(Serial), {fetch,false,COBID,IX,SI}).
+    gen_server:call(serial_to_pid(Serial), {fetch,false,COBID,IX,SI,data}).
 
 %%--------------------------------------------------------------------
-%% @spec fetch_block(Serial, CobId, Index, SubInd) -> noreply | {error, Error}
-%%
 %% @doc
 %% Starts a fetch session to fetch Value at Index:Subind on remote node.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec fetch_block(Serial::integer() | atom(), Cobid::integer(), 
+		  Index::integer(), SubInd::integer(), 
+		  {Pid::pid(), Module::atom()}) ->
+			 ok | {error, Error::atom()}.
+
+
+fetch_block(Serial, COBID, IX, SI, Term)
+  when ?is_index(IX), ?is_subind(SI) ->
+    gen_server:call(serial_to_pid(Serial), {fetch,true,COBID,IX,SI,Term}).
+
 fetch_block(Serial, COBID, IX, SI)
   when ?is_index(IX), ?is_subind(SI) ->
-    gen_server:call(serial_to_pid(Serial), {fetch,true,COBID,IX,SI}).
+    gen_server:call(serial_to_pid(Serial), {fetch,true,COBID,IX,SI,data}).
 
 
 %%--------------------------------------------------------------------
@@ -522,9 +545,9 @@ set_option(Serial, Option, NewValue)
 	    {error, "Option " ++ atom_to_list(Option) ++ 
 		 " can only be set to a float value between 0 and 1."}
     end;
-set_option(Serial, extended, NewValue) ->
+set_option(_Serial, extended, _NewValue) ->
     {error, "Option extended can not be changed."};
-set_option(Serial, Option, NewValue) ->
+set_option(_Serial, Option, _NewValue) ->
     {error, "Option " ++ atom_to_list(Option) + " unknwon."}.
 
 %% convert a node serial name to a local name
@@ -565,16 +588,16 @@ notify(Nid,Index,Subind,Value) ->
 	      [self(), Nid, Index, Subind, Value]),
 
     if ?is_nodeid_extended(Nid) ->
-	    ?dbg("~p: notify: Nid ~.16# is extended\n",[self(), Nid]),
+	    ?dbg(node, "notify: Nid ~.16# is extended\n",[self(), Nid]),
 	    CobId = ?XCOB_ID(?PDO1_TX, Nid);
 	true ->
-	    ?dbg("~p: notify: Nid ~.16# is not extended\n",[self(), Nid]),
+	    ?dbg(node, "notify: Nid ~.16# is not extended\n",[self(), Nid]),
 	    CobId = ?COB_ID(?PDO1_TX, Nid)
     end,
     FrameID = ?COBID_TO_CANID(CobId),
     Frame = #can_frame { id=FrameID, len=0, 
 			 data=(<<16#80,Index:16/little,Subind:8,Value:32/little>>) },
-    ?dbg("~p: notify: Sending frame ~p from Nid = ~.16# (CobId = ~.16#, CanId = ~.16#)\n",
+    ?dbg(node, "notify: Sending frame ~p from Nid = ~.16# (CobId = ~.16#, CanId = ~.16#)\n",
 	 [self(), Frame, Nid, CobId, FrameID]),
     can:send(Frame).
 
@@ -649,6 +672,8 @@ reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Serial, NodeId, NodeName, Opts]) ->
+    put(dbg, true), %% Make debug possbible
+
     can_router:start(),
     can_udp:start(0),
 
@@ -765,18 +790,21 @@ handle_call({value,Ix}, _From, Ctx) ->
     Result = co_dict:value(Ctx#co_ctx.dict, Ix, 0),
     {reply, Result, Ctx};
 
-handle_call({store,Block,COBID,IX,SI,Bin}, From, Ctx) ->
+handle_call({store,Block,COBID,IX,SI,Term}, From, Ctx) ->
     case lookup_sdo_server(COBID,Ctx) of
 	ID={Tx,Rx} ->
-	    case co_sdo_cli_fsm:store(Ctx#co_ctx.sdo,Block,From,Tx,Rx,IX,SI,Bin) of
+	    ?dbg(node, "~s: store: ID = ~p", [Ctx#co_ctx.name,ID]),
+	    case co_sdo_cli_fsm:store(Ctx#co_ctx.sdo,Block,From,Tx,Rx,IX,SI,Term) of
 		{error, Reason} ->
-		    io:format("unable to start co_sdo_cli_fsm: ~p\n", [Reason]),
+		    ?dbg(node,"~s: unable to start co_sdo_cli_fsm: ~p\n", 
+			 [Ctx#co_ctx.name,Reason]),
 		    {reply, Reason, Ctx};
 		{ok, Pid} ->
 		    Mon = erlang:monitor(process, Pid),
 		    sys:trace(Pid, true),
 		    S = #sdo { id=ID, pid=Pid, mon=Mon },
-		    ?dbg("~s: store: added session id=~p\n", [Ctx#co_ctx.name, ID]),
+		    ?dbg(node, "~s: store: added session id=~p\n", 
+			 [Ctx#co_ctx.name, ID]),
 		    Sessions = Ctx#co_ctx.sdo_list,
 		    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
 	    end;
@@ -784,18 +812,21 @@ handle_call({store,Block,COBID,IX,SI,Bin}, From, Ctx) ->
 	    {reply, {error, badarg}, Ctx}
     end;
 
-handle_call({fetch,Block,COBID,IX,SI}, From, Ctx) ->
+handle_call({fetch,Block,COBID,IX,SI, Term}, From, Ctx) ->
     case lookup_sdo_server(COBID,Ctx) of
 	ID={Tx,Rx} ->
-	    case co_sdo_cli_fsm:fetch(Ctx#co_ctx.sdo,Block,From,Tx,Rx,IX,SI) of
+	    ?dbg(node, "~s: fetch: ID = ~p", [Ctx#co_ctx.name,ID]),
+	    case co_sdo_cli_fsm:fetch(Ctx#co_ctx.sdo,Block,From,Tx,Rx,IX,SI,Term) of
 		{error, Reason} ->
-		    io:format("unable to start co_sdo_cli_fsm: ~p\n", [Reason]),
+		    io:format("~s: unable to start co_sdo_cli_fsm: ~p\n", 
+			      [Ctx#co_ctx.name,Reason]),
 		    {reply, Reason, Ctx};
 		{ok, Pid} ->
 		    Mon = erlang:monitor(process, Pid),
 		    sys:trace(Pid, true),
 		    S = #sdo { id=ID, pid=Pid, mon=Mon },
-		    ?dbg("~s: fetch: added session id=~p\n", [Ctx#co_ctx.name, ID]),
+		    ?dbg(node, "~s: fetch: added session id=~p\n", 
+			 [Ctx#co_ctx.name, ID]),
 		    Sessions = Ctx#co_ctx.sdo_list,
 		    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
 	    end;
@@ -995,7 +1026,7 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
 	    {reply, ok, Ctx#co_ctx {sdo = SdoCtx}};
 	NewCtx when is_record(NewCtx, co_ctx) ->
 	    {reply, ok, NewCtx};
-	{error, Reason} ->
+	{error, _Reason} ->
 	    {reply, Reply, Ctx}
     end;
 handle_call(stop, _From, Ctx) ->
@@ -1057,7 +1088,7 @@ handle_info({timeout,Ref,time_stamp}, Ctx) when Ref =:= Ctx#co_ctx.time_stamp_tm
     Size = byte_size(Data),
     Frame = #can_frame { id=FrameID, len=Size, data=Data },
     can:send(Frame),
-    ?dbg("~s: handle_info: Sent time stamp ~p\n", [Ctx#co_ctx.name, Time]),
+    ?dbg(node, "~s: handle_info: Sent time stamp ~p\n", [Ctx#co_ctx.name, Time]),
     Ctx1 = Ctx#co_ctx { time_stamp_tmr = start_timer(Ctx#co_ctx.time_stamp_time, time_stamp) },
     {noreply, Ctx1};
 
@@ -1065,7 +1096,7 @@ handle_info({'DOWN',Ref,process,_Pid,Reason}, Ctx) ->
     case lists:keysearch(Ref, #sdo.mon, Ctx#co_ctx.sdo_list) of
 	{value,_S} ->
 	    if Reason =/= normal ->
-		    io:format("~p: session died: ~p\n", [?MODULE, Reason]);
+		    io:format("~s: session died: ~p\n", [Ctx#co_ctx.name, Reason]);
 	       true ->
 		    ok
 	    end,
@@ -1076,7 +1107,7 @@ handle_info({'DOWN',Ref,process,_Pid,Reason}, Ctx) ->
 		false ->
 		    {noreply, Ctx};
 		{value,A} ->
-		    io:format("can_node: id=~w application died\n", [A#app.pid]),
+		    io:format("~s: id=~w application died\n", [Ctx#co_ctx.name,A#app.pid]),
 		    remove_subscriptions(Ctx#co_ctx.sub_table, A#app.pid), %% Or reset ??
 		    reset_reservations(Ctx#co_ctx.res_table, A#app.pid),
 		    %% FIXME: restart application? application_mod ?
@@ -1104,8 +1135,10 @@ terminate(_Reason, Ctx) ->
 	      case Pid of
 		  Self -> 
 		      do_nothing;
-		  _NotSelf ->
-		      ?dbg("~s: terminate: Killing application with pid = ~p\n", 
+		  dead ->
+		      do_nothing;
+		  _NotSelf->
+		      ?dbg(node, "~s: terminate: Killing application with pid = ~p\n", 
 			   [Ctx#co_ctx.name, Pid]),
 		      %% Or gen_server:cast(Pid, co_node_terminated) ??	 
 		      exit(Pid, co_node_terminated)
@@ -1120,8 +1153,10 @@ terminate(_Reason, Ctx) ->
 	      case Pid of
 		  Self -> 
 		      do_nothing;
+		  dead ->
+		      do_nothing;
 		  _NotSelf ->
-		      ?dbg("~s: terminate: Killing application with pid = ~p\n", 
+		      ?dbg(node, "~s: terminate: Killing application with pid = ~p\n", 
 			   [Ctx#co_ctx.name, Pid]),
 		      %% Or gen_server:cast(Pid, co_node_terminated) ??	 
 		      exit(Pid, co_node_terminated)
@@ -1136,7 +1171,7 @@ terminate(_Reason, Ctx) ->
 	      case T#tpdo.pid of
 		  Self  -> do_nothing; %% ??
 		  Pid -> 
-		      ?dbg("~s: terminate: Killing TPDO with pid = ~p\n", 
+		      ?dbg(node, "~s: terminate: Killing TPDO with pid = ~p\n", 
 			   [Ctx#co_ctx.name, Pid]),
 			  %% Or gen_server:cast(Pid, co_node_terminated) ?? 
 		      exit(Pid, co_node_terminated)
@@ -1144,7 +1179,7 @@ terminate(_Reason, Ctx) ->
       end,
       Ctx#co_ctx.tpdo_list),
 
-    ?dbg("~s: terminate: cleaned up, exiting\n", [Ctx#co_ctx.name]),
+    ?dbg(node, "~s: terminate: cleaned up, exiting\n", [Ctx#co_ctx.name]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -1164,7 +1199,7 @@ code_change(_OldVsn, Ctx, _Extra) ->
 %% Load a dictionary
 %% 
 load_dict_internal(File, Ctx) ->
-    ?dbg("~p: load_dict_internal: Loading file = ~p\n", [?MODULE, File]),
+    ?dbg(node, "load_dict_internal: Loading file = ~p\n", [File]),
     try co_file:load(File) of
 	{ok,Os} ->
 	    %% Install all objects
@@ -1184,8 +1219,8 @@ load_dict_internal(File, Ctx) ->
 	    {error, Error, Ctx}
     catch
 	error:Reason ->
-	    ?dbg("~p: load_dict_internal: Failed Loading file, reason = ~p\n", 
-		 [?MODULE, Reason]),
+	    ?dbg(node, "load_dict_internal: Failed Loading file, reason = ~p\n", 
+		 [Reason]),
 
 	    {error, Reason, Ctx}
     end.
@@ -1195,7 +1230,7 @@ load_dict_internal(File, Ctx) ->
 %%
 handle_can(Frame, Ctx) when ?is_can_frame_rtr(Frame) ->
     COBID = ?CANID_TO_COBID(Frame#can_frame.id),
-    ?dbg("~s: handle_can: COBID=~8.16.0B\n", [Ctx#co_ctx.name, COBID]),
+    ?dbg(node, "~s: handle_can: COBID=~8.16.0B\n", [Ctx#co_ctx.name, COBID]),
     case lookup_cobid(COBID, Ctx) of
 	nmt  ->
 	    %% Handle Node guard
@@ -1208,7 +1243,7 @@ handle_can(Frame, Ctx) when ?is_can_frame_rtr(Frame) ->
     end;
 handle_can(Frame, Ctx) ->
     COBID = ?CANID_TO_COBID(Frame#can_frame.id),
-    ?dbg("~s: handle_can: COBID=~8.16.0B\n", [Ctx#co_ctx.name, COBID]),
+    ?dbg(node, "~s: handle_can: COBID=~8.16.0B\n", [Ctx#co_ctx.name, COBID]),
     case lookup_cobid(COBID, Ctx) of
 	nmt        -> handle_nmt(Frame, Ctx);
 	sync       -> handle_sync(Frame, Ctx);
@@ -1240,12 +1275,12 @@ handle_can(Frame, Ctx) ->
 			    %% DAM-MPDO, destination is a group
 			    handle_dam_mpdo(Ctx, ?XNODE_ID(COBID), Ix, Si, Data);
 			_Other ->
-			    ?dbg("~s: handle_can: frame not handled: Frame = ~p\n", 
+			    ?dbg(node, "~s: handle_can: frame not handled: Frame = ~p\n", 
 				 [Ctx#co_ctx.name, Frame]),
 			    Ctx
 		    end;
 		_Other ->
-		    ?dbg("~s: handle_can: frame not handled: Frame = ~p\n", 
+		    ?dbg(node, "~s: handle_can: frame not handled: Frame = ~p\n", 
 			 [Ctx#co_ctx.name, Frame]),
 		    Ctx
 	    end
@@ -1255,7 +1290,7 @@ handle_can(Frame, Ctx) ->
 %% NMT 
 %%
 handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
-    ?dbg("~s: handle_nmt: ~p\n", [Ctx#co_ctx.name, M]),
+    ?dbg(node, "~s: handle_nmt: ~p\n", [Ctx#co_ctx.name, M]),
     <<NodeId,Cs,_/binary>> = M#can_frame.data,
     if NodeId == 0; NodeId == Ctx#co_ctx.id ->
 	    case Cs of
@@ -1270,7 +1305,7 @@ handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
 		?NMT_STOP_REMOTE_NODE ->
 		    Ctx#co_ctx { state = ?Stopped };
 		_ ->
-		    ?dbg("handle_nmt: unknown cs=~w\n", [Cs]),
+		    ?dbg(node, "handle_nmt: unknown cs=~w\n", [Cs]),
 		    Ctx
 	    end;
        true ->
@@ -1280,7 +1315,7 @@ handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
 
 
 handle_node_guard(Frame, Ctx) when ?is_can_frame_rtr(Frame) ->
-    ?dbg("~s: handle_node_guard: request ~p\n", [Ctx#co_ctx.name,Frame]),
+    ?dbg(node, "~s: handle_node_guard: request ~p\n", [Ctx#co_ctx.name,Frame]),
     NodeId = ?NODE_ID(Frame#can_frame.id),
     if NodeId == 0; NodeId == Ctx#co_ctx.id ->
 	    Data = Ctx#co_ctx.state bor Ctx#co_ctx.toggle,
@@ -1294,7 +1329,7 @@ handle_node_guard(Frame, Ctx) when ?is_can_frame_rtr(Frame) ->
 	    Ctx
     end;
 handle_node_guard(Frame, Ctx) when Frame#can_frame.len >= 1 ->
-    ?dbg("~s: handle_node_guard: ~p\n", [Ctx#co_ctx.name,Frame]),
+    ?dbg(node, "~s: handle_node_guard: ~p\n", [Ctx#co_ctx.name,Frame]),
     NodeId = ?NODE_ID(Frame#can_frame.id),
     case Frame#can_frame.data of
 	<<_Toggle:1, State:7, _/binary>> when NodeId =/= Ctx#co_ctx.id ->
@@ -1308,14 +1343,14 @@ handle_node_guard(Frame, Ctx) when Frame#can_frame.len >= 1 ->
 %% LSS
 %% 
 handle_lss(M, Ctx) ->
-    ?dbg("~s: handle_lss: ~p\n", [Ctx#co_ctx.name,M]),
+    ?dbg(node, "~s: handle_lss: ~p\n", [Ctx#co_ctx.name,M]),
     Ctx.
 
 %%
 %% SYNC
 %%
 handle_sync(_Frame, Ctx) ->
-    ?dbg("~s: handle_sync: ~p\n", [Ctx#co_ctx.name,_Frame]),
+    ?dbg(node, "~s: handle_sync: ~p\n", [Ctx#co_ctx.name,_Frame]),
     lists:foreach(
       fun(T) -> co_tpdo:sync(T#tpdo.pid) end, Ctx#co_ctx.tpdo_list),
     Ctx.
@@ -1324,10 +1359,10 @@ handle_sync(_Frame, Ctx) ->
 %% TIME STAMP - update local time offset
 %%
 handle_time_stamp(Frame, Ctx) ->
-    ?dbg("~s: handle_timestamp: ~p\n", [Ctx#co_ctx.name,Frame]),
+    ?dbg(node, "~s: handle_timestamp: ~p\n", [Ctx#co_ctx.name,Frame]),
     try co_codec:decode(Frame#can_frame.data, ?TIME_OF_DAY) of
 	{T, _Bits} when is_record(T, time_of_day) ->
-	    ?dbg("~s: Got timestamp: ~p\n", [Ctx#co_ctx.name, T]),
+	    ?dbg(node, "~s: Got timestamp: ~p\n", [Ctx#co_ctx.name, T]),
 	    set_time_of_day(T),
 	    Ctx;
 	_ ->
@@ -1341,14 +1376,14 @@ handle_time_stamp(Frame, Ctx) ->
 %% EMERGENCY - this is the consumer side detecting emergency
 %%
 handle_emcy(_Frame, Ctx) ->
-    ?dbg("~s: handle_emcy: ~p\n", [Ctx#co_ctx.name,_Frame]),
+    ?dbg(node, "~s: handle_emcy: ~p\n", [Ctx#co_ctx.name,_Frame]),
     Ctx.
 
 %%
 %% Recive PDO - unpack into the dictionary
 %%
 handle_rpdo(Frame, Offset, _COBID, Ctx) ->
-    ?dbg("~s: handle_rpdo: ~p\n", [Ctx#co_ctx.name,Frame]),
+    ?dbg(node, "~s: handle_rpdo: ~p\n", [Ctx#co_ctx.name,Frame]),
     rpdo_unpack(Offset,Frame#can_frame.data, Ctx).
 
 %% CLIENT side:
@@ -1356,18 +1391,18 @@ handle_rpdo(Frame, Offset, _COBID, Ctx) ->
 %% FIXME: conditional compile this
 %%
 handle_sdo_tx(Frame, Tx, Rx, Ctx) ->
-    ?dbg("~s: handle_sdo_tx: src=~p, ~s\n",
+    ?dbg(node, "~s: handle_sdo_tx: src=~p, ~s\n",
 	      [Ctx#co_ctx.name, Tx,
 	       co_format:format_sdo(co_sdo:decode_tx(Frame#can_frame.data))]),
     ID = {Tx,Rx},
-    ?dbg("~s: handle_sdo_tx: session id=~p\n", [Ctx#co_ctx.name, ID]),
+    ?dbg(node, "~s: handle_sdo_tx: session id=~p\n", [Ctx#co_ctx.name, ID]),
     Sessions = Ctx#co_ctx.sdo_list,
     case lists:keysearch(ID,#sdo.id,Sessions) of
 	{value, S} ->
 	    gen_fsm:send_event(S#sdo.pid, Frame),
 	    Ctx;
 	false ->
-	    ?dbg("~s: handle_sdo_tx: session not found\n", [Ctx#co_ctx.name]),
+	    ?dbg(node, "~s: handle_sdo_tx: session not found\n", [Ctx#co_ctx.name]),
 	    %% no such session active
 	    Ctx
     end.
@@ -1377,14 +1412,14 @@ handle_sdo_tx(Frame, Tx, Rx, Ctx) ->
 %% FIXME: conditional compile this
 %%
 handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
-    ?dbg("~s: handle_sdo_rx: ~s\n", 
+    ?dbg(node, "~s: handle_sdo_rx: ~s\n", 
 	      [Ctx#co_ctx.name,
 	       co_format:format_sdo(co_sdo:decode_rx(Frame#can_frame.data))]),
     ID = {Rx,Tx},
     Sessions = Ctx#co_ctx.sdo_list,
     case lists:keysearch(ID,#sdo.id,Sessions) of
 	{value, S} ->
-	    ?dbg("~s: handle_sdo_rx: Frame sent to old process ~p\n", 
+	    ?dbg(node, "~s: handle_sdo_rx: Frame sent to old process ~p\n", 
 		 [Ctx#co_ctx.name,S#sdo.pid]),
 	    gen_fsm:send_event(S#sdo.pid, Frame),
 	    Ctx;
@@ -1393,13 +1428,13 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
 	    %% like late aborts etc here !!!
 	    case co_sdo_srv_fsm:start(Ctx#co_ctx.sdo,Rx,Tx) of
 		{error, Reason} ->
-		    io:format("unable to start co_sdo_srv_fsm: ~p\n",
-			      [Reason]),
+		    io:format("~p: unable to start co_sdo_srv_fsm: ~p\n",
+			      [Ctx#co_ctx.name, Reason]),
 		    Ctx;
 		{ok,Pid} ->
 		    Mon = erlang:monitor(process, Pid),
 		    sys:trace(Pid, true),
-		    ?dbg("~s: handle_sdo_rx: Frame sent to new process ~p\n", 
+		    ?dbg(node, "~s: handle_sdo_rx: Frame sent to new process ~p\n", 
 			 [Ctx#co_ctx.name,Pid]),		    
 		    gen_fsm:send_event(Pid, Frame),
 		    S = #sdo { id=ID, pid=Pid, mon=Mon },
@@ -1411,15 +1446,15 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
 %% DAM-MPDO
 %%
 handle_dam_mpdo(Ctx, RId, Ix, Si, Data) ->
-    ?dbg("~s: handle_dam_mpdo: Index = ~7.16.0#\n", [Ctx#co_ctx.name,Ix]),
+    ?dbg(node, "~s: handle_dam_mpdo: Index = ~7.16.0#\n", [Ctx#co_ctx.name,Ix]),
     case lists:usort(subscribers(Ctx#co_ctx.sub_table, Ix) ++
 		     reserver_pid(Ctx#co_ctx.res_table, Ix)) of
 	[] ->
-	    ?dbg("~s: No subscribers for index ~7.16.0#\n", [Ctx#co_ctx.name, Ix]);
+	    ?dbg(node, "~s: No subscribers for index ~7.16.0#\n", [Ctx#co_ctx.name, Ix]);
 	PidList ->
 	    lists:foreach(
 	      fun(Pid) ->
-		      ?dbg("~s: Process ~p subscribes to index ~7.16.0#\n", 
+		      ?dbg(node, "~s: Process ~p subscribes to index ~7.16.0#\n", 
 			   [Ctx#co_ctx.name, Pid, Ix]),
 		      Pid ! {notify, RId, Ix, Si, Data}
 	      end, PidList)
@@ -1517,7 +1552,7 @@ handle_notify(I, Ctx) ->
     NewCtx.
 
 handle_notify1(I, Ctx) ->
-    ?dbg("~s: handle_notify: Index=~7.16.0#\n",[Ctx#co_ctx.name, I]),
+    ?dbg(node, "~s: handle_notify: Index=~7.16.0#\n",[Ctx#co_ctx.name, I]),
     case I of
 	?IX_COB_ID_SYNC_MESSAGE ->
 	    update_sync(Ctx);
@@ -1548,7 +1583,7 @@ handle_notify1(I, Ctx) ->
 		    Ctx
 	    end;
 	_ when I >= ?IX_RPDO_PARAM_FIRST, I =< ?IX_RPDO_PARAM_LAST ->
-	    ?dbg("~s: handle_notify: update RPDO offset=~7.16.0#\n", 
+	    ?dbg(node, "~s: handle_notify: update RPDO offset=~7.16.0#\n", 
 		 [Ctx#co_ctx.name, (I-?IX_RPDO_PARAM_FIRST)]),
 	    case load_pdo_parameter(I, (I-?IX_RPDO_PARAM_FIRST), Ctx) of
 		undefined -> 
@@ -1565,36 +1600,36 @@ handle_notify1(I, Ctx) ->
 		    Ctx
 	    end;
 	_ when I >= ?IX_TPDO_PARAM_FIRST, I =< ?IX_TPDO_PARAM_LAST ->
-	    ?dbg("~s: handle_notify: update TPDO: offset=~7.16.0#\n",
+	    ?dbg(node, "~s: handle_notify: update TPDO: offset=~7.16.0#\n",
 		 [Ctx#co_ctx.name, I - ?IX_TPDO_PARAM_FIRST]),
 	    case load_pdo_parameter(I, (I-?IX_TPDO_PARAM_FIRST), Ctx) of
 		undefined -> Ctx;
 		Param ->
 		    case update_tpdo(Param, Ctx) of
 			{new, {T,Ctx1}} ->
-			    ?dbg("~s: handle_notify: TPDO:new\n",[Ctx#co_ctx.name]),
+			    ?dbg(node, "~s: handle_notify: TPDO:new\n",[Ctx#co_ctx.name]),
 			    ets:insert(Ctx#co_ctx.cob_table, 
 				       {Param#pdo_parameter.cob_id,
 					{tpdo,Param#pdo_parameter.rtr_allowed,T#tpdo.pid}}),
 			    Ctx1;
 			{existing,T} ->
-			    ?dbg("~s: handle_notify: TPDO:existing\n",
+			    ?dbg(node, "~s: handle_notify: TPDO:existing\n",
 				 [Ctx#co_ctx.name]),
 			    co_tpdo:update_param(T#tpdo.pid, Param),
 			    Ctx;
 			{deleted,Ctx1} ->
-			    ?dbg("~s: handle_notify: TPDO:deleted\n",
+			    ?dbg(node, "~s: handle_notify: TPDO:deleted\n",
 				 [Ctx#co_ctx.name]),
 			    ets:delete(Ctx#co_ctx.cob_table, Param#pdo_parameter.cob_id),
 			    Ctx1;
 			none ->
-			    ?dbg("~s: handle_notify: TPDO:none\n",[Ctx#co_ctx.name]),
+			    ?dbg(node, "~s: handle_notify: TPDO:none\n",[Ctx#co_ctx.name]),
 			    Ctx
 		    end
 	    end;
 	_ when I >= ?IX_TPDO_MAPPING_FIRST, I =< ?IX_TPDO_MAPPING_LAST ->
 	    Offset = I - ?IX_TPDO_MAPPING_FIRST,
-	    ?dbg("~s: handle_notify: update TPDO-MAP: offset=~w\n", 
+	    ?dbg(node, "~s: handle_notify: update TPDO-MAP: offset=~w\n", 
 		 [Ctx#co_ctx.name, Offset]),
 	    J = ?IX_TPDO_PARAM_FIRST + Offset,
 	    COBID = co_dict:direct_value(Ctx#co_ctx.dict,J,?SI_PDO_COB_ID),
@@ -1606,7 +1641,7 @@ handle_notify1(I, Ctx) ->
 		    Ctx
 	    end;
 	_ ->
-	    ?dbg("~s: handle_notify: index not in cob table ix=~7.16.0#\n", 
+	    ?dbg(node, "~s: handle_notify: index not in cob table ix=~7.16.0#\n", 
 		 [Ctx#co_ctx.name, I]),
 	    Ctx
     end.
@@ -1618,7 +1653,7 @@ update_time_stamp(Ctx) ->
 	    COBID = ID band (?COBID_ENTRY_ID_MASK bor ?COBID_ENTRY_EXTENDED),
 	    if ID band ?COBID_ENTRY_TIME_PRODUCER =/= 0 ->
 		    Time = Ctx#co_ctx.time_stamp_time,
-		    ?dbg("~s: update_time_stamp: Timestamp server time=~p\n", 
+		    ?dbg(node, "~s: update_time_stamp: Timestamp server time=~p\n", 
 			 [Ctx#co_ctx.name, Time]),
 		    if Time > 0 ->
 			    Tmr = start_timer(Ctx#co_ctx.time_stamp_time,
@@ -1632,7 +1667,7 @@ update_time_stamp(Ctx) ->
 		    end;
 	       ID band ?COBID_ENTRY_TIME_CONSUMER =/= 0 ->
 		    %% consumer
-		    ?dbg("~s: update_time_stamp: Timestamp consumer\n", 
+		    ?dbg(node, "~s: update_time_stamp: Timestamp consumer\n", 
 			 [Ctx#co_ctx.name]),
 		    Tmr = stop_timer(Ctx#co_ctx.time_stamp_tmr),
 		    %% FIXME: delete old COBID!!!
@@ -1813,7 +1848,7 @@ create_cob_table(Nid) ->
 	    SDOTx = ?COB_ID(?SDO_TX,Nid),
 	    ets:insert(T, {?COB_ID(?NMT, 0), nmt})
     end,
-    ?dbg("install Nid=~w, SDORx=~w, SDOTx=~w\n", [Nid,SDORx,SDOTx]),
+    ?dbg(node, "install Nid=~w, SDORx=~w, SDOTx=~w\n", [Nid,SDORx,SDOTx]),
     ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
     ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
     T.
@@ -1838,8 +1873,8 @@ add_subscription(Tab, Ix, Pid) ->
 add_subscription(Tab, Ix1, Ix2, Pid) when ?is_index(Ix1), ?is_index(Ix2), 
 					  Ix1 =< Ix2, 
 					  (is_pid(Pid) orelse is_atom(Pid)) ->
-    ?dbg("~p: add_subscription: ~7.16.0#:~7.16.0# for ~w\n", 
-	 [?MODULE, Ix1, Ix2, Pid]),
+    ?dbg(node, "add_subscription: ~7.16.0#:~7.16.0# for ~w\n", 
+	 [Ix1, Ix2, Pid]),
     I = co_iset:new(Ix1, Ix2),
     case ets:lookup(Tab, Pid) of
 	[] -> ets:insert(Tab, {Pid, I});
@@ -1854,19 +1889,19 @@ remove_subscription(Tab, Ix, Pid) ->
     remove_subscription(Tab, Ix, Ix, Pid).
 
 remove_subscription(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
-    ?dbg("~p: remove_subscription: ~7.16.0#:~7.16.0# for ~w\n", 
-	 [?MODULE, Ix1, Ix2, Pid]),
+    ?dbg(node, "remove_subscription: ~7.16.0#:~7.16.0# for ~w\n", 
+	 [Ix1, Ix2, Pid]),
     case ets:lookup(Tab, Pid) of
 	[] -> ok;
 	[{Pid,ISet}] -> 
 	    case co_iset:difference(ISet, co_iset:new(Ix1, Ix2)) of
 		[] ->
-		    ?dbg("~p: remove_subscription: last index for ~w\n", 
-			 [?MODULE, Pid]),
+		    ?dbg(node, "remove_subscription: last index for ~w\n", 
+			 [Pid]),
 		    ets:delete(Tab, Pid);
 		ISet1 -> 
-		    ?dbg("~p: remove_subscription: new index set ~p for ~w\n", 
-			 [?MODULE, ISet1,Pid]),
+		    ?dbg(node, "remove_subscription: new index set ~p for ~w\n", 
+			 [ISet1,Pid]),
 		    ets:insert(Tab, {Pid,ISet1})
 	    end
     end.
@@ -1886,7 +1921,7 @@ inform_subscribers(I, Ctx) ->
 	      case self() of
 		  Pid -> do_nothing;
 		  _OtherPid ->
-		      ?dbg("~s: inform_subscribers: Sending object changed to ~p\n", 
+		      ?dbg(node, "~s: inform_subscribers: Sending object changed to ~p\n", 
 			   [Ctx#co_ctx.name, Pid]),
 		      gen_server:cast(Pid, {object_changed, I}) 
 	      end
@@ -1906,34 +1941,34 @@ add_reservation(_Tab, [], _Mod, _Pid) ->
 add_reservation(Tab, [Ix | Tail], Mod, Pid) ->
     case ets:lookup(Tab, Ix) of
 	[] -> 
-	    ?dbg("~p: add_reservation: ~7.16.0# for ~w\n",[?MODULE, Ix, Pid]), 
+	    ?dbg(node, "add_reservation: ~7.16.0# for ~w\n",[Ix, Pid]), 
 	    ets:insert(Tab, {Ix, Mod, Pid}), 
 	    add_reservation(Tab, Tail, Mod, Pid);
 	[{Ix, Mod, dead}] ->  %% M or Mod ???
 	    ok, 
-	    ?dbg("~p: add_reservation: renewing ~7.16.0# for ~w\n",[?MODULE, Ix, Pid]), 
+	    ?dbg(node, "add_reservation: renewing ~7.16.0# for ~w\n",[Ix, Pid]), 
 	    ets:insert(Tab, {Ix, Mod, Pid}), 
 	    add_reservation(Tab, Tail, Mod, Pid);
 	[{Ix, _M, Pid}] -> 
 	    ok, 
 	    add_reservation(Tab, Tail, Mod, Pid);
 	[{Ix, _M, OtherPid}] ->        
-	    ?dbg("~p: add_reservation: index already reserved  by ~p\n", 
-		 [?MODULE, OtherPid]),
+	    ?dbg(node, "add_reservation: index already reserved  by ~p\n", 
+		 [OtherPid]),
 	    {error, index_already_reserved}
     end.
 
 
 add_reservation(_Tab, Ix1, Ix2, _Mod, Pid) when Ix1 < ?MAN_SPEC_MIN;
 						Ix2 < ?MAN_SPEC_MIN->
-    ?dbg("~p: add_reservation: not possible for ~7.16.0#:~7.16.0# for ~w\n", 
-	 [?MODULE, Ix1, Ix2, Pid]),
+    ?dbg(node, "add_reservation: not possible for ~7.16.0#:~7.16.0# for ~w\n", 
+	 [Ix1, Ix2, Pid]),
     {error, not_possible_to_reserve};
 add_reservation(Tab, Ix1, Ix2, Mod, Pid) when ?is_index(Ix1), ?is_index(Ix2), 
 					      Ix1 =< Ix2, 
 					      is_pid(Pid) ->
-    ?dbg("~p: add_reservation: ~7.16.0#:~7.16.0# for ~w\n", 
-	 [?MODULE, Ix1, Ix2, Pid]),
+    ?dbg(node, "add_reservation: ~7.16.0#:~7.16.0# for ~w\n", 
+	 [Ix1, Ix2, Pid]),
     add_reservation(Tab, lists:seq(Ix1, Ix2), Mod, Pid).
 	    
 
@@ -1944,7 +1979,7 @@ remove_reservations(Tab, Pid) ->
 remove_reservation(_Tab, [], _Pid) ->
     ok;
 remove_reservation(Tab, [Ix | Tail], Pid) ->
-    ?dbg("~p: remove_reservation: ~7.16.0# for ~w\n", [?MODULE, Ix, Pid]),
+    ?dbg(node, "remove_reservation: ~7.16.0# for ~w\n", [Ix, Pid]),
     case ets:lookup(Tab, Ix) of
 	[] -> 
 	    ok, 
@@ -1953,14 +1988,14 @@ remove_reservation(Tab, [Ix | Tail], Pid) ->
 	    ets:delete(Tab, Ix), 
 	    remove_reservation(Tab, Tail, Pid);
 	[{Ix, _M, OtherPid}] -> 	    
-	    ?dbg("~p: remove_reservation: index reserved by other pid ~p\n", 
-		 [?MODULE, OtherPid]),
+	    ?dbg(node, "remove_reservation: index reserved by other pid ~p\n", 
+		 [OtherPid]),
 	    {error, index_reservered_by_other}
     end.
 
 remove_reservation(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
-    ?dbg("~p: remove_reservation: ~7.16.0#:~7.16.0# for ~w\n", 
-	 [?MODULE, Ix1, Ix2, Pid]),
+    ?dbg(node, "remove_reservation: ~7.16.0#:~7.16.0# for ~w\n", 
+	 [Ix1, Ix2, Pid]),
     remove_reservation(Tab, lists:seq(Ix1, Ix2), Pid).
 
 reset_reservations(Tab, Pid) ->
@@ -1969,7 +2004,7 @@ reset_reservations(Tab, Pid) ->
 reset_reservation(_Tab, [], _Pid) ->
     ok;
 reset_reservation(Tab, [Ix | Tail], Pid) ->
-    ?dbg("~p: reset_reservation: ~7.16.0# for ~w\n", [?MODULE, Ix, Pid]),
+    ?dbg(node, "reset_reservation: ~7.16.0# for ~w\n", [Ix, Pid]),
     case ets:lookup(Tab, Ix) of
 	[] -> 
 	    ok, 
@@ -1979,8 +2014,8 @@ reset_reservation(Tab, [Ix | Tail], Pid) ->
 	    ets:insert(Tab, {Ix, M, dead}),
 	    reset_reservation(Tab, Tail, Pid);
 	[{Ix, _M, OtherPid}] -> 	    
-	    ?dbg("~p: reset_reservation: index reserved by other pid ~p\n", 
-		 [?MODULE, OtherPid]),
+	    ?dbg(node, "reset_reservation: index reserved by other pid ~p\n", 
+		 [OtherPid]),
 	    {error, index_reservered_by_other}
     end.
 
@@ -2108,7 +2143,7 @@ rpdo_unpack(I, Data, Ctx) ->
 	    {Ds,_}= co_codec:decode(Data, Ts),
 	    rpdo_set(Is, Ds, Ctx);
 	Error ->
-	    io:format("rpdo_unpack: error = ~p\n", [Error]),
+	    io:format("~s: rpdo_unpack: error = ~p\n", [Ctx#co_ctx.name, Error]),
 	    Ctx
     end.
 
@@ -2144,11 +2179,11 @@ pdo_mapping(MType,_IX,SI,Sn,Ts,Is,_Dict) when SI > Sn ->
 pdo_mapping(MType,IX,SI,Sn,Ts,Is,Dict) ->
     case co_dict:value(Dict,IX,SI) of
 	{ok,Map} ->
-	    ?dbg("~p: pdo_mapping: ~7.16.0#:~w = ~11.16.0#\n", 
-		 [?MODULE, IX,SI,Map]),
+	    ?dbg(node, "pdo_mapping: ~7.16.0#:~w = ~11.16.0#\n", 
+		 [IX,SI,Map]),
 	    Index = {I,S} = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
-	    ?dbg("~p: pdo_mapping: entry[~w] = {~7.16.0#:~w}\n", 
-		 [?MODULE, SI,I,S]),
+	    ?dbg(node, "pdo_mapping: entry[~w] = {~7.16.0#:~w}\n", 
+		 [SI,I,S]),
 	    case co_dict:lookup_entry(Dict,Index) of
 		{ok,E} ->
 		    pdo_mapping(MType,IX,SI+1,Sn,
@@ -2158,8 +2193,8 @@ pdo_mapping(MType,IX,SI,Sn,Ts,Is,Dict) ->
 		    Error
 	    end;
 	Error ->
-	    ?dbg("~p: pdo_mapping: ~7.16.0#:~w = Error ~w\n", 
-		 [?MODULE, IX,SI,Error]),
+	    ?dbg(node, "pdo_mapping: ~7.16.0#:~w = Error ~w\n", 
+		 [IX,SI,Error]),
 	    Error
     end.
 
@@ -2233,7 +2268,7 @@ time_of_day() ->
     now_to_time_of_day(now()).
 
 set_time_of_day(Time) ->
-    ?dbg("~p: set_time_of_day: ~p\n", [?MODULE, Time]),
+    ?dbg(node, "set_time_of_day: ~p\n", [Time]),
     ok.
 
 now_to_time_of_day({Sm,S0,Us}) ->

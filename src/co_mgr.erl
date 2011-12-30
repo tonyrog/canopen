@@ -8,9 +8,9 @@
 -module(co_mgr).
 
 -export([start/0, start/1, stop/0]).
--export([fetch/3, fetch/4]).
+-export([fetch/3, fetch/4, fetch/5]).
 -export([load/1]).
--export([fetch_block/3, fetch_block/4]).
+-export([fetch_block/3, fetch_block/4, fetch_block/5]).
 -export([store/4, store/5]).
 -export([store_block/4, store_block/5]).
 
@@ -19,8 +19,7 @@
 start() ->
     start([]).
 start(Opts) ->
-    can_udp:start(),  %% DEMO only remove this later!
-    co_node:start([{serial, 0}, {options, [{name,co_mgr}|Opts]}]).
+    co_node:start_link([{serial, 0}, {options, [{name,co_mgr}|Opts]}]).
 
 stop() ->
     co_node:stop(?CO_MGR_NAME).
@@ -28,7 +27,11 @@ stop() ->
 load(File) ->
     co_node:load_dict(?CO_MGR_NAME, File).
 
-%% FIXME: deduce the type from IX:SI for standard or profile objects
+fetch(NodeId, Ix, Si, Pid, Mod) when is_pid(Pid) ->
+    case process_info(Pid) of
+	undefined -> {error, non_existing_application};
+	_Info -> co_node:fetch_block(?CO_MGR_NAME, NodeId, Ix, Si, {Pid, Mod})
+    end.
 
 fetch(NodeId, IX, SI, Type) ->
     case fetch(NodeId, IX, SI) of
@@ -40,9 +43,15 @@ fetch(NodeId, IX, SI, Type) ->
 	Error -> Error
     end.
 
+%% FIXME: deduce the type from IX:SI for standard or profile objects
 fetch(NodeId, IX, SI) ->
     co_node:fetch(?CO_MGR_NAME, NodeId, IX, SI).
 
+fetch_block(NodeId, Ix, Si, Pid, Mod) when is_pid(Pid) ->
+    case process_info(Pid) of
+	undefined -> {error, non_existing_application};
+	_Info -> co_node:fetch(?CO_MGR_NAME, NodeId, Ix, Si, {Pid, Mod})
+    end.
 fetch_block(NodeId, IX, SI, Type) ->
     case fetch_block(NodeId, IX, SI) of
 	{ok, Data} ->
@@ -51,17 +60,27 @@ fetch_block(NodeId, IX, SI, Type) ->
 		Error -> Error
 	    end;
 	Error -> Error
-    end.
+    end. 
 
 fetch_block(NodeId, IX, SI) ->
     co_node:fetch_block(?CO_MGR_NAME, NodeId, IX, SI).
 
+store(NodeId, Ix, Si, Pid, Mod) when is_pid(Pid) ->
+    case process_info(Pid) of
+	undefined -> {error, non_existing_application};
+	_Info -> co_node:store(?CO_MGR_NAME, NodeId, Ix, Si, {Pid, Mod})
+    end;
 store(NodeId, IX, SI, Value, Type) ->
     store(NodeId, IX, SI, co_codec:encode(Value, Type)).
 
 store(NodeId, IX, SI, Bin) when is_binary(Bin) ->
     co_node:store(?CO_MGR_NAME, NodeId, IX, SI, Bin).
 
+store_block(NodeId, Ix, Si, Pid, Mod) when is_pid(Pid) ->
+    case process_info(Pid) of
+	undefined -> {error, non_existing_application};
+	_Info -> co_node:store_block(?CO_MGR_NAME, NodeId, Ix, Si, {Pid, Mod})
+    end;
 store_block(NodeId, IX, SI, Value, Type) ->
     store_block(NodeId, IX, SI, co_codec:encode(Value, Type)).
 

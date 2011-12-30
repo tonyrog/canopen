@@ -49,6 +49,10 @@
 		  {error, Error::atom()};
 	  (read | write, Dict::term(), Entry::#dict_entry{}, BufSize::integer(), LLevel::integer()) -> 
 		  {ok, Buf::#co_data_buf{}} |
+		  {error, Error::atom()};
+	  (read | write, Pid::pid(), {Data::binary(), I::{integer(),integer()}},
+	   BufSize::integer(), LLevel::integer()) -> 
+		  {ok, Buf::#co_data_buf{}} |
 		  {error, Error::atom()}.
 
 init(Access, Pid, E, BSize, LLevel) ->
@@ -61,7 +65,7 @@ init_i(read, Pid, #app_entry{index = I, type = Type, transfer = {value, Value} =
      BSize, LLevel) ->
     Data = co_codec:encode(Value, Type),
     open(read, #co_data_buf {access = read,
-			  pid = Pid,
+			     pid = Pid,
 			     i = I,
 			     data = Data,
 			     size = size(Data),
@@ -97,7 +101,18 @@ init_i(write, Dict, #dict_entry{index = I, type = Type}, BSize, LLevel) ->
 		       eof = true,
 		       buf_size = BSize,
 		       load_level = LLevel,
-		       mode = {dict, Dict}}}.
+		       mode = {dict, Dict}}};
+init_i(Access, Pid, {Data, I}, BSize, LLevel) when is_binary(Data) ->
+    {ok, #co_data_buf {access = Access,
+		       i = I,
+		       pid = Pid,
+		       data = Data,
+		       size = size(Data),
+		       eof = true,
+		       buf_size = BSize,
+		       load_level = LLevel,
+		       mode = data}}.
+
 
     
 
@@ -198,14 +213,15 @@ read(Buf, Bytes) when is_record(Buf, co_data_buf) ->
 	    <<Data:Bytes/binary, NewData/binary>> = Buf#co_data_buf.data,
 	    ?dbg(data_buf, "read: Data = ~p", [Data]),
 	    {ok, Data, Buf#co_data_buf.eof andalso (size(NewData) =:= 0),
-	     Buf#co_data_buf {data = NewData}};
+	     Buf#co_data_buf {data = NewData, size = size(NewData)}};
        true ->
 	    %% More data is asked for
 	    if Buf#co_data_buf.eof =:= true ->
 		    %% No more data to fetch
 		    ?dbg(data_buf, "read: Data = ~p, Eod = true", 
 			 [Buf#co_data_buf.data]),
-		    {ok, Buf#co_data_buf.data, true, Buf};
+		    {ok, Buf#co_data_buf.data, true, 
+		     Buf#co_data_buf {data = (<<>>), size = 0}};
 	       true ->
 		    %% Get more data from app
 		    case read_app_call(Buf) of
@@ -234,7 +250,8 @@ read_app_call(_Buf) ->
 %% @doc
 %% @end
 %%--------------------------------------------------------------------
--spec write(Buf::#co_data_buf{}, Data::term(), EodFlag::boolean(), DownloadMode::atom()) ->
+-spec write(Buf::#co_data_buf{}, Data::term(), EodFlag::boolean(), 
+	    DownloadMode::segment | block) ->
 		   {ok, NewBuf::#co_data_buf{}} |
 		   {ok, NewBuf::#co_data_buf{}, Mref::reference()} |
 		   {error, Error::atom()}.
@@ -368,6 +385,16 @@ write(Buf=#co_data_buf {mode = {dict, Dict} = Mode, type = Type, data = OldData,
 	 [Index, SubInd, Value]),
     co_dict:direct_set(Dict, Index, SubInd, Value),
     {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
+write(Buf=#co_data_buf {mode = data = Mode, data = OldData, 
+		     i = {Index, SubInd}, tmp = TmpData}, 
+      Data, true, segment) -> 
+    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [Mode, Data, true]),
+    DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
+    ?dbg(data_buf, "write:store ?? I = ~.16B:~.8B, Data = ~p\n", 
+	 [Index, SubInd, DataToSend]),
+    %% ??
+    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
+
 %%%% Not End of Data
 %% Transfer == streamed => maybe send
 write(Buf=#co_data_buf {mode = streamed = Mode, pid = Pid, data = OldData, 
@@ -419,8 +446,14 @@ write(Buf=#co_data_buf {mode = Mode, data = OldData, tmp = TmpData},
 %% @doc
 %% @end
 %%--------------------------------------------------------------------
--spec update(Buf::#co_data_buf{}, Reply::{ok, Value::term()} | 
-					 {ok, Ref::reference(), Data::binary(), EofFlag::boolean()}) -> 
+-spec update(Buf::#co_data_buf{}, 
+	     Reply::{ok, Value::term()} | 
+		    {ok, Size::integer() | undefined} |
+		    {ok, Ref::reference()} | 
+		    {ok, Ref::reference(), Size::integer()} |
+		    {ok, Ref::reference(), WSize::integer()} | 
+		    {ok, Ref::reference(), Data::binary(), EofFlag::boolean()} |
+		    ok) -> 
 		    {ok, NewBuf::#co_data_buf{}} |
 		    {error, Error::atom()}.
     
@@ -431,12 +464,15 @@ update(Buf, {ok, Ref}) when is_reference(Ref) ->
 	Ref ->  {ok, Buf};
 	_OtherRef -> {error, ?abort_internal_error}
     end;
-update(Buf=#co_data_buf {type = Type}, {ok, Value}) ->
+update(Buf=#co_data_buf {access = read, type = Type}, {ok, Value}) ->
     ?dbg(data_buf, "update: Value = ~p", [Value]),
     Data = co_codec:encode(Value, Type),
     {ok, Buf#co_data_buf {data = Data, 
-		       size = size(Data),
-		       eof = true}};
+			  size = size(Data),
+			  eof = true}};
+update(Buf=#co_data_buf {access = write}, {ok, Size}) ->
+    ?dbg(data_buf, "update: Size = ~p", [Size]),
+    {ok, Buf#co_data_buf {size = Size}};
 update(Buf=#co_data_buf {access = read}, {ok, Ref, Size}) ->
     ?dbg(data_buf, "update: Ref = ~p, Size = ~p", [Ref, Size]),
     case Buf#co_data_buf.ref of

@@ -226,7 +226,7 @@ init_per_testcase(Case, Config) when Case == set_atomic_segment;
 				     Case == get_streamed_m_block;
 				     Case == break ->
     ct:pal("Testcase: ~p", [Case]),
-   {ok, _Pid} = co_test_app:start(serial(), app_dict()),
+    {ok, _Pid} = co_test_app:start(serial(), app_dict()),
     Config;
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
@@ -247,9 +247,9 @@ init_per_testcase(_TestCase, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_testcase(start_stop_app, _Config) ->
-    case whereis(co_test_app) of
+    case whereis(list_to_atom("co_test_app" ++ integer_to_list(serial()))) of
 	undefined  -> do_nothing;
-	_Pid -> co_test_app:stop()
+	_Pid -> co_test_app:stop(serial())
     end,
     ok;
 end_per_testcase(Case, _Config) when Case == set_atomic_segment;
@@ -275,9 +275,9 @@ end_per_testcase(Case, _Config) when Case == set_atomic_segment;
 				     Case == break ->
     %% Wait a little for session to terminate
     timer:sleep(1000),
-    case whereis(co_test_app) of
+    case whereis(list_to_atom("co_test_app" ++ integer_to_list(serial()))) of
 	undefined  -> do_nothing;
-	_Pid -> co_test_app:stop()
+	_Pid -> co_test_app:stop(serial())
     end,
     ok;
 end_per_testcase(Case, Config) when Case == stream_file_segment;
@@ -324,10 +324,10 @@ start_stop_app(_Config) ->
     timer:sleep(1000),
 
     %% Check that is it up
-    Dict = co_test_app:dict(),
+    Dict = co_test_app:dict(serial()),
     ct:pal("Dictionary = ~p", [Dict]),
 
-    ok = co_test_app:stop(),
+    ok = co_test_app:stop(serial()),
     ok.
 
 %%--------------------------------------------------------------------
@@ -620,15 +620,15 @@ break(Config) ->
 %%--------------------------------------------------------------------
 set(Config, {{Index, _T, _M, _Org}, NewValue}, BlockOrSegment) ->
     %% Get old value
-    {Index, _Type, _Transfer, OldValue} = lists:keyfind(Index, 1, co_test_app:dict()),
+    {Index, _Type, _Transfer, OldValue} = lists:keyfind(Index, 1, co_test_app:dict(serial())),
 							
     %% Change to new
     [] = os:cmd(set_cmd(Config, Index, NewValue, BlockOrSegment)),
-    {Index, _Type, _Transfer, NewValue} = lists:keyfind(Index, 1, co_test_app:dict()),
+    {Index, _Type, _Transfer, NewValue} = lists:keyfind(Index, 1, co_test_app:dict(serial())),
     
     %% Restore old
     [] = os:cmd(set_cmd(Config, Index, OldValue, BlockOrSegment)),
-    {Index, _Type, _Transfer, OldValue} = lists:keyfind(Index, 1, co_test_app:dict()),
+    {Index, _Type, _Transfer, OldValue} = lists:keyfind(Index, 1, co_test_app:dict(serial())),
 
     ok;
 set(Config, {Index, NewValue}, BlockOrSegment) ->
@@ -663,7 +663,7 @@ get(Config, {{Index, _T, _M, _Org}, _NewValue}, BlockOrSegment) ->
     ct:pal("Result = ~p", [Result]),
 
     %% Get value from cocli and compare with dict
-    %% {Index, _Type, _Transfer, Value} = lists:keyfind(Index, 1, co_test_app:dict()),
+    %% {Index, _Type, _Transfer, Value} = lists:keyfind(Index, 1, co_test_app:dict(serial())),
     
     ok;
 get(Config, {Index, _NewValue}, BlockOrSegment) ->
