@@ -157,7 +157,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    S2 = S1#co_session { buf=Buf, mref=Mref },
 		    {next_state, s_writing_segment_started,S2,?TMO(S2)};
 		{error,Reason} ->
-		    co_session:abort(S1, Reason)
+		    abort(S1, Reason)
 	    end;
 
 	?ma_ccs_block_download_request(ChkCrc,SizeInd,IX,SI,Size) ->
@@ -172,7 +172,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    S2 = S1#co_session { buf=Buf, mref=Mref },
 		    {next_state, s_writing_block_started,S2,?TMO(S2)};
 		{error,Reason} ->
-		    co_session:abort(S1, Reason)
+		    abort(S1, Reason)
 	    end;
 
 	?ma_ccs_initiate_upload_request(IX,SI) ->
@@ -185,7 +185,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    S2 = S1#co_session {mref = Mref, buf = Buf},
 		    {next_state, s_reading_segment_started, S2, ?TMO(S2)};
 		{error,Reason} ->
-		    co_session:abort(S1, Reason)
+		    abort(S1, Reason)
 	    end;
 
 	?ma_ccs_block_upload_request(GenCrc,IX,SI,BlkSize,Pst) ->
@@ -207,10 +207,10 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    {next_state, s_reading_block_started, S2, ?TMO(S2)};
 		{error,Reason} ->
 		    ?dbg(srv,"start block upload error=~p\n", [Reason]),
-		    co_session:abort(S1, Reason)
+		    abort(S1, Reason)
 	    end;
 	_ ->
-	    co_session:l_abort(M, S, s_initial)
+	    l_abort(M, S, s_initial)
     end;
 s_initial(timeout, S) ->
     {stop, timeout, S}.
@@ -363,7 +363,7 @@ start_segment_download(S) ->
 		    send(S, R),
 		    {stop, normal, S};
 		{error,Reason} ->
-		    co_session:abort(S, Reason)
+		    abort(S, Reason)
 	    end;
        true ->
 	    ?dbg(srv, "start_segment_download: not expedited\n", []),
@@ -385,7 +385,7 @@ s_segmented_download(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
 	?ma_ccs_download_segment_request(T,_N,_C,_D) 
 	  when T =:= S#co_session.t ->
-	    co_session:abort(S, ?abort_toggle_not_alternated);
+	    abort(S, ?abort_toggle_not_alternated);
 
 	?ma_ccs_download_segment_request(T,N,Last,Data) ->
 	    NBytes = 7-N,
@@ -415,13 +415,13 @@ s_segmented_download(M, S) when is_record(M, can_frame) ->
 			    {next_state, s_segmented_download, S1,?TMO(S1)}
 		    end;
 		{error,Reason} ->
-		    co_session:abort(S,Reason)
+		    abort(S,Reason)
 	    end;
 	_ ->
-	    co_session:l_abort(M, S, s_segmented_download)
+	    l_abort(M, S, s_segmented_download)
     end;
 s_segmented_download(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out).
+    abort(S, ?abort_timed_out).
 
 %%
 %% state: writing_segment_started (for application stored data)
@@ -435,13 +435,13 @@ s_writing_segment_started({Mref, Reply} = M, S)  ->
 	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
 	    start_segment_download(S#co_session {buf = Buf});
 	_Other ->
-	    co_session:l_abort(M, S, s_writing_segment_started)
+	    l_abort(M, S, s_writing_segment_started)
     end;
 s_writing_segment_started(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out);
+    abort(S, ?abort_timed_out);
 s_writing_segment_started(M, S)  ->
     ?dbg(srv, "s_writing_segment_started: Got event = ~p, aborting\n", [M]),
-    co_session:demonitor_and_abort(M, S).
+    demonitor_and_abort(M, S).
 
 
 %%
@@ -463,13 +463,13 @@ s_writing_segment({Mref, Reply} = M, S)  ->
 	    erlang:demonitor(Mref, [flush]),
 	    {stop, normal, S};
 	_Other ->
-	    co_session:l_abort(M, S, s_writing)
+	    l_abort(M, S, s_writing)
     end;
 s_writing_segment(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out);
+    abort(S, ?abort_timed_out);
 s_writing_segment(M, S)  ->
     ?dbg(srv, "s_writing_segment: Got event = ~p, aborting\n", [M]),
-    co_session:demonitor_and_abort(M, S).
+    demonitor_and_abort(M, S).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -498,7 +498,7 @@ start_segmented_upload(S) ->
 		    send(S, R),
 		    {stop, normal, S};
 		{error, Reason} ->
-		    co_session:abort(S, Reason)
+		    abort(S, Reason)
 	    end;
        (NBytes =:= 0 andalso EofFlag =:= true) orelse
        (NBytes =:= undefined) ->
@@ -525,14 +525,14 @@ start_segmented_upload(S) ->
 s_segmented_upload(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
 	?ma_ccs_upload_segment_request(T) when T =/= S#co_session.t ->
-	    co_session:abort(S, ?abort_toggle_not_alternated);
+	    abort(S, ?abort_toggle_not_alternated);
 	?ma_ccs_upload_segment_request(T) ->
 	    read_segment(S#co_session {t = T});
 	_ ->
-	    co_session:l_abort(M, S, s_segmented_upload)
+	    l_abort(M, S, s_segmented_upload)
     end;
 s_segmented_upload(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out).
+    abort(S, ?abort_timed_out).
 
 read_segment(S) ->
     case co_data_buf:read(S#co_session.buf,7) of
@@ -547,7 +547,7 @@ read_segment(S) ->
 	    S1 = S#co_session {mref = Mref, buf = Buf},
 	    {next_state, s_reading_segment, S1, ?TMO(S1)};
 	{error,Reason} ->
-	    co_session:abort(S,Reason)
+	    abort(S,Reason)
     end.
 
 upload_segment(S, Data, Eod) ->
@@ -592,23 +592,23 @@ s_reading_segment_started({Mref, Reply} = M, S)  ->
 		    %% Wait for data ??
 		    start_segmented_upload(S#co_session {buf = Buf1, mref = Mref1});
 		{error, Error} ->
-		    co_session:l_abort(M, S, s_reading_segment_started)
+		    l_abort(M, S, s_reading_segment_started)
 	    end;
 	_Other ->
-	    co_session:l_abort(M, S, s_reading_segment_started)
+	    l_abort(M, S, s_reading_segment_started)
     end;
 s_reading_segment_started(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out);
+    abort(S, ?abort_timed_out);
 s_reading_segment_started(M, S)  ->
     ?dbg(srv, "s_reading_segment_started: Got event = ~p, aborting\n", [M]),
-    co_session:demonitor_and_abort(M, S).
+    demonitor_and_abort(M, S).
 
 s_reading_segment(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out);
+    abort(S, ?abort_timed_out);
 s_reading_segment(M, S) ->
     %% All correct messages should be handled in handle_info()
     ?dbg(srv, "s_reading_segment: Got event = ~p, aborting\n", [M]),
-    co_session:demonitor_and_abort(M, S).
+    demonitor_and_abort(M, S).
 
 
 
@@ -643,10 +643,10 @@ s_block_upload_start(M, S)  when is_record(M, can_frame) ->
 	?ma_ccs_block_upload_start() ->
 	    read_block_segment(S#co_session {blkseq = 1});
 	_ ->
-	    co_session:l_abort(M, S, s_block_upload_start)
+	    l_abort(M, S, s_block_upload_start)
     end;
 s_block_upload_start(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out).
+    abort(S, ?abort_timed_out).
 
 
 read_block_segment(S) ->
@@ -660,7 +660,7 @@ read_block_segment(S) ->
 	    S1 = S#co_session {mref = Mref, buf = Buf},
 	    {next_state, s_reading_block_segment, S1, ?TMO(S1)};
 	{error,Reason} ->
-	    co_session:abort(S,Reason)
+	    abort(S,Reason)
     end.
 
 upload_block_segment(S, Data, Eod) ->
@@ -700,12 +700,12 @@ s_block_upload_response(M, S) when is_record(M, can_frame) ->
 	    S1 = S#co_session { blkseq=0, blksize=BlkSize },
 	    read_block_segment(S1#co_session {blkseq = 1});
 	?ma_ccs_block_upload_response(_AckSeq,_BlkSize) ->
-	    co_session:abort(S, ?abort_invalid_sequence_number);
+	    abort(S, ?abort_invalid_sequence_number);
 	_ ->
-	    co_session:l_abort(M, S, s_block_upload_response)
+	    l_abort(M, S, s_block_upload_response)
     end;
 s_block_upload_response(timeout,S) ->
-    co_session:abort(S, ?abort_timed_out).
+    abort(S, ?abort_timed_out).
 
 %%
 %% state: block_upload_response_last
@@ -721,12 +721,12 @@ s_block_upload_response_last(M, S) when is_record(M, can_frame) ->
 	    send(S1, R),
 	    {next_state, s_block_upload_end_response, S1, ?TMO(S1)};
 	?ma_ccs_block_upload_response(_AckSeq,_BlkSize) ->
-	    co_session:abort(S, ?abort_invalid_sequence_number);	    
+	    abort(S, ?abort_invalid_sequence_number);	    
 	_ ->
-	    co_session:l_abort(M, S, s_block_upload_response_last)
+	    l_abort(M, S, s_block_upload_response_last)
     end;
 s_block_upload_response_last(timeout,S) ->
-    co_session:abort(S, ?abort_timed_out).
+    abort(S, ?abort_timed_out).
 
 %%
 %% state: block_upload_end_response
@@ -737,10 +737,10 @@ s_block_upload_end_response(M, S) when is_record(M, can_frame) ->
 	?ma_ccs_block_upload_end_response() ->
 	    {stop, normal, S};
 	_ ->
-	    co_session:l_abort(M, S, s_block_upload_end_response)
+	    l_abort(M, S, s_block_upload_end_response)
     end;
 s_block_upload_end_response(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out).
+    abort(S, ?abort_timed_out).
 
 %%
 %% state: reading_block_started (for application stored data)
@@ -765,13 +765,13 @@ s_reading_block_started({Mref, Reply} = M, S)  ->
 		    start_block_upload(S#co_session {buf = Buf1, mref = Mref1})
 	    end;
 	_Other ->
-	    co_session:l_abort(M, S, s_reading_block_started)
+	    l_abort(M, S, s_reading_block_started)
     end;
 s_reading_block_started(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out);
+    abort(S, ?abort_timed_out);
 s_reading_block_started(M, S)  ->
     ?dbg(srv, "s_reading_block_started: Got event = ~p, aborting\n", [M]),
-    co_session:demonitor_and_abort(M, S).
+    demonitor_and_abort(M, S).
 
 
 %% Checks if protocol switch from block to segment should be done
@@ -789,11 +789,11 @@ segment_or_block(S) ->
     end.
 
 s_reading_block_segment(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out);
+    abort(S, ?abort_timed_out);
 s_reading_block_segment(M, S) ->
     %% All correct messages should be handled in handle_info()
     ?dbg(srv, "s_reading_segment: Got event = ~p, aborting\n", [M]),
-    co_session:demonitor_and_abort(M, S).
+    demonitor_and_abort(M, S).
 
 
     
@@ -831,21 +831,21 @@ s_block_download(M, S) when is_record(M, can_frame) ->
 		    block_segment_written(S#co_session {buf = Buf, last = Last, 
 							mref = Mref});
 		{error, Reason} ->
-		    co_session:abort(S, Reason)
+		    abort(S, Reason)
 	    end;
 	?ma_block_segment(_Last,Seq,_Data) when Seq =:= 0; Seq > S#co_session.blksize ->
-	    co_session:abort(S, ?abort_invalid_sequence_number);
+	    abort(S, ?abort_invalid_sequence_number);
 	?ma_block_segment(_Last,_Seq,_Data) ->
 	    %% here we could takecare of out of order data
-	    co_session:abort(S, ?abort_invalid_sequence_number);
+	    abort(S, ?abort_invalid_sequence_number);
 	%% Handle abort and spurious packets ...
 	%% We can not use l_abort here because we do not know if message
 	%% is an abort or not.
 	_ ->
-	    co_session:abort(S, ?abort_command_specifier)
+	    abort(S, ?abort_command_specifier)
     end;
 s_block_download(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out).
+    abort(S, ?abort_timed_out).
 
 block_segment_written(S) ->
     Last = S#co_session.last,
@@ -880,7 +880,7 @@ s_block_download_end(M, S) when is_record(M, can_frame) ->
 		    {next_state, s_writing_block_end, S1, ?TMO(S1)};
 		    
 		{error,Reason} ->
-		    co_session:abort(S, Reason);
+		    abort(S, Reason);
 
 		_ -> %% this can be any thing ok | true ..
 		    R = ?mk_scs_block_download_end_response(),
@@ -888,10 +888,10 @@ s_block_download_end(M, S) when is_record(M, can_frame) ->
 		    {stop, normal, S}
 	    end;
 	_ ->
-	    co_session:l_abort(M, S, s_block_download_end)
+	    l_abort(M, S, s_block_download_end)
     end;
 s_block_download_end(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out).    
+    abort(S, ?abort_timed_out).    
 
 %%
 %% state: writing_block_started (for application stored data)
@@ -905,20 +905,20 @@ s_writing_block_started({Mref, Reply} = M, S)  ->
 	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
 	    start_block_download(S#co_session {buf = Buf});
 	_Other ->
-	    co_session:l_abort(M, S, s_writing_block_started)
+	    l_abort(M, S, s_writing_block_started)
     end;
 s_writing_block_started(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out);
+    abort(S, ?abort_timed_out);
 s_writing_block_started(M, S)  ->
     ?dbg(srv, "s_writing_block_started: Got event = ~p, aborting\n", [M]),
-    co_session:demonitor_and_abort(M, S).
+    demonitor_and_abort(M, S).
 
 s_writing_block_end(timeout, S) ->
-    co_session:abort(S, ?abort_timed_out);
+    abort(S, ?abort_timed_out);
 s_writing_block_end(M, S)  ->
     %% All correct messages should be taken care of in handle_info()
     ?dbg(srv, "s_writing_block: Got event = ~p, aborting\n", [M]),
-    co_session:demonitor_and_abort(M, S).
+    demonitor_and_abort(M, S).
 
 
 %%--------------------------------------------------------------------
@@ -996,7 +996,7 @@ handle_info({Mref, {ok, _Ref, _Data, _Eod} = Reply}, StateName, S) ->
 		    check_reading(StateName, S#co_session {buf = Buf1, 
 							   mref = Mref1});
 		{error, Error} ->
-		    co_session:abort(S, Error)
+		    abort(S, Error)
 	    end;
 	_OtherRef ->
 	    %% Ignore reply
@@ -1081,6 +1081,38 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+demonitor_and_abort(M, S) ->
+    case S#co_session.mref of
+	Mref when is_reference(Mref)->
+	    erlang:demonitor(Mref, [flush]);
+	_NoRef ->
+	    do_nothing
+    end,
+    l_abort(M, S, s_reading).
+
+l_abort(M, S, StateName) ->
+    case M#can_frame.data of
+	?ma_scs_abort_transfer(IX,SI,Code) when
+	      IX =:= S#co_session.index,
+	      SI =:= S#co_session.subind ->
+	    Reason = co_sdo:decode_abort_code(Code),
+	    %% remote party has aborted
+	    {stop, normal, S};
+	?ma_scs_abort_transfer(_IX,_SI,_Code) ->
+	    %% probably a delayed abort for an old session ignore
+	    {next_state, StateName, S, ?TMO(S)};
+	_ ->
+	    %% we did not expect this command abort
+	    abort(S, ?abort_command_specifier)
+    end.
+	    
+
+abort(S, Reason) ->
+    Code = co_sdo:encode_abort_code(Reason),
+    R = ?mk_ccs_abort_transfer(S#co_session.index, S#co_session.subind, Code),
+    send(S, R),
+    {stop, normal, S}.
+    
 
 send(S, Data) when is_binary(Data) ->
     ?dbg(session, "send: ~s\n", [co_format:format_sdo(co_sdo:decode_tx(Data))]),

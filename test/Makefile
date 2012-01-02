@@ -4,7 +4,9 @@
 
 MODULES = \
 	co_test \
-	co_node_SUITE \
+	co_sdo_srv_SUITE \
+	co_sdo_cli_SUITE \
+	co_test_lib \
 	co_test_app \
 	co_stream_app
 

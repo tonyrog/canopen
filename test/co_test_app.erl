@@ -47,6 +47,7 @@
 	  state,
 	  co_node,
 	  dict,
+	  name_table,
 	  store
 	}).
 
@@ -137,11 +138,15 @@ abort(Pid, Ref) ->
 %% @end
 %%--------------------------------------------------------------------
 init([CoSerial, Dict]) ->
-    DictTable = ets:new(test_dict, [public, named_table, ordered_set]),
-    NameTable = ets:new(name_to_index, [private, named_table, ordered_set]),
+    DictTable = ets:new(dict_table(self()), [public, named_table, ordered_set]),
+    NameTable = ets:new(name_to_index, [private, ordered_set]),
     {ok, _NodeId} = co_node:attach(CoSerial),
     load_dict(CoSerial, Dict, DictTable, NameTable),
-    {ok, #loop_data {state=init, co_node = CoSerial, dict=DictTable}}.
+    {ok, #loop_data {state=init, co_node = CoSerial, dict=DictTable, 
+		     name_table=NameTable}}.
+
+dict_table(Pid) ->
+    list_to_atom("dict" ++ pid_to_list(Pid)).
 
 load_dict(CoSerial, Dict, DictTable, NameTable) ->
     ?dbg("Dict ~p", [Dict]),
@@ -191,7 +196,7 @@ load_dict(CoSerial, Dict, DictTable, NameTable) ->
 handle_call({get, {Index, SubInd}}, _From, LoopData) ->
     ?dbg("~p: handle_call: get ~.16B:~.8B \n",[?MODULE, Index, SubInd]),
 
-    [{timeout, I}] = ets:lookup(name_to_index, timeout),
+    [{timeout, I}] = ets:lookup(LoopData#loop_data.name_table, timeout),
     case Index of
 	I ->
 	    %% To test timeout
@@ -211,7 +216,7 @@ handle_call({set, {Index, SubInd}, NewValue}, _From, LoopData) ->
      ?dbg("~p: handle_call: set ~.16B:~.8B to ~p\n",
 	 [?MODULE, Index, SubInd, NewValue]),
 
-    [{timeout, I}] = ets:lookup(name_to_index, timeout),
+    [{timeout, I}] = ets:lookup(LoopData#loop_data.name_table, timeout),
     case Index of
 	I ->
 	    %% To test timeout
@@ -304,11 +309,16 @@ handle_call(dict, _From, LoopData) ->
     {reply, Dict, LoopData};    
 handle_call(stop, _From, LoopData) ->
     ?dbg("~p: handle_call: stop\n",[?MODULE]),
-    case whereis(list_to_atom(co_lib:serial_to_string(LoopData#loop_data.co_node))) of
+    CoNode = case LoopData#loop_data.co_node of
+		 co_mgr -> co_mgr;
+		 Serial ->
+		     list_to_atom(co_lib:serial_to_string(Serial))
+	     end,
+    case whereis(CoNode) of
 	undefined -> 
 	    do_nothing; %% Not possible to detach and unsubscribe
 	_Pid ->
-	    Name2Index = ets:tab2list(name_to_index),
+	    Name2Index = ets:tab2list(LoopData#loop_data.name_table),
 	    lists:foreach(
 	      fun({{Index, _SubInd}, _Type, _Transfer, _Value}) ->
 		      case lists:keyfind(Index, 2, Name2Index) of
@@ -319,7 +329,7 @@ handle_call(stop, _From, LoopData) ->
 			  {_Any, Ix} ->
 			      co_node:unreserve(LoopData#loop_data.co_node, Ix)
 		      end
-	      end, ets:tab2list(test_dict)),
+	      end, ets:tab2list(LoopData#loop_data.dict)),
 	    ?dbg("~p: stop: unsubscribed.\n",[?MODULE]),
 	    co_node:detach(LoopData#loop_data.co_node)
     end,
@@ -436,9 +446,9 @@ code_change(_OldVsn, LoopData, _Extra) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-get_entry(_Pid, {Index, 255}) ->
+get_entry(Pid, {Index, 255}) ->
     ?dbg("~p: get_entry type ~.16B \n",[?MODULE, Index]),
-    case ets:lookup(test_dict, {Index, 0}) of
+    case ets:lookup(dict_table(Pid), {Index, 0}) of
 	[{I, Type, _Transfer}] ->
 	    Value = (type(Type) bsl 8) bor ?OBJECT_VAR, %% VAR/ARRAY .. fixme
 	    Entry = #app_entry{index = I,
@@ -449,9 +459,9 @@ get_entry(_Pid, {Index, 255}) ->
 	[] ->
 	    {error, ?ABORT_NO_SUCH_OBJECT}
     end;
-get_entry(_Pid, {Index, SubInd} = I) ->
+get_entry(Pid, {Index, SubInd} = I) ->
     ?dbg("~p: get_entry ~.16B:~.8B \n",[?MODULE, Index, SubInd]),
-    case ets:lookup(test_dict, I) of
+    case ets:lookup(dict_table(Pid), I) of
 	[{I, Type, Transfer, _Value}] ->
 	    Entry = #app_entry{index = I,
 			       type = type(Type),

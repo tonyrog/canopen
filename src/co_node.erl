@@ -42,8 +42,7 @@
 -export([add_entry/2, get_entry/2]).
 -export([load_dict/2]).
 -export([set/3, set/4, value/2]).
--export([store/5, fetch/4, fetch/5]).
--export([store_block/5, fetch_block/4, fetch_block/5]).
+-export([store/6, fetch/6]).
 -export([subscribers/2]).
 -export([reserver_with_module/2]).
 -export([tpdo_mapping/2, rpdo_mapping/2]).
@@ -52,6 +51,7 @@
 -export([dump/1]).
 -export([change_session_timeout/2]).
 -export([get_option/2, set_option/3]).
+-export([nodeid/1]).
 
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
 
@@ -125,7 +125,7 @@ start_link(Args) ->
     gen_server:start({local, Name}, ?MODULE, [S,NodeId,Name,Opts], []).
 
 %%
-%% Get serial number, accepts both string and number
+%% Get serial number
 %%
 
 serial(Serial) when is_integer(Serial) ->
@@ -397,33 +397,18 @@ value(Serial, Ix) ->
 %%--------------------------------------------------------------------
 -spec store(Serial::integer() | atom(), Cobid::integer(), 
 	    Index::integer(), SubInd::integer(), 
-	    Term::binary() | {Pid::pid(), Module::atom()}) ->
+	    TransferMode:: block | segment,
+	    Term::{data, binary()} | {app, Pid::pid(), Module::atom()}) ->
 		   ok | {error, Error::atom()}.
 
-store(Serial, COBID, IX, SI, Term) 
+store(Serial, COBID, IX, SI, TransferMode, Term) 
   when ?is_index(IX), ?is_subind(SI) ->
-    ?dbg(node, "store: Serial = ~p, CobId = ~.16#, Ix = ~4.16.0B, Si = ~p, Term = ~p", 
-	 [Serial, COBID, IX, SI, Term]),
+    ?dbg(node, "store: Serial = ~p, CobId = ~.16#, Ix = ~4.16.0B, Si = ~p, " ++
+	     "Mode = ~p, Term = ~p", 
+	 [Serial, COBID, IX, SI, TransferMode, Term]),
     Pid = serial_to_pid(Serial),
-    gen_server:call(Pid, {store,false,COBID,IX,SI,Term}).
+    gen_server:call(Pid, {store,TransferMode,COBID,IX,SI,Term}).
 
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts a store session to store Value at Index:Subind on remote node.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec store_block(Serial::integer() | atom(), Cobid::integer(), 
-		  Index::integer(), SubInd::integer(), 
-		  Term::binary() | {Pid::pid(), Module::atom()}) ->
-			 ok | {error, Error::atom()}.
-
-store_block(Serial, COBID, IX, SI, Term) 
-  when ?is_index(IX), ?is_subind(SI) ->
-    ?dbg(node, "store_block: Serial = ~p, CobId = ~.16#, Ix = ~4.16.0B, Si = ~p, Term = ~p", 
-	 [Serial, COBID, IX, SI, Term]),
-    gen_server:call(serial_to_pid(Serial), {store,true,COBID,IX,SI,Term}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -432,38 +417,15 @@ store_block(Serial, COBID, IX, SI, Term)
 %% @end
 %%--------------------------------------------------------------------
 -spec fetch(Serial::integer() | atom(), Cobid::integer(), 
-	    Index::integer(), SubInd::integer(), 
-	    {Pid::pid(), Module::atom()}) ->
-		   ok | {error, Error::atom()}.
+	    Index::integer(), SubInd::integer(),
+ 	    TransferMode:: block | segment,
+	    Term::data | {app, Pid::pid(), Module::atom()}) ->
+		   ok | {ok, Data::binary()} | {error, Error::atom()}.
 
 
-fetch(Serial, COBID, IX, SI, Term)
+fetch(Serial, COBID, IX, SI, TransferMode, Term)
   when ?is_index(IX), ?is_subind(SI) ->
-    gen_server:call(serial_to_pid(Serial), {fetch,false,COBID,IX,SI,Term}).
-
-fetch(Serial, COBID, IX, SI)
-  when ?is_index(IX), ?is_subind(SI) ->
-    gen_server:call(serial_to_pid(Serial), {fetch,false,COBID,IX,SI,data}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts a fetch session to fetch Value at Index:Subind on remote node.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec fetch_block(Serial::integer() | atom(), Cobid::integer(), 
-		  Index::integer(), SubInd::integer(), 
-		  {Pid::pid(), Module::atom()}) ->
-			 ok | {error, Error::atom()}.
-
-
-fetch_block(Serial, COBID, IX, SI, Term)
-  when ?is_index(IX), ?is_subind(SI) ->
-    gen_server:call(serial_to_pid(Serial), {fetch,true,COBID,IX,SI,Term}).
-
-fetch_block(Serial, COBID, IX, SI)
-  when ?is_index(IX), ?is_subind(SI) ->
-    gen_server:call(serial_to_pid(Serial), {fetch,true,COBID,IX,SI,data}).
+    gen_server:call(serial_to_pid(Serial), {fetch,TransferMode,COBID,IX,SI,Term}).
 
 
 %%--------------------------------------------------------------------
@@ -476,6 +438,17 @@ fetch_block(Serial, COBID, IX, SI)
 %%--------------------------------------------------------------------
 dump(Serial) ->
     gen_server:call(serial_to_pid(Serial), dump).
+
+%%--------------------------------------------------------------------
+%% @spec dnodeid(Serial) -> NodeId | {error, Error}
+%%
+%% @doc
+%% Returns the co_nodes nodeid.
+%%
+%% @end
+%%--------------------------------------------------------------------
+nodeid(Serial) ->
+    gen_server:call(serial_to_pid(Serial), nodeid).
 
 %%--------------------------------------------------------------------
 %% @spec change_session_timeout(Serial, NewTimeout::integer()) -> ok | {error, Error}
@@ -790,11 +763,11 @@ handle_call({value,Ix}, _From, Ctx) ->
     Result = co_dict:value(Ctx#co_ctx.dict, Ix, 0),
     {reply, Result, Ctx};
 
-handle_call({store,Block,COBID,IX,SI,Term}, From, Ctx) ->
+handle_call({store,Mode,COBID,IX,SI,Term}, From, Ctx) ->
     case lookup_sdo_server(COBID,Ctx) of
 	ID={Tx,Rx} ->
 	    ?dbg(node, "~s: store: ID = ~p", [Ctx#co_ctx.name,ID]),
-	    case co_sdo_cli_fsm:store(Ctx#co_ctx.sdo,Block,From,Tx,Rx,IX,SI,Term) of
+	    case co_sdo_cli_fsm:store(Ctx#co_ctx.sdo,Mode,From,Tx,Rx,IX,SI,Term) of
 		{error, Reason} ->
 		    ?dbg(node,"~s: unable to start co_sdo_cli_fsm: ~p\n", 
 			 [Ctx#co_ctx.name,Reason]),
@@ -812,11 +785,11 @@ handle_call({store,Block,COBID,IX,SI,Term}, From, Ctx) ->
 	    {reply, {error, badarg}, Ctx}
     end;
 
-handle_call({fetch,Block,COBID,IX,SI, Term}, From, Ctx) ->
+handle_call({fetch,Mode,COBID,IX,SI, Term}, From, Ctx) ->
     case lookup_sdo_server(COBID,Ctx) of
 	ID={Tx,Rx} ->
 	    ?dbg(node, "~s: fetch: ID = ~p", [Ctx#co_ctx.name,ID]),
-	    case co_sdo_cli_fsm:fetch(Ctx#co_ctx.sdo,Block,From,Tx,Rx,IX,SI,Term) of
+	    case co_sdo_cli_fsm:fetch(Ctx#co_ctx.sdo,Mode,From,Tx,Rx,IX,SI,Term) of
 		{error, Reason} ->
 		    io:format("~s: unable to start co_sdo_cli_fsm: ~p\n", 
 			      [Ctx#co_ctx.name,Reason]),
@@ -989,6 +962,9 @@ handle_call(dump, _From, Ctx) ->
     co_dict:to_fd(Ctx#co_ctx.dict, user),
     io:format("------------------------\n"),
     {reply, ok, Ctx};
+
+handle_call(nodeid, _From, Ctx) ->
+    {reply, Ctx#co_ctx.id, Ctx};
 
 handle_call({change_session_timeout, NewTimeout}, _From, Ctx) ->
     Sdo = Ctx#co_ctx.sdo#sdo_ctx {timeout = NewTimeout},

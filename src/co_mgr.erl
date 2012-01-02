@@ -7,82 +7,82 @@
 
 -module(co_mgr).
 
--export([start/0, start/1, stop/0]).
--export([fetch/3, fetch/4, fetch/5]).
--export([load/1]).
--export([fetch_block/3, fetch_block/4, fetch_block/5]).
--export([store/4, store/5]).
--export([store_block/4, store_block/5]).
+-include("sdo.hrl").
 
--define(CO_MGR_NAME, ?MODULE).
+-export([start/0, start/1, stop/0]).
+-export([fetch/5]).
+-export([load/1]).
+-export([store/5]).
+
+-define(CO_MGR, co_mgr).
 
 start() ->
     start([]).
 start(Opts) ->
-    co_node:start_link([{serial, 0}, {options, [{name,co_mgr}|Opts]}]).
+    co_node:start_link([{serial, 16#000000}, {options, [{name,?CO_MGR}|Opts]}]).
 
 stop() ->
-    co_node:stop(?CO_MGR_NAME).
+    co_node:stop(?CO_MGR).
 
 load(File) ->
-    co_node:load_dict(?CO_MGR_NAME, File).
+    co_node:load_dict(?CO_MGR, File).
 
-fetch(NodeId, Ix, Si, Pid, Mod) when is_pid(Pid) ->
+-spec fetch(NodeId::integer(), Ix::integer(), Si::integer(),
+	    TransferMode:: block | segment,
+	    Term:: {app, Pid::pid(), Mod::atom()} | 
+		   {value, Type::integer()} |
+		   data) ->
+		   ok | 
+		   {ok, Value::term()} | 
+		   {ok, Data::binary()} |
+		   {error, Reason::atom()}.
+		   
+fetch(NodeId, Ix, Si, TransferMode, {app, Pid, Mod} = Term) 
+  when is_integer(NodeId), 
+       is_integer(Ix), 
+       is_integer(Si), 
+       is_pid(Pid),
+       is_atom(Mod) ->
     case process_info(Pid) of
 	undefined -> {error, non_existing_application};
-	_Info -> co_node:fetch_block(?CO_MGR_NAME, NodeId, Ix, Si, {Pid, Mod})
-    end.
-
-fetch(NodeId, IX, SI, Type) ->
-    case fetch(NodeId, IX, SI) of
+	_Info -> co_node:fetch(?CO_MGR, NodeId, Ix, Si, TransferMode, Term)
+    end;
+fetch(NodeId, Ix, Si, TransferMode, {value, Type}) 
+  when is_integer(NodeId), 
+       is_integer(Ix), 
+       is_integer(Si), 
+       is_integer(Type) ->
+    case co_node:fetch(?CO_MGR, NodeId, Ix, Si, TransferMode, data) of
 	{ok, Data} ->
 	    case co_codec:decode(Data, Type) of
 		{Value, _} -> {ok, Value};
 		Error -> Error
 	    end;
 	Error -> Error
-    end.
-
-%% FIXME: deduce the type from IX:SI for standard or profile objects
-fetch(NodeId, IX, SI) ->
-    co_node:fetch(?CO_MGR_NAME, NodeId, IX, SI).
-
-fetch_block(NodeId, Ix, Si, Pid, Mod) when is_pid(Pid) ->
-    case process_info(Pid) of
-	undefined -> {error, non_existing_application};
-	_Info -> co_node:fetch(?CO_MGR_NAME, NodeId, Ix, Si, {Pid, Mod})
-    end.
-fetch_block(NodeId, IX, SI, Type) ->
-    case fetch_block(NodeId, IX, SI) of
-	{ok, Data} ->
-	    case co_codec:decode(Data, Type) of
-		{Value, _} -> {ok, Value};
-		Error -> Error
-	    end;
-	Error -> Error
-    end. 
-
-fetch_block(NodeId, IX, SI) ->
-    co_node:fetch_block(?CO_MGR_NAME, NodeId, IX, SI).
-
-store(NodeId, Ix, Si, Pid, Mod) when is_pid(Pid) ->
-    case process_info(Pid) of
-	undefined -> {error, non_existing_application};
-	_Info -> co_node:store(?CO_MGR_NAME, NodeId, Ix, Si, {Pid, Mod})
     end;
-store(NodeId, IX, SI, Value, Type) ->
-    store(NodeId, IX, SI, co_codec:encode(Value, Type)).
+fetch(NodeId, Ix, Si, TransferMode, data = Term) ->
+    co_node:fetch(?CO_MGR, NodeId, Ix, Si, TransferMode, Term).
 
-store(NodeId, IX, SI, Bin) when is_binary(Bin) ->
-    co_node:store(?CO_MGR_NAME, NodeId, IX, SI, Bin).
-
-store_block(NodeId, Ix, Si, Pid, Mod) when is_pid(Pid) ->
+store(NodeId, Ix, Si, TransferMode, {app, Pid, Mod} = Term) 
+  when is_integer(NodeId), 
+       is_integer(Ix), 
+       is_integer(Si), 
+       is_pid(Pid),
+       is_atom(Mod) ->
     case process_info(Pid) of
 	undefined -> {error, non_existing_application};
-	_Info -> co_node:store_block(?CO_MGR_NAME, NodeId, Ix, Si, {Pid, Mod})
+	_Info -> co_node:store(?CO_MGR, NodeId, Ix, Si, TransferMode, Term)
     end;
-store_block(NodeId, IX, SI, Value, Type) ->
-    store_block(NodeId, IX, SI, co_codec:encode(Value, Type)).
-
-store_block(NodeId, IX, SI, Bin) when is_binary(Bin) ->
-    co_node:store_block(?CO_MGR_NAME, NodeId, IX, SI, Bin).
+store(NodeId, Ix, Si, TransferMode, {value, Value, Type}) 
+  when is_integer(NodeId), 
+       is_integer(Ix), 
+       is_integer(Si), 
+       is_integer(Type) ->
+    co_node:store(?CO_MGR, NodeId, Ix, Si, TransferMode, 
+		  {data, co_codec:encode(Value, Type)});
+store(NodeId, Ix, Si, TransferMode, {data, Bin} = Term)
+  when is_integer(NodeId), 
+       is_integer(Ix), 
+       is_integer(Si), 
+       is_binary(Bin) ->
+    co_node:store(?CO_MGR, NodeId, Ix, Si, TransferMode, Term).
