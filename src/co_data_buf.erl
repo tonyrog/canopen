@@ -431,17 +431,44 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = Mode, pid = Pid, data = OldD
        true ->
 	    {ok, Buf#co_data_buf {data = NewData, tmp = Data}}
     end;
-%% Transfer =/= streamed => just store
+%% Transfer =/= streamed => check size limit and store if OK
 write(Buf=#co_data_buf {mode = Mode, data = OldData, tmp = TmpData}, 
       Data, false, _DownloadMode) ->
     ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p, storing", 
 	 [Mode, Data, false]),
-    %% Move old from temp and store new in temp
-    NewData = <<OldData/binary, TmpData/binary>>,
-    {ok, Buf#co_data_buf {data = NewData, tmp = Data}}.
+    CheckLimitResult = check_limit(Buf, Data),
+    if CheckLimitResult == ok ->
+	    %% Move old from temp and store new in temp
+	    NewData = <<OldData/binary, TmpData/binary>>,
+	    {ok, Buf#co_data_buf {data = NewData, tmp = Data}};
+       true ->
+	    CheckLimitResult
+    end.
 
-    
-  
+%% Check limit based on transfer mode and type
+check_limit(Buf=#co_data_buf {mode = atomic}, Data) ->
+    check_limit_i(Buf, Data);
+check_limit(Buf=#co_data_buf {mode = {atomic, _M}}, Data) ->
+    check_limit_i(Buf, Data);
+check_limit(_Buf, _Data) ->
+    ok.
+
+check_limit_i(Buf=#co_data_buf {data = OldData, tmp = TmpData}, Data) ->
+    TypeSize = case Buf#co_data_buf.type of
+		   undefined -> 0;
+		   Type -> co_codec:bytesize(Type)
+	       end,
+    Limit = case TypeSize of
+		0 -> Buf#co_data_buf.buf_size;
+		TS -> TS
+	    end,
+    DataSize = size(OldData) + size(TmpData) + size(Data),
+    if DataSize > Limit ->
+	    {error, ?abort_data_length_too_high};
+       true ->
+	    ok
+    end.
+ 
 %%--------------------------------------------------------------------
 %% @doc
 %% @end

@@ -26,8 +26,8 @@ The interface for download is asynchronic, whereas the interface for upload is s
 This gives the below transfer possibilities:
 <ul>
 <li><b>atomic</b> - the clauses <code>handle_call({get, ..})</code> (for upload) and <code>handle_call({set, ..})</code> (for download) must exist.</li>
-<li><b>streamed</b> - the clauses <code>handle_call({read_begin, ..})</code>, <code>handle_call({read, ..})</code> and <code>handle_call({read_end, ..})</code> (for upload) and <code>handle_call({write_begin, ..})</code>,<code>handle_cast({write, ..})</code> and <code>handle_call({write_end, ..})</code> (for download) must. </li>
+<li><b>streamed</b> - the clauses <code>handle_call({read_begin, ..})</code> and <code>handle_call({read, ..})</code> (for upload) and <code>handle_call({write_begin, ..})</code> and <code>handle_call({write, ..})</code> (for download) must exist. </li>
 <li><b>{atomic, Module}</b> - the functions <code>Module:get()</code> (for upload) and <code>Module:set()</code> (for download) will be called.</li>
-<li><b>{streamed, Module}</b> - the functions <code>Module:read_begin()</code>, <code>Module:read()</code> and<code> Module:read_end()</code> (for upload) and <code>Module:write_begin()</code>,<code>Module:write()</code> and <code>Module:write_end()</code> (for download) will be called.</li>
+<li><b>{streamed, Module}</b> - the functions <code>Module:read_begin()</code> and <code>Module:read()</code> (for upload) and <code>Module:write_begin()</code> and <code>Module:write()</code> (for download) will be called.</li>
 </ul>
 

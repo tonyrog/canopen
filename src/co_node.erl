@@ -76,7 +76,7 @@
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Description: Starts the server.
+%% Description: Starts the CANOpen node.
 %%
 %% Options: 
 %%          extended - use extended (29-bit) ID <br/>
@@ -86,25 +86,25 @@
 %%          {pst, integer()}         - ( 16 ) <br/>
 %%          {max_blksize, integer()} - ( 74 = 518 bytes) <br/>
 %%          {use_crc, boolean()}     - use crc for block (true) <br/>
-%%          {read_buf_size, integer()} - size of buf when reading from app <br/>
+%%          {read_bufsize, integer()} - size of buf when reading from app <br/>
 %%          {load_ratio, float()} - ratio when time to fill read_buf <br/> 
+%%          {atomic_limit, integer()} - limit to size of atomic variable <br/>
 %%         
 %% @end
 %%--------------------------------------------------------------------
--type option_type() :: {vendor, integer()} | 
-		       extended |
-		       {time_stamp,  timeout()} |  
-		       {sdo_timeout, timeout()} |  
-		       {blk_timeout, timeout()} |  
-		       {pst, integer()} |          
-		       {max_blksize, integer()} |  
-		       {use_crc, boolean()} |
-		       {read_bufsize, integer()} |
-		       {load_ratio, float()}.
-
--type arg_type() :: {serial, Serial::integer()} | {options, Opts::list(option_type)}.
-
--spec start_link(list(argtype)) -> {ok, Pid::pid()} | ignore | {error, Error::atom()}.
+-spec start_link(list({serial, Serial::integer()} | 
+		      {options, list({vendor, integer()} | 
+				     extended |
+				     {time_stamp,  timeout()} |  
+				     {sdo_timeout, timeout()} |  
+				     {blk_timeout, timeout()} |  
+				     {pst, integer()} |          
+				     {max_blksize, integer()} |  
+				     {use_crc, boolean()} |
+				     {read_bufsize, integer()} |
+				     {load_ratio, float()} |
+				     {atomic_maxsize, integer()})})) -> 
+			{ok, Pid::pid()} | ignore | {error, Error::atom()}.
 
 start_link(Args) ->
     ?dbg(node, "start_link: Args = ~p\n", [ Args]),
@@ -143,7 +143,7 @@ name(Opts, Serial) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Stops the server.
+%% Stops the CANOpen node.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -154,7 +154,7 @@ stop(Serial) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Attches the calling process to the CANnode Serial.
+%% Attches the calling process to the CANnode idenified by Serial.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -165,7 +165,7 @@ attach(Serial) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Detaches the calling process from the CANnode Serial.
+%% Detaches the calling process from the CANnode idenified by Serial.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -176,36 +176,41 @@ detach(Serial) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Adds a subscription to changes of the Dictionary Object in position Index.
+%% Adds a subscription to changes of the Dictionary Object in position Index.<br/>
 %% Index can also be a range [Index1 - Index2].
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec subscribe(Serial::integer(), Index::integer()) -> ok | {error, Error::atom()}.
+-spec subscribe(Serial::integer(), Index::integer() | 
+					  list(Index::integer())) -> 
+		       ok | {error, Error::atom()}.
 
 subscribe(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {subscribe, Ix, self()}).
 
 %%--------------------------------------------------------------------
-%% @spec unsubscribe(Serial, Index) -> ok | {error, Error}
-%%
 %% @doc
-%% Removes a subscription to changes of the Dictionary Object in position Index.
+%% Removes a subscription to changes of the Dictionary Object in position Index.<br/>
 %% Index can also be a range [Index1 - Index2].
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec unsubscribe(Serial::integer(), Index::integer() | 
+					    list(Index::integer())) -> 
+		       ok | {error, Error::atom()}.
 unsubscribe(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {unsubscribe, Ix, self()}).
 
 %%--------------------------------------------------------------------
-%% @spec my_subscriptions(Serial, Pid) -> [Index] | {error, Error}
-%%
 %% @doc
-%% Returns the Indexes for which Pid has subscriptions.
+%% Returns the Indexes for which the application idenified by Pid 
+%% has subscriptions.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec my_subscriptions(Serial::integer(), Pid::pid()) -> 
+			      list(Index::integer()) | 
+			      {error, Error::atom()}.
 my_subscriptions(Serial, Pid) ->
     gen_server:call(serial_to_pid(Serial), {subscriptions, Pid}).
 
@@ -217,6 +222,9 @@ my_subscriptions(Serial, Pid) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec my_subscriptions(Serial::integer()) -> 
+			      list(Index::integer()) | 
+			      {error, Error::atom()}.
 my_subscriptions(Serial) ->
     gen_server:call(serial_to_pid(Serial), {subscriptions, self()}).
 
@@ -224,10 +232,13 @@ my_subscriptions(Serial) ->
 %% @spec all_subscribers(Serial) -> [Pid] | {error, Error}
 %%
 %% @doc
-%% Returns the Pids that subscribes to any Index.
+%% Returns the Pids of all applications that subscribes to any Index.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec all_subscribers(Serial::integer()) -> 
+			     list(Pid::pid()) | 
+			     {error, Error::atom()}.
 all_subscribers(Serial) ->
     gen_server:call(serial_to_pid(Serial), {subscribers}).
 
@@ -235,10 +246,11 @@ all_subscribers(Serial) ->
 %% @spec all_subscribers(Serial, Ix) -> [Pid] | {error, Error}
 %%
 %% @doc
-%% Returns the Pids that subscribes to Index.
+%% Returns the Pids of all applications that subscribes to Index.
 %%
 %% @end
 %%--------------------------------------------------------------------
+
 all_subscribers(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {subscribers, Ix}).
 
@@ -440,7 +452,7 @@ dump(Serial) ->
     gen_server:call(serial_to_pid(Serial), dump).
 
 %%--------------------------------------------------------------------
-%% @spec dnodeid(Serial) -> NodeId | {error, Error}
+%% @spec nodeid(Serial) -> NodeId | {error, Error}
 %%
 %% @doc
 %% Returns the co_nodes nodeid.
@@ -487,7 +499,8 @@ set_option(Serial, Option, NewValue)
        Option == read_bufsize;
        Option == time_stamp; 
        Option == sdo_timeout;
-       Option == blk_timeout ->
+       Option == blk_timeout;
+       Option == atomic_limit ->
     if is_integer(NewValue) andalso NewValue > 0 ->
 	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
        true ->
@@ -659,8 +672,9 @@ init([Serial, NodeId, NodeName, Opts]) ->
       pst             = proplists:get_value(pst,Opts,16),
       max_blksize     = proplists:get_value(max_blksize,Opts,7),
       use_crc         = proplists:get_value(use_crc,Opts,true),
-      read_buf_size   = proplists:get_value(read_buf_size,Opts,1024),
+      read_bufsize    = proplists:get_value(read_bufsize,Opts,1024),
       load_ratio      = proplists:get_value(load_ratio,Opts,0.5),
+      atomic_limit      = proplists:get_value(atomic_limit,Opts,1024),
       dict            = Dict,
       sub_table       = SubTable,
       res_table       = ResTable
@@ -977,8 +991,9 @@ handle_call({option, Option}, _From, Ctx) ->
 		pst ->  {Option, Ctx#co_ctx.sdo#sdo_ctx.pst};
 		max_blksize -> {Option, Ctx#co_ctx.sdo#sdo_ctx.max_blksize};
 		use_crc -> {Option, Ctx#co_ctx.sdo#sdo_ctx.use_crc};
-		read_buf_size -> {Option, Ctx#co_ctx.sdo#sdo_ctx.read_buf_size};
+		read_bufsize -> {Option, Ctx#co_ctx.sdo#sdo_ctx.read_bufsize};
 		load_ratio -> {Option, Ctx#co_ctx.sdo#sdo_ctx.load_ratio};
+		atomic_limit -> {Option, Ctx#co_ctx.sdo#sdo_ctx.atomic_limit};
 		time_stamp -> {Option, Ctx#co_ctx.time_stamp_time};
 		extended -> {Option, ?is_nodeid_extended(Ctx#co_ctx.id)};
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
@@ -991,8 +1006,9 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
 		pst ->  Ctx#co_ctx.sdo#sdo_ctx {pst = NewValue};
 		max_blksize -> Ctx#co_ctx.sdo#sdo_ctx {max_blksize = NewValue};
 		use_crc -> Ctx#co_ctx.sdo#sdo_ctx {use_crc = NewValue};
-		read_buf_size -> Ctx#co_ctx.sdo#sdo_ctx {read_buf_size = NewValue};
+		read_bufsize -> Ctx#co_ctx.sdo#sdo_ctx {read_bufsize = NewValue};
 		load_ratio -> Ctx#co_ctx.sdo#sdo_ctx {load_ratio = NewValue};
+		atomic_limit -> Ctx#co_ctx.sdo#sdo_ctx {atomic_limit = NewValue};
 		time_stamp -> Ctx#co_ctx {time_stamp_time = NewValue};
 		extended -> {error, "Option extended not possible to change"};
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}

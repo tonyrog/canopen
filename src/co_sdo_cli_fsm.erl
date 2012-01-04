@@ -69,7 +69,7 @@ store(Ctx,Block,From,Src,Dst,IX,SI,Term) when is_record(Ctx, sdo_ctx) ->
 		  [store,Block,Ctx,From,self(),Src,Dst,IX,SI,Term], []).
 
 %%--------------------------------------------------------------------
-%% @spec fetch(Ctx,Block,From,Src,Dst,IX,SI) -> 
+%% @spec fetch(Ctx,Block,From,Src,Dst,IX,SI,Term) -> 
 %%           {ok, Pid} | ignore | {error, Error}
 %% @doc
 %% Creates a gen_fsm process which calls Module:init/1 to
@@ -131,8 +131,8 @@ store(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, {app, Pid, Modul
     end;
 store(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, {data, Data}) 
   when is_binary(Data) ->
-    case co_data_buf:init(read, self(), {Data, {IX, SI}}, Ctx#sdo_ctx.read_buf_size, 
-			  trunc(Ctx#sdo_ctx.read_buf_size * 
+    case co_data_buf:init(read, self(), {Data, {IX, SI}}, Ctx#sdo_ctx.read_bufsize, 
+			  trunc(Ctx#sdo_ctx.read_bufsize * 
 				    Ctx#sdo_ctx.load_ratio)) of 
 	{ok, Buf} ->
 	    case Mode of 
@@ -145,9 +145,9 @@ store(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, {data, Data})
 	    abort(S, Reason)
     end.
 
-fetch(S=#co_session {index = IX, subind = SI}, Mode, {app, Pid, Module}) 
+fetch(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, {app, Pid, Module}) 
   when is_pid(Pid), is_atom(Module) ->
-    case write_begin(IX, SI, Pid, Module) of
+    case write_begin(Ctx, IX, SI, Pid, Module) of
 	{ok, Buf}  -> 
 	    case Mode of
 		block ->
@@ -167,8 +167,8 @@ fetch(S=#co_session {index = IX, subind = SI}, Mode, {app, Pid, Module})
 	{error,Reason} ->
 	    abort(S, Reason)
     end;
-fetch(S=#co_session {index = IX, subind = SI}, Mode, data) ->
-    case co_data_buf:init(write, self(), {(<<>>), {IX, SI}}, undefined, undefined) of
+fetch(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, data) ->
+    case co_data_buf:init(write, self(), {(<<>>), {IX, SI}}, Ctx#sdo_ctx.atomic_limit, undefined) of
 	{ok, Buf} ->
 	    case Mode of 
 		block ->
@@ -184,12 +184,12 @@ read_begin(Ctx, Index, SubInd, Pid, Mod) ->
     case Mod:get_entry(Pid, {Index, SubInd}) of
 	{entry, Entry} ->
 	    if (Entry#app_entry.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
-		    ?dbg(cli, "app_read_begin: Read access ok\n", []),
-		    ?dbg(cli, "app_read_begin: Transfer mode = ~p\n", 
+		    ?dbg(cli, "read_begin: Read access ok\n", []),
+		    ?dbg(cli, "read_begin: Transfer mode = ~p\n", 
 			 [Entry#app_entry.transfer]),
 		    co_data_buf:init(read, Pid, Entry, 
-				     Ctx#sdo_ctx.read_buf_size, 
-				     trunc(Ctx#sdo_ctx.read_buf_size * 
+				     Ctx#sdo_ctx.read_bufsize, 
+				     trunc(Ctx#sdo_ctx.read_bufsize * 
 					       Ctx#sdo_ctx.load_ratio));
 	       true ->
 		    {entry, ?abort_read_not_allowed}
@@ -198,13 +198,13 @@ read_begin(Ctx, Index, SubInd, Pid, Mod) ->
 	    Error
     end.
 
-write_begin(Index, SubInd, Pid, Mod) ->
+write_begin(Ctx, Index, SubInd, Pid, Mod) ->
     case Mod:get_entry(Pid, {Index, SubInd}) of
 	{entry, Entry} ->
 	    if (Entry#app_entry.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
-		    ?dbg(cli, "app_write_begin: transfer=~p, type = ~p\n",
+		    ?dbg(cli, "write_begin: transfer=~p, type = ~p\n",
 			 [Entry#app_entry.transfer, Entry#app_entry.type]),
-		    co_data_buf:init(write, Pid, Entry, undefined, undefined);
+		    co_data_buf:init(write, Pid, Entry,  Ctx#sdo_ctx.atomic_limit, undefined);
 	       true ->
 		    {entry, ?abort_unsupported_access}
 	    end;

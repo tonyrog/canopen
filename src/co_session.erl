@@ -18,7 +18,6 @@ next_blksize(S) ->
     %% We may want to alter this ...
     (S#co_session.ctx)#sdo_ctx.max_blksize.
 
-
 send(S, Data) when is_binary(Data) ->
     Dst = S#co_session.dst,
     ID = if ?is_cobid_extended(Dst) ->

@@ -22,6 +22,7 @@ MODULES = \
 	co_dict \
 	co_codec \
 	co_data_buf \
+	co_os_app \
 	co_node 
 
 

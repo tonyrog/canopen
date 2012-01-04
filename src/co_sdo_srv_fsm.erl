@@ -267,7 +267,7 @@ app_write_begin(Index, SubInd, Pid, Mod) ->
 			 [Entry#app_entry.transfer, Entry#app_entry.type]),
 		    co_data_buf:init(write, Pid, Entry, undefined, undefined);
 	       true ->
-		    {entry, ?abort_unsupported_access}
+		    {error, ?abort_unsupported_access}
 	    end;
 	{error, Reason}  ->
 	    {error, Reason}
@@ -310,8 +310,8 @@ central_read_begin(Ctx, Index, SubInd) ->
 	    if (E#dict_entry.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
 		    ?dbg(srv, "central_read_begin: Read access ok\n", []),
 		    co_data_buf:init(read, Dict, E,
-				     Ctx#sdo_ctx.read_buf_size, 
-				     trunc(Ctx#sdo_ctx.read_buf_size * 
+				     Ctx#sdo_ctx.read_bufsize, 
+				     trunc(Ctx#sdo_ctx.read_bufsize * 
 					       Ctx#sdo_ctx.load_ratio));
 	       true ->
 		    {error, ?abort_read_not_allowed}
@@ -328,11 +328,11 @@ app_read_begin(Ctx, Index, SubInd, Pid, Mod) ->
 		    ?dbg(srv, "app_read_begin: Transfer mode = ~p\n", 
 			 [Entry#app_entry.transfer]),
 		    co_data_buf:init(read, Pid, Entry, 
-				     Ctx#sdo_ctx.read_buf_size, 
-				     trunc(Ctx#sdo_ctx.read_buf_size * 
+				     Ctx#sdo_ctx.read_bufsize, 
+				     trunc(Ctx#sdo_ctx.read_bufsize * 
 					       Ctx#sdo_ctx.load_ratio));
 	       true ->
-		    {entry, ?abort_read_not_allowed}
+		    {error, ?abort_read_not_allowed}
 	    end;
 	Error ->
 	    Error

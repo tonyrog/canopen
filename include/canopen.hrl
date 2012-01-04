@@ -395,8 +395,9 @@
 	  dict,         %% copy of can dictionary in co_ctx
 	  sub_table,    %% copy of subscriber table in co_ctx
 	  res_table,    %% copy of reserver table in co_ctx
-	  read_buf_size,
-	  load_ratio   
+	  read_bufsize, %% Size of bufer when reading from application
+	  load_ratio,   %% Trigger for loading read buffer
+	  atomic_limit  %% Limit for atomic transfer when size unknown
 	}).
 
 -record(co_session,

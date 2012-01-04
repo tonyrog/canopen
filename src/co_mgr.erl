@@ -16,22 +16,73 @@
 
 -define(CO_MGR, co_mgr).
 
+%%====================================================================
+%% API
+%%====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Description: Starts the CANOpen SDO manager, that is, a co_node with
+%% Serial = 16#0 and Name = co_mgr.
+%% @end
+%%--------------------------------------------------------------------
+-spec start() -> {ok, Pid::pid()} | {error, Reason::atom()}.
 start() ->
     start([]).
-start(Opts) ->
-    co_node:start_link([{serial, 16#000000}, {options, [{name,?CO_MGR}|Opts]}]).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Description: Starts the CANOpen SDO manager, that is, a co_node with
+%% Serial = 16#0 and Name = co_mgr.
+%%
+%% Options: See {@link co_node:start_link/1}.
+%%         
+%% @end
+%%--------------------------------------------------------------------
+-spec start(Options::list()) ->  {ok, Pid::pid()} | {error, Reason::atom()}.
+start(Options) ->
+    co_node:start_link([{serial, 16#000000}, {options, [{name,?CO_MGR}|Options]}]).
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Description: Stops the CANOpen SDO manager.
+%% @end
+%%--------------------------------------------------------------------
+-spec stop() ->  ok | {error, Reason::atom()}.
 stop() ->
     co_node:stop(?CO_MGR).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Description: Loads object dictionary from file to the manager.
+%% @end
+%%--------------------------------------------------------------------
+-spec load(File::string()) -> ok | {error, Reason::atom()}.
 load(File) ->
     co_node:load_dict(?CO_MGR, File).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Description: Fetch object specified by Index, Subind from remote CANOpen
+%% node identified by NodeId.<br/>
+%% TransferMode controls whether block or segment transfer is used between
+%% the CANOpen nodes.<br/>
+%% Destination can be:
+%% <ul>
+%% <li> {app, Pid, Module} - data is sent to the application specified
+%% by Pid and Module. </li>
+%% <li> {value, Type} - data is decoded and returned to caller. 
+%% NOT IMPLEMENTED YET</li>
+%% <li> data - data is returned to caller. NOT IMPLEMENTED YET</li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
 -spec fetch(NodeId::integer(), Ix::integer(), Si::integer(),
 	    TransferMode:: block | segment,
-	    Term:: {app, Pid::pid(), Mod::atom()} | 
-		   {value, Type::integer()} |
-		   data) ->
+	    Destination:: {app, Pid::pid(), Mod::atom()} | 
+			  {value, Type::integer()} |
+			  data) ->
 		   ok | 
 		   {ok, Value::term()} | 
 		   {ok, Data::binary()} |
@@ -62,6 +113,30 @@ fetch(NodeId, Ix, Si, TransferMode, {value, Type})
     end;
 fetch(NodeId, Ix, Si, TransferMode, data = Term) ->
     co_node:fetch(?CO_MGR, NodeId, Ix, Si, TransferMode, Term).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Description: Stores object specified by Index, Subind at remote CANOpen
+%% node identified by NodeId.<br/>
+%% TransferMode controls whether block or segment transfer is used between
+%% the CANOpen nodes.<br/>
+%% Destination can be:
+%% <ul>
+%% <li> {app, Pid, Module} - data is fetched from the application specified
+%% by Pid and Module. </li>
+%% <li> {value, Value, Type} - value is supplied by caller and encoded
+%% before the transfer. NOT IMPLEMENTED YET </li>
+%% <li> {data, Data} - data is supplied by caller. NOT IMPLEMENTED YET</li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec store(NodeId::integer(), Ix::integer(), Si::integer(),
+	    TransferMode:: block | segment,
+	    Source:: {app, Pid::pid(), Mod::atom()} | 
+		      {value, Value::term(), Type::integer()} |
+		      {data, Bin::binary}) ->
+		   ok | 
+		   {error, Reason::atom()}.
 
 store(NodeId, Ix, Si, TransferMode, {app, Pid, Mod} = Term) 
   when is_integer(NodeId), 
