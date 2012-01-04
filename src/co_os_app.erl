@@ -147,7 +147,11 @@ init([CoSerial]) ->
 %%--------------------------------------------------------------------
 handle_call({set, {?IX_OS_COMMAND, ?SI_OS_COMMAND}, Command}, _From, LoopData) ->
     %% For now 
-    C = binary_to_list(Command),
+    C = if is_binary(Command) ->
+		binary_to_list(Command);
+	   true ->
+		Command
+	end,
     try os:cmd(C) of
 	{error, E} ->
 
@@ -155,6 +159,11 @@ handle_call({set, {?IX_OS_COMMAND, ?SI_OS_COMMAND}, Command}, _From, LoopData) -
 	    {reply, ok, LoopData#loop_data {command = Command, 
 					    status = 3, 
 					    reply = E}};
+	[] ->
+	    ?dbg(?NAME," handle_call: execute command no result\n",[]),    
+	    {reply, ok, LoopData#loop_data {command = Command, 
+					    status = 0, 
+					    reply = ""}};
 	Result ->
 	    ?dbg(?NAME," handle_call: execute command Result = ~p\n",[Result]),    
 	    {reply, ok, LoopData#loop_data {command = Command, 
