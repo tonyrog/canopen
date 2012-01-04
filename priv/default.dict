@@ -1,0 +1,23 @@
+%% -*- erlang -*-
+%%
+%%   Default dictionay
+
+{object, 16#1018,
+ [{name, "IDENTITY"},
+  {struct, rec},{access, ro},{type, unsigned32},
+  {entry,0,[{access,ro},{value,4}]},
+  {entry,1,[{access,ro},{value,16#2A1}]},       %% vendor
+  {entry,2,[{access,ro},{value,16#00010200}]},  %% product
+  {entry,3,[{access,ro},{value,16#00020000}]},  %% revision
+  {entry,4,[{access,ro},{value,16#12345678}]}   %% serial
+ ]}.
+
+%% TPDO entry - 0
+{tpdo, 0, 16#20002222, [{transmission_type,{sync,2}}]}.
+%% TPDO map - 0
+{tpdo_map, 0, [{16#2001, 0, 32},{16#3001,0,32}]}.
+
+%% RPDO entry - 0
+{rpdo, 0, 16#20003333, []}.
+%% RPDO map - 0
+{rpdo_map, 0, [{16#3001, 0, 32}]}.

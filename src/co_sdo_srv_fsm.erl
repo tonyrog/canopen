@@ -592,7 +592,7 @@ s_reading_segment_started({Mref, Reply} = M, S)  ->
 		    %% Wait for data ??
 		    start_segmented_upload(S#co_session {buf = Buf1, mref = Mref1});
 		{error, Error} ->
-		    l_abort(M, S, s_reading_segment_started)
+		    abort(S, Error)
 	    end;
 	_Other ->
 	    l_abort(M, S, s_reading_segment_started)
@@ -1016,6 +1016,10 @@ handle_info({_Mref, {ok, Ref}} = Info, StateName, S)
     apply(?MODULE, StateName, [Info, S]);
 handle_info({_Mref, {ok, Ref}} = Info, StateName, S) when is_reference(Ref) ->
     check_writing_block_end(Info, StateName, S);
+handle_info({_Mref, {error, Error}}, _StateName, S) ->
+    abort(S, Error);
+handle_info({'DOWN',_Ref,process,_Pid,_Reason}, _StateName, S) ->
+    abort(S, ?abort_internal_error);
 handle_info(Info, StateName, S) ->
     ?dbg(srv, "handle_info: Got info ~p\n",[Info]),
     %% "Converting" info to event
@@ -1095,7 +1099,7 @@ l_abort(M, S, StateName) ->
 	?ma_scs_abort_transfer(IX,SI,Code) when
 	      IX =:= S#co_session.index,
 	      SI =:= S#co_session.subind ->
-	    Reason = co_sdo:decode_abort_code(Code),
+	    _Reason = co_sdo:decode_abort_code(Code),
 	    %% remote party has aborted
 	    {stop, normal, S};
 	?ma_scs_abort_transfer(_IX,_SI,_Code) ->

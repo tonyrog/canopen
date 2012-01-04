@@ -18,6 +18,7 @@
 -include("co_app.hrl").
 
 -behaviour(gen_server).
+-behaviour(co_app).
 
 -compile(export_all).
 
@@ -114,9 +115,9 @@ write(Pid, Ref, Data, EodFlag) ->
 read_begin(Pid, {Index, SubInd}, Ref) ->
     ?dbg("~p: read_begin ~.16B:~.8B, ref = ~p\n",[?MODULE, Index, SubInd, Ref]),
     gen_server:call(Pid, {read_begin, {Index, SubInd}, Ref}).
-read(Pid, Bytes, Ref) ->
+read(Pid, Ref, Bytes) ->
     ?dbg("~p: read ref = ~p, \n",[?MODULE, Ref]),
-    gen_server:call(Pid, {read, Bytes, Ref}).
+    gen_server:call(Pid, {read, Ref, Bytes}).
 
 abort(Pid, Ref) ->
     ?dbg("~p: abort ref = ~p\n",[?MODULE, Ref]),
@@ -283,7 +284,7 @@ handle_call({read_begin, {Index, SubInd} = I, Ref}, _From, LoopData) ->
 	    Store = #store {ref = Ref, index = I, type = Type, data = Data},
 	    {reply, {ok, Ref, Size}, LoopData#loop_data {store = Store}}
     end;
-handle_call({read, Bytes, Ref}, _From, LoopData) ->
+handle_call({read, Ref, Bytes}, _From, LoopData) ->
     ?dbg("~p: handle_call: read ref = ~p\n",[?MODULE, Ref]),
     Store = LoopData#loop_data.store,
     Data = Store#store.data,

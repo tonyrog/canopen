@@ -5,25 +5,27 @@
 MODULES = \
 	canopen \
 	canopen_sup \
+	co_app \
+	co_codec \
 	co_crc \
-	co_iset \
-	co_probe \
-	co_format \
+	co_data_buf \
+	co_dict \
 	co_file \
-	eds_file \
+	co_format \
+	co_iset \
 	co_lib \
-	co_sdo \
 	co_mgr \
-	co_transfer \
-	co_session \
+	co_node \
+	co_os_app \
+	co_probe \
+	co_sdo \
 	co_sdo_cli_fsm \
 	co_sdo_srv_fsm \
+	co_session \
+	co_stream_app \
 	co_tpdo \
-	co_dict \
-	co_codec \
-	co_data_buf \
-	co_os_app \
-	co_node 
+	co_transfer \
+	eds_file
 
 
 

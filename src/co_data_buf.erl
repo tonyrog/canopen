@@ -236,10 +236,10 @@ read(Buf, Bytes) when is_record(Buf, co_data_buf) ->
 		
 read_app_call(Buf=#co_data_buf {pid=Pid, buf_size=BSize, ref=Ref, mode=streamed}) ->
     %% Async call
-    app_call(Buf, Pid, {read, BSize, Ref});
+    app_call(Buf, Pid, {read, Ref, BSize});
 read_app_call(Buf=#co_data_buf {pid=Pid, buf_size=BSize, ref=Ref, mode={streamed, Mod}}) ->
     %% Sync call
-    Reply = Mod:read(Pid, BSize, Ref),
+    Reply = Mod:read(Pid, Ref, BSize),
     update(Buf, Reply);
 read_app_call(_Buf) ->
     %% Should not happen!!

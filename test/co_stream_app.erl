@@ -160,7 +160,7 @@ handle_call({read_begin, {Index, SubInd}, Ref}, _From, LoopData) ->
 		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData}
     end;
-handle_call({read, Bytes, Ref}, _From, LoopData) ->
+handle_call({read, Ref, Bytes}, _From, LoopData) ->
     case LoopData#loop_data.ref of
 	Ref ->
 	    case file:read(LoopData#loop_data.readfile, Bytes) of

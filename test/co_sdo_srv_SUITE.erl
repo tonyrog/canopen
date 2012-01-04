@@ -271,7 +271,7 @@ end_per_testcase(Case, _Config) when Case == set_atomic_segment;
     ok;
 end_per_testcase(Case, Config) when Case == stream_file_segment;
 				     Case == stream_file_block->
-    co_test_lib:stop_app(co_stream_app, []),
+    co_test_lib:stop_app(co_test_stream_app, []),
 
     PrivDir = ?config(priv_dir, Config),
     RFile = filename:join(PrivDir, ct:get_config(read_file)),
@@ -529,7 +529,7 @@ get_streamed_m_block(Config) ->
 %%--------------------------------------------------------------------
 %% @spec stream_file_segment(Config) -> ok 
 %% @doc 
-%% Tests streaming of file cocli -> co_stream_app -> cocli 
+%% Tests streaming of file cocli -> co_test_stream_app -> cocli 
 %% @end
 %%--------------------------------------------------------------------
 stream_file_segment(Config) ->
@@ -538,7 +538,7 @@ stream_file_segment(Config) ->
 %%--------------------------------------------------------------------
 %% @spec stream_file_block(Config) -> ok 
 %% @doc 
-%% Tests streaming of file cocli -> co_stream_app -> cocli 
+%% Tests streaming of file cocli -> co_test_stream_app -> cocli 
 %% @end
 %%--------------------------------------------------------------------
 
@@ -643,9 +643,9 @@ stream_file(Config, TransferMode) ->
     Md5Res1 = os:cmd("md5 " ++ RFile),
     [_,_,_,Md5] = string:tokens(Md5Res1," "),
 
-    {ok, _Pid} = co_stream_app:start(serial(), 
-				     {ct:get_config(file_stream_index), 
-				      RFile, WFile}),
+    {ok, _Pid} = co_test_stream_app:start(serial(), 
+					  {ct:get_config(file_stream_index), 
+					   RFile, WFile}),
     ct:pal("Started stream app"),
     timer:sleep(1000),
 
