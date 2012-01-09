@@ -126,10 +126,7 @@ groups() ->
 %% @end
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
-    {ok, _Node} = co_node:start_link([{serial,serial()}, 
-				     {options, [extended, {vendor,16#2A1},
-						{dict_file, "test.dict"}]}]),
-    ct:pal("Started co_node"),
+    co_test_lib:start_node(),
     {ok, _Mgr} = co_mgr:start(),
     ct:pal("Started co_mgr"),
     Config.

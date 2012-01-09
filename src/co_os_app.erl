@@ -24,17 +24,20 @@
 	 terminate/2, code_change/3]).
 
 %% co_app and co_stream_app callbacks
--export([get_entry/2,
+-export([index_specification/2,
 	 set/3, get/2,
 	 write_begin/3, write/4,
 	 read_begin/3, read/3,
 	 abort/2]).
 
+%% Execution process
+-export([execute_command/2]).
+
 %% Test
 -export([loop_data/0,
 	 debug/1]).
 
--define(NAME, os_command_app).
+-define(NAME, os_cmd).
 -define(WRITE_SIZE, 56).    %% Size of data chunks when receiving
 
 -record(loop_data,
@@ -60,7 +63,7 @@
 		   {error, Error::atom()}.
 
 start(CoSerial) ->
-    gen_server:start_link({local, ?NAME}, ?MODULE, [CoSerial],[]).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [CoSerial],[]).
 	
 %%--------------------------------------------------------------------
 %% @doc
@@ -71,7 +74,7 @@ start(CoSerial) ->
 		{error, Error::atom()}.
 
 stop() ->
-    gen_server:call(?NAME, stop).
+    gen_server:call(?MODULE, stop).
 
 %%--------------------------------------------------------------------
 %%% CAllbacks for co_app and co_stream_app behavious
@@ -84,38 +87,37 @@ stop() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get_entry(Pid::pid(), {Index::integer(), SubInd::integer()}) -> 
+-spec index_specification(Pid::pid(), {Index::integer(), SubInd::integer()}) -> 
 		       {entry, Entry::record()} |
 		       {error, Reason::atom()}.
 
-get_entry(_Pid, {?IX_OS_COMMAND = Index, 255} = I) ->
-    ?dbg(?NAME," get_entry type ~.16B \n",[Index]),
-    Value = (?UNSIGNED8 bsl 8) bor ?OBJECT_VAR, %% VAR/ARRAY .. fixme
-    reply_entry(I, ?UNSIGNED32, ?ACCESS_RO, {value, Value});
-get_entry(_Pid, {?IX_OS_COMMAND, 0} = I) ->
-    reply_entry(I, ?UNSIGNED8, ?ACCESS_RO, atomic);
-get_entry(_Pid, {?IX_OS_COMMAND, ?SI_OS_COMMAND} = I) ->
-    reply_entry(I, ?OCTET_STRING, ?ACCESS_RW, streamed);
-get_entry(_Pid, {?IX_OS_COMMAND, ?SI_OS_STATUS} = I) ->
-    reply_entry(I, ?UNSIGNED8, ?ACCESS_RO, atomic);
-get_entry(_Pid, {?IX_OS_COMMAND, ?SI_OS_REPLY} = I) ->
-    reply_entry(I, ?OCTET_STRING, ?ACCESS_RO, streamed);
-get_entry(Pid, Index) when is_integer(Index) ->
-    get_entry(Pid, {Index, 0});
-get_entry(_Pid, {?IX_OS_COMMAND, SubInd})  ->
-    ?dbg(?NAME," get_entry Unknown subindex ~.8B \n",[SubInd]),
+index_specification(_Pid, {?IX_OS_COMMAND = Index, 255} = I) ->
+    ?dbg(?NAME," index_specification type ~.16B \n",[Index]),
+    reply_specification(I, ?UNSIGNED32, ?ACCESS_RO, {value, ?COMMAND_PAR});
+index_specification(_Pid, {?IX_OS_COMMAND, 0} = I) ->
+    reply_specification(I, ?UNSIGNED8, ?ACCESS_RO, atomic);
+index_specification(_Pid, {?IX_OS_COMMAND, ?SI_OS_COMMAND} = I) ->
+    reply_specification(I, ?OCTET_STRING, ?ACCESS_RW, streamed);
+index_specification(_Pid, {?IX_OS_COMMAND, ?SI_OS_STATUS} = I) ->
+    reply_specification(I, ?UNSIGNED8, ?ACCESS_RO, atomic);
+index_specification(_Pid, {?IX_OS_COMMAND, ?SI_OS_REPLY} = I) ->
+    reply_specification(I, ?OCTET_STRING, ?ACCESS_RO, streamed);
+index_specification(Pid, Index) when is_integer(Index) ->
+    index_specification(Pid, {Index, 0});
+index_specification(_Pid, {?IX_OS_COMMAND, SubInd})  ->
+    ?dbg(?NAME," index_specification Unknown subindex ~.8B \n",[SubInd]),
     {error, ?abort_no_such_subindex};
-get_entry(_Pid, {Index, SubInd})  ->
-    ?dbg(?NAME," get_entry ~.16B:~.8B \n",[Index, SubInd]),
+index_specification(_Pid, {Index, SubInd})  ->
+    ?dbg(?NAME," index_specification ~.16B:~.8B \n",[Index, SubInd]),
     {error, ?abort_no_such_object}.
 
-reply_entry({Index, SubInd} = I, Type, Access, Mode) ->
-    ?dbg(?NAME," reply_entry ~.16B:~.8B, type = ~p, access = ~p, mode = ~p\n",
+reply_specification({Index, SubInd} = I, Type, Access, Mode) ->
+    ?dbg(?NAME," reply_specification ~.16B:~.8B, type = ~p, access = ~p, mode = ~p\n",
 	 [Index, SubInd, Type, Access, Mode]),
-    Entry = #app_entry{index = I,
-		       type = Type,
-		       access = Access,
-		       transfer = Mode},
+    Entry = #index_spec{index = I,
+			type = Type,
+			access = Access,
+			transfer = Mode},
     {entry, Entry}.
 
 %%--------------------------------------------------------------------
@@ -219,10 +221,10 @@ abort(Pid, Ref) ->
     
 %% Test functions
 debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
-    gen_server:call(?NAME, {debug, TrueOrFalse}).
+    gen_server:call(?MODULE, {debug, TrueOrFalse}).
 
 loop_data() ->
-    gen_server:call(?NAME, loop_data).
+    gen_server:call(?MODULE, loop_data).
 
 
 
@@ -283,6 +285,9 @@ handle_call({set, {?IX_OS_COMMAND, SubInd}, _NewValue}, _From, LoopData) ->
 handle_call({set, {Index, SubInd}, _NewValue}, _From, LoopData) ->
     ?dbg(?NAME, "handle_call: set ~.16B:~.8B \n",[Index, SubInd]),    
     {reply, {error, ?abort_no_such_object}, LoopData};
+handle_call({get, {?IX_OS_COMMAND, 0}}, _From, LoopData) ->
+    ?dbg(?NAME, "handle_call: get object size = 3\n",[]),    
+    {reply, {ok, 3}, LoopData};
 handle_call({get, {?IX_OS_COMMAND, ?SI_OS_COMMAND}}, _From, LoopData) ->
     ?dbg(?NAME, "handle_call: get command = ~p\n",[LoopData#loop_data.command]),    
     {reply, {ok, LoopData#loop_data.command}, LoopData};
@@ -316,6 +321,10 @@ handle_call({write, Ref, Data, Eod}, _From, LoopData) ->
        true ->
 	    handle_write(Data, Eod, LoopData#loop_data {state = storing})
     end;
+handle_call({read_begin, {?IX_OS_COMMAND, ?SI_OS_COMMAND}, Ref}, _From, LoopData) ->
+    ?dbg(?NAME, "handle_call: read_begin ref = ~p\n", [Ref]),  
+    Data = co_codec:encode(LoopData#loop_data.command, ?OCTET_STRING),
+    {reply, {ok, Ref, size(Data)}, LoopData#loop_data {ref = Ref, read_buf = Data}};
 handle_call({read_begin, {?IX_OS_COMMAND, ?SI_OS_REPLY}, Ref}, _From, LoopData) ->
     ?dbg(?NAME, "handle_call: read_begin ref = ~p\n", [Ref]),  
     Data = co_codec:encode(LoopData#loop_data.reply, ?OCTET_STRING),
@@ -374,35 +383,45 @@ handle_write_i(NewC, false, LoopData=#loop_data {ref = Ref}) ->
     {reply, {ok, Ref}, LoopData#loop_data {command = NewC}}.
 
 
-handle_command(LoopData=#loop_data {command = Command}) when is_binary(Command) ->
-    ?dbg(?NAME," handle_command: converting command ~p.\n",[Command]),
-    handle_command(LoopData#loop_data {command = binary_to_list(Command)});
+
 handle_command(LoopData=#loop_data {command = Command}) when is_list(Command) ->
     ?dbg(?NAME," handle_command: command = ~p.\n",[Command]),
+    proc_lib:spawn_link(?MODULE, execute_command, [Command, self()]),
+    {reply, ok, LoopData#loop_data {state = executing,
+					    status = 255, 
+					    reply = ""}};
+handle_command(LoopData=#loop_data {command = Command}) ->
+    ?dbg(?NAME," handle_command: convert iolist = ~p.\n",[Command]),
+    try iolist_size(Command) of
+	_Size -> 
+	    handle_command(LoopData#loop_data 
+			   {command = binary_to_list(iolist_to_binary(Command))})
+    catch
+	{error, _Reason} -> 
+	    {reply, {error, ?abort_local_data_error}, LoopData}
+    end.
+
+execute_command(Command, Starter) ->
+    Res = execute_command(Command),
+    Starter ! Res.
+
+execute_command(Command) ->
     try os:cmd(Command) of
 	{error, E} ->
-
-	    ?dbg(?NAME," handle_command: execute Error = ~p\n",[E]),    
-	    {reply, ok, LoopData#loop_data {state = executed,
-					    status = 3, 
-					    reply = E}};
+	    ?dbg(?NAME," handle_command: execute Error = ~p\n",[E]), 
+	    {3, E};
 	[] ->
-	    ?dbg(?NAME," handle_command: execute no result\n",[]),    
-	    {reply, ok, LoopData#loop_data {state = executed,
-					    status = 0, 
-					    reply = ""}};
+	    ?dbg(?NAME," handle_command: execute no result\n",[]),  
+	    {0, ""};
 	Result ->
-	    ?dbg(?NAME," handle_command: execute Result = ~p\n",[Result]),    
-	    {reply, ok, LoopData#loop_data {state = executed,
-					    status = 1, 
-					    reply = Result}}
+	    ?dbg(?NAME," handle_command: execute Result = ~p\n",[Result]), 
+	    {1, Result}
     catch
 	error:Reason ->
-	    ?dbg(?NAME," handle_command: execute catch Reason = ~p\n",[Reason]),    
-	    {reply, ok, LoopData#loop_data {state = executed,
-					    status = 3, 
-					    reply = "Internal Error"}}
+	    ?dbg(?NAME," handle_command: execute catch Reason = ~p\n",[Reason]), 
+	    {3, "Internal Error"}
     end.
+
 
 handle_read(Bytes, LoopData=#loop_data {ref = Ref, read_buf = Data}) ->
     Size = size(Data),
@@ -463,6 +482,12 @@ handle_cast(Msg, LoopData) ->
 %% 
 %% @end
 %%--------------------------------------------------------------------
+handle_info({Status, Reply} = Info, LoopData) ->
+    %% Result received from spawned process
+    ?dbg(?NAME," handle_info: Received result ~p\n", [Info]),
+    {noreply, LoopData#loop_data {state = executed,
+				  status = Status, 
+				  reply = Reply}};
 handle_info({notify, RemoteId, {Index, SubInd}, Value}, LoopData) ->
     ?dbg(?NAME," handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w \n", 
 	      [RemoteId, Index, SubInd, Value]),

@@ -46,7 +46,6 @@
 -define(PDO_MAPPING,     16#0021).
 -define(SDO_PARAMETER,   16#0022).
 -define(IDENTITY,        16#0023).
-
 -define(DEBUGGER_PAR,    16#0024).
 -define(COMMAND_PAR,     16#0025).
 
@@ -399,9 +398,10 @@
 	  dict,         %% copy of can dictionary in co_ctx
 	  sub_table,    %% copy of subscriber table in co_ctx
 	  res_table,    %% copy of reserver table in co_ctx
-	  read_bufsize, %% Size of bufer when reading from application
+	  readbufsize,  %% Size of bufer when reading from application
 	  load_ratio,   %% Trigger for loading read buffer
-	  atomic_limit  %% Limit for atomic transfer when size unknown
+	  atomic_limit, %% Limit for atomic transfer when size unknown
+	  debug         %% enable/disable debug
 	}).
 
 -record(co_session,

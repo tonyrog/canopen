@@ -2,10 +2,14 @@
 # Make the canopen erlang implementation
 #
 
+#
+# Behaviours compiled first
+#
 MODULES = \
+	co_app \
+	co_stream_app \
 	canopen \
 	canopen_sup \
-	co_app \
 	co_codec \
 	co_crc \
 	co_data_buf \
@@ -22,9 +26,7 @@ MODULES = \
 	co_sdo_cli_fsm \
 	co_sdo_srv_fsm \
 	co_session \
-	co_stream_app \
 	co_tpdo \
-	co_transfer \
 	eds_file
 
 

@@ -100,7 +100,7 @@ fetch(Ctx,Block,From,Src,Dst,IX,SI,Term) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Action,Mode,Ctx,From,NodePid,Src,Dst,IX,SI,Term]) ->
-    put(dbg, true), %% Make debug possbible
+    put(dbg, Ctx#sdo_ctx.debug),
     ?dbg(cli,"init: ~p ~p src=~.16#, dst=~.16#", [Action, Mode, Src, Dst]),
     ?dbg(cli,"init: From = ~p, Index = ~4.16.0B:~p, Term = ~p",
     	 [From, IX, SI, Term]),
@@ -131,8 +131,8 @@ store(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, {app, Pid, Modul
     end;
 store(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, {data, Data}) 
   when is_binary(Data) ->
-    case co_data_buf:init(read, self(), {Data, {IX, SI}}, Ctx#sdo_ctx.read_bufsize, 
-			  trunc(Ctx#sdo_ctx.read_bufsize * 
+    case co_data_buf:init(read, self(), {Data, {IX, SI}}, Ctx#sdo_ctx.readbufsize, 
+			  trunc(Ctx#sdo_ctx.readbufsize * 
 				    Ctx#sdo_ctx.load_ratio)) of 
 	{ok, Buf} ->
 	    case Mode of 
@@ -181,15 +181,15 @@ fetch(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, data) ->
     end.
 	
 read_begin(Ctx, Index, SubInd, Pid, Mod) ->
-    case Mod:get_entry(Pid, {Index, SubInd}) of
+    case Mod:index_specification(Pid, {Index, SubInd}) of
 	{entry, Entry} ->
-	    if (Entry#app_entry.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
+	    if (Entry#index_spec.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
 		    ?dbg(cli, "read_begin: Read access ok\n", []),
 		    ?dbg(cli, "read_begin: Transfer mode = ~p\n", 
-			 [Entry#app_entry.transfer]),
+			 [Entry#index_spec.transfer]),
 		    co_data_buf:init(read, Pid, Entry, 
-				     Ctx#sdo_ctx.read_bufsize, 
-				     trunc(Ctx#sdo_ctx.read_bufsize * 
+				     Ctx#sdo_ctx.readbufsize, 
+				     trunc(Ctx#sdo_ctx.readbufsize * 
 					       Ctx#sdo_ctx.load_ratio));
 	       true ->
 		    {entry, ?abort_read_not_allowed}
@@ -199,11 +199,11 @@ read_begin(Ctx, Index, SubInd, Pid, Mod) ->
     end.
 
 write_begin(Ctx, Index, SubInd, Pid, Mod) ->
-    case Mod:get_entry(Pid, {Index, SubInd}) of
+    case Mod:index_specification(Pid, {Index, SubInd}) of
 	{entry, Entry} ->
-	    if (Entry#app_entry.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
+	    if (Entry#index_spec.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
 		    ?dbg(cli, "write_begin: transfer=~p, type = ~p\n",
-			 [Entry#app_entry.transfer, Entry#app_entry.type]),
+			 [Entry#index_spec.transfer, Entry#index_spec.type]),
 		    co_data_buf:init(write, Pid, Entry,  Ctx#sdo_ctx.atomic_limit, undefined);
 	       true ->
 		    {entry, ?abort_unsupported_access}
