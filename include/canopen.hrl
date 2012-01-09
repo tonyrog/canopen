@@ -46,6 +46,10 @@
 -define(PDO_MAPPING,     16#0021).
 -define(SDO_PARAMETER,   16#0022).
 -define(IDENTITY,        16#0023).
+
+-define(DEBUGGER_PAR,    16#0024).
+-define(COMMAND_PAR,     16#0025).
+
 %% Reserved 0024 - 003F
 
 %% 0040 - 005F - DEFSTRUCT - Manufacturer Specific Complex Data Types

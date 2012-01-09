@@ -40,46 +40,107 @@ new() ->
 new(Access) ->
     init(ets:new(co_dict, [{keypos,2},Access,ordered_set])).
 
+deftype(Dict, Type, Size) ->
+    ets:insert(Dict, #dict_object { index=Type,
+				    access=?ACCESS_RO,
+				    struct=?OBJECT_DEFTYPE,
+				    type=?UNSIGNED32 }),
+    %%
+    %% DS301 - page 82 - 
+    %% "A device may optionally provide the length of the standard data types
+    %% encoded as UNSIGNED32 at read access to the index that refers to the 
+    %% data type. E.g. index 000Ch (Time of Day) contains the value 30h=48dec 
+    %% as the data type „Time of Day“ is encoded using a bit sequence of 48 bit.
+    %% If the length is variable (e.g. 000Fh = Domain), the entry contains 0h.
+    %%
+    ets:insert(Dict, #dict_entry  { index={Type,0},
+				    access=?ACCESS_RO,
+				    type=?UNSIGNED32,
+				    value=Size }).
+    
+
+%% add entries in entry table
+%% "For the supported complex data types a device may optionally provide the 
+%% structure of that data type at read access to the corresponding data type
+%% index. Sub-index 0 then provides the number of entries at this index not 
+%% counting sub-indices 0 and 255 and the following sub-indices contain the 
+%% data type according to Table 39 encoded as UNSIGNED8. The entry at Index 
+%% 20h describing the structure of the PDO Communication Parameter then looks
+%%  as follows (see also objects 1400h – 15FFh):
+%%
+defstruct(Dict, Type, Fields) ->
+    ets:insert(Dict, #dict_entry  { index={Type,0},
+				    access=?ACCESS_RO,
+				    type=?UNSIGNED8,
+				    value = length(Fields) }),
+    defstruct_fields(Dict, Type, 1, Fields).
+    
+defstruct_fields(Dict, Type, I, [F|Fs]) ->
+    ets:insert(Dict, #dict_entry  { index={Type,I},
+				    access=?ACCESS_RO,
+				    type=?UNSIGNED8,
+				    value = F }),
+    defstruct_fields(Dict, Type, I+1, Fs);
+defstruct_fields(_Dict,_Type,_I,[]) ->
+    ok.
+
 init(Dict) ->
-    %% Install type nodes
-    foreach(fun({Index,Size}) ->
-		ets:insert(Dict,
-			   #dict_object { index=Index, 
-					  access=?ACCESS_RO,
-					  struct=?OBJECT_DEFTYPE,
-					  type=?UNSIGNED32 }),
-		ets:insert(Dict,
-			   #dict_entry { index={Index,0},
-					 access=?ACCESS_RO,
-					 type=?UNSIGNED32,
-					 value=Size })
-	end,
-	[{?BOOLEAN, 1}, 
-	 {?INTEGER8,8}, 
-	 {?INTEGER16,16},
-	 {?INTEGER32,32},
-	 {?UNSIGNED8,8},
-	 {?UNSIGNED16,16},
-	 {?UNSIGNED32,32},
-	 {?REAL32,32},
-	 {?VISIBLE_STRING,0},
-	 {?OCTET_STRING,0},
-	 {?UNICODE_STRING,0},
-	 {?TIME_OF_DAY,48},
-	 {?TIME_DIFFERENCE,48},
-	 {?BIT_STRING,0},
-	 {?DOMAIN,0},
-	 {?INTEGER24,0},
-	 {?REAL64,64},
-	 {?INTEGER40,40},
-	 {?INTEGER48,48},
-	 {?INTEGER56,56},
-	 {?INTEGER64,64},
-	 {?UNSIGNED24,24},
-	 {?UNSIGNED40,40},
-	 {?UNSIGNED48,48},
-	 {?UNSIGNED56,56},
-	 {?UNSIGNED64,64}]),
+    deftype(Dict, ?BOOLEAN,         1),
+    deftype(Dict, ?INTEGER8,        8),
+    deftype(Dict, ?INTEGER16,       16),
+    deftype(Dict, ?INTEGER32,       32),
+    deftype(Dict, ?UNSIGNED8,       8),
+    deftype(Dict, ?UNSIGNED16,      16),
+    deftype(Dict, ?UNSIGNED32,      32),
+    deftype(Dict, ?REAL32,          32),
+    deftype(Dict, ?VISIBLE_STRING,  0),
+    deftype(Dict, ?OCTET_STRING,    0),
+    deftype(Dict, ?UNICODE_STRING,  0),
+    deftype(Dict, ?TIME_OF_DAY,     48),
+    deftype(Dict, ?TIME_DIFFERENCE, 48),
+    deftype(Dict, ?BIT_STRING,      0),
+    deftype(Dict, ?DOMAIN,          0),
+    deftype(Dict, ?INTEGER24,      24),
+    deftype(Dict, ?REAL64,         64),
+    deftype(Dict, ?INTEGER40,      40),
+    deftype(Dict, ?INTEGER48,      48),
+    deftype(Dict, ?INTEGER56,      56),
+    deftype(Dict, ?INTEGER64,      64),
+    deftype(Dict, ?UNSIGNED24,     24),
+    deftype(Dict, ?UNSIGNED40,     40),
+    deftype(Dict, ?UNSIGNED48,     48),
+    deftype(Dict, ?UNSIGNED56,     56),
+    deftype(Dict, ?UNSIGNED64,     64),
+    defstruct(Dict, ?PDO_PARAMETER, 
+	      [?UNSIGNED32,  %% COB-ID
+	       ?UNSIGNED8,   %% Transmission type
+	       ?UNSIGNED16,  %% Inhibit timer
+	       ?UNSIGNED8,   %% reserved
+	       ?UNSIGNED16   %% Event timer
+	      ]),
+    defstruct(Dict, ?PDO_MAPPING, lists:duplicate(64, ?UNSIGNED32)),
+    defstruct(Dict, ?SDO_PARAMETER, 
+	      [?UNSIGNED32,   %% COB-ID: Client -> Server
+	       ?UNSIGNED32,   %% COB-ID: Server -> Client
+	       ?UNSIGNED8     %% Node ID of SDO's client/server 
+	                      %% FIXME: Extend this to UNSIGNED32!
+	      ]),
+    defstruct(Dict, ?IDENTITY, 
+	      [?UNSIGNED32,   %% Vendor ID
+	       ?UNSIGNED32,   %% Product code
+	       ?UNSIGNED32,   %% Revision number
+	       ?UNSIGNED32    %% Serial number
+	      ]),
+    defstruct(Dict, ?DEBUGGER_PAR,
+	      [?OCTET_STRING, %% Command
+	       ?UNSIGNED8,    %% Status
+	       ?OCTET_STRING  %% Reply
+	      ]),
+    defstruct(Dict, ?COMMAND_PAR,
+	      [?OCTET_STRING, %% Command,
+	       ?UNSIGNED8,    %% Status
+	       ?OCTET_STRING  %% Reply
+	      ]),
     Dict.
 				    
 
