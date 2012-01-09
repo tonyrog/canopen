@@ -85,7 +85,6 @@ defstruct_fields(_Dict,_Type,_I,[]) ->
     ok.
 
 init(Dict) ->
-<<<<<<< HEAD
     deftype(Dict, ?BOOLEAN,         1),
     deftype(Dict, ?INTEGER8,        8),
     deftype(Dict, ?INTEGER16,       16),
