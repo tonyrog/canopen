@@ -7,11 +7,13 @@
 %% @end
 %%===================================================================
 
--module(co_stream_app).
+-module(co_test_stream_app).
 -include_lib("canopen/include/canopen.hrl").
 -include("co_app.hrl").
+%%-include("co_debug.hrl").
 
 -behaviour(gen_server).
+-behaviour(co_stream_app).
 
 -compile(export_all).
 
@@ -20,10 +22,21 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
-%% CO node callbacks
--export([get_entry/2]).
+%% co_app and co_stream_app callbacks
+-export([index_specification/2,
+	 write_begin/3, write/4,
+	 read_begin/3, read/3,
+	 abort/2]).
 
--define(SERVER, ?MODULE). 
+%% Testing
+-ifdef(debug).
+-define(dbg(Tag,Fmt,As), ct:pal(atom_to_list(Tag) ++ (Fmt), (As))).
+-else.
+-define(dbg(Tag,Fmt,As), ok).
+-endif.
+
+
+-define(NAME, ?MODULE). 
 -define(WRITE_SIZE, 28).
 
 -record(loop_data,
@@ -50,7 +63,7 @@
 %% @end
 %%--------------------------------------------------------------------
 start(CoSerial, {Index, RFile, WFile}) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, 
+    gen_server:start_link({local, ?NAME}, ?MODULE, 
 			  {CoSerial, {Index, RFile, WFile}, self()}, []).
 
 %%--------------------------------------------------------------------
@@ -64,11 +77,9 @@ start(CoSerial, {Index, RFile, WFile}) ->
 stop() ->
     gen_server:call(?MODULE, stop).
 
-loop_data() ->
-    gen_server:call(?MODULE, loop_data).
-
 %%--------------------------------------------------------------------
-%% @spec get_entry(Pid, {Index, SubInd}) -> {entry, Entry::record()} | false
+%% @spec index_specification(Pid, {Index, SubInd}) -> 
+%%    {entry, Entry::record()} | false
 %%
 %% @doc
 %% Returns the data structure for {Index, SubInd}.
@@ -76,9 +87,75 @@ loop_data() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-get_entry(_Pid, {Index, SubInd} = I) ->
-    ct:pal("~p: get_entry ~.16B:~.8B \n",[?MODULE, Index, SubInd]),
-    gen_server:call(?MODULE, {get_entry, I}).
+index_specification(_Pid, {Index, SubInd} = I) ->
+    ?dbg(?NAME,"index_specification ~.16B:~.8B \n",[Index, SubInd]),
+    gen_server:call(?MODULE, {index_specification, I}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Intializes download of data. Returns max size of data chunks.
+%% @end
+%%--------------------------------------------------------------------
+-spec write_begin(Pid::pid(), {Index::integer(), SubInd::integer()}, 
+		  Ref::reference()) ->
+		 {ok, Ref::reference(), WriteSize::integer()} |
+		 {error, Reason::atom()}.
+
+write_begin(Pid, {Index, SubInd}, Ref) ->
+    ?dbg(?NAME,"write_begin ~.16B:~.8B, ref = ~p\n",[Index, SubInd, Ref]),
+    gen_server:call(Pid, {write_begin, {Index, SubInd}, Ref}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Downloads data.
+%% @end
+%%--------------------------------------------------------------------
+-spec write(Pid::pid(), Ref::reference(), Data::binary(), EodFlag::boolean()) ->
+		 {ok, Ref::reference()} |
+		 {error, Reason::atom()}.
+write(Pid, Ref, Data, EodFlag) ->
+    ?dbg(?NAME,"write ref = ~p, data = ~p, Eod = ~p\n",[Ref, Data, EodFlag]),
+    gen_server:call(Pid, {write, Ref, Data, EodFlag}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Intializes upload of data. Returns size of data.
+%% @end
+%%--------------------------------------------------------------------
+-spec read_begin(Pid::pid(), {Index::integer(), SubInd::integer()}, 
+		  Ref::reference()) ->
+		 {ok, Ref::reference(), Size::integer()} |
+		 {error, Reason::atom()}.
+
+read_begin(Pid, {Index, SubInd}, Ref) ->
+    ?dbg(?NAME,"read_begin ~.16B:~.8B, ref = ~p\n",[Index, SubInd, Ref]),
+    gen_server:call(Pid, {read_begin, {Index, SubInd}, Ref}).
+%%--------------------------------------------------------------------
+%% @doc
+%% Uploads data.
+%% @end
+%%--------------------------------------------------------------------
+-spec read(Pid::pid(), Ref::reference(), Bytes::integer()) ->
+		 {ok, Ref::reference(), Data::binary(), EodFlag::boolean()} |
+		 {error, Reason::atom()}.
+read(Pid, Ref, Bytes) ->
+    ?dbg(?NAME,"read ref = ~p, \n",[Ref]),
+    gen_server:call(Pid, {read, Bytes, Ref}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Aborts stream transaction.
+%% @end
+%%--------------------------------------------------------------------
+-spec abort(Pid::pid(), Ref::reference()) ->
+		   ok |
+		   {error, Reason::atom()}.
+abort(Pid, Ref) ->
+    ?dbg(?NAME," abort ref = ~p\n",[Ref]),
+    gen_server:call(Pid, {abort, Ref}).
+    
+loop_data() ->
+    gen_server:call(?MODULE, loop_data).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -96,7 +173,7 @@ get_entry(_Pid, {Index, SubInd} = I) ->
 %% @end
 %%--------------------------------------------------------------------
 init({CoSerial, {Index, RFileName, WFileName}, Starter}) ->
-    ct:pal("Starting with index = ~.16B, readfile = ~p, writefile = ~p\n",
+    ct:pal(?NAME, "Starting with index = ~.16B, readfile = ~p, writefile = ~p\n",
 	   [Index, RFileName, WFileName]),
     {ok, _NodeId} = co_node:attach(CoSerial),
     ok = co_node:reserve(CoSerial, Index, ?MODULE),
@@ -130,34 +207,34 @@ init({CoSerial, {Index, RFileName, WFileName}, Starter}) ->
 %% 
 %% @end
 %%--------------------------------------------------------------------
-handle_call({get_entry, {Index, SubInd} = I}, _From, LoopData) ->   
-    ct:pal("~p: handle_call: get_entry ~.16B:~.8B\n", [?MODULE, Index, SubInd]),
+handle_call({index_specification, {Index, SubInd} = I}, _From, LoopData) ->   
+    ?dbg(?NAME, "handle_call: index_specification ~.16B:~.8B\n", [Index, SubInd]),
     case LoopData#loop_data.index of
 	Index ->
-	    Entry = #app_entry{index = I,
-			       type = ?VISIBLE_STRING,
-			       access = ?ACCESS_RW,
-			       transfer = streamed},
+	    Entry = #index_spec{index = I,
+			        type = ?VISIBLE_STRING,
+				access = ?ACCESS_RW,
+				transfer = streamed},
 	    {reply, {entry, Entry}, LoopData};
 	_OtherIndex ->
-	    ct:pal("~p: handle_call: get_entry error = ~.16B\n", 
-		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
+	    ?dbg(?NAME, "handle_call: index_specification error = ~.16B\n", 
+		 [?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData}
     end;
 handle_call({read_begin, {Index, SubInd}, Ref}, _From, LoopData) ->
-    ct:pal("~p: handle_call: read_begin ~.16B:~.8B, ref = ~p\n",
-	 [?MODULE, Index, SubInd, Ref]),
+    ?dbg(?NAME, "handle_call: read_begin ~.16B:~.8B, ref = ~p\n",
+	 [Index, SubInd, Ref]),
     case LoopData#loop_data.index of
 	Index ->
-	    ct:pal("~p: handle_call: read_begin opening file ~p",
-		   [?MODULE, LoopData#loop_data.readfilename]),
+	    ?dbg(?NAME, "handle_call: read_begin opening file ~p",
+		   [LoopData#loop_data.readfilename]),
 	    {ok, F} = file:open(LoopData#loop_data.readfilename, 
 				[read, raw, binary, read_ahead]),
 	    {reply, {ok, Ref, undefined}, 
 	     LoopData#loop_data {ref = Ref, readfile = F}};
 	_OtherIndex ->
-	    ct:pal("~p: handle_call: read_begin error = ~.16B\n", 
-		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
+	    ?dbg(?NAME, "handle_call: read_begin error = ~.16B\n", 
+		 [?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData}
     end;
 handle_call({read, Ref, Bytes}, _From, LoopData) ->
@@ -167,26 +244,26 @@ handle_call({read, Ref, Bytes}, _From, LoopData) ->
 		{ok, Data} ->
 		    {reply, {ok, Ref, Data, false}, LoopData};
 		eof ->
-		    ct:pal("~p: handle_call: read  eof reached\n", [?MODULE]), 
+		    ?dbg(?NAME, "handle_call: read  eof reached\n", []), 
 		    file:close(LoopData#loop_data.readfile),    
 		    LoopData#loop_data.starter ! eof,
 		    {reply, {ok, Ref, <<>>, true}, LoopData}
 	    end;
 	_OtherRef ->
-	    ct:pal("~p: handle_call: read error = wrong_ref\n", [?MODULE]), 
+	    ?dbg(?NAME, "handle_call: read error = wrong_ref\n", []), 
 	    {reply, {error, ?ABORT_INTERNAL_ERROR}, LoopData}	    
     end;
 handle_call({write_begin, {Index, SubInd}, Ref}, _From, LoopData) ->
-    ct:pal("~p: handle_call: write_begin ~.16B:~.8B, ref = ~p\n",
-	 [?MODULE, Index, SubInd, Ref]),
+    ?dbg(?NAME, "handle_call: write_begin ~.16B:~.8B, ref = ~p\n",
+	 [Index, SubInd, Ref]),
     case LoopData#loop_data.index of
 	Index ->
 	    {ok, F} = file:open(LoopData#loop_data.writefilename, 
 				[write, raw, binary, delayed_write]),
 	    {reply, {ok, Ref, ?WRITE_SIZE}, LoopData#loop_data {ref = Ref, writefile = F}};
 	_OtherIndex ->
-	    ct:pal("~p: handle_call: read_begin error = ~.16B\n", 
-		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
+	    ?dbg(?NAME, "handle_call: read_begin error = ~.16B\n", 
+		 [?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData}
     end;
 handle_call({write, Ref, Data, Eod}, _From, LoopData) ->
@@ -194,7 +271,7 @@ handle_call({write, Ref, Data, Eod}, _From, LoopData) ->
 	Ref ->
 	    file:write(LoopData#loop_data.writefile, Data),
 	    if Eod ->
-		    ct:pal("~p: handle_call: write eof reached\n", [?MODULE]), 
+		    ?dbg(?NAME, "handle_call: write eof reached\n", []), 
 		    file:close(LoopData#loop_data.writefile),
 		    LoopData#loop_data.starter ! eof;
 	       true ->
@@ -202,29 +279,29 @@ handle_call({write, Ref, Data, Eod}, _From, LoopData) ->
 	    end,
 	    {reply, {ok, Ref}, LoopData};
 	_OtherRef ->
-	    ct:pal("~p: handle_call: read error = wrong_ref\n", [?MODULE]), 
+	    ?dbg(?NAME, "handle_call: read error = wrong_ref\n", []), 
 	    {reply, {error, ?abort_internal_error}, LoopData}	    
     end;
 handle_call({abort, Ref}, _From, LoopData) ->
-    ct:pal("~p: handle_call: abort ref = ~p\n",[?MODULE, Ref]),
+    ?dbg(?NAME, "handle_call: abort ref = ~p\n",[Ref]),
     {reply, ok, LoopData};
 handle_call(loop_data, _From, LoopData) ->
-    ct:pal("~p: LoopData = ~p\n", [?MODULE, LoopData]),
+    ?dbg(?NAME, "LoopData = ~p\n", [LoopData]),
     {reply, ok, LoopData};
 handle_call(stop, _From, LoopData) ->
-    ct:pal("~p: handle_call: stop\n",[?MODULE]),
+    ?dbg(?NAME, "handle_call: stop\n",[]),
     case whereis(list_to_atom(co_lib:serial_to_string(LoopData#loop_data.co_node))) of
 	undefined -> 
 	    do_nothing; %% Not possible to detach and unsubscribe
 	_Pid ->
 	    co_node:unreserve(LoopData#loop_data.co_node, LoopData#loop_data.index),
-	    ct:pal("~p: stop: unsubscribed.\n",[?MODULE]),
+	    ?dbg(?NAME, "stop: unsubscribed.\n",[]),
 	    co_node:detach(LoopData#loop_data.co_node)
     end,
-    ct:pal("~p: handle_call: stop detached.\n",[?MODULE]),
+    ?dbg(?NAME, "handle_call: stop detached.\n",[]),
     {stop, normal, ok, LoopData};
 handle_call(Request, _From, LoopData) ->
-    ct:pal("~p: handle_call: bad call ~p.\n",[?MODULE, Request]),
+    ?dbg(?NAME, "handle_call: bad call ~p.\n",[Request]),
     {reply, {error,bad_call}, LoopData}.
 
 %%--------------------------------------------------------------------
@@ -263,11 +340,11 @@ handle_cast(_Msg, LoopData) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info({notify, RemoteId, {Index, SubInd}, Value}, LoopData) ->
-    ct:pal("~p: handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w \n", 
-	      [?MODULE, RemoteId, Index, SubInd, Value]),
+    ?dbg(?NAME, "handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w \n", 
+	      [RemoteId, Index, SubInd, Value]),
     {noreply, LoopData};
 handle_info(Info, LoopData) ->
-    ct:pal("~p: handle_info: Unknown Info ~p\n", [?MODULE, Info]),
+    ?dbg(?NAME, "handle_info: Unknown Info ~p\n", [Info]),
     {noreply, LoopData}.
 
 %%--------------------------------------------------------------------

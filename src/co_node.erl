@@ -49,7 +49,6 @@
 
 %% Debug interface
 -export([dump/1]).
--export([change_session_timeout/2]).
 -export([get_option/2, set_option/3]).
 -export([nodeid/1]).
 
@@ -86,9 +85,10 @@
 %%          {pst, integer()}         - ( 16 ) <br/>
 %%          {max_blksize, integer()} - ( 74 = 518 bytes) <br/>
 %%          {use_crc, boolean()}     - use crc for block (true) <br/>
-%%          {read_bufsize, integer()} - size of buf when reading from app <br/>
+%%          {readbufsize, integer()} - size of buf when reading from app <br/>
 %%          {load_ratio, float()} - ratio when time to fill read_buf <br/> 
 %%          {atomic_limit, integer()} - limit to size of atomic variable <br/>
+%%          {debug, boolean()}         - Enable/Disable trace output<br/>
 %%         
 %% @end
 %%--------------------------------------------------------------------
@@ -101,9 +101,10 @@
 				     {pst, integer()} |          
 				     {max_blksize, integer()} |  
 				     {use_crc, boolean()} |
-				     {read_bufsize, integer()} |
+				     {readbufsize, integer()} |
 				     {load_ratio, float()} |
-				     {atomic_maxsize, integer()})})) -> 
+				     {atomic_maxsize, integer()} |
+				     {debug, boolean()})})) -> 
 			{ok, Pid::pid()} | ignore | {error, Error::atom()}.
 
 start_link(Args) ->
@@ -259,7 +260,7 @@ all_subscribers(Serial, Ix) ->
 %%
 %% @doc
 %% Adds a reservation to an index.
-%% Module:get_entry will be called if needed.
+%% Module:index_specification will be called if needed.
 %% Index can also be a range {Index1, Index2}.
 %%
 %% @end
@@ -463,17 +464,6 @@ nodeid(Serial) ->
     gen_server:call(serial_to_pid(Serial), nodeid).
 
 %%--------------------------------------------------------------------
-%% @spec change_session_timeout(Serial, NewTimeout::integer()) -> ok | {error, Error}
-%%
-%% @doc
-%% Changes the session time out. (For testing)
-%%
-%% @end
-%%--------------------------------------------------------------------
-change_session_timeout(Serial, NewTimeout) ->
-    gen_server:call(serial_to_pid(Serial), {change_session_timeout, NewTimeout}).
-
-%%--------------------------------------------------------------------
 %% @spec get_option(Serial, Option::atom()) -> 
 %%        {ok, {option, Value}} | {error, unkown_option}
 %%
@@ -496,7 +486,7 @@ get_option(Serial, Option) ->
 set_option(Serial, Option, NewValue) 
   when Option == vendor;
        Option == max_blksize;
-       Option == read_bufsize;
+       Option == readbufsize;
        Option == time_stamp; 
        Option == sdo_timeout;
        Option == blk_timeout;
@@ -516,7 +506,8 @@ set_option(Serial, Option, NewValue)
 		 " can only be set to a positive integer value or zero."}
     end;
 set_option(Serial, Option, NewValue) 
-  when Option == use_crc ->
+  when Option == use_crc;
+       Option == debug ->
     if is_boolean(NewValue) ->
 	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
        true ->
@@ -658,10 +649,11 @@ reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Serial, NodeId, NodeName, Opts]) ->
-    put(dbg, true), %% Make debug possbible
-
     can_router:start(),
     can_udp:start(0),
+
+    %% Trace output enable/disable
+    put(dbg, proplists:get_value(debug,Opts,false)), 
 
     Dict = create_dict(),
     SubTable = create_sub_table(),
@@ -672,9 +664,10 @@ init([Serial, NodeId, NodeName, Opts]) ->
       pst             = proplists:get_value(pst,Opts,16),
       max_blksize     = proplists:get_value(max_blksize,Opts,7),
       use_crc         = proplists:get_value(use_crc,Opts,true),
-      read_bufsize    = proplists:get_value(read_bufsize,Opts,1024),
+      readbufsize     = proplists:get_value(readbufsize,Opts,1024),
       load_ratio      = proplists:get_value(load_ratio,Opts,0.5),
-      atomic_limit      = proplists:get_value(atomic_limit,Opts,1024),
+      atomic_limit    = proplists:get_value(atomic_limit,Opts,1024),
+      debug           = proplists:get_value(debug,Opts,false),
       dict            = Dict,
       sub_table       = SubTable,
       res_table       = ResTable
@@ -703,22 +696,19 @@ init([Serial, NodeId, NodeName, Opts]) ->
 
     can_router:attach(),
 
-    Ctx1 = case proplists:get_value(dict_file, Opts) of
-	       undefined -> Ctx;
-	       File -> 
-		   case load_dict_internal(filename:join(code:priv_dir(canopen), File), Ctx) of
-		       {ok, NewCtx} -> NewCtx;
-		       {error, _Error, OldCtx} -> Ctx %% or exit ???
-		   end
-	   end,
-
-    process_flag(trap_exit, true),
-    if NodeId =:= 0 ->
-	    {ok, Ctx1#co_ctx { state = ?Operational }};
-       true ->
-	    {ok, reset_application(Ctx1)}
+    case load_dict_init(proplists:get_value(dict_file, Opts), Ctx) of
+	{ok, Ctx1} ->
+	    process_flag(trap_exit, true),
+	    if NodeId =:= 0 ->
+		    {ok, Ctx1#co_ctx { state = ?Operational }};
+	       true ->
+		    {ok, reset_application(Ctx1)}
+	    end;
+	{error, Reason} ->
+	    io:format("~p: Loading of dict failed, exiting\n", [Ctx#co_ctx.name]),
+	    {stop, Reason}
     end.
-
+	    
 
 %%
 %%
@@ -980,10 +970,6 @@ handle_call(dump, _From, Ctx) ->
 handle_call(nodeid, _From, Ctx) ->
     {reply, Ctx#co_ctx.id, Ctx};
 
-handle_call({change_session_timeout, NewTimeout}, _From, Ctx) ->
-    Sdo = Ctx#co_ctx.sdo#sdo_ctx {timeout = NewTimeout},
-    {reply, ok, Ctx#co_ctx {sdo = Sdo}};
-
 handle_call({option, Option}, _From, Ctx) ->
     Reply = case Option of
 		sdo_timeout ->  {Option, Ctx#co_ctx.sdo#sdo_ctx.timeout};
@@ -991,11 +977,12 @@ handle_call({option, Option}, _From, Ctx) ->
 		pst ->  {Option, Ctx#co_ctx.sdo#sdo_ctx.pst};
 		max_blksize -> {Option, Ctx#co_ctx.sdo#sdo_ctx.max_blksize};
 		use_crc -> {Option, Ctx#co_ctx.sdo#sdo_ctx.use_crc};
-		read_bufsize -> {Option, Ctx#co_ctx.sdo#sdo_ctx.read_bufsize};
+		readbufsize -> {Option, Ctx#co_ctx.sdo#sdo_ctx.readbufsize};
 		load_ratio -> {Option, Ctx#co_ctx.sdo#sdo_ctx.load_ratio};
 		atomic_limit -> {Option, Ctx#co_ctx.sdo#sdo_ctx.atomic_limit};
 		time_stamp -> {Option, Ctx#co_ctx.time_stamp_time};
 		extended -> {Option, ?is_nodeid_extended(Ctx#co_ctx.id)};
+		debug -> {Option, Ctx#co_ctx.sdo#sdo_ctx.debug};
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
 	    end,
     {reply, Reply, Ctx};
@@ -1006,11 +993,13 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
 		pst ->  Ctx#co_ctx.sdo#sdo_ctx {pst = NewValue};
 		max_blksize -> Ctx#co_ctx.sdo#sdo_ctx {max_blksize = NewValue};
 		use_crc -> Ctx#co_ctx.sdo#sdo_ctx {use_crc = NewValue};
-		read_bufsize -> Ctx#co_ctx.sdo#sdo_ctx {read_bufsize = NewValue};
+		readbufsize -> Ctx#co_ctx.sdo#sdo_ctx {readbufsize = NewValue};
 		load_ratio -> Ctx#co_ctx.sdo#sdo_ctx {load_ratio = NewValue};
 		atomic_limit -> Ctx#co_ctx.sdo#sdo_ctx {atomic_limit = NewValue};
 		time_stamp -> Ctx#co_ctx {time_stamp_time = NewValue};
 		extended -> {error, "Option extended not possible to change"};
+		debug -> put(dbg, NewValue),
+			 Ctx#co_ctx.sdo#sdo_ctx {debug = NewValue};
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
 	    end,
     case Reply of
@@ -1190,6 +1179,14 @@ code_change(_OldVsn, Ctx, _Extra) ->
 %%
 %% Load a dictionary
 %% 
+load_dict_init(undefined, Ctx) ->
+    {ok, Ctx};
+load_dict_init(File, Ctx) ->
+    case load_dict_internal(filename:join(code:priv_dir(canopen), File), Ctx) of
+	{ok, NewCtx} -> {ok, NewCtx};
+	{error, Error, OldCtx} -> {error, Error}
+    end.
+
 load_dict_internal(File, Ctx) ->
     ?dbg(node, "load_dict_internal: Loading file = ~p\n", [File]),
     try co_file:load(File) of
@@ -1208,10 +1205,12 @@ load_dict_internal(File, Ctx) ->
 		      end, Ctx, Os),
 	    {ok, Ctx1};
 	Error ->
+	    ?dbg(node, "load_dict_internal: Failed loading file, error = ~p\n", 
+		 [Error]),
 	    {error, Error, Ctx}
     catch
 	error:Reason ->
-	    ?dbg(node, "load_dict_internal: Failed Loading file, reason = ~p\n", 
+	    ?dbg(node, "load_dict_internal: Failed loading file, reason = ~p\n", 
 		 [Reason]),
 
 	    {error, Reason, Ctx}

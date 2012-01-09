@@ -28,7 +28,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 %% CO node callbacks
--export([get_entry/2,
+-export([index_specification/2,
 	 set/3, get/2,
 	 write_begin/3, write/4,
 	 read_begin/3, read/3,
@@ -439,7 +439,8 @@ code_change(_OldVsn, LoopData, _Extra) ->
     {ok, LoopData}.
 
 %%--------------------------------------------------------------------
-%% @spec get_entry(Pid, {Index, SubInd}) -> {entry, Entry::record()} | false
+%% @spec index_specification(Pid, {Index, SubInd}) -> 
+%%   {entry, Entry::record()} | false
 %%
 %% @doc
 %% Returns the data structure for {Index, SubInd}.
@@ -447,33 +448,33 @@ code_change(_OldVsn, LoopData, _Extra) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-get_entry(Pid, {Index, 255}) ->
-    ?dbg("~p: get_entry type ~.16B \n",[?MODULE, Index]),
+index_specification(Pid, {Index, 255}) ->
+    ?dbg("~p: index_specification type ~.16B \n",[?MODULE, Index]),
     case ets:lookup(dict_table(Pid), {Index, 0}) of
 	[{I, Type, _Transfer}] ->
 	    Value = (type(Type) bsl 8) bor ?OBJECT_VAR, %% VAR/ARRAY .. fixme
-	    Entry = #app_entry{index = I,
-			       type = ?UNSIGNED32,
-			       access = ?ACCESS_RO,
-			       transfer = {value, Value}},
+	    Entry = #index_spec{index = I,
+				type = ?UNSIGNED32,
+				access = ?ACCESS_RO,
+				transfer = {value, Value}},
 	    {entry,Entry};
 	[] ->
 	    {error, ?ABORT_NO_SUCH_OBJECT}
     end;
-get_entry(Pid, {Index, SubInd} = I) ->
-    ?dbg("~p: get_entry ~.16B:~.8B \n",[?MODULE, Index, SubInd]),
+index_specification(Pid, {Index, SubInd} = I) ->
+    ?dbg("~p: index_specification ~.16B:~.8B \n",[?MODULE, Index, SubInd]),
     case ets:lookup(dict_table(Pid), I) of
 	[{I, Type, Transfer, _Value}] ->
-	    Entry = #app_entry{index = I,
-			       type = type(Type),
-			       access = ?ACCESS_RW,
-			       transfer = Transfer},
+	    Entry = #index_spec{index = I,
+			        type = type(Type),
+				access = ?ACCESS_RW,
+				transfer = Transfer},
 	    {entry, Entry};
 	[] ->
 	    {error, ?ABORT_NO_SUCH_OBJECT}
     end;
-get_entry(Pid, Index) when is_integer(Index) ->
-    get_entry(Pid, {Index, 0}).
+index_specification(Pid, Index) when is_integer(Index) ->
+    index_specification(Pid, {Index, 0}).
 
 
 type(string) -> ?VISIBLE_STRING;

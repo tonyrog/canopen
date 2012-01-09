@@ -11,6 +11,7 @@ run(Serial) ->
     {ok, _Pid} = co_node:start_link([{serial,Serial}, 
 				     {options, [extended,
 						{max_blksize, 7},
-						{vendor,0},
-						{dict_file, "test.dict"}]}]).
+						{vendor,16#2A1},
+						{dict_file, "test.dict"},
+						{debug, true}]}]).
 

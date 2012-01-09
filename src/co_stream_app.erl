@@ -16,6 +16,6 @@
 
 behaviour_info(callbacks) ->
     [{write_begin, 3}, {write, 4}, {read_begin, 3}, {read, 3},
-     {get_entry, 2}, {abort, 2}];
+     {index_specification, 2}, {abort, 2}];
 behaviour_info(_) ->
     undefined.

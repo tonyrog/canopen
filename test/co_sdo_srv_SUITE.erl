@@ -130,10 +130,7 @@ groups() ->
 %% @end
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
-    {ok, _Pid} = co_node:start_link([{serial,serial()}, 
-				     {options, [extended, {vendor,16#2A1},
-						{dict_file, "test.dict"}]}]),
-    ct:pal("Started co_node"),
+    co_test_lib:start_node(),
     Config.
 
 %%--------------------------------------------------------------------
@@ -579,20 +576,23 @@ app_dict() -> co_test_lib:app_dict().
 %%--------------------------------------------------------------------
 set(Config, {{Index, _T, _M, _Org}, NewValue}, BlockOrSegment) ->
     %% Get old value
-    {Index, _Type, _Transfer, OldValue} = lists:keyfind(Index, 1, co_test_app:dict(serial())),
+    {Index, _Type, _Transfer, OldValue} = 
+	lists:keyfind(Index, 1, co_test_app:dict(serial())),
 							
     %% Change to new
-    [] = os:cmd(set_cmd(Config, Index, NewValue, BlockOrSegment)),
-    {Index, _Type, _Transfer, NewValue} = lists:keyfind(Index, 1, co_test_app:dict(serial())),
+    [] = os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, BlockOrSegment)),
+    {Index, _Type, _Transfer, NewValue} = 
+	lists:keyfind(Index, 1, co_test_app:dict(serial())),
     
     %% Restore old
-    [] = os:cmd(set_cmd(Config, Index, OldValue, BlockOrSegment)),
-    {Index, _Type, _Transfer, OldValue} = lists:keyfind(Index, 1, co_test_app:dict(serial())),
+    [] = os:cmd(co_test_lib:set_cmd(Config, Index, OldValue, BlockOrSegment)),
+    {Index, _Type, _Transfer, OldValue} = 
+	lists:keyfind(Index, 1, co_test_app:dict(serial())),
 
     ok;
 set(Config, {Index, NewValue}, BlockOrSegment) ->
     %% co_node internal dict
-    [] = os:cmd(set_cmd(Config, Index, NewValue, BlockOrSegment)).
+    [] = os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, BlockOrSegment)).
    
 
 
@@ -607,7 +607,7 @@ set(Config, {Index, NewValue}, BlockOrSegment) ->
 %%--------------------------------------------------------------------
 get(Config, {{Index, _T, _M, _Org}, _NewValue}, BlockOrSegment) ->
 
-    Result = os:cmd(get_cmd(Config, Index, BlockOrSegment)),
+    Result = os:cmd(co_test_lib:get_cmd(Config, Index, BlockOrSegment)),
 
     %% For now ....
     case Result of
@@ -627,7 +627,7 @@ get(Config, {{Index, _T, _M, _Org}, _NewValue}, BlockOrSegment) ->
     ok;
 get(Config, {Index, _NewValue}, BlockOrSegment) ->
     %% co_node internal dict
-    Result = os:cmd(get_cmd(Config, Index, BlockOrSegment)),
+    Result = os:cmd(co_test_lib:get_cmd(Config, Index, BlockOrSegment)),
     ct:pal("Result = ~p", [Result]),
     
     Result = "0x2002 = \"New string aaaaabbbbbbbccccccddddddeeeee\"\n".
@@ -649,7 +649,8 @@ stream_file(Config, TransferMode) ->
     ct:pal("Started stream app"),
     timer:sleep(1000),
 
-    [] = os:cmd(file_cmd(Config, ct:get_config(file_stream_index), "download", TransferMode)),
+    [] = os:cmd(co_test_lib:file_cmd(Config, ct:get_config(file_stream_index), 
+				     "download", TransferMode)),
     %% ct:pal("Started download of file from stream app, result = ~p",[Res1]),
     receive 
 	eof ->
@@ -660,7 +661,8 @@ stream_file(Config, TransferMode) ->
 	    ct:fail("Application stuck")
     end,
 
-    [] = os:cmd(file_cmd(Config, ct:get_config(file_stream_index), "upload", TransferMode)),
+    [] = os:cmd(co_test_lib:file_cmd(Config, ct:get_config(file_stream_index), 
+				     "upload", TransferMode)),
     %% ct:pal("Started upload of file to stream app, result = ~p",[Res2]),
     receive 
 	eof ->
@@ -678,73 +680,4 @@ stream_file(Config, TransferMode) ->
     ok.
 
 
-set_cmd(Config, Index, Value, block) ->
-    set_cmd(Config, Index, Value, " -b");
-set_cmd(Config, Index, Value, segment) ->
-    set_cmd(Config, Index, Value, "");
-set_cmd(Config, Index, Value, BFlag) ->
-    Cmd = set_cmd1(Config, Index, Value, BFlag),
-    ct:pal("Command = ~p",[Cmd]),
-    Cmd.
-
-set_cmd1(Config, Index, Value, BFlag) ->
-    cocli(Config) ++ BFlag ++ " -s " ++ 
-	serial_as_c_string(serial()) ++ " set " ++ 
-	index_as_c_string(Index) ++ " \"" ++ Value ++ "\"".
-
-get_cmd(Config, Index, block) ->
-    get_cmd(Config, Index, " -b");
-get_cmd(Config, Index, segment) ->
-    get_cmd(Config, Index, "");
-get_cmd(Config, Index, BFlag) ->
-    Cmd = get_cmd1(Config, Index, BFlag),
-    ct:pal("Command = ~p",[Cmd]),
-    Cmd.
-
-get_cmd1(Config, Index, BFlag) ->
-    cocli(Config) ++ BFlag ++ " -s " ++ 
-	serial_as_c_string(serial()) ++ " get " ++ 
-	index_as_c_string(Index).
-
-file_cmd(Config, Index, Direction, block) ->
-    file_cmd(Config, Index, Direction, " -b");
-file_cmd(Config, Index, Direction, segment) ->
-    file_cmd(Config, Index, Direction, "");
-file_cmd(Config, Index, Direction, BFlag) ->
-    cocli(Config) ++ BFlag ++ " -s " ++ 
-	serial_as_c_string(serial()) ++ " " ++ 
-	Direction ++ " " ++ index_as_c_string(Index) ++ " " ++
-	filename:join(?config(priv_dir, Config), "tmp_file").
-    
-index_as_c_string({Index, 0}) ->
-    "0x" ++ integer_to_list(Index,16);
-index_as_c_string({Index, SubInd}) ->
-    "0x" ++ integer_to_list(Index,16) ++ ":" ++ integer_to_list(SubInd);
-index_as_c_string(Index) when is_integer(Index)->
-    "0x" ++ integer_to_list(Index,16).
-
-serial_as_c_string(Serial) ->
-    S = integer_to_list(Serial,16),
-    S1 = string:substr(S, 1, length(S) - 2), 
-    case length(S1) of
-	3 -> "0x80000" ++ S1;
-	4 -> "0x8000" ++ S1;
-	5 -> "0x800" ++ S1;
-	6 -> "0x80" ++ S1
-    end.
-	     
-    
-cocli(C) ->
-    DataDir = ?config(data_dir, C),
-    filename:join(DataDir, ct:get_config(cocli)).
-
-set_get_tests() ->
-    [test(set ,Name, segment) || {Name, {_Entry, _NewValue}} <- ct:get_config(dict)] ++
-	[test(get, Name, segment) || {Name, {_Entry, _NewValue}} <- ct:get_config(dict)] ++
-	[test(set, Name, block) || {Name, {_Entry, _NewValue}} <- ct:get_config(dict)] ++
-	[test(get, Name, block) || {Name, {_Entry, _NewValue}} <- ct:get_config(dict)].
-
-test(SetOrGet, Name, BlockOrSegment) ->
-    list_to_atom(atom_to_list(SetOrGet) ++ "_" ++ atom_to_list(Name) ++ "-" ++
-		     atom_to_list(BlockOrSegment)).
 

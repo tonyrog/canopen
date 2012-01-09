@@ -79,7 +79,8 @@ init(Dict) ->
 	 {?UNSIGNED40,40},
 	 {?UNSIGNED48,48},
 	 {?UNSIGNED56,56},
-	 {?UNSIGNED64,64}]),
+	 {?UNSIGNED64,64},
+	 {?COMMAND_PAR,0}]),
     Dict.
 				    
 

@@ -14,6 +14,6 @@
 -export([behaviour_info/1]).
 
 behaviour_info(callbacks) ->
-    [{set, 3}, {get, 2}, {get_entry, 2}];
+    [{set, 3}, {get, 2}, {index_specification, 2}];
 behaviour_info(_) ->
     undefined.

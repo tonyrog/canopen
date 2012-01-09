@@ -43,14 +43,19 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
--spec init(read | write, Pid::pid(), Entry::#app_entry{}, BufSize::integer(), LLevel::integer()) -> 
+-spec init(read | write, 
+	   Pid::pid(), Entry::#index_spec{}, 
+	   BufSize::integer(), LLevel::integer()) -> 
 		  {ok, Buf::#co_data_buf{}} |
 		  {ok, Mref::reference(), Buf::#co_data_buf{}} |
 		  {error, Error::atom()};
-	  (read | write, Dict::term(), Entry::#dict_entry{}, BufSize::integer(), LLevel::integer()) -> 
+	  (read | write, 
+	   Dict::term(), Entry::#dict_entry{}, 
+	   BufSize::integer(), LLevel::integer()) -> 
 		  {ok, Buf::#co_data_buf{}} |
 		  {error, Error::atom()};
-	  (read | write, Pid::pid(), {Data::binary(), I::{integer(),integer()}},
+	  (read | write, 
+	   Pid::pid(), {Data::binary(), I::{integer(),integer()}},
 	   BufSize::integer(), LLevel::integer()) -> 
 		  {ok, Buf::#co_data_buf{}} |
 		  {error, Error::atom()}.
@@ -61,7 +66,7 @@ init(Access, Pid, E, BSize, LLevel) ->
 	 [Access, E, BSize, LLevel]),
     init_i(Access, Pid, E, BSize, LLevel).
 
-init_i(read, Pid, #app_entry{index = I, type = Type, transfer = {value, Value} = M},
+init_i(read, Pid, #index_spec{index = I, type = Type, transfer = {value, Value} = M},
      BSize, LLevel) ->
     Data = co_codec:encode(Value, Type),
     open(read, #co_data_buf {access = read,
@@ -74,7 +79,8 @@ init_i(read, Pid, #app_entry{index = I, type = Type, transfer = {value, Value} =
 			     buf_size = BSize,
 			     load_level = LLevel,
 			     mode = M});
-init_i(Access, Pid, #app_entry{index = I, type = Type, transfer = Mode}, BSize, LLevel) ->
+init_i(Access, Pid, #index_spec{index = I, type = Type, transfer = Mode}, 
+       BSize, LLevel) ->
     open(Access, #co_data_buf {access = Access,
 			       pid = Pid,
 			       i = I,

@@ -84,7 +84,7 @@ start(Ctx,Src,Dst) when is_record(Ctx, sdo_ctx) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Ctx,NodePid,Src,Dst]) ->
-    put(dbg, true), %% Make debug possbible
+    put(dbg, Ctx#sdo_ctx.debug),
     ?dbg(srv,"init: src=~p, dst=~p \n", [Src, Dst]),
     S0 = #co_session {
       src    = Src,
@@ -260,11 +260,11 @@ central_write_begin(Ctx, Index, SubInd) ->
     end.
 
 app_write_begin(Index, SubInd, Pid, Mod) ->
-    case Mod:get_entry(Pid, {Index, SubInd}) of
+    case Mod:index_specification(Pid, {Index, SubInd}) of
 	{entry, Entry} ->
-	    if (Entry#app_entry.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
+	    if (Entry#index_spec.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
 		    ?dbg(srv, "app_write_begin: transfer=~p, type = ~p\n",
-			 [Entry#app_entry.transfer, Entry#app_entry.type]),
+			 [Entry#index_spec.transfer, Entry#index_spec.type]),
 		    co_data_buf:init(write, Pid, Entry, undefined, undefined);
 	       true ->
 		    {error, ?abort_unsupported_access}
@@ -310,8 +310,8 @@ central_read_begin(Ctx, Index, SubInd) ->
 	    if (E#dict_entry.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
 		    ?dbg(srv, "central_read_begin: Read access ok\n", []),
 		    co_data_buf:init(read, Dict, E,
-				     Ctx#sdo_ctx.read_bufsize, 
-				     trunc(Ctx#sdo_ctx.read_bufsize * 
+				     Ctx#sdo_ctx.readbufsize, 
+				     trunc(Ctx#sdo_ctx.readbufsize * 
 					       Ctx#sdo_ctx.load_ratio));
 	       true ->
 		    {error, ?abort_read_not_allowed}
@@ -321,15 +321,15 @@ central_read_begin(Ctx, Index, SubInd) ->
     end.
 
 app_read_begin(Ctx, Index, SubInd, Pid, Mod) ->
-    case Mod:get_entry(Pid, {Index, SubInd}) of
+    case Mod:index_specification(Pid, {Index, SubInd}) of
 	{entry, Entry} ->
-	    if (Entry#app_entry.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
+	    if (Entry#index_spec.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
 		    ?dbg(srv, "app_read_begin: Read access ok\n", []),
 		    ?dbg(srv, "app_read_begin: Transfer mode = ~p\n", 
-			 [Entry#app_entry.transfer]),
+			 [Entry#index_spec.transfer]),
 		    co_data_buf:init(read, Pid, Entry, 
-				     Ctx#sdo_ctx.read_bufsize, 
-				     trunc(Ctx#sdo_ctx.read_bufsize * 
+				     Ctx#sdo_ctx.readbufsize, 
+				     trunc(Ctx#sdo_ctx.readbufsize * 
 					       Ctx#sdo_ctx.load_ratio));
 	       true ->
 		    {error, ?abort_read_not_allowed}
@@ -484,7 +484,8 @@ start_segmented_upload(S) ->
     SI = S#co_session.subind,
     NBytes = co_data_buf:data_size(Buf),
     EofFlag = co_data_buf:eof(Buf),
-    ?dbg(srv, "start_segmented_upload, nbytes = ~p\n", [NBytes]),
+    ?dbg(srv, "start_segmented_upload, nbytes = ~p, eof = ~p\n", 
+	 [NBytes, EofFlag]),
     if NBytes =/= 0, NBytes =< 4 andalso EofFlag =:= true ->
 	    case co_data_buf:read(Buf, NBytes) of
 		{ok, Data, true, _Buf1} ->
@@ -502,6 +503,7 @@ start_segmented_upload(S) ->
 	    end;
        (NBytes =:= 0 andalso EofFlag =:= true) orelse
        (NBytes =:= undefined) ->
+	    ?dbg(srv, "start_segmented_upload, sizeind = 0, size = ~p",[NBytes]),
 	    N=0, E=0, SizeInd=0,
 	    Data = <<0:32/?SDO_ENDIAN>>, %% filler
 	    R=?mk_scs_initiate_upload_response(N,E,SizeInd,
@@ -509,6 +511,7 @@ start_segmented_upload(S) ->
 	    send(S, R),
 	    {next_state, s_segmented_upload, S, ?TMO(S)};
        true ->
+	    ?dbg(srv, "start_segmented_upload, sizeind = 1, size = ~p",[NBytes]),
 	    N=0, E=0, SizeInd=1,
 	    Data = <<NBytes:32/?SDO_ENDIAN>>,
 	    R=?mk_scs_initiate_upload_response(N,E,SizeInd,
@@ -537,8 +540,8 @@ s_segmented_upload(timeout, S) ->
 read_segment(S) ->
     case co_data_buf:read(S#co_session.buf,7) of
 	{ok, Data, Eod, Buf} ->
-	    ?dbg(srv, "read_segment: data=~p, Eod=~p\n", 
-		 [Data, Eod]),
+	    ?dbg(srv, "read_segment: data=~p, Size = ~p, Eod=~p\n", 
+		 [Data, size(Data), Eod]),
 	    upload_segment(S#co_session {buf = Buf}, Data, Eod);
 	{ok, Buf, Mref} ->
 	    %% Called an application
