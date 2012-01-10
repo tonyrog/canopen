@@ -5,7 +5,7 @@
 
 -module(co_file).
 
--include("../include/canopen.hrl").
+-include("canopen.hrl").
 
 -export([load/1, fold/3]).
 -import(lists, [map/2, seq/2, foreach/2]).

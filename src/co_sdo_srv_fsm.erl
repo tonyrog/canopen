@@ -261,11 +261,11 @@ central_write_begin(Ctx, Index, SubInd) ->
 
 app_write_begin(Index, SubInd, Pid, Mod) ->
     case Mod:index_specification(Pid, {Index, SubInd}) of
-	{entry, Entry} ->
-	    if (Entry#index_spec.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
+	{spec, Spec} ->
+	    if (Spec#index_spec.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
 		    ?dbg(srv, "app_write_begin: transfer=~p, type = ~p\n",
-			 [Entry#index_spec.transfer, Entry#index_spec.type]),
-		    co_data_buf:init(write, Pid, Entry, undefined, undefined);
+			 [Spec#index_spec.transfer, Spec#index_spec.type]),
+		    co_data_buf:init(write, Pid, Spec, undefined, undefined);
 	       true ->
 		    {error, ?abort_unsupported_access}
 	    end;
@@ -322,12 +322,12 @@ central_read_begin(Ctx, Index, SubInd) ->
 
 app_read_begin(Ctx, Index, SubInd, Pid, Mod) ->
     case Mod:index_specification(Pid, {Index, SubInd}) of
-	{entry, Entry} ->
-	    if (Entry#index_spec.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
+	{spec, Spec} ->
+	    if (Spec#index_spec.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
 		    ?dbg(srv, "app_read_begin: Read access ok\n", []),
 		    ?dbg(srv, "app_read_begin: Transfer mode = ~p\n", 
-			 [Entry#index_spec.transfer]),
-		    co_data_buf:init(read, Pid, Entry, 
+			 [Spec#index_spec.transfer]),
+		    co_data_buf:init(read, Pid, Spec, 
 				     Ctx#sdo_ctx.readbufsize, 
 				     trunc(Ctx#sdo_ctx.readbufsize * 
 					       Ctx#sdo_ctx.load_ratio));
@@ -361,6 +361,8 @@ start_segment_download(S) ->
 		{ok, _Buf1} ->
 		    R = ?mk_scs_initiate_download_response(IX,SI),
 		    send(S, R),
+		    co_node:object_event(S#co_session.node_pid, 
+					 {S#co_session.index, S#co_session.subind}),
 		    {stop, normal, S};
 		{error,Reason} ->
 		    abort(S, Reason)
@@ -410,6 +412,9 @@ s_segmented_download(M, S) when is_record(M, can_frame) ->
 		    R = ?mk_scs_download_segment_response(T),
 		    send(S1,R),
 		    if Eod ->
+			    co_node:object_event(S1#co_session.node_pid, 
+						 {S1#co_session.index,
+						  S1#co_session.subind}),
 			    {stop, normal, S1};
 		       true ->
 			    {next_state, s_segmented_download, S1,?TMO(S1)}
@@ -457,10 +462,14 @@ s_writing_segment({Mref, Reply} = M, S)  ->
 	    R = ?mk_scs_initiate_download_response(S#co_session.index, 
 						   S#co_session.subind),
 	    send(S,R),
+	    co_node:object_event(S#co_session.node_pid, 
+				 {S#co_session.index, S#co_session.subind}),
 	    {stop, normal, S};
 	{Mref, {ok, Ref}} when is_reference(Ref)->
 	    %% Streamed reply
 	    erlang:demonitor(Mref, [flush]),
+	    co_node:object_event(S#co_session.node_pid, 
+				 {S#co_session.index, S#co_session.subind}),
 	    {stop, normal, S};
 	_Other ->
 	    l_abort(M, S, s_writing)
@@ -888,6 +897,8 @@ s_block_download_end(M, S) when is_record(M, can_frame) ->
 		_ -> %% this can be any thing ok | true ..
 		    R = ?mk_scs_block_download_end_response(),
 		    send(S, R),
+		    co_node:object_event(S#co_session.node_pid, 
+					 {S#co_session.index,S#co_session.subind}),
 		    {stop, normal, S}
 	    end;
 	_ ->

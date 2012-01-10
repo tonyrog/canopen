@@ -79,7 +79,7 @@ stop() ->
 
 %%--------------------------------------------------------------------
 %% @spec index_specification(Pid, {Index, SubInd}) -> 
-%%    {entry, Entry::record()} | false
+%%    {spec, Spec::record()} | false
 %%
 %% @doc
 %% Returns the data structure for {Index, SubInd}.
@@ -211,11 +211,11 @@ handle_call({index_specification, {Index, SubInd} = I}, _From, LoopData) ->
     ?dbg(?NAME, "handle_call: index_specification ~.16B:~.8B\n", [Index, SubInd]),
     case LoopData#loop_data.index of
 	Index ->
-	    Entry = #index_spec{index = I,
+	    Spec = #index_spec{index = I,
 			        type = ?VISIBLE_STRING,
 				access = ?ACCESS_RW,
 				transfer = streamed},
-	    {reply, {entry, Entry}, LoopData};
+	    {reply, {spec, Spec}, LoopData};
 	_OtherIndex ->
 	    ?dbg(?NAME, "handle_call: index_specification error = ~.16B\n", 
 		 [?ABORT_NO_SUCH_OBJECT]),

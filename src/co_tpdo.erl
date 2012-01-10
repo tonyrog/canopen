@@ -14,10 +14,11 @@
 -behaviour(gen_server).
 
 -include_lib("can/include/can.hrl").
--include("../include/canopen.hrl").
+-include("canopen.hrl").
+-include("co_debug.hrl").
 
 %% API
--export([start/2, stop/1]).
+-export([start/3, stop/1]).
 -export([rtr/1, sync/1, transmit/1]).
 -export([update_param/2]).
 -export([update_map/1]).
@@ -27,12 +28,6 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
-
--ifdef(debug).
--define(dbg(Fmt,As), io:format(Fmt, As)).
--else.
--define(dbg(Fmt, As), ok).
--endif.
 
 %% inhibit_time is in 1/100 
 -define(INHIBIT_TO_MS(T), (((T)+9) div 10)).
@@ -45,6 +40,7 @@
 	  rtr_allowed = true,  %% RTR is allowed
 	  inhibit_time = 0,    %% inhibit timer value (0.1 ms)
 	  event_timer  = 0,    %% event rate
+	  res_table,           %% reference to reserver table
 	  dict,                %% reference to object dictionary
 	  from,                %% Can frame originator
 	  offset,              %% This is the pdo offset
@@ -70,8 +66,8 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
-start(Dict, Param) ->
-    gen_server:start_link(?MODULE, [Dict, Param, self()], []).
+start(ResTable, Dict, Param) ->
+    gen_server:start_link(?MODULE, [ResTable, Dict, Param, self()], []).
 
 %% stop
 stop(Pid) ->
@@ -107,8 +103,9 @@ update_map(Pid) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-init([Dict, Param, FromPid]) ->
-    ?dbg("~p: tpdo: init\n", [self()]),
+init([ResTable, Dict, Param, FromPid]) ->
+    put(dbg, true),
+    ?dbg(tpdo, "init: param = ~p\n", [Param]),
     Valid = Param#pdo_parameter.valid,
     COBID = Param#pdo_parameter.cob_id,
     ID = if (COBID band ?COBID_ENTRY_EXTENDED) =/= 0 ->
@@ -117,7 +114,7 @@ init([Dict, Param, FromPid]) ->
 		 (COBID band ?COBID_ENTRY_ID_MASK)
 	 end,
     I = Param#pdo_parameter.offset,
-    {Ts,Is} = tpdo_mapping(I, Dict),
+    {Ts,Is} = tpdo_mapping(I, ResTable, Dict),
     %% May start an event timer
     Trans = Param#pdo_parameter.transmission_type,
     ETmr = if Valid, Param#pdo_parameter.event_timer > 0,Trans >= ?TRANS_RTR ->
@@ -134,6 +131,7 @@ init([Dict, Param, FromPid]) ->
 	     rtr_allowed = Param#pdo_parameter.rtr_allowed,
 	     cob_id = COBID,
 	     id     = ID,
+	     res_table = ResTable,
 	     dict   = Dict,
 	     from   = FromPid,
 	     offset = I,
@@ -163,7 +161,7 @@ init([Dict, Param, FromPid]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({update_param,Param}, _From, S) ->
-    ?dbg("~p: tpdo: update_param\n", [self()]),
+    ?dbg(tpdo, "handle_call: update_param\n", []),
     Valid = Param#pdo_parameter.valid,
     ITmr0 = if not Valid; Param#pdo_parameter.inhibit_time =:= 0 ->
 		    stop_timer(S#s.itmr);
@@ -182,9 +180,9 @@ handle_call({update_param,Param}, _From, S) ->
 	 end,
     {Ts,Is} =
 	if Valid, COBID =/= S#s.cob_id ->
-		tpdo_mapping(Param#pdo_parameter.offset, S#s.dict);
+		tpdo_mapping(Param#pdo_parameter.offset, S#s.res_table, S#s.dict);
 	   Valid, Param#pdo_parameter.offset =/= S#s.offset ->
-		tpdo_mapping(Param#pdo_parameter.offset, S#s.dict);
+		tpdo_mapping(Param#pdo_parameter.offset, S#s.res_table, S#s.dict);
 	   not Valid ->
 		{[],[]};
 	   true ->
@@ -229,17 +227,17 @@ handle_call({update_param,Param}, _From, S) ->
 	  },
     {reply, ok, S1};
 handle_call(update_map, _From, S) ->
-    ?dbg("~p: tpdo: update_map\n", [self()]),
+    ?dbg(tpdo, "handle_call: update_map\n", []),
     {Ts,Is} =
 	if S#s.valid ->
-		tpdo_mapping(S#s.offset, S#s.dict);
+		tpdo_mapping(S#s.offset, S#s.res_table, S#s.dict);
 	   true ->
 		{[],[]}
 	end,
     S1 = S#s { index_list = Is, type_list=Ts },
     {reply, ok, S1};
 handle_call(stop, _From, S) ->
-    ?dbg("~p: tpdo: stop\n", [self()]),
+    ?dbg(tpdo, "handle_call: stop\n", []),
     {stop, normal, S};
 handle_call(_Request, _From, S) ->
     {reply, {error,bad_call}, S}.
@@ -259,7 +257,7 @@ handle_cast(sync, S) ->
 handle_cast(rtr, S) ->
     {noreply, do_rtr(S)};
 handle_cast(transmit, S) ->
-    {nreply, do_transmit(S)};
+    {noreply, do_transmit(S)};
 handle_cast(_Msg, S) ->
     {noreply, S}.
 
@@ -310,19 +308,21 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-tpdo_mapping(Offset, Dict) ->
+tpdo_mapping(Offset, ResTable, Dict) ->
     %% cob_id is changed!
-    case co_node:tpdo_mapping(Offset, Dict) of
+    ?dbg(tpdo, "tpdo_mapping: offset=~8.16.0#\n", [Offset]),
+    case co_node:tpdo_mapping(Offset, ResTable, Dict) of
 	{pdo,Mapping} -> 
-	    ?dbg("tpdo_mapping: offset=~8.16.0#, ~p\n", [Offset,Mapping]),
+	    ?dbg(tpdo, "tpdo_mapping: mapping = ~p\n", [Mapping]),
 	    Mapping;
 	%% {mpdo,Mapping} -> %% FIXME
 	_Error ->
-	    ?dbg("tpdo_mapping: offset=~8.16.0#, ~p\n", [Offset,_Error]),
+	    ?dbg(tpdo, "tpdo_mapping: mapping error= ~p\n", [_Error]),
 	    {[],[]}
     end.
 
 do_transmit(S) ->
+    ?dbg(tpdo, "do_transmit:\n", []),
     if S#s.transmission_type =:= ?TRANS_SYNC_ONCE ->
 	    S#s { emit=true }; %% send at next sync
        S#s.transmission_type >= ?TRANS_RTR_SYNC ->
@@ -332,7 +332,7 @@ do_transmit(S) ->
     end.
 
 do_rtr(S) ->
-    ?dbg("~p: tpdo: do_rtr\n", [self()]),
+    ?dbg(tpdo, "do_rtr:\n", []),
     if S#s.rtr_allowed ->
 	    if S#s.transmission_type =:= ?TRANS_RTR_SYNC ->
 		    S#s { emit=true };  %% send at next sync
@@ -346,14 +346,14 @@ do_rtr(S) ->
     end.
 
 do_sync(S) ->
-    ?dbg("~p: tpdo: do_sync\n", [self()]),
+    ?dbg(tpdo, "do_sync:\n", []),
     if S#s.transmission_type =:= ?TRANS_RTR_SYNC ->
 	    do_send(S, S#s.emit);
        S#s.transmission_type =:= ?TRANS_SYNC_ONCE ->
 	    do_send(S, S#s.emit);
        S#s.transmission_type =< ?TRANS_SYNC_MAX ->
 	    Count = S#s.count - 1,
-	    ?dbg("~p: tpdo: do_sync: count=~w\n", [self(),Count]),
+	    ?dbg(tpdo, "do_sync: count=~w\n", [Count]),
 	    if Count =:= 0 ->
 		    do_send(S#s { count=S#s.transmission_type }, true);
 	       true ->
@@ -364,12 +364,15 @@ do_sync(S) ->
     end.
 
 do_send(S,true) ->
-    ?dbg("~p: tpdo: do_send\n", [self()]),
+    ?dbg(tpdo, "do_send:\n", []),
     if S#s.itmr =:= false ->
 	    Ds = map(fun({IX,SI}) -> 
-			     co_dict:direct_value(S#s.dict, IX, SI) 
+			     {ok, V} = 
+				 co_node:value({IX, SI}, S#s.res_table, S#s.dict),
+			     V
 		     end,
 		     S#s.index_list),
+	    ?dbg(tpdo, "do_send: values = ~p, types = ~p", [Ds, S#s.type_list]),
 	    Data = co_codec:encode(Ds, S#s.type_list),
 	    Frame = #can_frame { id = S#s.id,
 				 len = byte_size(Data),

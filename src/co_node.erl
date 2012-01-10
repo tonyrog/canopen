@@ -36,16 +36,17 @@
 -export([my_reservations/1, my_reservations/2]).
 -export([all_subscribers/1, all_subscribers/2]).
 -export([all_reservers/1, reserver/2]).
+-export([object_event/2, pdo_event/2]).
 -export([notify/3, notify/4]). %% To send MPOs
 
 %% CANopen application internal
 -export([add_entry/2, get_entry/2]).
 -export([load_dict/2]).
--export([set/3, set/4, value/2]).
+-export([set/3, set/4, value/2, value/3]).
 -export([store/6, fetch/6]).
 -export([subscribers/2]).
 -export([reserver_with_module/2]).
--export([tpdo_mapping/2, rpdo_mapping/2]).
+-export([tpdo_mapping/3, rpdo_mapping/3]).
 
 %% Debug interface
 -export([dump/1]).
@@ -244,20 +245,19 @@ all_subscribers(Serial) ->
     gen_server:call(serial_to_pid(Serial), {subscribers}).
 
 %%--------------------------------------------------------------------
-%% @spec all_subscribers(Serial, Ix) -> [Pid] | {error, Error}
-%%
 %% @doc
 %% Returns the Pids of all applications that subscribes to Index.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec all_subscribers(Serial::integer(), Ix::integer()) ->
+			     list(Pid::pid()) | 
+			     {error, Error::atom()}.
 
 all_subscribers(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {subscribers, Ix}).
 
 %%--------------------------------------------------------------------
-%% @spec reserve(Serial, Index, Module) -> ok | {error, Error}
-%%
 %% @doc
 %% Adds a reservation to an index.
 %% Module:index_specification will be called if needed.
@@ -265,126 +265,189 @@ all_subscribers(Serial, Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec reserve(Serial::integer(), Index::integer(), Module::atom()) -> 
+		     ok | {error, Error::atom()}.
+
 reserve(Serial, Ix, Module) ->
     gen_server:call(serial_to_pid(Serial), {reserve, Ix, Module, self()}).
 
 %%--------------------------------------------------------------------
-%% @spec unreserve(Serial, Index) -> ok | {error, Error}
-%%
 %% @doc
 %% Removes a reservation to changes of the Dictionary Object in position Index.
 %% Index can also be a range {Index1, Index2}.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec unreserve(Serial::integer(), Index::integer()) -> 
+		       ok | {error, Error::atom()}.
 unreserve(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {unreserve, Ix, self()}).
 
 %%--------------------------------------------------------------------
-%% @spec my_reservations(Serial, Pid) -> [Index] | {error, Error}
-%%
 %% @doc
 %% Returns the Indexes for which Pid has reservations.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec my_reservations(Serial::integer(), Pid::pid()) -> 
+			     list(Index::integer()) | 
+			     {error, Error::atom()}.
+
 my_reservations(Serial, Pid) ->
     gen_server:call(serial_to_pid(Serial), {reservations, Pid}).
 
 %%--------------------------------------------------------------------
-%% @spec my_reservations(Serial) -> [Index] | {error, Error}
-%%
 %% @doc
 %% Returns the Indexes for which the calling process has reservations.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec my_reservations(Serial::integer()) ->
+			     list(Index::integer()) | 
+			     {error, Error::atom()}.
+
 my_reservations(Serial) ->
     gen_server:call(serial_to_pid(Serial), {reservations, self()}).
 
 %%--------------------------------------------------------------------
-%% @spec all_reservers(Serial) -> [Pid] | {error, Error}
-%%
 %% @doc
 %% Returns the Pids that has reserved any index.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec all_reservers(Serial::integer()) ->
+			   list(Pid::pid()) | {error, Error::atom()}.
+
 all_reservers(Serial) ->
     gen_server:call(serial_to_pid(Serial), {reservers}).
 
 %%--------------------------------------------------------------------
-%% @spec reserver(Serial, Ix) -> [Pid] | {error, Error}
-%%
 %% @doc
 %% Returns the Pid that has reserved index if any.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec reserver(Serial::integer(), Ix::integer()) ->
+		      list(Pid::pid()) | {error, Error::atom()}.
+
 reserver(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {reserver, Ix}).
 
 %%--------------------------------------------------------------------
-%% @spec add_entry(Serial, Entry) -> ok | {error, Error}
-%%
+%% @doc
+%% Tells the co_node that an object has been updated so that any
+%% subscribers can be informed.
+%% @end
+%%--------------------------------------------------------------------
+-spec object_event(CoNodePid::pid(), Index::{Ix::integer(), Si::integer()}) ->
+			  ok | {error, Error::atom()}.
+
+object_event(CoNodePid, Index) ->
+    gen_server:cast(CoNodePid, {object_event, Index}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Tells the co_node that a PDO should be transmitted.
+%% @end
+%%--------------------------------------------------------------------
+-spec pdo_event(CoNode::pid() | integer(), Offset::integer()) ->
+		       ok | {error, Error::atom()}.
+
+pdo_event(CoNodePid, Offset) when is_pid(CoNodePid) ->
+    gen_server:cast(CoNodePid, {pdo_event, Offset});
+pdo_event(Serial, Offset) ->
+    gen_server:cast(serial_to_pid(Serial), {pdo_event, Offset}).
+
+
+%%--------------------------------------------------------------------
 %% @doc
 %% Adds Entry to the Object dictionary.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec add_entry(Serial::integer(), Entry::record()) -> 
+		       ok | {error, Error::atom()}.
+
 add_entry(Serial, Ent) ->
     gen_server:call(serial_to_pid(Serial), {add_entry, Ent}).
 
 %%--------------------------------------------------------------------
-%% @spec get_entry(Serial, Index) -> ok | {error, Error}
-%%
 %% @doc
 %% Gets the Entry at Index in Object dictionary.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec get_entry(Serial::integer(), Index::integer()) -> 
+		       ok | {error, Error::atom()}.
+
 get_entry(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {get_entry,Ix}).
 
 %%--------------------------------------------------------------------
-%% @spec load_dict(Serial, File) -> ok | {error, Error}
-%%
 %% @doc
 %% Loads a new Object Dictionary from File.
 %%
 %% @end
 %%-------------------------------------------------------------------
+-spec load_dict(Serial::integer(), File::atom()) -> 
+		       ok | {error, Error::atom()}.
+
 load_dict(Serial, File) ->
     gen_server:call(serial_to_pid(Serial), {load_dict, File}).
     
 
 %%--------------------------------------------------------------------
-%% @spec set(Serial, Index, Value) -> ok | {error, Error}
-%%
 %% @doc
-%% Sets Index to Value.
-%%
+%% Sets {Ix, 0} to Value.
 %% @end
 %%--------------------------------------------------------------------
+-spec set(Serial::integer(), Ix::integer(), Value::term()) -> 
+		 ok | {error, Error::atom()}.
+
 set(Serial, Ix, Value) when ?is_index(Ix) ->
     gen_server:call(serial_to_pid(Serial), {set,Ix,0,Value}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Sets {Ix, Si} to Value.
+%% @end
+%%--------------------------------------------------------------------
+-spec set(Serial::integer(), Ix::integer(), Si::integer(), Value::term()) -> 
+		 ok | {error, Error::atom()}.
+
 set(Serial, Ix, Si, Value) when ?is_index(Ix), ?is_subind(Si) ->
     gen_server:call(serial_to_pid(Serial), {set,Ix,Si,Value}).    
 
+%%--------------------------------------------------------------------
+%% @doc
 %% Set raw value (used to update internal read only tables etc)
+%% @end
+%%--------------------------------------------------------------------
+-spec direct_set(Serial::integer(), Ix::integer(), Value::term()) -> 
+		 ok | {error, Error::atom()}.
+
 direct_set(Serial, Ix, Si, Value) when ?is_index(Ix), ?is_subind(Si) ->
     gen_server:call(serial_to_pid(Serial), {direct_set,Ix,Si,Value}).
+%%--------------------------------------------------------------------
+%% @doc
+%% Set raw value (used to update internal read only tables etc)
+%% @end
+%%--------------------------------------------------------------------
+-spec direct_set(Serial::integer(), Ix::integer(), Si::integer(), Value::term()) -> 
+		 ok | {error, Error::atom()}.
+
 direct_set(Serial, Ix, Value) when ?is_index(Ix) ->
     gen_server:call(serial_to_pid(Serial), {direct_set,Ix,0,Value}).
 
 %%--------------------------------------------------------------------
-%% @spec value(Serial, Index) -> Value | {error, Error}
-%%
 %% @doc
 %% Gets Value for Index.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec value(Serial::integer(), Index::integer()) -> 
+		   Value::term() | {error, Error::atom()}.
+
 value(Serial, Ix) ->
     gen_server:call(serial_to_pid(Serial), {value,Ix}).
 
@@ -442,47 +505,50 @@ fetch(Serial, COBID, IX, SI, TransferMode, Term)
 
 
 %%--------------------------------------------------------------------
-%% @spec dump(Serial) -> ok | {error, Error}
-%%
 %% @doc
 %% Dumps the loop data to standard output.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec dump(Serial::integer()) -> ok | {error, Error::atom()}.
+
 dump(Serial) ->
     gen_server:call(serial_to_pid(Serial), dump).
 
 %%--------------------------------------------------------------------
-%% @spec nodeid(Serial) -> NodeId | {error, Error}
-%%
 %% @doc
 %% Returns the co_nodes nodeid.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec nodeid(Serial::integer()) -> 
+		    NodeId::integer() | {error, Error::atom()}.
+
 nodeid(Serial) ->
     gen_server:call(serial_to_pid(Serial), nodeid).
 
 %%--------------------------------------------------------------------
-%% @spec get_option(Serial, Option::atom()) -> 
-%%        {ok, {option, Value}} | {error, unkown_option}
-%%
 %% @doc
 %% Gets value of option variable. (For testing)
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec get_option(Serial::integer(), Option::atom()) -> 
+			{ok, {option, Value::term()}} | 
+			{error, unkown_option}.
+
 get_option(Serial, Option) ->
     gen_server:call(serial_to_pid(Serial), {option, Option}).
 
 %%--------------------------------------------------------------------
-%% @spec set_option(Serial, Option::atom(), NewValue) -> ok | {error, Reason}
-%%
 %% @doc
 %% Sets value of option variable. (For testing)
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec set_option(Serial::integer(), Option::atom(), NewValue::term()) -> 
+			ok | {error, Reason::string()}.
+
 set_option(Serial, Option, NewValue) 
   when Option == vendor;
        Option == max_blksize;
@@ -539,8 +605,6 @@ serial_to_pid(Pid) when is_pid(Pid); is_atom(Pid) ->
 
 
 %%--------------------------------------------------------------------
-%% @spec notify(Nid, Index, Value) -> ok | {error, Error}
-%%
 %% @doc
 %% Send notification (from Nid). <br/>
 %% SubInd is set to 0.<br/>
@@ -548,6 +612,9 @@ serial_to_pid(Pid) when is_pid(Pid); is_atom(Pid) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec notify(Nid::integer(), Ix::integer(), Value::term()) -> 
+		    ok | {error, Error::atom()}.
+
 notify(Nid,Index,Value) ->
     notify(Nid,Index,0,Value).
 
@@ -560,6 +627,9 @@ notify(Nid,Index,Value) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec notify(Nid::integer(), Ix::integer(), Si::integer(), Value::term()) -> 
+		    ok | {error, Error::atom()}.
+
 notify(Nid,Index,Subind,Value) ->
     io:format("~p: notify: Nid = ~.16#, Index = ~7.16.0#:~w, Value = ~8.16.0B\n",
 	      [self(), Nid, Index, Subind, Value]),
@@ -579,38 +649,41 @@ notify(Nid,Index,Subind,Value) ->
     can:send(Frame).
 
 %%--------------------------------------------------------------------
-%% @spec rpdo_mapping(I, Dixt) -> Map | {error, Error}
-%%
 %% @doc
 %% Get the RPDO mapping. <br/>
 %% Executing in calling process context.<br/>
 %%
 %% @end
 %%--------------------------------------------------------------------
-rpdo_mapping(I, Dict) ->
-    pdo_mapping(I+?IX_RPDO_MAPPING_FIRST,Dict).
+-spec rpdo_mapping(Offset::integer(), ResTable::reference(), Dict::reference()) -> 
+			  Map::term() | {error, Error::atom()}.
+
+rpdo_mapping(Offset, ResTable, Dict) ->
+    pdo_mapping(Offset+?IX_RPDO_MAPPING_FIRST, ResTable, Dict).
 
 %%--------------------------------------------------------------------
-%% @spec tpdo_mapping(I, Dixt) -> Map | {error, Error}
-%%
 %% @doc
 %% Get the TPDO mapping. <br/>
 %% Executing in calling process context.<br/>
 %%
 %% @end
 %%--------------------------------------------------------------------
-tpdo_mapping(I, Dict) ->
-    pdo_mapping(I+?IX_TPDO_MAPPING_FIRST,Dict).
+-spec tpdo_mapping(Offset::integer(), ResTable::reference(), Dict::reference()) -> 
+			  Map::term() | {error, Error::atom()}.
+
+tpdo_mapping(Offset, ResTable, Dict) ->
+    pdo_mapping(Offset+?IX_TPDO_MAPPING_FIRST, ResTable, Dict).
 
 %%--------------------------------------------------------------------
-%% @spec subscribers(Tab, Index) -> [Pid] | {error, Error}
-%%
 %% @doc
 %% Get all subscribers in Tab for Index. <br/>
 %% Executing in calling process context.<br/>
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec subscribers(Tab::reference(), Index::integer()) -> 
+			 list(Pid::pid()) | {error, Error::atom()}.
+
 subscribers(Tab, Ix) when ?is_index(Ix) ->
     ets:foldl(
       fun({ID,ISet}, Acc) ->
@@ -621,14 +694,15 @@ subscribers(Tab, Ix) when ?is_index(Ix) ->
       end, [], Tab).
 
 %%--------------------------------------------------------------------
-%% @spec reserver_with_module(Tab, Index) -> {Pid, Mod} | []
-%%
 %% @doc
 %% Get the reserver in Tab for Index if any. <br/>
 %% Executing in calling process context.<br/>
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec reserver_with_module(Tab::reference(), Index::integer()) -> 
+				  {Pid::pid(), Mod::atom()} | [].
+
 reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
     case ets:lookup(Tab, Ix) of
 	[] -> [];
@@ -640,10 +714,13 @@ reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
 %%====================================================================
 %%--------------------------------------------------------------------
 %% @private
-%% @spec init(Args) -> {ok, State} |
-%%                     {ok, State, Timeout} |
-%%                     ignore               |
-%%                     {stop, Reason}
+%% @spec init([Serial::integer(), NodeId::integer(), NodeName::atom(), 
+%%	       Opts::list(term())]) -> 
+%%		  {ok, State::record()} |
+%%		  {ok, State::record(), Timeout::integer()} |
+%%		  ignore               |
+%%		  {stop, Reason::atom()}.
+%%
 %% @doc
 %% Description: Initiates the server
 %% @end
@@ -1023,9 +1100,16 @@ handle_call(_Request, _From, Ctx) ->
 %% Description: Handling cast messages
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({pdo_event,I}, Ctx) ->
-    Index = ?IX_TPDO_PARAM_FIRST + I,
-    case co_dict:value(Ctx#co_ctx.dict, Index,?SI_PDO_COB_ID) of
+handle_cast({object_event, {Ix, Si}}, Ctx) ->
+    ?dbg(node, "~s: handle_cast: object_event, index = ~.16B:~p\n", 
+	 [Ctx#co_ctx.name, Ix, Si]),
+    inform_subscribers(Ix, Ctx),
+    {noreply, Ctx};
+handle_cast({pdo_event, Offset}, Ctx) ->
+    ?dbg(node, "~s: handle_cast: pdo_event, offset = ~p\n", 
+	 [Ctx#co_ctx.name, Offset]),
+    Index = ?IX_TPDO_PARAM_FIRST + Offset,
+    case co_dict:value(Ctx#co_ctx.dict, Index, ?SI_PDO_COB_ID) of
 	{ok,COBID} ->
 	    case lookup_cobid(COBID, Ctx) of
 		{tpdo,_,Pid} ->
@@ -1074,29 +1158,59 @@ handle_info({timeout,Ref,time_stamp}, Ctx) when Ref =:= Ctx#co_ctx.time_stamp_tm
     {noreply, Ctx1};
 
 handle_info({'DOWN',Ref,process,_Pid,Reason}, Ctx) ->
+    Ctx1 = handle_sdo_processes(Ref, Reason, Ctx),
+    Ctx2 = handle_app_processes(Ref, Ctx1),
+    Ctx3 = handle_tpdo_processes(Ref, Ctx2),
+    {noreply, Ctx3};
+handle_info(_Info, Ctx) ->
+    {noreply, Ctx}.
+
+handle_sdo_processes(Ref, Reason, Ctx) ->
     case lists:keysearch(Ref, #sdo.mon, Ctx#co_ctx.sdo_list) of
 	{value,_S} ->
 	    if Reason =/= normal ->
-		    io:format("~s: session died: ~p\n", [Ctx#co_ctx.name, Reason]);
+		    io:format("~s: sdo session died: ~p\n", 
+			      [Ctx#co_ctx.name, Reason]);
 	       true ->
 		    ok
 	    end,
 	    Sessions = lists:keydelete(Ref, #sdo.mon, Ctx#co_ctx.sdo_list),
-	    {noreply, Ctx#co_ctx { sdo_list = Sessions }};
+	    Ctx#co_ctx { sdo_list = Sessions };
 	false ->
-	    case lists:keysearch(Ref, #app.mon, Ctx#co_ctx.app_list) of
-		false ->
-		    {noreply, Ctx};
-		{value,A} ->
-		    io:format("~s: id=~w application died\n", [Ctx#co_ctx.name,A#app.pid]),
-		    remove_subscriptions(Ctx#co_ctx.sub_table, A#app.pid), %% Or reset ??
-		    reset_reservations(Ctx#co_ctx.res_table, A#app.pid),
-		    %% FIXME: restart application? application_mod ?
-		    {noreply, Ctx#co_ctx { app_list = Ctx#co_ctx.app_list--[A]}}
-	    end
-    end;
-handle_info(_Info, Ctx) ->
-    {noreply, Ctx}.
+	    Ctx
+    end.
+
+handle_app_processes(Ref, Ctx) ->
+    case lists:keysearch(Ref, #app.mon, Ctx#co_ctx.app_list) of
+	{value,A} ->
+	    io:format("~s: id=~w application died\n", 
+		      [Ctx#co_ctx.name,A#app.pid]),
+	    remove_subscriptions(Ctx#co_ctx.sub_table, A#app.pid), %% Or reset ??
+	    reset_reservations(Ctx#co_ctx.res_table, A#app.pid),
+	    %% FIXME: restart application? application_mod ?
+	    Ctx#co_ctx { app_list = Ctx#co_ctx.app_list--[A]};
+	false ->
+	    Ctx
+    end.
+
+handle_tpdo_processes(Ref, Ctx) ->
+    case lists:keysearch(Ref, #tpdo.mon, Ctx#co_ctx.tpdo_list) of
+	{value,T} ->
+	    io:format("~s: id=~w tpdo process died\n", 
+		      [Ctx#co_ctx.name,T#tpdo.pid]),
+	    
+	    case restart_tpdo(T, Ctx) of
+		{error, not_found} ->
+		    io:format("~s: id=~w not possible to restart " ++
+				  "tpdo process for offset ~p\n", 
+			      [Ctx#co_ctx.name,T#tpdo.offset]),
+		    Ctx;
+		NewT ->
+		    Ctx#co_ctx  { tpdo_list = Ctx#co_ctx.tpdo_list--[T] ++ [NewT]}
+	    end;
+	false ->
+	    Ctx
+    end.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -1184,7 +1298,7 @@ load_dict_init(undefined, Ctx) ->
 load_dict_init(File, Ctx) ->
     case load_dict_internal(filename:join(code:priv_dir(canopen), File), Ctx) of
 	{ok, NewCtx} -> {ok, NewCtx};
-	{error, Error, OldCtx} -> {error, Error}
+	{error, Error, _OldCtx} -> {error, Error}
     end.
 
 load_dict_internal(File, Ctx) ->
@@ -1596,7 +1710,7 @@ handle_notify1(I, Ctx) ->
 	    case load_pdo_parameter(I, (I-?IX_TPDO_PARAM_FIRST), Ctx) of
 		undefined -> Ctx;
 		Param ->
-		    case update_tpdo(Param, Ctx) of
+		    case update_tpdo(I, Param, Ctx) of
 			{new, {T,Ctx1}} ->
 			    ?dbg(node, "~s: handle_notify: TPDO:new\n",[Ctx#co_ctx.name]),
 			    ets:insert(Ctx#co_ctx.cob_table, 
@@ -1721,14 +1835,16 @@ update_sync(Ctx) ->
     end.
     
 
-update_tpdo(Param, Ctx) ->
+update_tpdo(Offset, Param, Ctx) ->
     case lists:keytake(Param#pdo_parameter.cob_id, #tpdo.cob_id,
 		       Ctx#co_ctx.tpdo_list) of
 	false ->
 	    if Param#pdo_parameter.valid ->
-		    {ok,Pid} = co_tpdo:start(Ctx#co_ctx.dict, Param),
+		    {ok,Pid} = 
+			co_tpdo:start(Ctx#co_ctx.res_table, Ctx#co_ctx.dict, Param),
 		    Mon = erlang:monitor(process, Pid),
-		    T = #tpdo { cob_id = Param#pdo_parameter.cob_id,
+		    T = #tpdo { offset = Offset,
+				cob_id = Param#pdo_parameter.cob_id,
 				pid = Pid,
 				mon = Mon },
 		    TList = [T | Ctx#co_ctx.tpdo_list],
@@ -1746,12 +1862,27 @@ update_tpdo(Param, Ctx) ->
 	    end
     end.
 
+restart_tpdo(T=#tpdo {offset = Offset}, Ctx) ->
+    case load_pdo_parameter((?IX_TPDO_PARAM_FIRST) + Offset, Offset, Ctx) of
+	undefined -> 
+	    {error, not_found};
+	Param ->
+	    {ok,Pid} = 
+		co_tpdo:start(Ctx#co_ctx.res_table, Ctx#co_ctx.dict, Param),
+	    Mon = erlang:monitor(process, Pid),
+	    ets:insert(Ctx#co_ctx.cob_table, 
+		       {Param#pdo_parameter.cob_id,
+			{tpdo,Param#pdo_parameter.rtr_allowed,Pid}}),
+	    T#tpdo {pid = Pid, mon = Mon}
+    end.
+
+
 
 load_pdo_parameter(I, Offset, Ctx) ->
     case load_list(Ctx#co_ctx.dict, [{I, ?SI_PDO_COB_ID}, 
-			  {I,?SI_PDO_TRANSMISSION_TYPE, 255},
-			  {I,?SI_PDO_INHIBIT_TIME, 0},
-			  {I,?SI_PDO_EVENT_TIMER, 0}]) of
+				     {I,?SI_PDO_TRANSMISSION_TYPE, 255},
+				     {I,?SI_PDO_INHIBIT_TIME, 0},
+				     {I,?SI_PDO_EVENT_TIMER, 0}]) of
 	[ID,Trans,Inhibit,Timer] ->
 	    Valid = (ID band ?COBID_ENTRY_INVALID) =:= 0,
 	    RtrAllowed = (ID band ?COBID_ENTRY_RTR_DISALLOWED) =:=0,
@@ -1912,13 +2043,12 @@ inform_subscribers(I, Ctx) ->
 	      case self() of
 		  Pid -> do_nothing;
 		  _OtherPid ->
-		      ?dbg(node, "~s: inform_subscribers: Sending object changed to ~p\n", 
+		      ?dbg(node, "~s: inform_subscribers: Sending object event to ~p", 
 			   [Ctx#co_ctx.name, Pid]),
-		      gen_server:cast(Pid, {object_changed, I}) 
+		      gen_server:cast(Pid, {object_event, I}) 
 	      end
       end,
-      lists:usort(subscribers(Ctx#co_ctx.sub_table, I) ++ 
-		  reserver_pid(Ctx#co_ctx.res_table, I))).
+      lists:usort(subscribers(Ctx#co_ctx.sub_table, I))).
 
 create_res_table() ->
     ets:new(res_table, [public,ordered_set]).
@@ -2129,7 +2259,7 @@ dyn_nodeid({cob,_I,Serial},Ctx) ->
 %% Unpack PDO Data from external TPDO 
 %%
 rpdo_unpack(I, Data, Ctx) ->
-    case rpdo_mapping(I, Ctx#co_ctx.dict) of
+    case rpdo_mapping(I, Ctx#co_ctx.res_table, Ctx#co_ctx.dict) of
 	{pdo,{Ts,Is}} ->
 	    {Ds,_}= co_codec:decode(Data, Ts),
 	    rpdo_set(Is, Ds, Ctx);
@@ -2142,7 +2272,7 @@ rpdo_set([{IX,SI}|Is], [Value|Vs], Ctx) ->
     if IX >= ?BOOLEAN, IX =< ?UNSIGNED32 -> %% skip entry
 	    rpdo_set(Is, Vs, Ctx);
        true ->
-	    {_Reply,Ctx1} = set_dict_value(IX,SI,Value,Ctx),
+	    {_Reply,Ctx1} = set_value(IX,SI,Value,Ctx),
 	    rpdo_set(Is, Vs, Ctx1)
     end;
 rpdo_set([], [], Ctx) ->
@@ -2150,36 +2280,42 @@ rpdo_set([], [], Ctx) ->
 
 
 %% read PDO mapping  => {ok,[{Type,Len}],[Index]}
-pdo_mapping(IX, Dict) ->
-    case co_dict:value(Dict, IX, 0) of
+pdo_mapping(IX, ResTable, Dict) ->
+    case value({IX,0}, ResTable, Dict) of
 	{ok,N} when N >= 0, N =< 64 ->
-	    pdo_mapping(pdo,IX,1,N,Dict);
+	    pdo_mapping(pdo,IX,1,N,ResTable,Dict);
 	{ok,254} -> %% SAM-MPDO
 	    {mpdo,[]};
 	{ok,255} -> %% DAM-MPDO
-	    pdo_mapping(mpdo,IX,1,1,Dict);
+	    pdo_mapping(mpdo,IX,1,1,ResTable,Dict);
 	Error ->
 	    Error
     end.
 
-pdo_mapping(MType,IX,SI,Sn,Dict) ->
-    pdo_mapping(MType,IX,SI,Sn,[],[],Dict).
+    
+pdo_mapping(MType,IX,SI,Sn,ResTable,Dict) ->
+    pdo_mapping(MType,IX,SI,Sn,[],[],ResTable,Dict).
 
-pdo_mapping(MType,_IX,SI,Sn,Ts,Is,_Dict) when SI > Sn ->
+pdo_mapping(MType,_IX,SI,Sn,Ts,Is,_ResTable,_Dict) when SI > Sn ->
     {MType, {reverse(Ts),reverse(Is)}};
-pdo_mapping(MType,IX,SI,Sn,Ts,Is,Dict) ->
-    case co_dict:value(Dict,IX,SI) of
+pdo_mapping(MType,IX,SI,Sn,Ts,Is,ResTable,Dict) ->
+    case value({IX,SI},ResTable,Dict) of
 	{ok,Map} ->
 	    ?dbg(node, "pdo_mapping: ~7.16.0#:~w = ~11.16.0#\n", 
 		 [IX,SI,Map]),
 	    Index = {I,S} = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
 	    ?dbg(node, "pdo_mapping: entry[~w] = {~7.16.0#:~w}\n", 
 		 [SI,I,S]),
-	    case co_dict:lookup_entry(Dict,Index) of
+	    case entry(Index, ResTable, Dict) of
 		{ok,E} ->
 		    pdo_mapping(MType,IX,SI+1,Sn,
 				[{E#dict_entry.type,?PDO_MAP_BITS(Map)}|Ts],
-				[Index|Is], Dict);
+				[Index|Is], ResTable, Dict);
+		{spec, Spec} ->
+		    pdo_mapping(MType,IX,SI+1,Sn,
+				[{Spec#index_spec.type,?PDO_MAP_BITS(Map)}|Ts],
+				[Index|Is], ResTable, Dict);
+		    
 		Error ->
 		    Error
 	    end;
@@ -2188,6 +2324,67 @@ pdo_mapping(MType,IX,SI,Sn,Ts,Is,Dict) ->
 		 [IX,SI,Error]),
 	    Error
     end.
+
+entry({Index, Si}, ResTable, Dict) ->
+    case co_node:reserver_with_module(ResTable, Index) of
+	[] ->
+	    ?dbg(srv, "entry: No reserver for index ~7.16.0#\n", [Index]),
+	    co_dict:lookup_entry(Dict, Index);
+	{Pid, Mod} when is_pid(Pid)->
+	    ?dbg(srv, "entry: Process ~p subscribes to index ~7.16.0#\n", 
+		 [Pid, Index]),
+	    Mod:index_specification(Pid, {Index, Si});
+	{dead, _Mod} ->
+	    ?dbg(srv, "entry: Reserver process for index ~7.16.0# dead.\n", [Index]),
+	    {error, ?abort_internal_error}; %% ???
+	_Other ->
+	    ?dbg(srv, "entry: Other case = ~p\n", [_Other]),
+	    {error, ?abort_internal_error}
+    end.
+
+value({Index, Si}, ResTable, Dict) ->
+    case co_node:reserver_with_module(ResTable, Index) of
+	[] ->
+	    ?dbg(srv, "value: No reserver for index ~7.16.0#\n", [Index]),
+	    co_dict:value(Dict, Index, Si);
+	{Pid, Mod} when is_pid(Pid)->
+	    ?dbg(srv, "value: Process ~p subscribes to index ~7.16.0#\n", 
+		 [Pid, Index]),
+	    Mod:value(Pid, {Index, Si});
+	{dead, _Mod} ->
+	    ?dbg(srv, "value: Reserver process for index ~7.16.0# dead.\n", [Index]),
+	    {error, ?abort_internal_error}; %% ???
+	_Other ->
+	    ?dbg(srv, "value: Other case = ~p\n", [_Other]),
+	    {error, ?abort_internal_error}
+    end.
+
+set_value(Index,Si,Value,Ctx) ->
+    case co_node:reserver_with_module(Ctx#co_ctx.res_table, Index) of
+	[] ->
+	    ?dbg(srv, "value: No reserver for index ~7.16.0#\n", [Index]),
+	    try co_dict:set(Ctx#co_ctx.dict, Index, Si, Value) of
+		ok -> {ok, handle_notify(Index, Ctx)};
+		Error -> {Error, Ctx}
+	    catch
+		error:Reason -> {{error,Reason}, Ctx}
+	    end;
+	{Pid, Mod} when is_pid(Pid)->
+	    ?dbg(srv, "value: Process ~p subscribes to index ~7.16.0#\n", 
+		 [Pid, Index]),
+	    case Mod:value(Pid, {Index, Si}) of
+		ok -> {ok, handle_notify(Index, Ctx)};
+		Error -> {Error, Ctx}
+	    end;
+	{dead, _Mod} ->
+	    ?dbg(srv, "value: Reserver process for index ~7.16.0# dead.\n", [Index]),
+	    {error, ?abort_internal_error}; %% ???
+	_Other ->
+	    ?dbg(srv, "value: Other case = ~p\n", [_Other]),
+	    {error, ?abort_internal_error}
+    end.
+
+
 
 %% Set error code - and send the emergency object (if defined)
 %% FIXME: clear error list when code 0000

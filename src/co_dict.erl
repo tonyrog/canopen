@@ -31,7 +31,7 @@
 %%
 %% Note: this table contains two types of objects
 %%       {dict_object, index=<integer>, ...}
-%%       {dict_enty,   index={<integer>,<integer>}, ...}
+%%       {dict_entry,  index={<integer>,<integer>}, ...}
 %% key position MUST be 2 on both records
 %%
 new() ->

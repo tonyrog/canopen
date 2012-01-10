@@ -455,7 +455,8 @@
 %% TPDO descriptor
 -record(tpdo,
 	{
-	  cob_id,  %% Active TPDO cobid
+	  offset, %% Offset from IX_TPDO_PARAM_FIRST
+	  cob_id, %% Active TPDO cobid
 	  pid,    %% gen_server pid
 	  mon     %% gen_server monitor
 	}).

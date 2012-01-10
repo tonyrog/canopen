@@ -82,7 +82,9 @@ all() ->
      set_streamed_m_block,
      get_streamed_m_block,
      stream_file_segment,
-     stream_file_block].
+     stream_file_block,
+     notify,
+     mpdo].
 %%     break].
 
 
@@ -199,32 +201,10 @@ end_per_group(_GroupName, _Config) ->
 %%               Config1 | {skip,Reason} | {skip_and_save,Reason,Config1}
 %% @end
 %%--------------------------------------------------------------------
-init_per_testcase(Case, Config) when Case == set_atomic_segment;
-				     Case == get_atomic_segment;
-				     Case == set_atomic_block;
-				     Case == get_atomic_block;
-				     Case == set_atomic_exp;
-				     Case == get_atomic_exp;
-				     Case == set_streamed_segment;
-				     Case == get_streamed_segment;
-				     Case == set_streamed_block;
-				     Case == get_streamed_block;
-				     Case == set_streamed_exp;
-				     Case == get_streamed_exp;
-				     Case == set_atomic_m_segment;
-				     Case == get_atomic_m_segment;
-				     Case == set_atomic_m_block;
-				     Case == get_atomic_m_block;
-				     Case == set_streamed_m_segment;
-				     Case == get_streamed_m_segment;
-				     Case == set_streamed_m_block;
-				     Case == get_streamed_m_block;
-				     Case == break ->
-    ct:pal("Testcase: ~p", [Case]),
-    {ok, _Pid} = co_test_app:start(serial(), app_dict()),
-    Config;
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
+    {ok, Pid} = co_test_app:start(serial(), app_dict()),
+    ok = co_test_app:debug(Pid, true),
     Config.
 
 
@@ -241,31 +221,6 @@ init_per_testcase(_TestCase, Config) ->
 %%               void() | {save_config,Config1} | {fail,Reason}
 %% @end
 %%--------------------------------------------------------------------
-end_per_testcase(Case, _Config) when Case == set_atomic_segment;
-				     Case == get_atomic_segment;
-				     Case == set_atomic_block;
-				     Case == get_atomic_block;
-				     Case == set_atomic_exp;
-				     Case == get_atomic_exp;
-				     Case == set_streamed_segment;
-				     Case == get_streamed_segment;
-				     Case == set_streamed_block;
-				     Case == get_streamed_block;
-				     Case == set_streamed_exp;
-				     Case == get_streamed_exp;
-				     Case == set_atomic_m_segment;
-				     Case == get_atomic_m_segment;
-				     Case == set_atomic_m_block;
-				     Case == get_atomic_m_block;
-				     Case == set_streamed_m_segment;
-				     Case == get_streamed_m_segment;
-				     Case == set_streamed_m_block;
-				     Case == get_streamed_m_block;
-				     Case == break ->
-    %% Wait a little for session to terminate
-    timer:sleep(1000),
-    co_test_lib:stop_app(co_test_app, serial()),
-    ok;
 end_per_testcase(Case, Config) when Case == stream_file_segment;
 				     Case == stream_file_block->
     co_test_lib:stop_app(co_test_stream_app, []),
@@ -279,6 +234,9 @@ end_per_testcase(Case, Config) when Case == stream_file_segment;
 
     ok;
 end_per_testcase(_TestCase, _Config) ->
+    %% Wait a little for session to terminate
+    timer:sleep(1000),
+    co_test_lib:stop_app(co_test_app, serial()),
     ok.
 %%--------------------------------------------------------------------
 %% TEST CASES
@@ -542,6 +500,46 @@ stream_file_segment(Config) ->
 stream_file_block(Config) ->
     stream_file(Config, block).
 
+
+%%--------------------------------------------------------------------
+%% @spec notify(Config) -> ok 
+%% @doc 
+%% Sets a value for an index for which co_test_app subscribes.
+%% @end
+%%--------------------------------------------------------------------
+notify(Config) ->
+    {{Index = {Ix, _Si}, _T, _M, _Org}, NewValue} = ct:get_config({dict, notify}),
+    [] = os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, segment)),
+    
+    receive 
+	{object_event, Ix} ->
+	    ct:pal("Application notified",[]),
+	    ok;
+	Other ->
+	    ct:fail("Received other = ~p", [Other])
+    after 5000 ->
+	    ct:fail("Application not notified")
+    end.
+
+%%--------------------------------------------------------------------
+%% @spec mpdo(Config) -> ok 
+%% @doc 
+%% Sets a value for an index for which co_test_app subscribes.
+%% @end
+%%--------------------------------------------------------------------
+mpdo(Config) ->
+    {{Index = {Ix, _Si}, _T, _M, _Org}, NewValue} = ct:get_config({dict, mpdo}),
+    "ok\n" = os:cmd(co_test_lib:notify_cmd(Config, Index, NewValue, segment)),
+    
+    receive 
+	{notify, Ix} ->
+	    ct:pal("Application notified",[]),
+	    ok;
+	Other ->
+	    ct:fail("Received other = ~p", [Other])
+    after 5000 ->
+	    ct:fail("Application not notified")
+    end.
 
 %%--------------------------------------------------------------------
 %% @spec break(Config) -> ok 

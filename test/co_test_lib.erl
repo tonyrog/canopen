@@ -109,6 +109,20 @@ file_cmd(Config, Index, Direction, BFlag) ->
 	Direction ++ " " ++ index_as_c_string(Index) ++ " " ++
 	filename:join(?config(priv_dir, Config), "tmp_file").
     
+notify_cmd(Config, Index, Value, block) ->
+    notify_cmd(Config, Index, Value, " -b");
+notify_cmd(Config, Index, Value, segment) ->
+    notify_cmd(Config, Index, Value, "");
+notify_cmd(Config, Index, Value, BFlag) ->
+    Cmd = notify_cmd1(Config, Index, Value, BFlag),
+    ct:pal("Command = ~p",[Cmd]),
+    Cmd.
+
+notify_cmd1(Config, Index, Value, BFlag) ->
+    cocli(Config) ++ BFlag ++ " -s " ++ 
+	serial_as_c_string(serial()) ++ " notify " ++
+	index_as_c_string(Index) ++ " \"" ++ Value ++ "\"".
+
 index_as_c_string({Index, 0}) ->
     "0x" ++ integer_to_list(Index,16);
 index_as_c_string({Index, SubInd}) ->

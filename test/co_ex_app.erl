@@ -363,7 +363,7 @@ handle_cast({write, Ref, Data}, LoopData) ->
 		    LoopData#loop_data.store#store {data = <<OldData/binary, Data/binary>>}
 	    end,
     {noreply, LoopData#loop_data {store = Store}};
-handle_cast({object_changed, Ix}, LoopData) ->
+handle_cast({object_event, Ix}, LoopData) ->
     ?dbg("~p: handle_cast: My object ~w has changed. ", [?MODULE, Ix]),
     {ok, Val} = co_node:value(LoopData#loop_data.co_node, Ix),
     ?dbg("New value is ~p\n", [Val]),
@@ -433,7 +433,7 @@ code_change(_OldVsn, LoopData, _Extra) ->
 
 %%--------------------------------------------------------------------
 %% @spec index_specification(Pid, {Index, SubInd}) -> 
-%%      {entry, Entry::record()} | false
+%%      {spec, Spec::record()} | false
 %%
 %% @doc
 %% Returns the data structure for {Index, SubInd}.
@@ -445,11 +445,11 @@ index_specification(_Pid, {Index, SubInd}) ->
     ?dbg("~p: index_specification ~.16B:~.8B \n",[?MODULE, Index, SubInd]),
     case lists:keyfind({Index, SubInd}, 1, ?DICT) of
 	{{Index, SubInd}, Type, Transfer, _Value} ->
-	    Entry = #index_spec{index = Index,
+	    Spec = #index_spec{index = Index,
 				type = Type,
 				access = ?ACCESS_RW,
 				transfer = Transfer},
-	    {entry, Entry};
+	    {spec, Spec};
 	false ->
 	    {error, ?ABORT_NO_SUCH_OBJECT}
     end;

@@ -182,17 +182,17 @@ fetch(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, data) ->
 	
 read_begin(Ctx, Index, SubInd, Pid, Mod) ->
     case Mod:index_specification(Pid, {Index, SubInd}) of
-	{entry, Entry} ->
-	    if (Entry#index_spec.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
+	{spec, Spec} ->
+	    if (Spec#index_spec.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
 		    ?dbg(cli, "read_begin: Read access ok\n", []),
 		    ?dbg(cli, "read_begin: Transfer mode = ~p\n", 
-			 [Entry#index_spec.transfer]),
-		    co_data_buf:init(read, Pid, Entry, 
+			 [Spec#index_spec.transfer]),
+		    co_data_buf:init(read, Pid, Spec, 
 				     Ctx#sdo_ctx.readbufsize, 
 				     trunc(Ctx#sdo_ctx.readbufsize * 
 					       Ctx#sdo_ctx.load_ratio));
 	       true ->
-		    {entry, ?abort_read_not_allowed}
+		    {spec, ?abort_read_not_allowed}
 	    end;
 	Error ->
 	    Error
@@ -200,13 +200,13 @@ read_begin(Ctx, Index, SubInd, Pid, Mod) ->
 
 write_begin(Ctx, Index, SubInd, Pid, Mod) ->
     case Mod:index_specification(Pid, {Index, SubInd}) of
-	{entry, Entry} ->
-	    if (Entry#index_spec.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
+	{spec, Spec} ->
+	    if (Spec#index_spec.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
 		    ?dbg(cli, "write_begin: transfer=~p, type = ~p\n",
-			 [Entry#index_spec.transfer, Entry#index_spec.type]),
-		    co_data_buf:init(write, Pid, Entry,  Ctx#sdo_ctx.atomic_limit, undefined);
+			 [Spec#index_spec.transfer, Spec#index_spec.type]),
+		    co_data_buf:init(write, Pid, Spec,  Ctx#sdo_ctx.atomic_limit, undefined);
 	       true ->
-		    {entry, ?abort_unsupported_access}
+		    {error, ?abort_unsupported_access}
 	    end;
 	{error, Reason}  ->
 	    {error, Reason}
@@ -397,6 +397,9 @@ s_segmented_upload_response(M, S) when is_record(M, can_frame) ->
 		    case co_data_buf:write(S#co_session.buf, Data1, true, segment) of
 			{ok, _Buf1} ->
 			    gen_server:reply(S#co_session.node_from, {ok, Data1}),
+			    co_node:object_event(S#co_session.node_pid, 
+						 {S#co_session.index,
+						  S#co_session.subind}),
 			    {stop, normal, S};
 			{ok, Buf1, Mref} when is_reference(Mref) ->
 			    %% Called an application
@@ -437,6 +440,9 @@ s_segmented_upload(M, S) when is_record(M, can_frame) ->
 		{ok, Buf1} ->
 		    if Eod ->
 			    gen_server:reply(S#co_session.node_from, ok),
+			    co_node:object_event(S#co_session.node_pid, 
+						 {S#co_session.index,
+						  S#co_session.subind}),
 			    {stop, normal, S};
 		       true ->
 			    T1 = 1-T,
@@ -490,10 +496,14 @@ s_writing_segment({Mref, Reply} = M, S)  ->
 	    %% Atomic reply
 	    erlang:demonitor(Mref, [flush]),
 	    gen_server:reply(S#co_session.node_from, ok),
+	    co_node:object_event(S#co_session.node_pid, 
+				 {S#co_session.index,S#co_session.subind}),
 	    {stop, normal, S};
 	{Mref, {ok, Ref}} when is_reference(Ref)->
 	    %% Streamed reply
 	    erlang:demonitor(Mref, [flush]),
+	    co_node:object_event(S#co_session.node_pid, 
+				 {S#co_session.index,S#co_session.subind}),
 	    gen_server:reply(S#co_session.node_from, ok),
 	    {stop, normal, S};
 	_Other ->
@@ -745,6 +755,8 @@ s_block_upload_end(M, S) when is_record(M, can_frame) ->
 		    R = ?mk_scs_block_download_end_response(),
 		    send(S, R),
 		    gen_server:reply(S#co_session.node_from, ok),
+		    co_node:object_event(S#co_session.node_pid, 
+					 {S#co_session.index,S#co_session.subind}),
 		    {stop, normal, S}
 	    end;
 	_ ->
@@ -897,6 +909,8 @@ check_writing_block_end({Mref, Reply}, StateName, S) ->
 		    R = ?mk_scs_block_download_end_response(),
 		    send(S, R),
 		    gen_server:reply(S#co_session.node_from, ok),
+		    co_node:object_event(S#co_session.node_pid, 
+					 {S#co_session.index,S#co_session.subind}),
 		    {stop, normal, S};
 		State ->
 		    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),

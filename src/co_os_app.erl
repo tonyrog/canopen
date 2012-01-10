@@ -88,7 +88,7 @@ stop() ->
 %% @end
 %%--------------------------------------------------------------------
 -spec index_specification(Pid::pid(), {Index::integer(), SubInd::integer()}) -> 
-		       {entry, Entry::record()} |
+		       {spec, Spec::record()} |
 		       {error, Reason::atom()}.
 
 index_specification(_Pid, {?IX_OS_COMMAND = Index, 255} = I) ->
@@ -114,11 +114,11 @@ index_specification(_Pid, {Index, SubInd})  ->
 reply_specification({Index, SubInd} = I, Type, Access, Mode) ->
     ?dbg(?NAME," reply_specification ~.16B:~.8B, type = ~p, access = ~p, mode = ~p\n",
 	 [Index, SubInd, Type, Access, Mode]),
-    Entry = #index_spec{index = I,
+    Spec = #index_spec{index = I,
 			type = Type,
 			access = Access,
 			transfer = Mode},
-    {entry, Entry}.
+    {spec, Spec}.
 
 %%--------------------------------------------------------------------
 %% @doc
