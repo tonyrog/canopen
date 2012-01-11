@@ -13,7 +13,7 @@
 -define(dbg(Tag, Format, Args),
 	Dbg = get(dbg),
 	if Dbg ->
-		io:format("~p: " ++ Format ++ "\n", lists:append([?MODULE], Args));
+		io:format("~p: ~p: " ++ Format ++ "\n", [self(), ?MODULE] ++ Args);
 	   true ->
 		ok
 	end).

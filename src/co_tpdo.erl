@@ -29,12 +29,16 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
+%% Test
+-export([debug/2]).
+
 %% inhibit_time is in 1/100 
 -define(INHIBIT_TO_MS(T), (((T)+9) div 10)).
 
 %% PDO descriptor
 -record(s,
 	{
+	  state = ?Initialisation, %% State, see canopen.hrl
 	  emit = false,        %% true when scheduled to send
 	  valid = true,        %% normally true
 	  rtr_allowed = true,  %% RTR is allowed
@@ -88,6 +92,11 @@ update_param(Pid, Param) ->
 update_map(Pid) ->
     gen_server:call(Pid, update_map).
 
+debug(Pid, TrueOrFalse) when is_boolean(TrueOrFalse) ->
+    gen_server:call(Pid, {debug, TrueOrFalse}).
+
+
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -104,7 +113,6 @@ update_map(Pid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([ResTable, Dict, Param, FromPid]) ->
-    put(dbg, true),
     ?dbg(tpdo, "init: param = ~p\n", [Param]),
     Valid = Param#pdo_parameter.valid,
     COBID = Param#pdo_parameter.cob_id,
@@ -114,7 +122,6 @@ init([ResTable, Dict, Param, FromPid]) ->
 		 (COBID band ?COBID_ENTRY_ID_MASK)
 	 end,
     I = Param#pdo_parameter.offset,
-    {Ts,Is} = tpdo_mapping(I, ResTable, Dict),
     %% May start an event timer
     Trans = Param#pdo_parameter.transmission_type,
     ETmr = if Valid, Param#pdo_parameter.event_timer > 0,Trans >= ?TRANS_RTR ->
@@ -126,7 +133,8 @@ init([ResTable, Dict, Param, FromPid]) ->
 	       Trans > ?TRANS_SYNC_MAX -> 0;
 	       true -> Trans
 	    end,
-    S = #s { emit = false,
+    S = #s { state = ?Initialisation, 
+	     emit = false,
 	     valid = Valid, %% normally true!
 	     rtr_allowed = Param#pdo_parameter.rtr_allowed,
 	     cob_id = COBID,
@@ -139,8 +147,6 @@ init([ResTable, Dict, Param, FromPid]) ->
 	     count        = Count,
 	     event_timer  = Param#pdo_parameter.event_timer,
 	     inhibit_time = Param#pdo_parameter.inhibit_time,
-	     index_list = Is,
-	     type_list = Ts,
 	     etmr = ETmr,
 	     itmr = false
 	   },
@@ -179,14 +185,20 @@ handle_call({update_param,Param}, _From, S) ->
 		 (COBID band ?COBID_ENTRY_ID_MASK)
 	 end,
     {Ts,Is} =
-	if Valid, COBID =/= S#s.cob_id ->
-		tpdo_mapping(Param#pdo_parameter.offset, S#s.res_table, S#s.dict);
-	   Valid, Param#pdo_parameter.offset =/= S#s.offset ->
-		tpdo_mapping(Param#pdo_parameter.offset, S#s.res_table, S#s.dict);
-	   not Valid ->
-		{[],[]};
+	if S#s.state == ?Operational ->
+		if Valid, COBID =/= S#s.cob_id ->
+			tpdo_mapping(Param#pdo_parameter.offset, 
+				     S#s.res_table, S#s.dict);
+		   Valid, Param#pdo_parameter.offset =/= S#s.offset ->
+			tpdo_mapping(Param#pdo_parameter.offset, 
+				     S#s.res_table, S#s.dict);
+		   not Valid ->
+			{[],[]};
+		   true ->
+			{S#s.type_list, S#s.index_list}
+		end;
 	   true ->
-		{S#s.type_list, S#s.index_list}
+		{[],[]}
 	end,
     Trans = Param#pdo_parameter.transmission_type,
     Count0 = S#s.count,
@@ -229,13 +241,16 @@ handle_call({update_param,Param}, _From, S) ->
 handle_call(update_map, _From, S) ->
     ?dbg(tpdo, "handle_call: update_map\n", []),
     {Ts,Is} =
-	if S#s.valid ->
+	if S#s.valid andalso S#s.state == ?Operational ->
 		tpdo_mapping(S#s.offset, S#s.res_table, S#s.dict);
 	   true ->
 		{[],[]}
 	end,
     S1 = S#s { index_list = Is, type_list=Ts },
     {reply, ok, S1};
+handle_call({debug, TrueOrFalse}, _From, LD) ->
+    put(dbg, TrueOrFalse),
+    {reply, ok, LD};
 handle_call(stop, _From, S) ->
     ?dbg(tpdo, "handle_call: stop\n", []),
     {stop, normal, S};
@@ -252,6 +267,13 @@ handle_call(_Request, _From, S) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({state, State}, 
+	    S=#s {offset = I, res_table = ResTable, dict = Dict}) 
+  when State == ?Operational ->
+    {Ts,Is} = tpdo_mapping(I, ResTable, Dict),
+    {noreply, S#s {state = State, type_list = Ts, index_list = Is}};
+handle_cast({state, State}, S) ->
+    {noreply, S#s {state = State}};
 handle_cast(sync, S) ->
     {noreply, do_sync(S)};
 handle_cast(rtr, S) ->
@@ -321,7 +343,7 @@ tpdo_mapping(Offset, ResTable, Dict) ->
 	    {[],[]}
     end.
 
-do_transmit(S) ->
+do_transmit(S=#s {state = ?Operational})->
     ?dbg(tpdo, "do_transmit:\n", []),
     if S#s.transmission_type =:= ?TRANS_SYNC_ONCE ->
 	    S#s { emit=true }; %% send at next sync
@@ -329,9 +351,11 @@ do_transmit(S) ->
 	    do_send(S,true);
        true ->
 	    S  %% ignore, produce error
-    end.
+    end;
+do_transmit(S) ->
+    S.
 
-do_rtr(S) ->
+do_rtr(S=#s {state = ?Operational}) ->
     ?dbg(tpdo, "do_rtr:\n", []),
     if S#s.rtr_allowed ->
 	    if S#s.transmission_type =:= ?TRANS_RTR_SYNC ->
@@ -343,9 +367,12 @@ do_rtr(S) ->
 	    end;
        true ->
 	    S  %% ignored
-    end.
+    end;
+do_rtr(S) ->
+    S.
 
-do_sync(S) ->
+
+do_sync(S=#s {state = ?Operational}) ->
     ?dbg(tpdo, "do_sync:\n", []),
     if S#s.transmission_type =:= ?TRANS_RTR_SYNC ->
 	    do_send(S, S#s.emit);
@@ -361,11 +388,14 @@ do_sync(S) ->
 	    end;
        true ->
 	    S
-    end.
+    end;
+do_sync(S) ->
+    S.
 
-do_send(S,true) ->
+do_send(S=#s {state = ?Operational},true) ->
     ?dbg(tpdo, "do_send:\n", []),
     if S#s.itmr =:= false ->
+	    ?dbg(tpdo, "do_send: indexes = ~p", [S#s.index_list]),
 	    Ds = map(fun({IX,SI}) -> 
 			     {ok, V} = 
 				 co_node:value({IX, SI}, S#s.res_table, S#s.dict),
@@ -383,7 +413,7 @@ do_send(S,true) ->
        true ->
 	    S#s { emit=true }  %% inhibit is running, delay transmission
     end;
-do_send(S,false) ->
+do_send(S,_) ->
     S.
 
 %% Optionally start a timer

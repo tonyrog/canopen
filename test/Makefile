@@ -9,7 +9,9 @@ MODULES = \
 	co_sdo_srv_SUITE \
 	co_sdo_cli_SUITE \
 	co_os_SUITE \
+	co_tpdo_SUITE \
 	co_test_app \
+	co_test_tpdo_app \
 	co_test_stream_app
 
 

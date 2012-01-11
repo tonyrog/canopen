@@ -22,7 +22,7 @@
 {object, 16#1005,
  [{name, "SYNC_MESSAGE"},
   {struct, var}, {access, rw}, {type, unsigned32},
-  {value, 16#20001111}]}.
+  {value, 16#00001111}]}. %% Consumer
 
 {object, 16#2001,
  [{name, "TEST32"},
@@ -53,10 +53,14 @@
   {value, 16#12345678}]}.
 
 %% TPDO entry - 0
-{tpdo, 0, 16#20002222, [{transmission_type,specific}]}.
-%%{tpdo, 0, 16#20002222, [{transmission_type,{sync,2}}]}.
+{tpdo, 0, 16#20002222, [{transmission_type,{sync,2}}]}.
 %% TPDO map - 0
 {tpdo_map, 0, [{16#2001, 0, 32},{16#3001,0,32}]}.
+
+%% TPDO entry - 1
+{tpdo, 1, 16#20002221, [{transmission_type,specific}]}.
+%% TPDO map - 1
+{tpdo_map, 1, [{16#2001, 0, 32},{16#5001,0,16}]}.
 
 %% RPDO entry - 0
 {rpdo, 0, 16#20003333, []}.

@@ -32,7 +32,8 @@
 	 set/3, get/2,
 	 write_begin/3, write/4,
 	 read_begin/3, read/3,
-	 abort/2]).
+	 abort/2,
+	 value/2]).
 
 
 %% Testing
@@ -92,6 +93,45 @@ name(Serial) when is_atom(Serial) ->
 stop(CoSerial) ->
     gen_server:call(name(CoSerial), stop).
 
+%%--------------------------------------------------------------------
+%% @spec index_specification(Pid, {Index, SubInd}) -> 
+%%   {entry, Entry::record()} | false
+%%
+%% @doc
+%% Returns the data structure for {Index, SubInd}.
+%% Should if possible be implemented without process context switch.
+%%
+%% @end
+%%--------------------------------------------------------------------
+index_specification(Pid, {Index, 255}) ->
+    ?dbg("~p: index_specification type ~.16B ",[?MODULE, Index]),
+    case ets:lookup(dict_table(Pid), {Index, 0}) of
+	[{I, Type, _Transfer}] ->
+	    %% VAR/ARRAY .. fixme
+	    Value = (co_test_lib:type(Type) bsl 8) bor ?OBJECT_VAR, 
+	    Spec = #index_spec{index = I,
+			       type = ?UNSIGNED32,
+			       access = ?ACCESS_RO,
+			       transfer = {value, Value}},
+	    {spec,Spec};
+	[] ->
+	    {error, ?ABORT_NO_SUCH_OBJECT}
+    end;
+index_specification(Pid, {Index, SubInd} = I) ->
+    ?dbg("~p: index_specification ~.16B:~.8B ",[?MODULE, Index, SubInd]),
+    case ets:lookup(dict_table(Pid), I) of
+	[{I, Type, Transfer, _Value}] ->
+	    Spec = #index_spec{index = I,
+			       type = co_test_lib:type(Type),
+			       access = ?ACCESS_RW,
+			       transfer = Transfer},
+	    {spec, Spec};
+	[] ->
+	    {error, ?ABORT_NO_SUCH_OBJECT}
+    end;
+index_specification(Pid, Index) when is_integer(Index) ->
+    index_specification(Pid, {Index, 0}).
+    
 %% transfer_mode == {atomic, Module}
 set(Pid, {Index, SubInd}, NewValue) ->
     ?dbg("~p: set ~.16B:~.8B to ~p",[?MODULE, Index, SubInd, NewValue]),
@@ -119,6 +159,11 @@ abort(Pid, Ref) ->
     ?dbg("~p: abort ref = ~p",[?MODULE, Ref]),
     gen_server:call(Pid, {abort, Ref}).
     
+
+%% TPDO creattion callback
+value(Pid, I) ->
+    get(Pid,I).
+
 loop_data(CoSerial) ->
     gen_server:call(name(CoSerial), loop_data).
 
@@ -259,7 +304,8 @@ handle_call({write, Ref, Data, Eod}, _From, LD) ->
 		    LD#loop_data.store#store {data = <<OldData/binary, Data/binary>>}
 	    end,
     if Eod ->
-	    {NewValue, _} = co_codec:decode(Store#store.data, type(Store#store.type)),
+	    {NewValue, _} = co_codec:decode(Store#store.data, 
+					    co_test_lib:type(Store#store.type)),
 	    ?dbg("~p: handle_call: write decoded data = ~p",[?MODULE, NewValue]),
 	    handle_set(LD,Store#store.index, NewValue, Ref);
        true ->
@@ -275,7 +321,7 @@ handle_call({read_begin, {16#6037 = Index, SubInd} = I, Ref}, _From, LD) ->
 		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LD};
 	[{I, Type, _Transfer, Value}] ->
-	    Data = co_codec:encode(Value, type(Type)),
+	    Data = co_codec:encode(Value, co_test_lib:type(Type)),
 	    Store = #store {ref = Ref, index = I, type = Type, data = Data},
 	    {reply, {ok, Ref, unknown}, LD#loop_data {store = Store}}
     end;
@@ -288,7 +334,7 @@ handle_call({read_begin, {Index, SubInd} = I, Ref}, _From, LD) ->
 		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LD};
 	[{I, Type, _Transfer, Value}] ->
-	    Data = co_codec:encode(Value, type(Type)),
+	    Data = co_codec:encode(Value, co_test_lib:type(Type)),
 	    Size = size(Data),
 	    Store = #store {ref = Ref, index = I, type = Type, data = Data},
 	    {reply, {ok, Ref, Size}, LD#loop_data {store = Store}}
@@ -471,46 +517,3 @@ code_change(_OldVsn, LD, _Extra) ->
     %% reserved it is vital to unreserve the indexes no longer used.
     {ok, LD}.
 
-%%--------------------------------------------------------------------
-%% @spec index_specification(Pid, {Index, SubInd}) -> 
-%%   {entry, Entry::record()} | false
-%%
-%% @doc
-%% Returns the data structure for {Index, SubInd}.
-%% Should if possible be implemented without process context switch.
-%%
-%% @end
-%%--------------------------------------------------------------------
-index_specification(Pid, {Index, 255}) ->
-    ?dbg("~p: index_specification type ~.16B ",[?MODULE, Index]),
-    case ets:lookup(dict_table(Pid), {Index, 0}) of
-	[{I, Type, _Transfer}] ->
-	    Value = (type(Type) bsl 8) bor ?OBJECT_VAR, %% VAR/ARRAY .. fixme
-	    Spec = #index_spec{index = I,
-			       type = ?UNSIGNED32,
-			       access = ?ACCESS_RO,
-			       transfer = {value, Value}},
-	    {spec,Spec};
-	[] ->
-	    {error, ?ABORT_NO_SUCH_OBJECT}
-    end;
-index_specification(Pid, {Index, SubInd} = I) ->
-    ?dbg("~p: index_specification ~.16B:~.8B ",[?MODULE, Index, SubInd]),
-    case ets:lookup(dict_table(Pid), I) of
-	[{I, Type, Transfer, _Value}] ->
-	    Spec = #index_spec{index = I,
-			       type = type(Type),
-			       access = ?ACCESS_RW,
-			       transfer = Transfer},
-	    {spec, Spec};
-	[] ->
-	    {error, ?ABORT_NO_SUCH_OBJECT}
-    end;
-index_specification(Pid, Index) when is_integer(Index) ->
-    index_specification(Pid, {Index, 0}).
-
-
-type(string) -> ?VISIBLE_STRING;
-type(int) -> ?INTEGER;
-type(_) -> unknown.
-     

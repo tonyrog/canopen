@@ -12,6 +12,7 @@
 -compile(export_all).
 
 -include_lib("common_test/include/ct.hrl").
+-include_lib("canopen/include/canopen.hrl").
 
 start_node() ->
     {ok, Pid} = co_node:start_link([{serial,serial()}, 
@@ -146,6 +147,9 @@ cocli(C) ->
     filename:join(DataDir, ct:get_config(cocli)).
 
 
+type(string) -> ?VISIBLE_STRING;
+type(int) -> ?INTEGER;
+type(_) -> unknown.
 
 set_get_tests() ->
     [test(set ,Name, segment) || {Name, {_Entry, _NewValue}} <- ct:get_config(dict)] ++
