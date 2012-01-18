@@ -67,7 +67,7 @@ init(Access, Pid, E, BSize, LLevel) ->
     init_i(Access, Pid, E, BSize, LLevel).
 
 init_i(read, Pid, #index_spec{index = I, type = Type, transfer = {value, Value} = M},
-     BSize, LLevel) ->
+     BSize, LLevel) when is_pid(Pid) ->
     Data = co_codec:encode(Value, Type),
     open(read, #co_data_buf {access = read,
 			     pid = Pid,
@@ -80,7 +80,7 @@ init_i(read, Pid, #index_spec{index = I, type = Type, transfer = {value, Value} 
 			     load_level = LLevel,
 			     mode = M});
 init_i(Access, Pid, #index_spec{index = I, type = Type, transfer = Mode}, 
-       BSize, LLevel) ->
+       BSize, LLevel)  when is_pid(Pid) ->
     open(Access, #co_data_buf {access = Access,
 			       pid = Pid,
 			       i = I,

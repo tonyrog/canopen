@@ -80,6 +80,7 @@ encode_e(Data, Type, E) when is_atom(Type) ->
     encode_e(Data, co_lib:encode_type(Type), E).
 
 
+encode_e(0,    _Any,       S, E) -> encode_signed(0, S, E); %% Pad zeros ???
 encode_e(Data, ?INTEGER8,  S, E) when S=<8 -> encode_signed(Data, S, E);
 encode_e(Data, ?INTEGER16, S, E) when S=<16 -> encode_signed(Data, S, E);
 encode_e(Data, ?INTEGER24, S, E) when S=<24 -> encode_signed(Data, S, E);

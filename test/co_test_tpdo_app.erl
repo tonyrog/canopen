@@ -23,11 +23,13 @@
 
 %% API
 -export([start/3, stop/0]).
+
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
+
 %% CO node callbacks
--export([index_specification/2,
+-export([tpdo_callback/3,
 	 value/2]).
 
 
@@ -44,6 +46,7 @@
 	  co_node,
 	  offset,
 	  tpdo_dict,
+	  callback,
 	  starter
 	}).
 
@@ -71,7 +74,6 @@ start(CoSerial, Offset, IndexList) ->
 stop() ->
     gen_server:call(?MODULE, stop).
 
-%% TPDO callback
 %%--------------------------------------------------------------------
 %% @spec index_specification(Pid, {Index, SubInd}) -> 
 %%   {entry, Entry::record()} | false
@@ -97,6 +99,18 @@ index_specification(_Pid, {Index, SubInd} = I) ->
 index_specification(Pid, Index) when is_integer(Index) ->
     index_specification(Pid, {Index, 0}).
 
+
+%% TPDO callbacks
+tpdo_callback(_Pid, {Index, SubInd} = I, MF) ->
+    ?dbg("tpdo_callback: ~.16B:~.8B callback = ~w",[Index, SubInd, MF]),
+    case ets:lookup(tpdo_dict, I) of
+	[{I, Type, _Value}] ->
+	    gen_server:cast(?MODULE, {callback, I, MF}),
+	    {ok, co_test_lib:type(Type)};
+	[] ->
+	    {error, ?ABORT_NO_SUCH_OBJECT}
+    end.
+
 value(_Pid, {Index, SubInd} = I) ->
     ?dbg("value: ~.16B:~.8B ",[Index, SubInd]),
     case ets:lookup(tpdo_dict, I) of
@@ -107,8 +121,20 @@ value(_Pid, {Index, SubInd} = I) ->
 	    {error, ?ABORT_NO_SUCH_OBJECT}
     end;
 value(Pid, Index) when is_integer(Index) ->
-    index_specification(Pid, {Index, 0}).
+    value(Pid, {Index, 0}).
 
+set(_Pid, {Index, SubInd} = I, NewValue) ->
+    ?dbg("value: ~.16B:~.8B ",[Index, SubInd]),
+    case ets:lookup(tpdo_dict, I) of
+	[{I, Type, _Value}] ->
+	    ets:insert(tpdo_dict, {I, Type, NewValue}),
+	    gen_server:cast(?MODULE, {set, I, NewValue}),
+	    ok;
+	[] ->
+	    {error, ?ABORT_NO_SUCH_OBJECT}
+    end;
+set(Pid, Index, NewValue) when is_integer(Index) ->
+    set(Pid, {Index, 0}, NewValue).
 
 loop_data() ->
     gen_server:call(?MODULE, loop_data).
@@ -129,6 +155,7 @@ loop_data() ->
 %% @end
 %%--------------------------------------------------------------------
 init([CoSerial, Offset, IndexList, Starter]) ->
+    put(dbg, true),
     DictTable = ets:new(tpdo_dict, [public, named_table, ordered_set]),
     {ok, _NodeId} = co_node:attach(CoSerial),
     load_dict(CoSerial, DictTable, IndexList),
@@ -205,12 +232,27 @@ handle_call(Request, _From, LD) ->
 %%                                  {noreply, LD, Timeout} |
 %%                                  {stop, Reason, LD}
 %% @doc
-%% Handling cast messages
-%%
+%% Handling cast messages:
+%% <ul>
+%% <li>  callback </li>
+%% <li>  value </li>
+%% <li>  set </li>
+%% </ul>
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({callback, {_Ix, _Si}, MF} = Msg, LD) ->
+    ?dbg("handle_cast: callback called for ~.16B:~.8B with mf = ~p",
+	 [_Ix, _Si, MF]),
+    LD#loop_data.starter ! Msg,
+    {noreply, LD#loop_data {callback = MF}};
 handle_cast({value, {_Ix, _Si}} = Msg, LD) ->
     ?dbg("handle_cast: value called for ~.16B:~.8B ",[_Ix, _Si]),
+    LD#loop_data.starter ! Msg,
+    {noreply, LD};
+handle_cast({set, {_Ix, _Si} = I, Value} = Msg, 
+	    LD=#loop_data {co_node = CoNode, callback = {M, F}}) ->
+    ?dbg("handle_cast: set called for ~.16B:~w with ~p",[_Ix, _Si, Value]),
+    ok = M:F(CoNode, I, Value),
     LD#loop_data.starter ! Msg,
     {noreply, LD};
 handle_cast(_Msg, LD) ->

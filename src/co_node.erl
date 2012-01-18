@@ -42,17 +42,18 @@
 %% CANopen application internal
 -export([add_entry/2, get_entry/2]).
 -export([load_dict/2]).
--export([set/3, set/4, value/2, value/3]).
+-export([set/3, value/2, value/3]).
 -export([store/6, fetch/6]).
 -export([subscribers/2]).
 -export([reserver_with_module/2]).
--export([tpdo_mapping/3, rpdo_mapping/3]).
+-export([tpdo_mapping/3, rpdo_mapping/3, tpdo_set/3]).
 
 %% Debug interface
--export([dump/1]).
+-export([dump/1, loop_data/1]).
 -export([get_option/2, set_option/3]).
 -export([nodeid/1]).
 -export([state/2]).
+-export([direct_set/3]).
 
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
 
@@ -399,46 +400,51 @@ load_dict(Serial, File) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Sets {Ix, 0} to Value.
-%% @end
-%%--------------------------------------------------------------------
--spec set(Serial::integer(), Ix::integer(), Value::term()) -> 
-		 ok | {error, Error::atom()}.
-
-set(Serial, Ix, Value) when ?is_index(Ix) ->
-    gen_server:call(serial_to_pid(Serial), {set,Ix,0,Value}).
-
-%%--------------------------------------------------------------------
-%% @doc
 %% Sets {Ix, Si} to Value.
 %% @end
 %%--------------------------------------------------------------------
--spec set(Serial::integer(), Ix::integer(), Si::integer(), Value::term()) -> 
+-spec set(Serial::integer(), 
+	  Index::{Ix::integer(), Si::integer()} | integer(), 
+	  Value::term()) -> 
 		 ok | {error, Error::atom()}.
 
-set(Serial, Ix, Si, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    gen_server:call(serial_to_pid(Serial), {set,Ix,Si,Value}).    
+set(Serial, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
+    gen_server:call(serial_to_pid(Serial), {set,I,Value});   
+set(Serial, Ix, Value) when is_integer(Ix) ->
+    set(Serial, {Ix, 0}, Value).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Sets {Ix, Si} to Value truncated to 64 bits.
+%% @end
+%%--------------------------------------------------------------------
+-spec tpdo_set(Serial::integer(), 
+	       Index::{Ix::integer(), Si::integer()} | integer(), 
+	       Value::term()) -> 
+		      ok | {error, Error::atom()}.
+
+tpdo_set(Serial, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
+    ?dbg(node, "tpdo_set: Serial = ~.16#,  Ix = ~.16#:~w, Value = ~p",
+	 [Serial, Ix, Si, Value]), 
+    gen_server:call(serial_to_pid(Serial), {tpdo_set,I,Value});   
+tpdo_set(Serial, Ix, Value) when is_integer(Ix) ->
+    tpdo_set(Serial, {Ix, 0}, Value).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Set raw value (used to update internal read only tables etc)
 %% @end
 %%--------------------------------------------------------------------
--spec direct_set(Serial::integer(), Ix::integer(), Value::term()) -> 
+-spec direct_set(Serial::integer(), 
+		 Index::{Ix::integer(), Si::integer()} | integer(), 
+		 Value::term()) -> 
 		 ok | {error, Error::atom()}.
 
-direct_set(Serial, Ix, Si, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    gen_server:call(serial_to_pid(Serial), {direct_set,Ix,Si,Value}).
-%%--------------------------------------------------------------------
-%% @doc
-%% Set raw value (used to update internal read only tables etc)
-%% @end
-%%--------------------------------------------------------------------
--spec direct_set(Serial::integer(), Ix::integer(), Si::integer(), Value::term()) -> 
-		 ok | {error, Error::atom()}.
+direct_set(Serial, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
+    gen_server:call(serial_to_pid(Serial), {direct_set,I,Value});
+direct_set(Serial, Ix, Value) when is_integer(Ix) ->
+    direct_set(Serial, {Ix, 0}, Value).
 
-direct_set(Serial, Ix, Value) when ?is_index(Ix) ->
-    gen_server:call(serial_to_pid(Serial), {direct_set,Ix,0,Value}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -446,11 +452,14 @@ direct_set(Serial, Ix, Value) when ?is_index(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec value(Serial::integer(), Index::integer()) -> 
+-spec value(Serial::integer(), 
+	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
 		   Value::term() | {error, Error::atom()}.
 
-value(Serial, Ix) ->
-    gen_server:call(serial_to_pid(Serial), {value,Ix}).
+value(Serial, {Ix, Si} = I) when ?is_index(Ix), ?is_subind(Si)  ->
+    gen_server:call(serial_to_pid(Serial), {value,I});
+value(Serial, Ix) when is_integer(Ix) ->
+    value(Serial, {Ix, 0}).
 
 %% 
 %% Note on COBID for SDO service
@@ -507,7 +516,7 @@ fetch(Serial, COBID, IX, SI, TransferMode, Term)
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Dumps the loop data to standard output.
+%% Dumps data to standard output.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -515,6 +524,17 @@ fetch(Serial, COBID, IX, SI, TransferMode, Term)
 
 dump(Serial) ->
     gen_server:call(serial_to_pid(Serial), dump).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Dumps loop data to standard output.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec loop_data(Serial::integer()) -> ok | {error, Error::atom()}.
+
+loop_data(Serial) ->
+    gen_server:call(serial_to_pid(Serial), loop_data).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -848,17 +868,17 @@ initialization(Ctx) ->
 %% @end
 %%--------------------------------------------------------------------
 
-handle_call({set,IX,SI,Value}, _From, Ctx) ->
+handle_call({set,{IX,SI},Value}, _From, Ctx) ->
     {Reply,Ctx1} = set_dict_value(IX,SI,Value,Ctx),
     {reply, Reply, Ctx1};
-handle_call({direct_set,IX,SI,Value}, _From, Ctx) ->
+handle_call({tpdo_set,{IX,SI},Value}, _From, Ctx) ->
+    {Reply,Ctx1} = set_tpdo_value(IX,SI,Value,Ctx),
+    {reply, Reply, Ctx1};
+handle_call({direct_set,{IX,SI},Value}, _From, Ctx) ->
     {Reply,Ctx1} = direct_set_dict_value(IX,SI,Value,Ctx),
     {reply, Reply, Ctx1};
 handle_call({value,{Ix, Si}}, _From, Ctx) ->
     Result = co_dict:value(Ctx#co_ctx.dict, Ix, Si),
-    {reply, Result, Ctx};
-handle_call({value,Ix}, _From, Ctx) ->
-    Result = co_dict:value(Ctx#co_ctx.dict, Ix, 0),
     {reply, Result, Ctx};
 
 handle_call({store,Mode,COBID,IX,SI,Term}, From, Ctx) ->
@@ -1061,6 +1081,10 @@ handle_call(dump, _From, Ctx) ->
     io:format("------------------------\n"),
     {reply, ok, Ctx};
 
+handle_call(loop_data, _From, Ctx) ->
+    io:format("  LoopData: ~p\n", [Ctx]),
+    {reply, ok, Ctx};
+
 handle_call({option, Option}, _From, Ctx) ->
     Reply = case Option of
 		sdo_timeout ->  {Option, Ctx#co_ctx.sdo#sdo_ctx.timeout};
@@ -1236,7 +1260,9 @@ handle_tpdo_processes(Ref, Ctx) ->
 			      [Ctx#co_ctx.name,T#tpdo.offset]),
 		    Ctx;
 		NewT ->
-		    Ctx#co_ctx  { tpdo_list = Ctx#co_ctx.tpdo_list--[T] ++ [NewT]}
+		    ?dbg(node, "~s: handle_info: new tpdo process ~p started", 
+			 [Ctx#co_ctx.name, NewT]),
+		    Ctx#co_ctx  { tpdo_list = Ctx#co_ctx.tpdo_list--[T]++[NewT]}
 	    end;
 	false ->
 	    Ctx
@@ -1252,8 +1278,6 @@ handle_tpdo_processes(Ref, Ctx) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, Ctx) ->
-    Self = self(),
-
     %% Stop all apps ??
     lists:foreach(
       fun(A) ->
@@ -1619,6 +1643,9 @@ lookup_nmt_entry(NodeId, Ctx) ->
 	    E
     end.
 
+broadcast_state(State, #co_ctx {state = State}) ->
+    %% No change
+    ok;
 broadcast_state(State, Ctx) ->
     ?dbg(node, "~s: broadcast_state: new state = ~p", [Ctx#co_ctx.name, State]),
 
@@ -1634,11 +1661,12 @@ broadcast_state(State, Ctx) ->
       end,
       Ctx#co_ctx.tpdo_list),
     
+    %% To all applications ??
     lists:foreach(
       fun(A) ->
 	      case A#app.pid of
 		  Pid -> 
-		      ?dbg(node, "~s: broadcast_state: to TPDO with pid = ~p", 
+		      ?dbg(node, "~s: broadcast_state: to app with pid = ~p", 
 			   [Ctx#co_ctx.name, Pid]),
 		      gen_server:cast(Pid, {state, State}) 
 	      end
@@ -1676,7 +1704,26 @@ set_dict_value(IX,SI,Value,Ctx) ->
 	error:Reason -> {{error,Reason}, Ctx}
     end.
 
+%% Truncate data to 64 bits
+set_tpdo_value(IX,SI,Value,Ctx) when is_binary(Value) andalso size(Value) > 8 ->
+    <<TruncValue:8/binary, _Rest/binary>> = Value,
+    set_tpdo_value(IX,SI,TruncValue,Ctx);
+set_tpdo_value(IX,SI,Value,Ctx)  when is_list(Value) ->
+    set_tpdo_value(IX,SI,lists:sublist(Value,8),Ctx);
+%% Other conversions ???
+set_tpdo_value(IX,SI,Value,Ctx) ->
+    ?dbg(node, "set_tpdo_value: Ix = ~.16#:~w, Value = ~p",
+	 [IX, SI, Value]), 
+    try co_dict:force_set(Ctx#co_ctx.dict,IX,SI,Value) of
+	Result -> {Result, Ctx}
+    catch
+	error:Reason -> {{error,Reason}, Ctx}
+    end.
+
+
 direct_set_dict_value(IX,SI,Value,Ctx) ->
+    ?dbg(node, "direct_set_dict_value: Ix = ~.16#:~w, Value = ~p",
+	 [IX, SI, Value]), 
     try co_dict:direct_set(Ctx#co_ctx.dict, IX,SI,Value) of
 	ok -> {ok, handle_notify(IX, Ctx)};
 	Error -> {Error, Ctx}
@@ -1880,6 +1927,7 @@ update_tpdo(P=#pdo_parameter {offset = Offset, cob_id = CId, valid = Valid}, Ctx
 		    {ok,Pid} = 
 			co_tpdo:start(Ctx#co_ctx.res_table, Ctx#co_ctx.dict, P),
 		    co_tpdo:debug(Pid, get(dbg)),
+		    gen_server:cast(Pid, {state, Ctx#co_ctx.state}),
 		    Mon = erlang:monitor(process, Pid),
 		    T = #tpdo { offset = Offset,
 				cob_id = CId,
@@ -1910,6 +1958,7 @@ restart_tpdo(T=#tpdo {offset = Offset}, Ctx) ->
 	    {ok,Pid} = 
 		co_tpdo:start(Ctx#co_ctx.res_table, Ctx#co_ctx.dict, Param),
 	    co_tpdo:debug(Pid, get(dbg)),
+	    gen_server:cast(Pid, {state, Ctx#co_ctx.state}),
 	    Mon = erlang:monitor(process, Pid),
 	    ets:insert(Ctx#co_ctx.cob_table, 
 		       {Param#pdo_parameter.cob_id,
@@ -2349,13 +2398,13 @@ pdo_mapping(MType,IX,SI,Sn,Ts,Is,ResTable,Dict) ->
 	    ?dbg(node, "pdo_mapping: entry[~w] = {~7.16.0#:~w}", 
 		 [SI,I,S]),
 	    case entry(Index, ResTable, Dict) of
-		{ok,E} ->
+		{ok, E} when is_record(E,dict_entry) ->
 		    pdo_mapping(MType,IX,SI+1,Sn,
 				[{E#dict_entry.type,?PDO_MAP_BITS(Map)}|Ts],
 				[Index|Is], ResTable, Dict);
-		{spec, Spec} ->
+		{ok, Type} ->
 		    pdo_mapping(MType,IX,SI+1,Sn,
-				[{Spec#index_spec.type,?PDO_MAP_BITS(Map)}|Ts],
+				[{Type,?PDO_MAP_BITS(Map)}|Ts],
 				[Index|Is], ResTable, Dict);
 		    
 		Error ->
@@ -2375,7 +2424,16 @@ entry({Index, Si}, ResTable, Dict) ->
 	{Pid, Mod} when is_pid(Pid)->
 	    ?dbg(srv, "entry: Process ~p subscribes to index ~7.16.0#", 
 		 [Pid, Index]),
-	    Mod:index_specification(Pid, {Index, Si});
+	    %% Store default value in dict ??
+	    co_dict:force_set(Dict, Index, Si, 0),
+	    try Mod:tpdo_callback(Pid, {Index, Si}, {co_node, tpdo_set}) of
+		Res -> Res %% Handle error??
+	    catch error:Reason ->
+		    io:format("p: ~p: entry: tpdo_callback call failed for process "
+			      ++ "~p module ~p, index ~7.16.0#:~w, reason ~p\n", 
+			      [self(), ?MODULE, Pid, Mod, Index, Si, Reason]),
+		    {error,  ?abort_internal_error}
+	    end;
 	{dead, _Mod} ->
 	    ?dbg(srv, "entry: Reserver process for index ~7.16.0# dead.", [Index]),
 	    {error, ?abort_internal_error}; %% ???
@@ -2392,7 +2450,9 @@ value({Index, Si}, ResTable, Dict) ->
 	{Pid, Mod} when is_pid(Pid)->
 	    ?dbg(srv, "value: Process ~p subscribes to index ~7.16.0#", 
 		 [Pid, Index]),
-	    Mod:value(Pid, {Index, Si});
+	    %% Value cached ??
+	    co_dict:value(Dict, Index, Si);
+	    %%Mod:value(Pid, {Index, Si});
 	{dead, _Mod} ->
 	    ?dbg(srv, "value: Reserver process for index ~7.16.0# dead.", [Index]),
 	    {error, ?abort_internal_error}; %% ???

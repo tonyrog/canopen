@@ -31,6 +31,7 @@
 
 %% Test
 -export([debug/2]).
+-export([loop_data/1]).
 
 %% inhibit_time is in 1/100 
 -define(INHIBIT_TO_MS(T), (((T)+9) div 10)).
@@ -95,6 +96,8 @@ update_map(Pid) ->
 debug(Pid, TrueOrFalse) when is_boolean(TrueOrFalse) ->
     gen_server:call(Pid, {debug, TrueOrFalse}).
 
+loop_data(Pid) ->
+    gen_server:call(Pid, loop_data).
 
 
 %%%===================================================================
@@ -250,6 +253,9 @@ handle_call(update_map, _From, S) ->
     {reply, ok, S1};
 handle_call({debug, TrueOrFalse}, _From, LD) ->
     put(dbg, TrueOrFalse),
+    {reply, ok, LD};
+handle_call(loop_data, _From, LD) ->
+    io:format("Loop data = ~p\n", [LD]),
     {reply, ok, LD};
 handle_call(stop, _From, S) ->
     ?dbg(tpdo, "handle_call: stop\n", []),

@@ -19,7 +19,7 @@
 	 delete_object/2, delete_entry/2,
 	 update_object/2, update_entry/2,
 	 lookup_object/2, lookup_entry/2,
-	 set/4, direct_set/4,
+	 set/4, direct_set/4, force_set/4,
 	 set_array/3, set_objects/3,
 	 value/3, direct_value/3
 	]).
@@ -358,6 +358,19 @@ direct_set(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
     case ets:update_element(Dict, Index, {#dict_entry.value, Value}) of
 	false ->
 	    i_fail(Dict, Index);
+	true ->
+	    ok
+    end.
+
+%% force_set(Dict, Index, Value) 
+%%   Work as direct_set but creates entry if it does not exist
+%%
+force_set(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
+    Index = {Ix, Si},
+    case ets:update_element(Dict, Index, {#dict_entry.value, Value}) of
+	false ->
+	    %% Type and acces ??
+	    add_entry(Dict, #dict_entry {index = Index, value = Value});
 	true ->
 	    ok
     end.

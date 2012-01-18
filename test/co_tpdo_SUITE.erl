@@ -190,11 +190,13 @@ end_per_group(_GroupName, _Config) ->
 
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
-    {ok, _Pid} = co_test_tpdo_app:start(serial(), 
+    IndexList  = ct:get_config(tpdo_index),
+    {ok, Pid} = co_test_tpdo_app:start(serial(), 
 					ct:get_config(tpdo_offset),
-					ct:get_config(tpdo_index)),
+				       [ E || {E, _NV} <- IndexList]),
+    timer:sleep(100),
     ok = co_node:state(serial(), operational),
-    Config.
+    [{app, Pid} | Config].
 
 
 %%--------------------------------------------------------------------
@@ -215,7 +217,7 @@ init_per_testcase(_TestCase, Config) ->
 end_per_testcase(_TestCase, _Config) ->
     case whereis(co_test_tpdo_app) of
 	undefined  -> do_nothing;
-	_Pid ->  co_os_app:stop()
+	_Pid ->  co_test_tpdo_app:stop()
     end,
     ok.
 
@@ -230,22 +232,55 @@ end_per_testcase(_TestCase, _Config) ->
 %%--------------------------------------------------------------------
 -spec send_tpdo(Config::list(tuple())) -> ok.
 
-send_tpdo(_Config) ->
+send_tpdo(Config) ->
     IndexList = ct:get_config(tpdo_index),
-    co_node:pdo_event(serial(), ct:get_config(tpdo_offset)),
-    
+    {{Ix, _T, V}, NV} = hd(IndexList),
+
     receive 
-	{value, Ix} ->
-	    {Ix, _T, _V} = lists:keyfind(Ix, 1, IndexList),
-	    ct:pal("Application asked for value",[]);
-	Other ->
-	    ct:fail("Received other = ~p", [Other])
+	{callback, Ix, MF} ->
+	    ct:pal("Application got callback ~p for ~p",[MF, Ix]);
+	_Other1 ->
+	    ct:pal("Received other = ~p", [_Other1]),
+	    ct:fail("Received other")
     after 5000 ->
-	    ct:fail("Application not asked for value")
+	    ct:fail("Application did not get callback")
     end,
 
+    timer:sleep(100),
+    co_node:pdo_event(serial(), ct:get_config(tpdo_offset)),
+    %% Check tpdo sent with default value ??
+
+    timer:sleep(100),
+    co_test_tpdo_app:set(?config(app, Config), Ix, NV),
+    receive 
+	{set, Ix, NV} ->
+	    ct:pal("Application got set for ~p",[Ix]);
+	_Other2 ->
+	    ct:pal("Received other = ~p", [_Other2]),
+	    ct:fail("Received other")
+    after 5000 ->
+	    ct:fail("Application did not get set")
+    end,
+
+    timer:sleep(100),
+    co_node:pdo_event(serial(), ct:get_config(tpdo_offset)),
     %% Check tpdo sent ??
 
+    timer:sleep(100),
+    co_test_tpdo_app:set(?config(app, Config), Ix, V),
+    receive 
+	{set, Ix, V} ->
+	    ct:pal("Application got set for ~p",[Ix]);
+	_Other3 ->
+	    ct:pal("Received other = ~p", [_Other3]),
+	    ct:fail("Received other")
+    after 5000 ->
+	    ct:fail("Application did not get set")
+    end,
+
+    timer:sleep(100),
+    co_node:pdo_event(serial(), ct:get_config(tpdo_offset)),
+    %% Check tpdo sent ??
     ok.
 
 
