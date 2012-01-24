@@ -13,7 +13,7 @@
 -include("co_debug.hrl").
 
 %% API
--export([init/5,
+-export([init/3, init/4, init/5,
 	 open/2,
 	 read/2,
 	 write/4,
@@ -60,9 +60,15 @@
 		  {ok, Buf::#co_data_buf{}} |
 		  {error, Error::atom()}.
 
+init(Access, Pid, E) ->
+    init(Access, Pid, E, undefined, undefined).
+
+init(Access, Pid, E, BSize) ->
+    init(Access, Pid, E, BSize, undefined).
+
 init(Access, Pid, E, BSize, LLevel) ->
     ?dbg(data_buf, 
-	 "init: access = ~p, e = ~p, blocksize = ~p, load_level ~p",
+	 "init: e = ~w\n, access = ~p, blocksize = ~p, load_level ~p",
 	 [Access, E, BSize, LLevel]),
     init_i(Access, Pid, E, BSize, LLevel).
 
@@ -130,9 +136,9 @@ init_i(Access, Pid, {Data, I}, BSize, LLevel) when is_binary(Data) ->
 						 {ok, NewBuf::#co_data_buf{}, Mref::reference()} |
 						 {error, Error::atom()}. 
 
-open(Access, Buf=#co_data_buf {pid = Pid, i = I, mode = M})  ->
+open(Access, Buf=#co_data_buf {pid = _Pid, i = _I, mode = _M})  ->
     ?dbg(data_buf, "open: access = ~p, pid = ~p, i = ~p, mode = ~p", 
-	 [Access, Pid, I, M]),
+	 [Access, _Pid, _I, _M]),
     open_i(Access, Buf).
 
 open_i(read, Buf=#co_data_buf {pid = Pid, i = I, mode = atomic})  ->
@@ -274,10 +280,10 @@ write(Buf=#co_data_buf {mode = atomic, pid = Pid, type = Type, data = OldData,
     ?dbg(data_buf, "write: set Value = ~p\n", [Value]),
     app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true} , 
 	     Pid, {set, I, Value});
-write(Buf=#co_data_buf {mode = atomic = Mode, pid = Pid, type = Type, data = Data, 
+write(Buf=#co_data_buf {mode = atomic = _Mode, pid = Pid, type = Type, data = Data, 
 		     tmp = TmpData, i = I}, 
       N, true, block) ->
-    ?dbg(data_buf, "write: mode = ~p, N = ~p, Eod = ~p", [Mode, N, true]),
+    ?dbg(data_buf, "write: mode = ~p, N = ~p, Eod = ~p", [_Mode, N, true]),
     %% All data received, time to transfer to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
@@ -286,11 +292,11 @@ write(Buf=#co_data_buf {mode = atomic = Mode, pid = Pid, type = Type, data = Dat
     ?dbg(data_buf, "write: set  Value = ~p\n", [Value]),
     app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}, 
 	     Pid, {set, I, Value});
-write(Buf=#co_data_buf {mode = {atomic, Module} = Mode, pid = Pid, type = Type, 
+write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type, 
 		     data = OldData, tmp = TmpData, i = I}, 
       Data, true, segment) ->
     ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", 
-	 [Mode, Data, true]),
+	 [_Mode, Data, true]),
     %% All data received, time to transfer to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     {Value, _} = co_codec:decode(DataToSend, Type),
@@ -301,10 +307,10 @@ write(Buf=#co_data_buf {mode = {atomic, Module} = Mode, pid = Pid, type = Type,
 	Other ->
 	    Other
     end;
-write(Buf=#co_data_buf {mode = {atomic, Module} = Mode, pid = Pid, type = Type, 
+write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type, 
 		     data = Data, tmp = TmpData, i = I}, 
       N, true, block) ->
-    ?dbg(data_buf, "write: mode = ~p, N = ~p, Eod = ~p", [Mode, N, true]),
+    ?dbg(data_buf, "write: mode = ~p, N = ~p, Eod = ~p", [_Mode, N, true]),
     %% All data received, time to transfer to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
@@ -318,19 +324,19 @@ write(Buf=#co_data_buf {mode = {atomic, Module} = Mode, pid = Pid, type = Type,
 	    Other
     end;
 %% Transfer == streamed
-write(Buf=#co_data_buf {mode = streamed = Mode, pid = Pid, data = OldData, ref = Ref, 
+write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = OldData, ref = Ref, 
 		     tmp = TmpData}, 
       Data, true, segment) ->
-    ?dbg(data_buf, "write: mode = ~p,  Data = ~p, Eod = ~p", [Mode, Data, true]),
+    ?dbg(data_buf, "write: mode = ~p,  Data = ~p, Eod = ~p", [_Mode, Data, true]),
     %% All data received, time to transfer rest to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     ?dbg(data_buf, "write: send Data = ~p\n", [DataToSend]),
     app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}, Pid, 
 	     {write, Ref, DataToSend, true});
-write(Buf=#co_data_buf {mode = streamed = Mode, pid = Pid, data = Data, ref = Ref, 
+write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = Data, ref = Ref, 
 		     tmp = TmpData}, 
       N, true, block) ->
-    ?dbg(data_buf, "write: mode = ~p,  N = ~p, Eod = ~p", [Mode, N, true]),
+    ?dbg(data_buf, "write: mode = ~p,  N = ~p, Eod = ~p", [_Mode, N, true]),
     %% All data received, time to transfer rest to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
@@ -338,10 +344,10 @@ write(Buf=#co_data_buf {mode = streamed = Mode, pid = Pid, data = Data, ref = Re
     ?dbg(data_buf, "write: send Data = ~p\n", [DataToSend]),
     app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}, Pid, 
 	     {write, Ref, DataToSend, true});
-write(Buf=#co_data_buf {mode = {streamed, Module} = Mode, pid = Pid, data = OldData, 
+write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = OldData, 
 		     ref = Ref, tmp = TmpData}, 
       Data, true, segment) ->
-    ?dbg(data_buf, "write: mode = ~p,  Data = ~p, Eod = ~p", [Mode, Data, true]),
+    ?dbg(data_buf, "write: mode = ~p,  Data = ~p, Eod = ~p", [_Mode, Data, true]),
     %% All data received, time to transfer rest to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     ?dbg(data_buf, "write: send Data = ~p\n", [DataToSend]),
@@ -351,11 +357,11 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = Mode, pid = Pid, data = OldD
 	Other ->
 	    Other
     end;
-write(Buf=#co_data_buf {mode = {streamed, Module} = Mode, pid = Pid, data = Data, 
+write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = Data, 
 		     ref = Ref, tmp = TmpData}, 
       N, true, block) ->
     ?dbg(data_buf, "write: mode = ~p,  N = ~p, TmpData = ~p, Eod = ~p", 
-	 [Mode, N, TmpData, true]),
+	 [_Mode, N, TmpData, true]),
     %% All data received, time to transfer rest to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
@@ -368,21 +374,21 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = Mode, pid = Pid, data = Data
 	    Other
     end;
 %% Transfer == dict
-write(Buf=#co_data_buf {mode = {dict, Dict} = Mode, type = Type, data = OldData, 
+write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, type = Type, data = OldData, 
 		     i = {Index, SubInd}, tmp = TmpData}, 
       Data, true, segment) -> 
-    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [Mode, Data, true]),
+    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [_Mode, Data, true]),
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     {Value, _} = co_codec:decode(DataToSend, Type),
     ?dbg(data_buf, "write:store I = ~.16B:~.8B, Value = ~p\n", 
 	 [Index, SubInd, Value]),
     co_dict:direct_set(Dict, Index, SubInd, Value),
     {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
-write(Buf=#co_data_buf {mode = {dict, Dict} = Mode, type = Type, data = OldData, 
+write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, type = Type, data = OldData, 
 		     i = {Index, SubInd}, tmp = TmpData}, 
       N, true, block) -> 
     ?dbg(data_buf, "write: mode = ~p, N = ~p, TmpData = ~p, Eod = ~p", 
-	 [Mode, N, TmpData, true]),
+	 [_Mode, N, TmpData, true]),
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<OldData/binary, DataToAdd/binary>>,
@@ -391,22 +397,22 @@ write(Buf=#co_data_buf {mode = {dict, Dict} = Mode, type = Type, data = OldData,
 	 [Index, SubInd, Value]),
     co_dict:direct_set(Dict, Index, SubInd, Value),
     {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
-write(Buf=#co_data_buf {mode = data = Mode, data = OldData, 
-		     i = {Index, SubInd}, tmp = TmpData}, 
+write(Buf=#co_data_buf {mode = data = _Mode, data = OldData, 
+		     i = {_Index, _SubInd}, tmp = TmpData}, 
       Data, true, segment) -> 
-    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [Mode, Data, true]),
+    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [_Mode, Data, true]),
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     ?dbg(data_buf, "write:store ?? I = ~.16B:~.8B, Data = ~p\n", 
-	 [Index, SubInd, DataToSend]),
+	 [_Index, _SubInd, DataToSend]),
     %% ??
     {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
 
 %%%% Not End of Data
 %% Transfer == streamed => maybe send
-write(Buf=#co_data_buf {mode = streamed = Mode, pid = Pid, data = OldData, 
+write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = OldData, 
 		     write_size = WSize, ref = Ref, tmp = TmpData}, 
       Data, false, _DownloadMode) ->
-    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [Mode, Data, false]),
+    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [_Mode, Data, false]),
     %% Not the last data, store it
     NewData = <<OldData/binary, TmpData/binary>>,
     if size(NewData) >= WSize ->
@@ -418,10 +424,10 @@ write(Buf=#co_data_buf {mode = streamed = Mode, pid = Pid, data = OldData,
        true ->
 	    {ok, Buf#co_data_buf {data = NewData, tmp = Data}}
     end;
-write(Buf=#co_data_buf {mode = {streamed, Module} = Mode, pid = Pid, data = OldData, 
+write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = OldData, 
 		     write_size = WSize, ref = Ref, tmp = TmpData}, 
       Data, false, _DownloadMode) ->
-    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [Mode, Data, false]),
+    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [_Mode, Data, false]),
     %% Not the last data, store it
     NewData = <<OldData/binary, TmpData/binary>>,
     if size(NewData) >= WSize ->
@@ -438,10 +444,10 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = Mode, pid = Pid, data = OldD
 	    {ok, Buf#co_data_buf {data = NewData, tmp = Data}}
     end;
 %% Transfer =/= streamed => check size limit and store if OK
-write(Buf=#co_data_buf {mode = Mode, data = OldData, tmp = TmpData}, 
+write(Buf=#co_data_buf {mode = _Mode, data = OldData, tmp = TmpData}, 
       Data, false, _DownloadMode) ->
     ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p, storing", 
-	 [Mode, Data, false]),
+	 [_Mode, Data, false]),
     CheckLimitResult = check_limit(Buf, Data),
     if CheckLimitResult == ok ->
 	    %% Move old from temp and store new in temp
@@ -529,8 +535,8 @@ update(Buf=#co_data_buf {data = OldData}, {ok, Ref, Data, Eod}) ->
     end;    
 update(Buf, ok) ->
     {ok, Buf};
-update(Buf, Other) ->
-    ?dbg(data_buf, "update: Buf = ~p, Other = ~p", [Buf, Other]),
+update(_Buf, Other) ->
+    ?dbg(data_buf, "update: Buf = ~p, Other = ~p", [_Buf, Other]),
     %% Error replies
     Other.
 

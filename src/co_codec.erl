@@ -152,6 +152,9 @@ encode_unsigned(Data, Size, big)    -> <<Data:Size/unsigned-integer-big>>.
 encode_float(Data, Size, little)    -> <<Data:Size/float-little>>;
 encode_float(Data, Size, big)       -> <<Data:Size/float-big>>.
 
+encode_binary(Data, Size) when Size > bit_size(Data) ->
+    Pad = Size - bit_size(Data),
+    <<Data/bits, 0:Pad>>;
 encode_binary(Data, Size) -> <<Data:Size/bits>>.
 %%
 %% Decoder ->
@@ -221,8 +224,8 @@ decode_e(Data, ?UNSIGNED56,S, E) when S=<56-> decode_unsigned(Data, S, E);
 decode_e(Data, ?UNSIGNED64,S, E) when S=<64-> decode_unsigned(Data, S, E);
 decode_e(Data, ?REAL32, S, E) when S==32 -> decode_float(Data, 32, E);
 decode_e(Data, ?REAL64, S, E) when S==64 -> decode_float(Data, 64, E);
-decode_e(Data, ?VISIBLE_STRING, S, _E) -> decode_binary(list_to_binary(Data), S);
-decode_e(Data, ?OCTET_STRING, S, _E) -> decode_binary(list_to_binary(Data), S);
+decode_e(Data, ?VISIBLE_STRING, S, _E) -> decode_binary(Data, S);
+decode_e(Data, ?OCTET_STRING, S, _E) -> decode_binary(Data, S);
 decode_e(Data, ?UNICODE_STRING, S, little) ->
     decode_binary(<< <<X:16/little>> || X <- Data>>, S);
 decode_e(Data, ?UNICODE_STRING, S, big) -> 
@@ -230,7 +233,7 @@ decode_e(Data, ?UNICODE_STRING, S, big) ->
 decode_e(Data, ?DOMAIN, S, _E) when is_binary(Data) -> 
     decode_binary(Data, S);
 decode_e(Data, ?DOMAIN, S, _E) when is_list(Data) -> 
-        decode_binary(list_to_binary(Data), S);
+    decode_binary(Data, S);
 decode_e(Data, Type, S, E) when is_atom(Type) ->
     decode_e(Data, co_lib:encode_type(Type), S, E).
 

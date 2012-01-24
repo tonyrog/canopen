@@ -53,16 +53,37 @@
   {value, 16#12345678}]}.
 
 %% TPDO entry - 0
-{tpdo, 0, 16#20002222, [{transmission_type,{sync,2}}]}.
+{tpdo, 0, 16#20001110, [{transmission_type,{sync,2}}]}.
 %% TPDO map - 0
 {tpdo_map, 0, [{16#2001, 0, 32},{16#3001,0,32}]}.
-
-%% TPDO entry - 1
-{tpdo, 1, 16#20002221, [{transmission_type,specific}]}.
-%% TPDO map - 1
-{tpdo_map, 1, [{16#2001, 0, 32},{16#5001,0,16}]}.
-
 %% RPDO entry - 0
-{rpdo, 0, 16#20003333, []}.
+{rpdo, 0, 16#20001110, []}.
 %% RPDO map - 0
 {rpdo_map, 0, [{16#3001, 0, 32}]}.
+
+%% TPDO entry - 1 - Simple case
+{tpdo, 1, 16#20001111, [{transmission_type,specific}]}.
+%% TPDO map - 1
+{tpdo_map, 1, [{16#5001,0,64}]}.
+%% RPDO entry - 1
+{rpdo, 1, 16#20001111, []}.
+%% RPDO map - 1
+{rpdo_map, 1, [{16#6033,0,64}]}.
+
+%% TPDO entry - 2 double strings
+{tpdo, 2, 16#20001112, [{transmission_type,specific}]}.
+%% TPDO map - 2
+{tpdo_map, 2, [{16#2003, 0, 32}, {16#5001,0,16}]}.
+%% RPDO entry - 2
+{rpdo, 2, 16#20001112, []}.
+%% RPDO map - 2
+{rpdo_map, 2, [{16#6034, 0, 16}, {16#6035,0,48}]}.
+
+%% TPDO entry - integers
+{tpdo, 3, 16#20001113, [{transmission_type,specific}]}.
+%% TPDO map - 3
+{tpdo_map, 3, [{16#5002, 0, 32},{16#2001,0,32}]}.
+%% RPDO entry - 3
+{rpdo, 3, 16#20001113, []}.
+%% RPDO map - 3
+{rpdo_map, 3, [{16#7033,0,64}]}.

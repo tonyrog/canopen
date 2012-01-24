@@ -25,6 +25,7 @@ MODULES = \
 	co_sdo \
 	co_sdo_cli_fsm \
 	co_sdo_srv_fsm \
+	co_set_fsm \
 	co_session \
 	co_tpdo \
 	eds_file

@@ -15,13 +15,16 @@
 -include_lib("canopen/include/canopen.hrl").
 
 start_node() ->
-    {ok, Pid} = co_node:start_link([{serial,serial()}, 
+    start_node(serial()).
+
+start_node(Serial) ->
+    {ok, Pid} = co_node:start_link([{serial,Serial}, 
 				     {options, [extended, 
 						{max_blksize, 7},
 						{vendor,16#2A1},
 						{dict_file, "test.dict"},
 						{debug, true}]}]),
-    ct:pal("Started co_node"),
+    ct:pal("Started co_node ~p",[integer_to_list(Serial,16)]),
     {ok, Pid}.
 
 

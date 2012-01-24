@@ -251,7 +251,7 @@ central_write_begin(Ctx, Index, SubInd) ->
 	{ok,E} ->
 	    if (E#dict_entry.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
 		    ?dbg(srv, "central_write_begin: Write access ok\n", []),
-		    co_data_buf:init(write, Dict, E, undefined, undefined);
+		    co_data_buf:init(write, Dict, E);
 	       true ->
 		    {error,?abort_write_not_allowed}
 	    end;
@@ -265,7 +265,7 @@ app_write_begin(Index, SubInd, Pid, Mod) ->
 	    if (Spec#index_spec.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
 		    ?dbg(srv, "app_write_begin: transfer=~p, type = ~p\n",
 			 [Spec#index_spec.transfer, Spec#index_spec.type]),
-		    co_data_buf:init(write, Pid, Spec, undefined, undefined);
+		    co_data_buf:init(write, Pid, Spec);
 	       true ->
 		    {error, ?abort_unsupported_access}
 	    end;
@@ -969,8 +969,8 @@ handle_event(Event, StateName, S) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-handle_sync_event(Event, _From, StateName, State) ->
-    ?dbg(srv, "handle_sync_event: Got event ~p\n",[Event]),
+handle_sync_event(_Event, _From, StateName, State) ->
+    ?dbg(srv, "handle_sync_event: Got event ~p\n",[_Event]),
     Reply = ok,
     {reply, Reply, StateName, State}.
 

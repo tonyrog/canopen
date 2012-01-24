@@ -168,7 +168,8 @@ fetch(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, {app, Pid, Modul
 	    abort(S, Reason)
     end;
 fetch(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, data) ->
-    case co_data_buf:init(write, self(), {(<<>>), {IX, SI}}, Ctx#sdo_ctx.atomic_limit, undefined) of
+    case co_data_buf:init(write, self(), {(<<>>), {IX, SI}}, 
+			  Ctx#sdo_ctx.atomic_limit) of
 	{ok, Buf} ->
 	    case Mode of 
 		block ->
@@ -204,7 +205,7 @@ write_begin(Ctx, Index, SubInd, Pid, Mod) ->
 	    if (Spec#index_spec.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
 		    ?dbg(cli, "write_begin: transfer=~p, type = ~p\n",
 			 [Spec#index_spec.transfer, Spec#index_spec.type]),
-		    co_data_buf:init(write, Pid, Spec,  Ctx#sdo_ctx.atomic_limit, undefined);
+		    co_data_buf:init(write, Pid, Spec, Ctx#sdo_ctx.atomic_limit);
 	       true ->
 		    {error, ?abort_unsupported_access}
 	    end;

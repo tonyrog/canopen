@@ -13,6 +13,8 @@
 
 -include_lib("common_test/include/ct.hrl").
 
+-define(RPDO_NODE, 16#3077701).
+
 %%--------------------------------------------------------------------
 %% COMMON TEST CALLBACK FUNCTIONS
 %%--------------------------------------------------------------------
@@ -58,7 +60,7 @@ suite() ->
 	       {skip, Reason::term()}.
 
 all() -> 
-    [send_tpdo
+    [send_tpdo1
     ].
 %%     break].
 
@@ -111,6 +113,8 @@ groups() ->
 			    {skip_and_save,Reason::term(),Config1::list(tuple())}.
 init_per_suite(Config) ->
     co_test_lib:start_node(),
+    co_test_lib:start_node(?RPDO_NODE),
+
     Config.
 
 %%--------------------------------------------------------------------
@@ -190,13 +194,18 @@ end_per_group(_GroupName, _Config) ->
 
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
-    IndexList  = ct:get_config(tpdo_index),
-    {ok, Pid} = co_test_tpdo_app:start(serial(), 
-					ct:get_config(tpdo_offset),
-				       [ E || {E, _NV} <- IndexList]),
+    IndexList  = ct:get_config(tpdo_dict),
+    {ok, TPid} = co_test_tpdo_app:start(serial(), IndexList),
+    ct:pal("Started tpdo app: ~p", [TPid]),
+    timer:sleep(100),
+    {ok, RPid} = co_test_app:start(?RPDO_NODE, app_dict()),
+    ct:pal("Started rpdo app: ~p", [RPid]),    
+    ok = co_test_app:debug(RPid, true),
     timer:sleep(100),
     ok = co_node:state(serial(), operational),
-    [{app, Pid} | Config].
+    ct:pal("Changed state to operational", []),    
+    timer:sleep(100),
+    [{tpdo_app, TPid}, {rpdo_app,  RPid} | Config].
 
 
 %%--------------------------------------------------------------------
@@ -219,6 +228,7 @@ end_per_testcase(_TestCase, _Config) ->
 	undefined  -> do_nothing;
 	_Pid ->  co_test_tpdo_app:stop()
     end,
+    co_test_lib:stop_app(co_test_app, serial()),
     ok.
 
 %%--------------------------------------------------------------------
@@ -230,9 +240,47 @@ end_per_testcase(_TestCase, _Config) ->
 %% Verifies sending of tpdo
 %% @end
 %%--------------------------------------------------------------------
--spec send_tpdo(Config::list(tuple())) -> ok.
+-spec send_tpdo1(Config::list(tuple())) -> ok.
 
-send_tpdo(Config) ->
+send_tpdo1(Config) ->
+    %% Wait for all processes to be up
+    timer:sleep(100),
+    {CobId, [{SourceIndex, SourceValue}], [{TargetIndex, TargetValue}]} = 
+	ct:get_config(tpdo1),
+
+    %% Send tpdo with default value
+    co_node:pdo_event(serial(), CobId),
+
+    receive 
+	{set, TargetIndex = {Ix, Si}, DefValue} ->
+	    ct:pal("Application got set ~.16B:~.8B updated to ~p",
+		   [Ix, Si, DefValue]);
+	_Other1 ->
+	    ct:pal("Received other = ~p", [_Other1]),
+	    ct:fail("Received other")
+    after 5000 ->
+	    ct:fail("Application did not get set")
+    end,
+
+    co_test_tpdo_app:set(?config(app, Config), SourceIndex, SourceValue),
+
+    %% Send tpdo with new value
+    co_node:pdo_event(serial(), CobId),
+
+    receive 
+	{set, TargetIndex = {Ix2, Si2}, NewValue} ->
+	    ct:pal("Application got set ~.16B:~.8B updated to ~p",
+		   [Ix2, Si2, NewValue]);
+	_Other2 ->
+	    ct:pal("Received other = ~p", [_Other2]),
+	    ct:fail("Received other")
+    after 5000 ->
+	    ct:fail("Application did not get set")
+    end,
+
+    ok.
+
+send_tpdo_old(Config) ->
     IndexList = ct:get_config(tpdo_index),
     {{Ix, _T, V}, NV} = hd(IndexList),
 
@@ -247,7 +295,7 @@ send_tpdo(Config) ->
     end,
 
     timer:sleep(100),
-    co_node:pdo_event(serial(), ct:get_config(tpdo_offset)),
+    co_node:pdo_event(serial(), ct:get_config(tpdo1)),
     %% Check tpdo sent with default value ??
 
     timer:sleep(100),

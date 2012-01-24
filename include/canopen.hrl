@@ -452,6 +452,14 @@
 	  mon  %% fsm monitor
 	}).
 
+%% TPDO process context
+-record(tpdo_ctx,
+	{
+	  dict,       %% copy of dictionary in co_ctx
+	  tpdo_cache, %% copy of tpdo cache in co_ctx
+	  res_table   %% copy of reserver table in co_ctx
+	}).
+
 %% TPDO descriptor
 -record(tpdo,
 	{
@@ -481,9 +489,11 @@
 	  node_map,         %% serial to node id mapping
 	  nmt_table,        %% node states,  #nmt_entry {}
 	  dict,             %% can dictionary
+	  tpdo_cache,       %% caching values used in tpdos
 	  res_table,        %% dictionary reservations
 	  sub_table,        %% dictionary subscriptions
 	  cob_table,        %% COB lookup table
+	  tpdo,             %% tpdo context
 	  tpdo_list=[],     %% [#tpdo{}]
 	  app_list=[],      %% [#app{}]
 	  data,             %% application data?

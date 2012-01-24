@@ -32,8 +32,7 @@
 	 set/3, get/2,
 	 write_begin/3, write/4,
 	 read_begin/3, read/3,
-	 abort/2,
-	 value/2]).
+	 abort/2]).
 
 
 %% Testing
@@ -159,10 +158,6 @@ abort(Pid, Ref) ->
     ?dbg("~p: abort ref = ~p",[?MODULE, Ref]),
     gen_server:call(Pid, {abort, Ref}).
     
-
-%% TPDO creattion callback
-value(Pid, I) ->
-    get(Pid,I).
 
 loop_data(CoSerial) ->
     gen_server:call(name(CoSerial), loop_data).
@@ -413,10 +408,12 @@ handle_set(LD, I, NewValue, Ref) ->
 	[{I, _Type, _Transfer, NewValue}] ->
 	    %% No change
 	    ?dbg("~p: handle_set: set no change", [?MODULE]),
+	    LD#loop_data.starter ! {set, I, NewValue},
 	    {reply, Reply, LD};
 	[{{Index, SubInd}, Type, Transfer, _OldValue}] ->
 	    ets:insert(LD#loop_data.dict, {I, Type, Transfer, NewValue}),
 	    ?dbg("~p: handle_set: set ~.16B:~.8B updated to ~p",[?MODULE, Index, SubInd, NewValue]),
+	    LD#loop_data.starter ! {set, I, NewValue},
 	    {reply, Reply, LD}
     end.
 
