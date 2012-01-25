@@ -224,7 +224,9 @@ decode_e(Data, ?UNSIGNED56,S, E) when S=<56-> decode_unsigned(Data, S, E);
 decode_e(Data, ?UNSIGNED64,S, E) when S=<64-> decode_unsigned(Data, S, E);
 decode_e(Data, ?REAL32, S, E) when S==32 -> decode_float(Data, 32, E);
 decode_e(Data, ?REAL64, S, E) when S==64 -> decode_float(Data, 64, E);
-decode_e(Data, ?VISIBLE_STRING, S, _E) -> decode_binary(Data, S);
+decode_e(Data, ?VISIBLE_STRING, S, _E) -> 
+    {X, Y} = decode_binary(Data, S),
+    {binary_to_list(X), Y};
 decode_e(Data, ?OCTET_STRING, S, _E) -> decode_binary(Data, S);
 decode_e(Data, ?UNICODE_STRING, S, little) ->
     decode_binary(<< <<X:16/little>> || X <- Data>>, S);

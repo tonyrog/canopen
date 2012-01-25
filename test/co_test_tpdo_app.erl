@@ -34,12 +34,8 @@
 
 
 %% Testing
--ifdef(debug).
 -define(dbg(Format, Args),
 	ct:pal("~p: ~p: " ++ Format ++ "\n", ([self(), ?MODULE] ++ Args))).
--else.
--define(dbg(Fmt,As), ok).
--endif.
 
 -record(loop_data,
 	{
@@ -154,7 +150,6 @@ loop_data() ->
 %% @end
 %%--------------------------------------------------------------------
 init([CoSerial, IndexList, Starter]) ->
-    put(dbg, true),
     DictTable = ets:new(tpdo_dict, [public, named_table, ordered_set]),
     {ok, _NodeId} = co_node:attach(CoSerial),
     load_dict(CoSerial, DictTable, IndexList),
@@ -240,7 +235,7 @@ handle_call(Request, _From, LD) ->
 %%--------------------------------------------------------------------
 handle_cast({callback, {_Ix, _Si} = I, {M, F} = MF} = Msg, 
 	    LD=#loop_data {co_node = CoNode}) ->
-    ?dbg("handle_cast: callback called for ~.16B:~.8B with mf = ~p",
+    ?dbg("handle_cast: callback called for ~.16B:~.8B with mf = ~w",
 	 [_Ix, _Si, MF]),
 %%    LD#loop_data.starter ! Msg,
     case ets:lookup(tpdo_dict, I) of

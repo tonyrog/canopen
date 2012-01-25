@@ -12,7 +12,8 @@
 -compile(export_all).
 
 -include_lib("common_test/include/ct.hrl").
--include_lib("canopen/include/canopen.hrl").
+
+-define(DICT, "test.dict").
 
 start_node() ->
     start_node(serial()).
@@ -22,11 +23,14 @@ start_node(Serial) ->
 				     {options, [extended, 
 						{max_blksize, 7},
 						{vendor,16#2A1},
-						{dict_file, "test.dict"},
+						{dict_file, ?DICT},
 						{debug, true}]}]),
     ct:pal("Started co_node ~p",[integer_to_list(Serial,16)]),
     {ok, Pid}.
 
+
+reload_dict(Serial) ->
+    co_node:load_dict(Serial, filename:join(code:priv_dir(canopen), ?DICT)).
 
 serial() ->
     case os:getenv("SERIAL") of
@@ -149,10 +153,7 @@ cocli(C) ->
     DataDir = ?config(data_dir, C),
     filename:join(DataDir, ct:get_config(cocli)).
 
-
-type(string) -> ?VISIBLE_STRING;
-type(int) -> ?INTEGER;
-type(_) -> unknown.
+type(T) -> co_lib:encode_type(T).
 
 set_get_tests() ->
     [test(set ,Name, segment) || {Name, {_Entry, _NewValue}} <- ct:get_config(dict)] ++

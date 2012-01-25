@@ -51,7 +51,7 @@
 %% @end
 %%--------------------------------------------------------------------
 start(App, Index = {_Ix, _Si}, Data)  ->
-    ?dbg(set,"start: App = ~p, Index = ~7.16.0#:~w, Data = ~p", 
+    ?dbg(set,"start: App = ~p, Index = ~7.16.0#:~w, Data = ~w", 
 	 [App, _Ix, _Si, Data]),
     gen_fsm:start(?MODULE, [App, Index, Data], []).
 
@@ -74,7 +74,7 @@ start(App, Index = {_Ix, _Si}, Data)  ->
 %%--------------------------------------------------------------------
 init([App, I = {_Ix, _Si}, Data]) ->
     put(dbg, true),
-    ?dbg(set,"init: App = ~p, Index = ~7.16.0#:~w, Data = ~p", 
+    ?dbg(set,"init: App = ~p, Index = ~7.16.0#:~w, Data = ~w", 
 	 [App, _Ix, _Si, Data]),
     LD = #loop_data{ index = I, app = App, data = Data },
       

@@ -50,10 +50,26 @@
 {object, 16#3001,
  [{name, "TEST32-2"},
   {struct, var}, {access, rw}, {type, unsigned32},
-  {value, 16#12345678}]}.
+  {value, 16#1234}]}.
 
-%% TPDO entry - 0
-{tpdo, 0, 16#20001110, [{transmission_type,{sync,2}}]}.
+{object, 16#3002,
+ [{name, "TESTINT"},
+  {struct, var}, {access, rw}, {type, integer32},
+  {value, 16#AAAA}]}.
+
+{object, 16#3003,
+ [{name, "TEST32-3"},
+  {struct, var}, {access, rw}, {type, unsigned32},
+  {value, 16#4321}]}.
+
+{object, 16#3004,
+ [{name, "TEST64"},
+  {struct, var}, {access, rw}, {type, unsigned64},
+  {value, 16#4321}]}.
+
+%% TPDO entry 0 - 2 unsigned to 1 unsigned
+%%{tpdo, 0, 16#20001110, [{transmission_type,{sync,2}}]}.
+{tpdo, 0, 16#20001110, [{transmission_type,specific}]}.
 %% TPDO map - 0
 {tpdo_map, 0, [{16#2001, 0, 32},{16#3001,0,32}]}.
 %% RPDO entry - 0
@@ -61,29 +77,42 @@
 %% RPDO map - 0
 {rpdo_map, 0, [{16#3001, 0, 32}]}.
 
-%% TPDO entry - 1 - Simple case
+%% TPDO/RPDO 1 - 1 string to 1 string
+%% TPDO entry
 {tpdo, 1, 16#20001111, [{transmission_type,specific}]}.
-%% TPDO map - 1
+%% TPDO map
 {tpdo_map, 1, [{16#5001,0,64}]}.
-%% RPDO entry - 1
+%% RPDO entry
 {rpdo, 1, 16#20001111, []}.
-%% RPDO map - 1
+%% RPDO map
 {rpdo_map, 1, [{16#6033,0,64}]}.
 
-%% TPDO entry - 2 double strings
+%% TPDO/RPDO 2 - 2 strings to 2 other strings
+%% TPDO entry 
 {tpdo, 2, 16#20001112, [{transmission_type,specific}]}.
-%% TPDO map - 2
-{tpdo_map, 2, [{16#2003, 0, 32}, {16#5001,0,16}]}.
-%% RPDO entry - 2
+%% TPDO map
+{tpdo_map, 2, [{16#2003, 0, 32}, {16#5001,0,32}]}.
+%% RPDO entry
 {rpdo, 2, 16#20001112, []}.
-%% RPDO map - 2
-{rpdo_map, 2, [{16#6034, 0, 16}, {16#6035,0,48}]}.
+%% RPDO map
+{rpdo_map, 2, [{16#6034, 0, 48}, {16#6035,0,16}]}.
 
-%% TPDO entry - integers
+%% TPDO/RPDO 3 - 1 integer to 1 integer
+%% TPDO entry 
 {tpdo, 3, 16#20001113, [{transmission_type,specific}]}.
-%% TPDO map - 3
-{tpdo_map, 3, [{16#5002, 0, 32},{16#2001,0,32}]}.
-%% RPDO entry - 3
+%% TPDO map
+{tpdo_map, 3, [{16#5002, 0, 32}]}.
+%% RPDO entry
 {rpdo, 3, 16#20001113, []}.
-%% RPDO map - 3
-{rpdo_map, 3, [{16#7033,0,64}]}.
+%% RPDO map
+{rpdo_map, 3, [{16#7033, 0, 32}]}.
+
+%% TPDO/RPDO 4 - 2 unsigned to 1 unsigned
+%% TPDO entry 
+{tpdo, 4, 16#20001114, [{transmission_type,specific}]}.
+%% TPDO map
+{tpdo_map, 4, [{16#5003, 0, 32}, {16#3003,0,32}]}.
+%% RPDO entry
+{rpdo, 4, 16#20001114, []}.
+%% RPDO map
+{rpdo_map, 4, [{16#7034,0,64}]}.

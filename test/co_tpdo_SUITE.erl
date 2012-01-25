@@ -60,7 +60,11 @@ suite() ->
 	       {skip, Reason::term()}.
 
 all() -> 
-    [send_tpdo1
+    [send_tpdo0,
+     send_tpdo1,
+     send_tpdo2,
+     send_tpdo3,
+     send_tpdo4
     ].
 %%     break].
 
@@ -192,19 +196,37 @@ end_per_group(_GroupName, _Config) ->
 			    {skip,Reason::term()} | 
 			    {skip_and_save,Reason::term(),Config1::list(tuple())}.
 
+init_per_testcase(TestCase, Config) when TestCase == send_tpdo0 ->
+    ct:pal("Testcase: ~p", [TestCase]),
+    %% Redo mapping, i.e. calls to tpdo_callback
+    ok = co_node:state(serial(), preoperational),
+    ok = co_node:state(serial(), operational),
+    ct:pal("Changed state to operational", []),    
+    timer:sleep(100),
+
+    Config;
+
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
+
+    %% Start reserver of tpdo objects
     IndexList  = ct:get_config(tpdo_dict),
     {ok, TPid} = co_test_tpdo_app:start(serial(), IndexList),
     ct:pal("Started tpdo app: ~p", [TPid]),
     timer:sleep(100),
+
+    %% Redo mapping, i.e. calls to tpdo_callback
+    ok = co_node:state(serial(), preoperational),
+    ok = co_node:state(serial(), operational),
+    ct:pal("Changed state to operational", []),    
+    timer:sleep(100),
+
+    %% Start reserver of rpdo objects
     {ok, RPid} = co_test_app:start(?RPDO_NODE, app_dict()),
     ct:pal("Started rpdo app: ~p", [RPid]),    
     ok = co_test_app:debug(RPid, true),
     timer:sleep(100),
-    ok = co_node:state(serial(), operational),
-    ct:pal("Changed state to operational", []),    
-    timer:sleep(100),
+
     [{tpdo_app, TPid}, {rpdo_app,  RPid} | Config].
 
 
@@ -222,6 +244,12 @@ init_per_testcase(_TestCase, Config) ->
 -spec end_per_testcase(TestCase::atom(), Config0::list(tuple())) ->
 			      ok |
 			      {save_config,Config1::list(tuple())}.
+
+end_per_testcase(TestCase, _Config) when TestCase == send_tpdo0 ->
+    %% Restore data
+    co_test_lib:reload_dict(serial()),
+    co_test_lib:reload_dict(?RPDO_NODE),
+    ok;
 
 end_per_testcase(_TestCase, _Config) ->
     case whereis(co_test_tpdo_app) of
@@ -242,96 +270,105 @@ end_per_testcase(_TestCase, _Config) ->
 %%--------------------------------------------------------------------
 -spec send_tpdo1(Config::list(tuple())) -> ok.
 
-send_tpdo1(Config) ->
-    %% Wait for all processes to be up
-    timer:sleep(100),
-    {CobId, [{SourceIndex, SourceValue}], [{TargetIndex, TargetValue}]} = 
-	ct:get_config(tpdo1),
+send_tpdo0(_Config) ->
+    %% Set and read in dict
+    {CobId, SourceList, TargetList} = ct:get_config(tpdo0),
 
-    %% Send tpdo with default value
-    co_node:pdo_event(serial(), CobId),
-
-    receive 
-	{set, TargetIndex = {Ix, Si}, DefValue} ->
-	    ct:pal("Application got set ~.16B:~.8B updated to ~p",
-		   [Ix, Si, DefValue]);
-	_Other1 ->
-	    ct:pal("Received other = ~p", [_Other1]),
-	    ct:fail("Received other")
-    after 5000 ->
-	    ct:fail("Application did not get set")
-    end,
-
-    co_test_tpdo_app:set(?config(app, Config), SourceIndex, SourceValue),
+    %% Set values
+    lists:foreach(
+      fun({{Ix, Si} = SourceIndex, SourceValue}) -> 
+	      ct:pal("Setting ~.16B:~w to ~p",[Ix, Si, SourceValue]),
+	      co_node:set(serial(), SourceIndex, SourceValue)
+      end, SourceList),
 
     %% Send tpdo with new value
     co_node:pdo_event(serial(), CobId),
 
-    receive 
-	{set, TargetIndex = {Ix2, Si2}, NewValue} ->
-	    ct:pal("Application got set ~.16B:~.8B updated to ~p",
-		   [Ix2, Si2, NewValue]);
-	_Other2 ->
-	    ct:pal("Received other = ~p", [_Other2]),
-	    ct:fail("Received other")
-    after 5000 ->
-	    ct:fail("Application did not get set")
-    end,
+    %% Wait for new values to be sent to co_node
+    timer:sleep(1000),
+
+    lists:foreach(
+      fun({{IxT, SiT} = TargetIndex, TargetValue}) -> 
+	      {ok, TargetValue} = co_node:value(?RPDO_NODE, TargetIndex),
+	      ct:pal("Value for ~.16B:~w is ~p",[IxT, SiT, TargetValue])
+      end, TargetList),
+    
+    ok.
+    
+send_tpdo1(Config) ->
+    send_tpdo(Config, tpdo1).
+
+send_tpdo2(Config) ->
+    send_tpdo(Config, tpdo2).
+
+send_tpdo3(Config) ->
+    send_tpdo(Config, tpdo3).
+
+send_tpdo4(Config) ->
+    send_tpdo(Config, tpdo4).
+
+send_tpdo(Config, Tpdo) ->
+    %% Wait for all processes to be up
+    timer:sleep(100),
+    {CobId, SourceList, TargetList} = ct:get_config(Tpdo),
+     
+    %% Set values
+    lists:foreach(
+      fun({{Ix, Si} = SourceIndex, SourceValue}) -> 
+	      ct:pal("Setting ~.16B:~w to ~p",[Ix, Si, SourceValue]),
+	      co_test_tpdo_app:set(?config(tpdo_app, Config), 
+				   SourceIndex, SourceValue)
+      end, SourceList),
+    
+    %% Wait for new values to be sent to co_node
+    timer:sleep(100),
+
+    %% Send tpdo with new value
+    co_node:pdo_event(serial(), CobId),
+
+    rec(TargetList),
 
     ok.
 
-send_tpdo_old(Config) ->
-    IndexList = ct:get_config(tpdo_index),
-    {{Ix, _T, V}, NV} = hd(IndexList),
 
+rec([{TargetIndex, TargetValue}]) ->
     receive 
-	{callback, Ix, MF} ->
-	    ct:pal("Application got callback ~p for ~p",[MF, Ix]);
+	{set, TargetIndex = {Ix, Si}, TargetValue} ->
+	    ct:pal("Application got set ~.16B:~w updated to ~p",
+		   [Ix, Si, TargetValue]);
 	_Other1 ->
 	    ct:pal("Received other = ~p", [_Other1]),
 	    ct:fail("Received other")
     after 5000 ->
-	    ct:fail("Application did not get callback")
-    end,
-
-    timer:sleep(100),
-    co_node:pdo_event(serial(), ct:get_config(tpdo1)),
-    %% Check tpdo sent with default value ??
-
-    timer:sleep(100),
-    co_test_tpdo_app:set(?config(app, Config), Ix, NV),
-    receive 
-	{set, Ix, NV} ->
-	    ct:pal("Application got set for ~p",[Ix]);
-	_Other2 ->
-	    ct:pal("Received other = ~p", [_Other2]),
-	    ct:fail("Received other")
-    after 5000 ->
 	    ct:fail("Application did not get set")
     end,
+    ok;
 
-    timer:sleep(100),
-    co_node:pdo_event(serial(), ct:get_config(tpdo_offset)),
-    %% Check tpdo sent ??
-
-    timer:sleep(100),
-    co_test_tpdo_app:set(?config(app, Config), Ix, V),
-    receive 
-	{set, Ix, V} ->
-	    ct:pal("Application got set for ~p",[Ix]);
-	_Other3 ->
-	    ct:pal("Received other = ~p", [_Other3]),
-	    ct:fail("Received other")
-    after 5000 ->
-	    ct:fail("Application did not get set")
-    end,
-
-    timer:sleep(100),
-    co_node:pdo_event(serial(), ct:get_config(tpdo_offset)),
-    %% Check tpdo sent ??
+rec([{TargetIndex1, TargetValue1}, {TargetIndex2, TargetValue2}]) ->
+    %% We don't know the order ...
+    %% receive first
+    rec({TargetIndex1, TargetValue1}, {TargetIndex2, TargetValue2}),
+    %% receive second
+    rec({TargetIndex1, TargetValue1}, {TargetIndex2, TargetValue2}),
     ok.
 
-
+rec({TargetIndex1, TargetValue1}, {TargetIndex2, TargetValue2}) ->
+    receive 
+	{set, TargetIndex1 = {Ix1, Si1}, TargetValue1} ->
+	    ct:pal("Application got set ~.16B:~w updated to ~p",
+		   [Ix1, Si1, TargetValue1]);
+	{set, TargetIndex2 = {Ix2, Si2}, TargetValue2} ->
+	    ct:pal("Application got set ~.16B:~w updated to ~p",
+		   [Ix2, Si2, TargetValue2]);
+	_Other1 ->
+	    ct:pal("Received other = ~p", [_Other1]),
+	    ct:fail("Received other")
+    after 5000 ->
+	    ct:fail("Application did not get set")
+    end,
+    ok.
+    
+  
 %%--------------------------------------------------------------------
 %% @spec break(Config) -> ok 
 %% @doc 

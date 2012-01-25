@@ -404,7 +404,7 @@ load_dict(Serial, File) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec set(Serial::integer(), 
-	  Index::{Ix::integer(), Si::integer()} | integer(), 
+	  Index::{Ix::integer(), Si::integer()} |integer(), 
 	  Value::term()) -> 
 		 ok | {error, Error::atom()}.
 
@@ -827,7 +827,8 @@ init([Serial, NodeId, NodeName, Opts]) ->
 		    {ok, reset_application(Ctx1)}
 	    end;
 	{error, Reason} ->
-	    io:format("~p: Loading of dict failed, exiting\n", [Ctx#co_ctx.name]),
+	    io:format("WARNING! ~p: Loading of dict failed, exiting\n", 
+		      [Ctx#co_ctx.name]),
 	    {stop, Reason}
     end.
 	    
@@ -917,7 +918,8 @@ handle_call({fetch,Mode,COBID,IX,SI, Term}, From, Ctx) ->
 	    ?dbg(node, "~s: fetch: ID = ~p", [Ctx#co_ctx.name,ID]),
 	    case co_sdo_cli_fsm:fetch(Ctx#co_ctx.sdo,Mode,From,Tx,Rx,IX,SI,Term) of
 		{error, Reason} ->
-		    io:format("~s: unable to start co_sdo_cli_fsm: ~p\n", 
+		    io:format("WARNING!" 
+			      "~s: unable to start co_sdo_cli_fsm: ~p\n", 
 			      [Ctx#co_ctx.name,Reason]),
 		    {reply, Reason, Ctx};
 		{ok, Pid} ->
@@ -1179,7 +1181,7 @@ handle_cast({object_event, {Ix, _Si}}, Ctx) ->
     inform_subscribers(Ix, Ctx),
     {noreply, Ctx};
 handle_cast({pdo_event, CobId}, Ctx) ->
-    ?dbg(node, "~s: handle_cast: pdo_event, CobId = ~p", 
+    ?dbg(node, "~s: handle_cast: pdo_event, CobId = ~.16B", 
 	 [Ctx#co_ctx.name, CobId]),
     case lists:keysearch(CobId, #tpdo.cob_id, Ctx#co_ctx.tpdo_list) of
 	{value, T} ->
@@ -1246,7 +1248,8 @@ handle_sdo_processes(Ref, Reason, Ctx) ->
     case lists:keysearch(Ref, #sdo.mon, Ctx#co_ctx.sdo_list) of
 	{value,_S} ->
 	    if Reason =/= normal ->
-		    io:format("~s: sdo session died: ~p\n", 
+		    io:format("WARNING!" 
+			      "~s: sdo session died: ~p\n", 
 			      [Ctx#co_ctx.name, Reason]);
 	       true ->
 		    ok
@@ -1260,7 +1263,8 @@ handle_sdo_processes(Ref, Reason, Ctx) ->
 handle_app_processes(Ref, Ctx) ->
     case lists:keysearch(Ref, #app.mon, Ctx#co_ctx.app_list) of
 	{value,A} ->
-	    io:format("~s: id=~w application died\n", 
+	    io:format("WARNING!" 
+		      "~s: id=~w application died\n", 
 		      [Ctx#co_ctx.name,A#app.pid]),
 	    remove_subscriptions(Ctx#co_ctx.sub_table, A#app.pid), %% Or reset ??
 	    reset_reservations(Ctx#co_ctx.res_table, A#app.pid),
@@ -1273,7 +1277,8 @@ handle_app_processes(Ref, Ctx) ->
 handle_tpdo_processes(Ref, Ctx) ->
     case lists:keysearch(Ref, #tpdo.mon, Ctx#co_ctx.tpdo_list) of
 	{value,T} ->
-	    io:format("~s: id=~w tpdo process died\n", 
+	    io:format("WARNING!" 
+		      "~s: id=~w tpdo process died\n", 
 		      [Ctx#co_ctx.name,T#tpdo.pid]),
 	    
 	    case restart_tpdo(T, Ctx) of
@@ -1597,7 +1602,8 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
 	    %% like late aborts etc here !!!
 	    case co_sdo_srv_fsm:start(Ctx#co_ctx.sdo,Rx,Tx) of
 		{error, Reason} ->
-		    io:format("~p: unable to start co_sdo_srv_fsm: ~p\n",
+		    io:format("WARNING!" 
+			      "~p: unable to start co_sdo_srv_fsm: ~p\n",
 			      [Ctx#co_ctx.name, Reason]),
 		    Ctx;
 		{ok,Pid} ->
@@ -2378,25 +2384,30 @@ rpdo_unpack(I, Data, Ctx) ->
 	{rpdo,{Ts,Is}} ->
 	    ?dbg(node, "~s: rpdo_unpack: data = ~w, ts = ~w, is = ~w", 
 		 [Ctx#co_ctx.name, Data, Ts, Is]),
-%%	    try co_codec:decode(Data, Ts) of
-	    try rpdo_split(Data, Ts) of
-		Ds -> rpdo_set(Is, Ds, Ts, Ctx)
+%%	    try rpdo_split(Data, Ts) of
+%%		Ds -> rpdo_set(Is, Ds, Ts, Ctx)
+	    try co_codec:decode(Data, Ts) of
+		{Ds, _} -> 
+		    ?dbg(node, "rpdo_unpack: decoded data ~p", [Ds]),
+		    rpdo_set(Is, Ds, Ts, Ctx)
 	    catch error:_Reason ->
-		    io:format("~s: rpdo_unpack: decode failed = ~p\n", 
+		    io:format("WARNING!" 
+			      "~s: rpdo_unpack: decode failed = ~p\n", 
 			      [Ctx#co_ctx.name, _Reason]),
 		    Ctx
 	    end;
 	Error ->
-	    io:format("~s: rpdo_unpack: error = ~p\n", [Ctx#co_ctx.name, Error]),
+	    io:format("WARNING!" 
+		      "~s: rpdo_unpack: error = ~p\n", [Ctx#co_ctx.name, Error]),
 	    Ctx
     end.
 
 rpdo_split(Bin, []) ->
     [];
 rpdo_split(Bin, [{_Type, Size} | Ts]) ->
-    ?dbg(node, "pdo_split: bin ~p, size ~p", [Bin, Size]),
+    ?dbg(node, "rpdo_split: bin ~p, size ~p", [Bin, Size]),
     <<Data:Size/bits, Rest/binary>> = Bin, 
-    ?dbg(node, "pdo_split: data ~p, rest ~p", [Data, Rest]),
+    ?dbg(node, "rpdo_split: data ~p, rest ~p", [Data, Rest]),
     [Data] ++ rpdo_split(Rest, Ts).
 
 rpdo_set([{IX,SI}|Is], [Value|Vs], [Type|Ts], Ctx) ->
@@ -2485,7 +2496,8 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
 		    try Mod:tpdo_callback(Pid, {Ix, Si}, {co_node, tpdo_set}) of
 			Res -> Res %% Handle error??
 		    catch error:Reason ->
-			    io:format("~p: ~p: entry: tpdo_callback call failed"
+			    io:format("WARNING!" 
+				      "~p: ~p: entry: tpdo_callback call failed " 
 				      "for process ~p module ~p, index ~7.16.0#"
 				      ":~w, reason ~p\n", 
 				      [self(), ?MODULE, Pid, Mod, Ix, Si, Reason]),
@@ -2496,7 +2508,8 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
 			{spec, Spec} ->
 			    {ok, Spec#index_spec.type}
 		    catch error:Reason -> 
-			    io:format("~p: ~p: entry: index_specification call "
+			    io:format("WARNING!" 
+				      "~p: ~p: entry: index_specification call "
 				      "failed for process ~p module ~p, index "
 				      "~7.16.0#:~w, reason ~p\n", 
 				      [self(), ?MODULE, Pid, Mod, Ix, Si, Reason]),
@@ -2531,7 +2544,8 @@ tpdo_value({Ix, Si}, ResTable, Dict, TpdoCache) ->
 		    try  Mod:value(Pid, {Ix, Si}) of
 			Res -> Res %% Handle error??
 		    catch error:Reason ->
-			    io:format("~p: ~p: entry: value call failed"
+			    io:format("WARNING!" 
+				      "~p: ~p: entry: value call failed"
 				      "for process ~p module ~p, index ~7.16.0#"
 				      ":~w, reason ~p\n", 
 				      [self(), ?MODULE, Pid, Mod, Ix, Si, Reason]),
@@ -2553,17 +2567,17 @@ tpdo_value({Ix, Si}, ResTable, Dict, TpdoCache) ->
 	    {error, ?abort_internal_error}
     end.
 
-rpdo_value({Ix,Si},Bin,Type,Ctx) ->
+rpdo_value({Ix,Si},Value,Type,Ctx) ->
     case co_node:reserver_with_module(Ctx#co_ctx.res_table, Ix) of
 	[] ->
 	    ?dbg(node, "rpdo_value: No reserver for index ~7.16.0#", [Ix]),
-	    {Value, _} = 
-		try co_codec:decode(Bin, Type) of
-		    V -> V
-		catch error:_Reason ->
-			?dbg(node, "rpdo_value: Decode failed for ~p", [Bin]),
-			Bin %% ??
-		end,
+%%	    {Value, _} = 
+%%		try co_codec:decode(Bin, Type) of
+%%		    V -> V
+%%		catch error:_Reason ->
+%%			?dbg(node, "rpdo_value: Decode failed for ~p", [Bin]),
+%%			{Bin, any} %% ??
+%%		end,
 	    try co_dict:set(Ctx#co_ctx.dict, Ix, Si, Value) of
 		ok -> {ok, handle_notify(Ix, Ctx)};
 		Error -> {Error, Ctx}
@@ -2573,6 +2587,14 @@ rpdo_value({Ix,Si},Bin,Type,Ctx) ->
 	{Pid, Mod} when is_pid(Pid)->
 	    ?dbg(node, "rpdo_value: Process ~p has reserved index ~7.16.0#", 
 		 [Pid, Ix]),
+	    Bin = 
+		try co_codec:encode(Value, Type) of
+		    B -> B
+		catch error: _Reason1 ->
+			?dbg(node, "rpdo_value: Encode failed for ~p of type ~w "
+			     "reason ~p",[Value, Type, _Reason1]),
+			Value %% ??
+		end,
 	    case co_set_fsm:start({Pid, Mod}, {Ix, Si}, Bin) of
 		{ok, _FsmPid} -> 
 		    ?dbg(node,"Started set session ~p", [_FsmPid]),
