@@ -12,7 +12,8 @@ MODULES = \
 	co_tpdo_SUITE \
 	co_test_app \
 	co_test_tpdo_app \
-	co_test_stream_app
+	co_test_stream_app \
+	codec_bench
 
 
 EBIN = .

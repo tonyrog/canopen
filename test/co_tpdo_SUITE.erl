@@ -60,7 +60,8 @@ suite() ->
 	       {skip, Reason::term()}.
 
 all() -> 
-    [send_tpdo0,
+    [encode_decode,
+     send_tpdo0,
      send_tpdo1,
      send_tpdo2,
      send_tpdo3,
@@ -196,6 +197,10 @@ end_per_group(_GroupName, _Config) ->
 			    {skip,Reason::term()} | 
 			    {skip_and_save,Reason::term(),Config1::list(tuple())}.
 
+init_per_testcase(TestCase, Config) when TestCase == encode_decode ->
+    ct:pal("Testcase: ~p", [TestCase]),
+    Config;
+
 init_per_testcase(TestCase, Config) when TestCase == send_tpdo0 ->
     ct:pal("Testcase: ~p", [TestCase]),
     %% Redo mapping, i.e. calls to tpdo_callback
@@ -244,6 +249,9 @@ init_per_testcase(_TestCase, Config) ->
 -spec end_per_testcase(TestCase::atom(), Config0::list(tuple())) ->
 			      ok |
 			      {save_config,Config1::list(tuple())}.
+
+end_per_testcase(TestCase, _Config) when TestCase == encode_decode ->
+    ok;
 
 end_per_testcase(TestCase, _Config) when TestCase == send_tpdo0 ->
     %% Restore data
@@ -369,6 +377,50 @@ rec({TargetIndex1, TargetValue1}, {TargetIndex2, TargetValue2}) ->
     ok.
     
   
+encode_decode(_Config) ->
+    %% Encode decode testing
+    %% {ValuesIn, TypesIn, ValuesOut, TypesOut}
+    Cases = 
+	[{["hej"], [{string, 64}], [[104,101,106,0,0,0,0,0]], [{string, 64}]},
+	 {["hej"], [{string, 64}], [[0,0,0]], [{string, 24}]},
+	 {["hejsanxx"], [{string, 64}], ["hejsanxx"], [{string, 64}]},
+	 {["hej"], [{string, 24}], ["hej"], [{string, 24}]},
+	 {[16#AAAA], [{integer, 32}], [16#AAAA], [{integer, 32}]},
+	 {[16#AAAA], [{unsigned, 16}], [16#AAAA], [{unsigned, 16}]},
+	 {[16#AAAA, 16#BBBB], [{unsigned, 16}, {unsigned, 16}], 
+	  [16#AAAA, 16#BBBB], [{unsigned, 16}, {unsigned, 16}]},
+	 {[16#AAAA, 16#BBBB], [{unsigned, 16}, {unsigned, 16}], 
+	  [16#BBBBAAAA], [{unsigned, 32}]},
+	 {[16#AAAAAAAA], [{unsigned, 16}], [16#AAAA], [{unsigned, 16}]},
+	 {[6], [{integer16, 32}], [not_used], [{integer16, 32}]}],
+
+    lists:foreach(
+      fun({ValuesIn, TsIn, ValuesOut, TsOut}) ->
+	      TsInX = [{co_lib:encode_type(T), S } || {T,S} <- TsIn],
+	      TsOutX = [{co_lib:encode_type(T), S } || {T,S} <- TsOut],
+	      try co_codec:encode(ValuesIn, TsInX) of
+		  Bin -> 
+		      try co_codec:decode(Bin, TsOutX) of
+			  {_ValuesOut, Rest} ->
+			      ct:pal("Encoding values ~p with types ~w = ~w,\n "
+				     "resulting bin ~w,\n "
+				     "decoded ~p with types ~w = ~w,\n"
+				     "residue ~p",
+				     [ValuesIn, TsIn, TsInX, Bin, 
+				      _ValuesOut, TsOut, TsInX, Rest])
+		      catch error:Reason2 ->
+			    ct:pal("Decode of ~p with ~w = ~w failed, reason ~p", 
+				   [Bin, TsOut, TsOutX, Reason2])
+		      end
+	      catch error:Reason1 ->
+		      ct:pal("Encode of ~p with ~w = ~w failed, reason ~p", 
+			     [ValuesIn, TsIn, TsInX, Reason1])
+	      end
+      end, Cases),
+    
+    ok.
+    
+
 %%--------------------------------------------------------------------
 %% @spec break(Config) -> ok 
 %% @doc 

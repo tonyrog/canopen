@@ -2384,8 +2384,6 @@ rpdo_unpack(I, Data, Ctx) ->
 	{rpdo,{Ts,Is}} ->
 	    ?dbg(node, "~s: rpdo_unpack: data = ~w, ts = ~w, is = ~w", 
 		 [Ctx#co_ctx.name, Data, Ts, Is]),
-%%	    try rpdo_split(Data, Ts) of
-%%		Ds -> rpdo_set(Is, Ds, Ts, Ctx)
 	    try co_codec:decode(Data, Ts) of
 		{Ds, _} -> 
 		    ?dbg(node, "rpdo_unpack: decoded data ~p", [Ds]),
@@ -2401,14 +2399,6 @@ rpdo_unpack(I, Data, Ctx) ->
 		      "~s: rpdo_unpack: error = ~p\n", [Ctx#co_ctx.name, Error]),
 	    Ctx
     end.
-
-rpdo_split(Bin, []) ->
-    [];
-rpdo_split(Bin, [{_Type, Size} | Ts]) ->
-    ?dbg(node, "rpdo_split: bin ~p, size ~p", [Bin, Size]),
-    <<Data:Size/bits, Rest/binary>> = Bin, 
-    ?dbg(node, "rpdo_split: data ~p, rest ~p", [Data, Rest]),
-    [Data] ++ rpdo_split(Rest, Ts).
 
 rpdo_set([{IX,SI}|Is], [Value|Vs], [Type|Ts], Ctx) ->
     if IX >= ?BOOLEAN, IX =< ?UNSIGNED32 -> %% skip entry
@@ -2571,13 +2561,6 @@ rpdo_value({Ix,Si},Value,Type,Ctx) ->
     case co_node:reserver_with_module(Ctx#co_ctx.res_table, Ix) of
 	[] ->
 	    ?dbg(node, "rpdo_value: No reserver for index ~7.16.0#", [Ix]),
-%%	    {Value, _} = 
-%%		try co_codec:decode(Bin, Type) of
-%%		    V -> V
-%%		catch error:_Reason ->
-%%			?dbg(node, "rpdo_value: Decode failed for ~p", [Bin]),
-%%			{Bin, any} %% ??
-%%		end,
 	    try co_dict:set(Ctx#co_ctx.dict, Ix, Si, Value) of
 		ok -> {ok, handle_notify(Ix, Ctx)};
 		Error -> {Error, Ctx}
