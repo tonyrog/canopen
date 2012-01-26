@@ -2384,7 +2384,7 @@ rpdo_unpack(I, Data, Ctx) ->
 	{rpdo,{Ts,Is}} ->
 	    ?dbg(node, "~s: rpdo_unpack: data = ~w, ts = ~w, is = ~w", 
 		 [Ctx#co_ctx.name, Data, Ts, Is]),
-	    try co_codec:decode(Data, Ts) of
+	    try co_codec:decode_pdo(Data, Ts) of
 		{Ds, _} -> 
 		    ?dbg(node, "rpdo_unpack: decoded data ~p", [Ds]),
 		    rpdo_set(Is, Ds, Ts, Ctx)

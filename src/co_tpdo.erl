@@ -405,7 +405,7 @@ do_send(S=#s {state = ?Operational},true) ->
 		     end,
 		     S#s.index_list),
 	    ?dbg(tpdo, "do_send: values = ~p, types = ~p", [Ds, S#s.type_list]),
-	    Data = co_codec:encode(Ds, S#s.type_list),
+	    Data = co_codec:encode_pdo(Ds, S#s.type_list),
 	    ?dbg(tpdo, "do_send: data = ~p", [Data]),
 	    Frame = #can_frame { id = S#s.id,
 				 len = byte_size(Data),
