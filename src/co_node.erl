@@ -630,16 +630,6 @@ set_option(_Serial, extended, _NewValue) ->
 set_option(_Serial, Option, _NewValue) ->
     {error, "Option " ++ atom_to_list(Option) + " unknwon."}.
 
-%% convert a node serial name to a local name
-serial_to_pid(Sn) when is_integer(Sn) ->
-    list_to_atom(co_lib:serial_to_string(Sn));
-serial_to_pid(Serial) when is_list(Serial) ->
-    serial_to_pid(co_lib:string_to_serial(Serial));
-serial_to_pid(Pid) when is_pid(Pid); is_atom(Pid) ->
-    Pid.
-
-
-
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -1244,58 +1234,6 @@ handle_info(_Info, Ctx) ->
     ?dbg(node, "~s: handle_info: unknown info received", [Ctx#co_ctx.name]),
     {noreply, Ctx}.
 
-handle_sdo_processes(Ref, Reason, Ctx) ->
-    case lists:keysearch(Ref, #sdo.mon, Ctx#co_ctx.sdo_list) of
-	{value,_S} ->
-	    if Reason =/= normal ->
-		    io:format("WARNING!" 
-			      "~s: sdo session died: ~p\n", 
-			      [Ctx#co_ctx.name, Reason]);
-	       true ->
-		    ok
-	    end,
-	    Sessions = lists:keydelete(Ref, #sdo.mon, Ctx#co_ctx.sdo_list),
-	    Ctx#co_ctx { sdo_list = Sessions };
-	false ->
-	    Ctx
-    end.
-
-handle_app_processes(Ref, Ctx) ->
-    case lists:keysearch(Ref, #app.mon, Ctx#co_ctx.app_list) of
-	{value,A} ->
-	    io:format("WARNING!" 
-		      "~s: id=~w application died\n", 
-		      [Ctx#co_ctx.name,A#app.pid]),
-	    remove_subscriptions(Ctx#co_ctx.sub_table, A#app.pid), %% Or reset ??
-	    reset_reservations(Ctx#co_ctx.res_table, A#app.pid),
-	    %% FIXME: restart application? application_mod ?
-	    Ctx#co_ctx { app_list = Ctx#co_ctx.app_list--[A]};
-	false ->
-	    Ctx
-    end.
-
-handle_tpdo_processes(Ref, Ctx) ->
-    case lists:keysearch(Ref, #tpdo.mon, Ctx#co_ctx.tpdo_list) of
-	{value,T} ->
-	    io:format("WARNING!" 
-		      "~s: id=~w tpdo process died\n", 
-		      [Ctx#co_ctx.name,T#tpdo.pid]),
-	    
-	    case restart_tpdo(T, Ctx) of
-		{error, not_found} ->
-		    io:format("WARNING! ~s: not possible to restart " ++
-				  "tpdo process for offset ~p\n", 
-			      [Ctx#co_ctx.name,T#tpdo.offset]),
-		    Ctx;
-		NewT ->
-		    ?dbg(node, "~s: handle_info: new tpdo process ~p started", 
-			 [Ctx#co_ctx.name, NewT#tpdo.pid]),
-		    Ctx#co_ctx { tpdo_list = [NewT | Ctx#co_ctx.tpdo_list]--[T]}
-	    end;
-	false ->
-	    Ctx
-    end.
-
 %%--------------------------------------------------------------------
 %% @private
 %% Function: terminate(Reason, State) -> void()
@@ -1346,11 +1284,94 @@ code_change(_OldVsn, Ctx, _Extra) ->
     {ok, Ctx}.
 
 %%--------------------------------------------------------------------
-%%% Internal functions
+%%% Support functions
 %%--------------------------------------------------------------------
 
 %%
+%% Convert a node serial name to a local name
+%%
+serial_to_pid(Sn) when is_integer(Sn) ->
+    list_to_atom(co_lib:serial_to_string(Sn));
+serial_to_pid(Serial) when is_list(Serial) ->
+    serial_to_pid(co_lib:string_to_serial(Serial));
+serial_to_pid(Pid) when is_pid(Pid); is_atom(Pid) ->
+    Pid.
+
+%% 
+%% Create and initialize dictionary
+%%
+create_dict() ->
+    Dict = co_dict:new(public),
+    %% install mandatory default items
+    co_dict:add_object(Dict, #dict_object { index=?IX_ERROR_REGISTER,
+					    access=?ACCESS_RO,
+					    struct=?OBJECT_VAR,
+					    type=?UNSIGNED8 },
+		       [#dict_entry { index={?IX_ERROR_REGISTER, 0},
+				      access=?ACCESS_RO,
+				      type=?UNSIGNED8,
+				      value=0}]),
+    co_dict:add_object(Dict, #dict_object { index=?IX_PREDEFINED_ERROR_FIELD,
+					    access=?ACCESS_RO,
+					    struct=?OBJECT_ARRAY,
+					    type=?UNSIGNED32 },
+		       [#dict_entry { index={?IX_PREDEFINED_ERROR_FIELD,0},
+				      access=?ACCESS_RW,
+				      type=?UNSIGNED8,
+				      value=0}]),
+    Dict.
+    
+%%
+%% Initialized the default connection set
+%% For the extended format we always set the COBID_ENTRY_EXTENDED bit
+%% This match for the none extended format
+%% We may handle the mixed mode later on....
+%%
+create_cob_table(Nid) ->
+    T = ets:new(cob_table, [public]),
+    if ?is_nodeid_extended(Nid) ->
+	    SDORx = ?XCOB_ID(?SDO_RX,Nid),
+	    SDOTx = ?XCOB_ID(?SDO_TX,Nid),
+	    ets:insert(T, {?XCOB_ID(?NMT, 0), nmt});
+	true ->
+	    SDORx = ?COB_ID(?SDO_RX,Nid),
+	    SDOTx = ?COB_ID(?SDO_TX,Nid),
+	    ets:insert(T, {?COB_ID(?NMT, 0), nmt})
+    end,
+    ?dbg(node, "create_cob_table Nid=~w, SDORx=~w, SDOTx=~w", 
+	 [Nid,SDORx,SDOTx]),
+    ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
+    ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
+    T.
+
+%%
+%% Create subscription table
+%%
+create_sub_table() ->
+    T = ets:new(sub_table, [public,ordered_set]),
+    add_subscription(T, ?IX_COB_ID_SYNC_MESSAGE, self()),
+    add_subscription(T, ?IX_COM_CYCLE_PERIOD, self()),
+    add_subscription(T, ?IX_COB_ID_TIME_STAMP, self()),
+    add_subscription(T, ?IX_COB_ID_EMERGENCY, self()),
+    add_subscription(T, ?IX_SDO_SERVER_FIRST,?IX_SDO_SERVER_LAST, self()),
+    add_subscription(T, ?IX_SDO_CLIENT_FIRST,?IX_SDO_CLIENT_LAST, self()),
+    add_subscription(T, ?IX_RPDO_PARAM_FIRST, ?IX_RPDO_PARAM_LAST, self()),
+    add_subscription(T, ?IX_TPDO_PARAM_FIRST, ?IX_TPDO_PARAM_LAST, self()),
+    add_subscription(T, ?IX_TPDO_MAPPING_FIRST, ?IX_TPDO_MAPPING_LAST, self()),
+    T.
+    
+%%
 %% Load a dictionary
+%% 
+%%
+%% Load dictionary from file
+%% FIXME: map
+%%    IX_COB_ID_SYNC_MESSAGE  => cob_table
+%%    IX_COB_ID_TIME_STAMP    => cob_table
+%%    IX_COB_ID_EMERGENCY     => cob_table
+%%    IX_SDO_SERVER_FIRST - IX_SDO_SERVER_LAST =>  cob_table
+%%    IX_SDO_CLIENT_FIRST - IX_SDO_CLIENT_LAST =>  cob_table
+%%    IX_RPDO_PARAM_FIRST - IX_RPDO_PARAM_LAST =>  cob_table
 %% 
 load_dict_init(undefined, Ctx) ->
     {ok, Ctx};
@@ -1389,6 +1410,41 @@ load_dict_internal(File, Ctx) ->
 
 	    {error, Reason, Ctx}
     end.
+
+%%
+%% Update dictionary
+%% Only valid for 'local' objects
+%%
+set_dict_object({O,Es}, Ctx) when is_record(O, dict_object) ->
+    lists:foreach(fun(E) -> ets:insert(Ctx#co_ctx.dict, E) end, Es),
+    ets:insert(Ctx#co_ctx.dict, O),
+    I = O#dict_object.index,
+    handle_notify(I, Ctx).
+
+set_dict_entry(E, Ctx) when is_record(E, dict_entry) ->
+    {I,_} = E#dict_entry.index,
+    ets:insert(Ctx#co_ctx.dict, E),
+    handle_notify(I, Ctx).
+
+set_dict_value(IX,SI,Value,Ctx) ->
+    try co_dict:set(Ctx#co_ctx.dict, IX,SI,Value) of
+	ok -> {ok, handle_notify(IX, Ctx)};
+	Error -> {Error, Ctx}
+    catch
+	error:Reason -> {{error,Reason}, Ctx}
+    end.
+
+
+direct_set_dict_value(IX,SI,Value,Ctx) ->
+    ?dbg(node, "~s: direct_set_dict_value: Ix = ~.16#:~w, Value = ~p",
+	 [Ctx#co_ctx.name, IX, SI, Value]), 
+    try co_dict:direct_set(Ctx#co_ctx.dict, IX,SI,Value) of
+	ok -> {ok, handle_notify(IX, Ctx)};
+	Error -> {Error, Ctx}
+    catch
+	error:Reason -> {{error,Reason}, Ctx}
+    end.
+
 
 %%
 %% Handle can messages
@@ -1636,7 +1692,64 @@ handle_dam_mpdo(Ctx, RId, Ix, Si, Data) ->
     end,
     Ctx.
 
+%%
+%% Handle terminated processes
+%%
+handle_sdo_processes(Ref, Reason, Ctx) ->
+    case lists:keysearch(Ref, #sdo.mon, Ctx#co_ctx.sdo_list) of
+	{value,_S} ->
+	    if Reason =/= normal ->
+		    io:format("WARNING!" 
+			      "~s: sdo session died: ~p\n", 
+			      [Ctx#co_ctx.name, Reason]);
+	       true ->
+		    ok
+	    end,
+	    Sessions = lists:keydelete(Ref, #sdo.mon, Ctx#co_ctx.sdo_list),
+	    Ctx#co_ctx { sdo_list = Sessions };
+	false ->
+	    Ctx
+    end.
+
+handle_app_processes(Ref, Ctx) ->
+    case lists:keysearch(Ref, #app.mon, Ctx#co_ctx.app_list) of
+	{value,A} ->
+	    io:format("WARNING!" 
+		      "~s: id=~w application died\n", 
+		      [Ctx#co_ctx.name,A#app.pid]),
+	    remove_subscriptions(Ctx#co_ctx.sub_table, A#app.pid), %% Or reset ??
+	    reset_reservations(Ctx#co_ctx.res_table, A#app.pid),
+	    %% FIXME: restart application? application_mod ?
+	    Ctx#co_ctx { app_list = Ctx#co_ctx.app_list--[A]};
+	false ->
+	    Ctx
+    end.
+
+handle_tpdo_processes(Ref, Ctx) ->
+    case lists:keysearch(Ref, #tpdo.mon, Ctx#co_ctx.tpdo_list) of
+	{value,T} ->
+	    io:format("WARNING!" 
+		      "~s: id=~w tpdo process died\n", 
+		      [Ctx#co_ctx.name,T#tpdo.pid]),
+	    
+	    case restart_tpdo(T, Ctx) of
+		{error, not_found} ->
+		    io:format("WARNING! ~s: not possible to restart " ++
+				  "tpdo process for offset ~p\n", 
+			      [Ctx#co_ctx.name,T#tpdo.offset]),
+		    Ctx;
+		NewT ->
+		    ?dbg(node, "~s: handle_info: new tpdo process ~p started", 
+			 [Ctx#co_ctx.name, NewT#tpdo.pid]),
+		    Ctx#co_ctx { tpdo_list = [NewT | Ctx#co_ctx.tpdo_list]--[T]}
+	    end;
+	false ->
+	    Ctx
+    end.
+
+%%
 %% NMT requests (call from within node process)
+%%
 set_node_state(Ctx, NodeId, State) ->
     update_nmt_entry(NodeId, [{state,State}], Ctx).
 
@@ -1710,63 +1823,6 @@ broadcast_state(State, Ctx) ->
       Ctx#co_ctx.app_list).
 
     
-%%
-%% Load dictionary from file
-%% FIXME: map
-%%    IX_COB_ID_SYNC_MESSAGE  => cob_table
-%%    IX_COB_ID_TIME_STAMP    => cob_table
-%%    IX_COB_ID_EMERGENCY     => cob_table
-%%    IX_SDO_SERVER_FIRST - IX_SDO_SERVER_LAST =>  cob_table
-%%    IX_SDO_CLIENT_FIRST - IX_SDO_CLIENT_LAST =>  cob_table
-%%    IX_RPDO_PARAM_FIRST - IX_RPDO_PARAM_LAST =>  cob_table
-%% 
-set_dict_object({O,Es}, Ctx) when is_record(O, dict_object) ->
-    lists:foreach(fun(E) -> ets:insert(Ctx#co_ctx.dict, E) end, Es),
-    ets:insert(Ctx#co_ctx.dict, O),
-    I = O#dict_object.index,
-    handle_notify(I, Ctx).
-
-set_dict_entry(E, Ctx) when is_record(E, dict_entry) ->
-    {I,_} = E#dict_entry.index,
-    ets:insert(Ctx#co_ctx.dict, E),
-    handle_notify(I, Ctx).
-
-set_dict_value(IX,SI,Value,Ctx) ->
-    try co_dict:set(Ctx#co_ctx.dict, IX,SI,Value) of
-	ok -> {ok, handle_notify(IX, Ctx)};
-	Error -> {Error, Ctx}
-    catch
-	error:Reason -> {{error,Reason}, Ctx}
-    end.
-
-%% Truncate data to 64 bits
-set_tpdo_value(I,Value,Ctx) when is_binary(Value) andalso size(Value) > 8 ->
-    <<TruncValue:8/binary, _Rest/binary>> = Value,
-    set_tpdo_value(I,TruncValue,Ctx);
-set_tpdo_value(I,Value,Ctx)  when is_list(Value) andalso length(Value) > 8 ->
-    %% ??
-    set_tpdo_value(I,lists:sublist(Value,8),Ctx);
-%% Other conversions ???
-set_tpdo_value({_Ix, _Si} = I,Value,Ctx) ->
-    ?dbg(node, "~s: set_tpdo_value: Ix = ~.16#:~w, Value = ~p",
-	 [Ctx#co_ctx.name, _Ix, _Si, Value]), 
-    try ets:insert(Ctx#co_ctx.tpdo_cache,{I,Value}) of
-	true -> {ok, Ctx}
-    catch
-	error:Reason -> {{error,Reason}, Ctx}
-    end.
-
-
-direct_set_dict_value(IX,SI,Value,Ctx) ->
-    ?dbg(node, "~s: direct_set_dict_value: Ix = ~.16#:~w, Value = ~p",
-	 [Ctx#co_ctx.name, IX, SI, Value]), 
-    try co_dict:direct_set(Ctx#co_ctx.dict, IX,SI,Value) of
-	ok -> {ok, handle_notify(IX, Ctx)};
-	Error -> {Error, Ctx}
-    catch
-	error:Reason -> {{error,Reason}, Ctx}
-    end.
-
 %%
 %% Dictionary entry has been updated
 %% Emulate co_node as subscriber to dictionary updates
@@ -2049,67 +2105,8 @@ load_list(Dict, [{IX,SI,Default}|List],Acc) ->
 load_list(_Dict, [], Acc) ->
     reverse(Acc).
 
-%% 
-%% Create and initialize dictionary
-%%
-create_dict() ->
-    Dict = co_dict:new(public),
-    %% install mandatory default items
-    co_dict:add_object(Dict, #dict_object { index=?IX_ERROR_REGISTER,
-					    access=?ACCESS_RO,
-					    struct=?OBJECT_VAR,
-					    type=?UNSIGNED8 },
-		       [#dict_entry { index={?IX_ERROR_REGISTER, 0},
-				      access=?ACCESS_RO,
-				      type=?UNSIGNED8,
-				      value=0}]),
-    co_dict:add_object(Dict, #dict_object { index=?IX_PREDEFINED_ERROR_FIELD,
-					    access=?ACCESS_RO,
-					    struct=?OBJECT_ARRAY,
-					    type=?UNSIGNED32 },
-		       [#dict_entry { index={?IX_PREDEFINED_ERROR_FIELD,0},
-				      access=?ACCESS_RW,
-				      type=?UNSIGNED8,
-				      value=0}]),
-    Dict.
-    
-%%
-%% Initialized the default connection set
-%% For the extended format we always set the COBID_ENTRY_EXTENDED bit
-%% This match for the none extended format
-%% We may handle the mixed mode later on....
-%%
-create_cob_table(Nid) ->
-    T = ets:new(cob_table, [public]),
-    if ?is_nodeid_extended(Nid) ->
-	    SDORx = ?XCOB_ID(?SDO_RX,Nid),
-	    SDOTx = ?XCOB_ID(?SDO_TX,Nid),
-	    ets:insert(T, {?XCOB_ID(?NMT, 0), nmt});
-	true ->
-	    SDORx = ?COB_ID(?SDO_RX,Nid),
-	    SDOTx = ?COB_ID(?SDO_TX,Nid),
-	    ets:insert(T, {?COB_ID(?NMT, 0), nmt})
-    end,
-    ?dbg(node, "create_cob_table Nid=~w, SDORx=~w, SDOTx=~w", 
-	 [Nid,SDORx,SDOTx]),
-    ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
-    ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
-    T.
 
-%% Create subscription table
-create_sub_table() ->
-    T = ets:new(sub_table, [public,ordered_set]),
-    add_subscription(T, ?IX_COB_ID_SYNC_MESSAGE, self()),
-    add_subscription(T, ?IX_COM_CYCLE_PERIOD, self()),
-    add_subscription(T, ?IX_COB_ID_TIME_STAMP, self()),
-    add_subscription(T, ?IX_COB_ID_EMERGENCY, self()),
-    add_subscription(T, ?IX_SDO_SERVER_FIRST,?IX_SDO_SERVER_LAST, self()),
-    add_subscription(T, ?IX_SDO_CLIENT_FIRST,?IX_SDO_CLIENT_LAST, self()),
-    add_subscription(T, ?IX_RPDO_PARAM_FIRST, ?IX_RPDO_PARAM_LAST, self()),
-    add_subscription(T, ?IX_TPDO_PARAM_FIRST, ?IX_TPDO_PARAM_LAST, self()),
-    add_subscription(T, ?IX_TPDO_MAPPING_FIRST, ?IX_TPDO_MAPPING_LAST, self()),
-    T.
-    
+
 add_subscription(Tab, Ix, Pid) ->
     add_subscription(Tab, Ix, Ix, Pid).
 
@@ -2376,6 +2373,26 @@ dyn_nodeid({cob,_I,Serial},Ctx) ->
     end.
 
 %%
+%% Callback functions for changes in tpdo elements
+%% Truncate data to 64 bits
+%%
+set_tpdo_value(I,Value,Ctx) when is_binary(Value) andalso size(Value) > 8 ->
+    <<TruncValue:8/binary, _Rest/binary>> = Value,
+    set_tpdo_value(I,TruncValue,Ctx);
+set_tpdo_value(I,Value,Ctx)  when is_list(Value) andalso length(Value) > 16 ->
+    %% ??
+    set_tpdo_value(I,lists:sublist(Value,8),Ctx);
+%% Other conversions ???
+set_tpdo_value({_Ix, _Si} = I,Value,Ctx) ->
+    ?dbg(node, "~s: set_tpdo_value: Ix = ~.16#:~w, Value = ~p",
+	 [Ctx#co_ctx.name, _Ix, _Si, Value]), 
+    try ets:insert(Ctx#co_ctx.tpdo_cache,{I,Value}) of
+	true -> {ok, Ctx}
+    catch
+	error:Reason -> {{error,Reason}, Ctx}
+    end.
+
+%%
 %% Unpack PDO Data from external TPDO/internal RPDO 
 %%
 rpdo_unpack(I, Data, Ctx) ->
@@ -2410,8 +2427,9 @@ rpdo_set([{IX,SI}|Is], [Value|Vs], [Type|Ts], Ctx) ->
 rpdo_set([], [], [], Ctx) ->
     Ctx.
 
-
+%%
 %% read PDO mapping  => {MapType,[{Type,Len}],[Index]}
+%%
 pdo_mapping(IX, _TpdoCtx=#tpdo_ctx {dict = Dict, res_table = ResTable, 
 				   tpdo_cache = TpdoCache}) ->
     pdo_mapping(IX, ResTable, Dict, TpdoCache).
