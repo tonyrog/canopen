@@ -1,10 +1,13 @@
 %%%-------------------------------------------------------------------
-%%% @author Marina Westman LÃ¶nne <malotte@malotte.net>
-%%% @copyright (C) 2011, Marina Westman LÃ¶nne
+%%% @author Marina Westman Lönne <malotte@malotte.net>
+%%% @copyright (C) 2011, Marina Westman Lönne
 %%% @doc
-%%%
+%%% Intermediate data storage for an SDO session process.<br/>
+%%% Responsible for setting up a connection to an application
+%%% if needed.
+%%% 
+%%% Created: 12 Dec 2011 by Malotte W Lönne
 %%% @end
-%%% Created : 12 Dec 2011 
 %%%-------------------------------------------------------------------
 -module(co_data_buf).
 
@@ -14,10 +17,10 @@
 
 %% API
 -export([init/3, init/4, init/5,
-	 open/2,
 	 read/2,
 	 write/4,
 	 update/2,
+	 abort/2,
 	 load/1,
 	 eof/1,
 	 data_size/1]).
@@ -43,6 +46,56 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
+%%--------------------------------------------------------------------
+%% @doc
+%% Initilizes the data buffer.
+%% @end
+%%--------------------------------------------------------------------
+-spec init(read | write, 
+	   Pid::pid(), Entry::#index_spec{}) -> 
+		  {ok, Buf::#co_data_buf{}} |
+		  {ok, Mref::reference(), Buf::#co_data_buf{}} |
+		  {error, Error::atom()};
+	  (read | write, 
+	   Dict::term(), Entry::#dict_entry{}) -> 
+		  {ok, Buf::#co_data_buf{}} |
+		  {error, Error::atom()};
+	  (read | write, 
+	   Pid::pid(), {Data::binary(), I::{integer(),integer()}}) -> 
+		  {ok, Buf::#co_data_buf{}} |
+		  {error, Error::atom()}.
+
+init(Access, Pid, E) ->
+    init(Access, Pid, E, undefined, undefined).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Initilizes the data buffer.
+%% @end
+%%--------------------------------------------------------------------
+-spec init(read | write, 
+	   Pid::pid(), Entry::#index_spec{}, BufSize::integer()) -> 
+		  {ok, Buf::#co_data_buf{}} |
+		  {ok, Mref::reference(), Buf::#co_data_buf{}} |
+		  {error, Error::atom()};
+	  (read | write, 
+	   Dict::term(), Entry::#dict_entry{}, BufSize::integer()) -> 
+		  {ok, Buf::#co_data_buf{}} |
+		  {error, Error::atom()};
+	  (read | write, 
+	   Pid::pid(), {Data::binary(), I::{integer(),integer()}},
+	   BufSize::integer()) -> 
+		  {ok, Buf::#co_data_buf{}} |
+		  {error, Error::atom()}.
+
+init(Access, Pid, E, BSize) ->
+    init(Access, Pid, E, BSize, undefined).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Initilizes the data buffer.
+%% @end
+%%--------------------------------------------------------------------
 -spec init(read | write, 
 	   Pid::pid(), Entry::#index_spec{}, 
 	   BufSize::integer(), LLevel::integer()) -> 
@@ -59,12 +112,6 @@
 	   BufSize::integer(), LLevel::integer()) -> 
 		  {ok, Buf::#co_data_buf{}} |
 		  {error, Error::atom()}.
-
-init(Access, Pid, E) ->
-    init(Access, Pid, E, undefined, undefined).
-
-init(Access, Pid, E, BSize) ->
-    init(Access, Pid, E, BSize, undefined).
 
 init(Access, Pid, E, BSize, LLevel) ->
     ?dbg(data_buf, 
@@ -130,6 +177,7 @@ init_i(Access, Pid, {Data, I}, BSize, LLevel) when is_binary(Data) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% If needed sets up connection to application.
 %% @end
 %%--------------------------------------------------------------------
 -spec open(read | write, Buf::#co_data_buf{}) -> {ok, NewBuf::#co_data_buf{}} |
@@ -191,6 +239,7 @@ open_i(write, Buf) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% If needed fetch data from an application.
 %% @end
 %%--------------------------------------------------------------------
 -spec load(Buf::#co_data_buf{}) -> {ok, NewBuf::#co_data_buf{}} |
@@ -211,6 +260,8 @@ load(Buf) when is_record(Buf, co_data_buf) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% Reads data in the buffer.<br/>
+%% If needed more data is fetched from the application.
 %% @end
 %%--------------------------------------------------------------------
 -spec read(Buf::#co_data_buf{}, Bytes::integer) -> 
@@ -260,6 +311,8 @@ read_app_call(_Buf) ->
 	    
 %%--------------------------------------------------------------------
 %% @doc
+%% Write data to the buffer.<br/>
+%% If needed data is sent to the application.
 %% @end
 %%--------------------------------------------------------------------
 -spec write(Buf::#co_data_buf{}, Data::term(), EodFlag::boolean(), 
@@ -483,6 +536,7 @@ check_limit_i(Buf=#co_data_buf {data = OldData, tmp = TmpData}, Data) ->
  
 %%--------------------------------------------------------------------
 %% @doc
+%% Update buffer with reply from application.
 %% @end
 %%--------------------------------------------------------------------
 -spec update(Buf::#co_data_buf{}, 
@@ -544,6 +598,26 @@ update(_Buf, Other) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% If needed abort connection with application.
+%% @end
+%%--------------------------------------------------------------------
+-spec abort(Buf::#co_data_buf{}, Reason::integer()) ->
+		   ok.
+
+abort(undefined, _Reason) -> 
+    ok;
+abort(_Buf=#co_data_buf {mode = atomic}, _Reason) -> 
+    ok;
+abort(_Buf=#co_data_buf {mode = {atomic, _Module}}, _Reason) -> 
+    ok;
+abort(_Buf=#co_data_buf {mode = streamed, pid = Pid, ref = Ref}, Reason) -> 
+    gen_server:cast(Pid, {abort, Ref, Reason});
+abort(_Buf=#co_data_buf {mode = {streamed, Module}, pid = Pid, ref = Ref}, Reason) -> 
+    Module:abort(Pid, Ref, Reason).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Check if all data is received from application.
 %% @end
 %%--------------------------------------------------------------------
 -spec eof(Buf::#co_data_buf{}) -> boolean().
@@ -553,6 +627,7 @@ eof(Buf) when is_record(Buf, co_data_buf) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% Get size of data in buffer.
 %% @end
 %%--------------------------------------------------------------------
 -spec data_size(Buf::#co_data_buf{}) -> integer().

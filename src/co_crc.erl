@@ -1,8 +1,14 @@
+%%%-------------------------------------------------------------------
+%%% @author Tony Rogvall <tony@rogvall.se>
+%%% @copyright (C) 2012, Tony Rogvall
+%%% @doc
 %%% File    : co_crc.erl
-%%% Author  : Tony Rogvall <tony@PBook.local>
+%%%
 %%% Description : CCITT CRC 16 (initial=0)
-%%% Created :  5 Feb 2008 by Tony Rogvall <tony@PBook.local>
-
+%%%
+%%% Created : 5 Feb 2008 by Tony Rogvall 
+%%% @end
+%%%-------------------------------------------------------------------
 -module(co_crc).
 
 -export([init/0]).
@@ -11,8 +17,34 @@
 -export([checksum/1]).
 
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Initialize the CRC computation.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec init() -> CRC::integer().
+				  
 init() -> 0.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Finalize the CRC computation.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec final(CRC::integer()) -> CRC::integer().
+
 final(CRC) -> CRC.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Updates the CRC checksum.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec update(CRC::integer(), Data::term()) -> CRC::integer().
+
 update(CRC, [H|T]) ->
     if is_integer(H) ->
 	    update(update_byte(CRC,H), T);
@@ -40,6 +72,14 @@ update_byte(CRC, Val) ->
     CRC3 = CRC2 bxor ?u16(?u16(CRC2 bsl 8) bsl 4),
     CRC3 bxor ?u16(?u16(?u8(CRC3) bsl 4) bsl 1).
 	     
+%%--------------------------------------------------------------------
+%% @doc
+%% Calculate CRC for Data.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec checksum(Data::term()) -> CRC::integer().
+
 checksum(Data) ->
     CRC0 = init(),
     CRC1 = update(CRC0, Data),

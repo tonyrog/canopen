@@ -6,8 +6,8 @@
 	<integer>0</integer>
 	<key>ApplicationVersion</key>
 	<array>
-		<string>com.omnigroup.OmniGraffle</string>
-		<string>138.33.0.157554</string>
+		<string>com.omnigroup.OmniGraffle.MacAppStore</string>
+		<string>138.33</string>
 	</array>
 	<key>AutoAdjust</key>
 	<true/>
@@ -728,7 +728,7 @@ with value}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{2.5, 20}, {330.5, 38}}</string>
+			<string>{{2.5, 20}, {258.5, 38}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -767,7 +767,7 @@ with value}</string>
 {\colortbl;\red255\green255\blue255;}
 \pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\qc
 
-\f0\fs48 \cf0 s_initial - start of download}</string>
+\f0\fs48 \cf0 segment download}</string>
 				<key>VerticalPad</key>
 				<integer>0</integer>
 			</dict>
@@ -1141,8 +1141,8 @@ with value}</string>
 			<integer>130</integer>
 			<key>Points</key>
 			<array>
-				<string>{468.5795, 684.49982}</string>
-				<string>{469.68823, 728.50421}</string>
+				<string>{468.58551, 684.49988}</string>
+				<string>{469.70575, 728.50372}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -1472,7 +1472,7 @@ with value}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{198.53836, 434.99561}, {51, 14}}</string>
+			<string>{{198.53835, 434.99561}, {51, 14}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -1559,8 +1559,8 @@ with value}</string>
 			<integer>117</integer>
 			<key>Points</key>
 			<array>
-				<string>{314.56982, 405.25491}</string>
-				<string>{224.30516, 458.74509}</string>
+				<string>{314.56985, 405.25491}</string>
+				<string>{224.30515, 458.74509}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -2075,7 +2075,7 @@ with value}</string>
 	<key>MasterSheets</key>
 	<array/>
 	<key>ModificationDate</key>
-	<string>2011-12-06 13:09:11 +0000</string>
+	<string>2012-01-31 19:47:58 +0000</string>
 	<key>Modifier</key>
 	<string>Marina Westman Lönne</string>
 	<key>NotesVisible</key>
@@ -2155,7 +2155,7 @@ with value}</string>
 		<key>FitInWindow</key>
 		<true/>
 		<key>Frame</key>
-		<string>{{70, 184}, {1014, 799}}</string>
+		<string>{{132, 40}, {1014, 799}}</string>
 		<key>ListView</key>
 		<false/>
 		<key>OutlineWidth</key>

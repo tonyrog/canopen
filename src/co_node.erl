@@ -1,11 +1,11 @@
 %%%-------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @copyright (C) 2010, Tony Rogvall
+%%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%% File    : co_node.erl
-%%% Description : can_node
+%%% CANopen node
 %%%
-%%% Created : 10 Jan 2008 
+%%% File    : co_node.erl <br/>
+%%% Created: 10 Jan 2008 by Tony Rogvall
 %%% @end
 %%%-------------------------------------------------------------------
 -module(co_node).
@@ -126,7 +126,7 @@ start_link(Args) ->
     Name = name(Opts, S),
     ?dbg(node, "Starting co_node with Name = ~p, Serial = ~.16#, NodeId = ~.16#",
 	 [Name, S, NodeId]),
-    gen_server:start({local, Name}, ?MODULE, [S,NodeId,Name,Opts], []).
+    gen_server:start({local, Name}, ?MODULE, {S,NodeId,Name,Opts}, []).
 
 %%
 %% Get serial number
@@ -679,7 +679,6 @@ notify(Nid,Index,Subind,Value) ->
 %% @doc
 %% Get the RPDO mapping. <br/>
 %% Executing in calling process context.<br/>
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec rpdo_mapping(Offset::integer(), Ctx::record()) -> 
@@ -741,18 +740,19 @@ reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
 %%====================================================================
 %%--------------------------------------------------------------------
 %% @private
-%% @spec init([Serial::integer(), NodeId::integer(), NodeName::atom(), 
-%%	       Opts::list(term())]) -> 
-%%		  {ok, State::record()} |
-%%		  {ok, State::record(), Timeout::integer()} |
-%%		  ignore               |
-%%		  {stop, Reason::atom()}.
-%%
 %% @doc
 %% Description: Initiates the server
 %% @end
 %%--------------------------------------------------------------------
-init([Serial, NodeId, NodeName, Opts]) ->
+-spec init({Serial::integer(), NodeId::integer(), NodeName::atom(), 
+	    Opts::list(term())}) -> 
+		  {ok, State::record()} |
+		  {ok, State::record(), Timeout::integer()} |
+		  ignore               |
+		  {stop, Reason::atom()}.
+
+
+init({Serial, NodeId, NodeName, Opts}) ->
     can_router:start(),
     can_udp:start(0),
 
@@ -2376,12 +2376,12 @@ dyn_nodeid({cob,_I,Serial},Ctx) ->
 %% Callback functions for changes in tpdo elements
 %% Truncate data to 64 bits
 %%
-set_tpdo_value(I,Value,Ctx) when is_binary(Value) andalso size(Value) > 8 ->
+set_tpdo_value(I,Value,Ctx) when is_binary(Value) andalso byte_size(Value) > 8 ->
     <<TruncValue:8/binary, _Rest/binary>> = Value,
     set_tpdo_value(I,TruncValue,Ctx);
 set_tpdo_value(I,Value,Ctx)  when is_list(Value) andalso length(Value) > 16 ->
     %% ??
-    set_tpdo_value(I,lists:sublist(Value,8),Ctx);
+    set_tpdo_value(I,lists:sublist(Value,16),Ctx);
 %% Other conversions ???
 set_tpdo_value({_Ix, _Si} = I,Value,Ctx) ->
     ?dbg(node, "~s: set_tpdo_value: Ix = ~.16#:~w, Value = ~p",

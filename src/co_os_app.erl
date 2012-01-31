@@ -28,7 +28,7 @@
 	 set/3, get/2,
 	 write_begin/3, write/4,
 	 read_begin/3, read/3,
-	 abort/2]).
+	 abort/3]).
 
 %% Execution process
 -export([execute_command/2]).
@@ -42,13 +42,13 @@
 
 -record(loop_data,
 	{
-	  state,
-	  command = "",     %% Subindex 1
-	  status = 0,       %% Subindex 2
-	  reply ="",        %% Subindex 3
-	  co_node,          %% Name of co_node
-	  ref,              %% Reference for communication with session
-	  read_buf = <<>>   %% Tmp buffer when uploading reply
+	  state            ::atom(),
+	  command = ""     ::string(),   %% Subindex 1
+	  status = 0       ::integer(),  %% Subindex 2
+	  reply =""        ::string(),   %% Subindex 3
+	  co_node          ::atom(),     %% Name of co_node
+	  ref              ::reference(),%% Reference for communication with session
+	  read_buf = <<>>  ::binary()    %% Tmp buffer when uploading reply
 	}).
 
 
@@ -121,13 +121,12 @@ reply_specification({_Index, _SubInd} = I, Type, Access, Mode) ->
     {spec, Spec}.
 
 %%--------------------------------------------------------------------
-%% @doc
 %% Callback functions for transfer_mode == {atomic, Module}
-%% @end
 %%--------------------------------------------------------------------
 %%--------------------------------------------------------------------
 %% @doc
-%% Sets {Index, SubInd} to NewValue.
+%% Sets {Index, SubInd} to NewValue.<br/>
+%% Used for transfer_mode = {atomic, Module}.
 %% @end
 %%--------------------------------------------------------------------
 -spec set(Pid::pid(), {Index::integer(), SubInd::integer()}, NewValue::term()) ->
@@ -140,7 +139,8 @@ set(Pid, {Index, SubInd}, NewValue) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Gets Value for {Index, SubInd}.
+%% Gets Value for {Index, SubInd}.<br/>
+%% Used for transfer_mode = {atomic, Module}.
 %% @end
 %%--------------------------------------------------------------------
 -spec get(Pid::pid(), {Index::integer(), SubInd::integer()}) ->
@@ -152,13 +152,12 @@ get(Pid, {Index, SubInd}) ->
     gen_server:call(Pid, {get, {Index, SubInd}}).
 
 %%--------------------------------------------------------------------
-%% @doc
 %% Callback functions for transfer_mode = {streamed, Module}
-%% @end
 %%--------------------------------------------------------------------
 %%--------------------------------------------------------------------
 %% @doc
-%% Intializes download of data. Returns max size of data chunks.
+%% Intializes download of data. Returns max size of data chunks.<br/>
+%% Used for transfer_mode =  {streamed, Module}
 %% @end
 %%--------------------------------------------------------------------
 -spec write_begin(Pid::pid(), {Index::integer(), SubInd::integer()}, 
@@ -172,7 +171,8 @@ write_begin(Pid, {Index, SubInd}, Ref) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Downloads data.
+%% Downloads data.<br/>
+%% Used for transfer_mode =  {streamed, Module}
 %% @end
 %%--------------------------------------------------------------------
 -spec write(Pid::pid(), Ref::reference(), Data::binary(), EodFlag::boolean()) ->
@@ -184,7 +184,8 @@ write(Pid, Ref, Data, EodFlag) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Intializes upload of data. Returns size of data.
+%% Intializes upload of data. Returns size of data.<br/>
+%% Used for transfer_mode =  {streamed, Module}
 %% @end
 %%--------------------------------------------------------------------
 -spec read_begin(Pid::pid(), {Index::integer(), SubInd::integer()}, 
@@ -197,7 +198,8 @@ read_begin(Pid, {Index, SubInd}, Ref) ->
     gen_server:call(Pid, {read_begin, {Index, SubInd}, Ref}).
 %%--------------------------------------------------------------------
 %% @doc
-%% Uploads data.
+%% Uploads data.<br/>
+%% Used for transfer_mode =  {streamed, Module}
 %% @end
 %%--------------------------------------------------------------------
 -spec read(Pid::pid(), Ref::reference(), Bytes::integer()) ->
@@ -209,20 +211,23 @@ read(Pid, Ref, Bytes) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Aborts stream transaction.
+%% Aborts stream transaction.<br/>
+%% Used for transfer_mode =  {streamed, Module}
 %% @end
 %%--------------------------------------------------------------------
--spec abort(Pid::pid(), Ref::reference()) ->
+-spec abort(Pid::pid(), Ref::reference(), Reason::integer()) ->
 		   ok |
 		   {error, Reason::atom()}.
-abort(Pid, Ref) ->
+abort(Pid, Ref, Reason) ->
     ?dbg(?NAME," abort ref = ~p\n",[Ref]),
-    gen_server:call(Pid, {abort, Ref}).
+    gen_server:cast(Pid, {abort, Ref, Reason}).
     
 %% Test functions
+%% @private
 debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
     gen_server:call(?MODULE, {debug, TrueOrFalse}).
 
+%% @private
 loop_data() ->
     gen_server:call(?MODULE, loop_data).
 
@@ -249,33 +254,42 @@ init([CoSerial]) ->
     {ok, #loop_data {state=init, co_node = CoSerial}}.
 
 %%--------------------------------------------------------------------
-%% @spec handle_call(Request, From, LoopData) ->
-%%                                   {reply, Reply, LoopData} |
-%%                                   {reply, Reply, LoopData, Timeout} |
-%%                                   {noreply, LoopData} |
-%%                                   {noreply, LoopData, Timeout} |
-%%                                   {stop, Reason, Reply, LoopData} |
-%%                                   {stop, Reason, LoopData}
-%%
-%% Request = {get, {Index, SubIndex}} |
-%%           {set, {Index, SubInd}, Value}
-%% LoopData = term()
-%% Index = integer()
-%% SubInd = integer()
-%% Value = term()
-%%
 %% @doc
 %% Handling call messages.
-%% Required to at least handle get and set requests as specified above.
-%% Handling all non call/cast messages.
-%% Required to at least handle a notify msg as specified above. <br/>
-%% RemoteId = Id of remote CANnode initiating the msg. <br/>
+%% Used for transfer mode atomic (set, get) and streamed 
+%% (write_begin, write, read_begin, read).
+%%
 %% Index = Index in Object Dictionary <br/>
-%% SubInd = Sub index in Object Disctionary  <br/>
-%% Value = Any value the node chooses to send.
-%% 
+%% SubInd =  SubIndex in Object Dictionary  <br/>
+%% Value =  Any value the node chooses to send.
+%% Ref - Reference in communication with the CANopen node.
+%%
+%% For description of requests compare with the correspondig functions:
+%% @see set/3  
+%% @see get/2 
+%% @see write_begin/3
+%% @see write/4
+%% @see read_begin/3
+%% @see read/3.
 %% @end
 %%--------------------------------------------------------------------
+-type call_request()::
+	{get, {Index::integer(), SubIndex::integer()}} |
+	{set, {Index::integer(), SubInd::integer()}, Value::term()} |
+	{write_begin, {Index::integer(), SubInd::integer()}, Ref::reference()} |
+	{write, Ref::reference(), Data::binary(), Eod::boolean()} |
+	{read_begin, {Index::integer(), SubInd::integer()}, Ref::reference()} |
+	{read, Ref::reference(), Bytes::integer()} |
+	stop.
+
+-spec handle_call(Request::call_request(), From::pid(), LoopData::#loop_data{}) ->
+			 {reply, Reply::term(), LoopData::#loop_data{}} |
+			 {reply, Reply::term(), LoopData::#loop_data{}, Timeout::timeout()} |
+			 {noreply, LoopData::#loop_data{}} |
+			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
+			 {stop, Reason::atom(), Reply::term(), LoopData::#loop_data{}} |
+			 {stop, Reason::atom(), LoopData::#loop_data{}}.
+
 handle_call({set, {?IX_OS_COMMAND, ?SI_OS_COMMAND}, Command}, _From, LoopData) ->
     ?dbg(?NAME," handle_call: set command = ~p\n",[Command]),
     handle_command(LoopData#loop_data {command = Command});
@@ -343,15 +357,6 @@ handle_call({read, Ref, Bytes}, _From, LoopData) ->
        true ->
 	    handle_read(Bytes, LoopData#loop_data {state = reading})
     end;
-handle_call({abort, Ref}, _From, LoopData) ->
-    ?dbg(?NAME," handle_call: abort ref = ~p\n", [Ref]),
-     if Ref =/= LoopData#loop_data.ref ->
-	     {reply, {error, ?abort_internal_error}, LoopData};
-	true ->
-	     {reply, ok, LoopData#loop_data {read_buf = (<<>>), state = init, 
-					     ref = undefined,
-					     command = "", status = 0, reply = ""}}
-    end;
 handle_call(loop_data, _From, LoopData) ->
     io:format("~p: LoopData = ~p\n", [?MODULE,LoopData]),
     {reply, ok, LoopData};
@@ -401,6 +406,7 @@ handle_command(LoopData=#loop_data {command = Command}) ->
 	    {reply, {error, ?abort_local_data_error}, LoopData}
     end.
 
+%% @private
 execute_command(Command, Starter) ->
     Res = execute_command(Command),
     Starter ! Res.
@@ -448,40 +454,70 @@ handle_stop(LoopData) ->
 
 
 %%--------------------------------------------------------------------
-%% @spec handle_cast(Msg, LoopData) -> {noreply, LoopData} |
-%%                                     {noreply, LoopData, Timeout} |
-%%                                     {stop, Reason, LoopData}
 %% @doc
-%% Handling cast messages
+%% Handling cast messages.
 %%
+%% Ref - Reference in communication with the CANopen node.
+%% 
+%% For description of message compare with the correspondig functions:
+%% @see abort/2  
 %% @end
 %%--------------------------------------------------------------------
+-type cast_msg()::
+	{abort, Ref::reference(), Reason::atom()} |
+	term().
+
+-spec handle_cast(Msg::cast_msg(), LoopData::#loop_data{}) ->
+			 {noreply, LoopData::#loop_data{}} |
+			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
+			 {stop, Reason::atom(), LoopData::#loop_data{}}.
+			 
+handle_cast({abort, Ref, _Reason}, LoopData) ->
+    ?dbg(?NAME," handle_cast: abort ref = ~p, reason\n", [Ref, _Reason]),
+     if Ref =/= LoopData#loop_data.ref ->
+	     ?dbg(?NAME," handle_cast: Abort of unknown reference", []),
+	     {noreply, LoopData};
+	true ->
+	     ?dbg(?NAME," handle_cast: Abort reason = ~p. ", [_Reason]),
+	     {noreply, LoopData#loop_data {read_buf = (<<>>), state = init, 
+					   ref = undefined,
+					   command = "", status = 0, reply = ""}}
+     end;
 handle_cast(_Msg, LoopData) ->
     ?dbg(?NAME," handle_cast: Message = ~p. ", [_Msg]),
     {noreply, LoopData}.
 
+
 %%--------------------------------------------------------------------
-%% @spec handle_info(Info, LoopData) -> {noreply, LoopData} |
-%%                                   {noreply, LoopData, Timeout} |
-%%                                   {stop, Reason, LoopData}
-%%
-%% Info = {notify, RemoteId, Index, SubInd, Value}
-%% LoopData = term()
-%% RemoteId = integer()
-%% Index = integer()
-%% SubInd = integer()
-%% Value = term()
-%%
 %% @doc
 %% Handling all non call/cast messages.
-%% Required to at least handle a notify msg as specified above. <br/>
+%%
+%% Ref - Reference in communication with the CANopen node.
 %% RemoteId = Id of remote CANnode initiating the msg. <br/>
 %% Index = Index in Object Dictionary <br/>
 %% SubInd = Sub index in Object Disctionary  <br/>
 %% Value = Any value the node chooses to send.
 %% 
+%% Info types:
+%% {Status, Reply} - When spawned process has finished executing. <br/>
+%% {notify, _RemoteId, {_Index, _SubInd}, _Value} - 
+%%   When Index subscribed to by this process has been updated. <br/>
 %% @end
 %%--------------------------------------------------------------------
+-type info()::
+	
+	{Status::integer(), Reply::term()} |
+	
+	{notify, RemoteId::term(), {Index::integer(), SubInd::integer()}, 
+	 Value::term()} |
+	%% Unknown info
+	term().
+
+-spec handle_info(Info::info(), LoopData::#loop_data{}) ->
+			 {noreply, LoopData::#loop_data{}} |
+			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
+			 {stop, Reason::atom(), LoopData::#loop_data{}}.
+			 
 handle_info({Status, Reply} = _Info, LoopData) ->
     %% Result received from spawned process
     ?dbg(?NAME," handle_info: Received result ~p\n", [_Info]),

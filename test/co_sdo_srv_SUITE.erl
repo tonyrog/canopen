@@ -83,6 +83,8 @@ all() ->
      get_streamed_m_block,
      stream_file_segment,
      stream_file_block,
+     stream_0file_segment,
+     stream_0file_block,
      notify,
      mpdo].
 %%     break].
@@ -222,7 +224,9 @@ init_per_testcase(_TestCase, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_testcase(Case, Config) when Case == stream_file_segment;
-				     Case == stream_file_block->
+				    Case == stream_file_block;
+				    Case == stream_0file_segment;
+				    Case == stream_0file_block ->
     co_test_lib:stop_app(co_test_stream_app, []),
 
     PrivDir = ?config(priv_dir, Config),
@@ -488,7 +492,7 @@ get_streamed_m_block(Config) ->
 %% @end
 %%--------------------------------------------------------------------
 stream_file_segment(Config) ->
-    stream_file(Config, segment).
+    stream_file(Config, segment, 50).
 
 %%--------------------------------------------------------------------
 %% @spec stream_file_block(Config) -> ok 
@@ -498,7 +502,27 @@ stream_file_segment(Config) ->
 %%--------------------------------------------------------------------
 
 stream_file_block(Config) ->
-    stream_file(Config, block).
+    stream_file(Config, block, 50).
+
+
+%%--------------------------------------------------------------------
+%% @spec stream_0file_segment(Config) -> ok 
+%% @doc 
+%% Tests streaming of 0 size file cocli -> co_test_stream_app -> cocli 
+%% @end
+%%--------------------------------------------------------------------
+stream_0file_segment(Config) ->
+    stream_file(Config, segment, 0).
+
+%%--------------------------------------------------------------------
+%% @spec stream_0file_block(Config) -> ok 
+%% @doc 
+%% Tests streaming of 0 size file cocli -> co_test_stream_app -> cocli 
+%% @end
+%%--------------------------------------------------------------------
+
+stream_0file_block(Config) ->
+    stream_file(Config, block, 0).
 
 
 %%--------------------------------------------------------------------
@@ -631,12 +655,13 @@ get(Config, {Index, _NewValue}, BlockOrSegment) ->
     Result = "0x2002 = \"New string aaaaabbbbbbbccccccddddddeeeee\"\n".
 
 
-stream_file(Config, TransferMode) ->
+
+stream_file(Config, TransferMode, Size) ->
     PrivDir = ?config(priv_dir, Config),
     RFile = filename:join(PrivDir, ct:get_config(read_file)),
     WFile = filename:join(PrivDir, ct:get_config(write_file)),
 
-    co_test_lib:generate_file(RFile),
+    co_test_lib:generate_file(RFile, Size),
 
     Md5Res1 = os:cmd("md5 " ++ RFile),
     [_,_,_,Md5] = string:tokens(Md5Res1," "),

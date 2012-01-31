@@ -1,7 +1,7 @@
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @copyright (C) 2010, Tony Rogvall
 %%% @doc
-%%%   SDO Pdu descritpions
+%%%   SDO Pdu descriptions
 %%% @end
 %%% Created :  2 Jun 2010 by Tony Rogvall <tony@rogvall.se>
 

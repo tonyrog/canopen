@@ -63,13 +63,18 @@
 %%%===================================================================
 
 %%--------------------------------------------------------------------
-%% @spec start(Ctx) -> {ok, Pid} | ignore | {error, Error}
-%%
 %% @doc
-%% Starts the server
-%%
+%% Starts the server.
+%% Arguments are:
+%% <ul>
+%% <li> Ctx - record tpdo_ctx(), see {@link canopen}. </li>
+%% <li> Param - record pdo_param(), see {@link canopen}. </li>
+%% </ul>
 %% @end
 %%--------------------------------------------------------------------
+-spec start(Ctx::#tpdo_ctx{}, Param::record()) -> 
+		   {ok, Pid::pid()} | ignore | {error, Error::atom()}.
+
 start(Ctx, Param) ->
     gen_server:start_link(?MODULE, [Ctx, Param, self()], []).
 

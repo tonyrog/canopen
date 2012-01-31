@@ -1,7 +1,7 @@
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @copyright (C) 2010, Tony Rogvall
+%%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%%  CANOPEN manager interface
+%%%  CANopen manager interface
 %%% @end
 %%% Created :  5 Jun 2010 by Tony Rogvall <tony@rogvall.se>
 
@@ -23,7 +23,7 @@
 %%--------------------------------------------------------------------
 %% @doc
 %% Description: Starts the CANOpen SDO manager, that is, a co_node with
-%% Serial = 16#0 and Name = co_mgr.
+%% Serial = 16#0 and Name = co_mgr, unless it is already running.
 %% @end
 %%--------------------------------------------------------------------
 -spec start() -> {ok, Pid::pid()} | {error, Reason::atom()}.
@@ -33,25 +33,39 @@ start() ->
 %%--------------------------------------------------------------------
 %% @doc
 %% Description: Starts the CANOpen SDO manager, that is, a co_node with
-%% Serial = 16#0 and Name = co_mgr.
+%% Serial = 16#0 and Name = co_mgr, unless it is already running.
 %%
 %% Options: See {@link co_node:start_link/1}.
 %%         
 %% @end
 %%--------------------------------------------------------------------
 -spec start(Options::list()) ->  {ok, Pid::pid()} | {error, Reason::atom()}.
+
 start(Options) ->
-    co_node:start_link([{serial, 16#000000}, {options, [{name,?CO_MGR}|Options]}]).
+    %% Check if already running
+    case whereis(co_mgr) of
+	Pid when is_pid(Pid) ->
+	    ok;
+	undefined ->
+	    co_node:start_link([{serial, 16#000000}, 
+				{options, [{name,?CO_MGR}|Options]}])
+    end.
 
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Description: Stops the CANOpen SDO manager.
+%% Description: Stops the CANOpen SDO manager if it is running.
 %% @end
 %%--------------------------------------------------------------------
 -spec stop() ->  ok | {error, Reason::atom()}.
+
 stop() ->
-    co_node:stop(?CO_MGR).
+    case whereis(co_mgr) of
+	Pid when is_pid(Pid) ->
+	    co_node:stop(?CO_MGR);
+	undefined ->
+	    {error, no_manager_running}
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc
