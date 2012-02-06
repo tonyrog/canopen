@@ -86,7 +86,8 @@ all() ->
      stream_0file_segment,
      stream_0file_block,
      notify,
-     mpdo].
+     mpdo,
+     timeout].
 %%     break].
 
 
@@ -203,6 +204,16 @@ end_per_group(_GroupName, _Config) ->
 %%               Config1 | {skip,Reason} | {skip_and_save,Reason,Config1}
 %% @end
 %%--------------------------------------------------------------------
+init_per_testcase(_TestCase = timeout, Config) ->
+    ct:pal("Testcase: ~p", [_TestCase]),
+    {ok, Pid} = co_test_app:start(serial(), app_dict()),
+    ok = co_test_app:debug(Pid, true),
+
+    %% Change the timeout for the co_node
+    {sdo_timeout, OldTOut} = co_node:get_option(serial(), sdo_timeout),
+    ok = co_node:set_option(serial(), sdo_timeout, 500),
+    [{timeout, OldTOut} | Config];
+
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
     {ok, Pid} = co_test_app:start(serial(), app_dict()),
@@ -237,6 +248,16 @@ end_per_testcase(Case, Config) when Case == stream_file_segment;
     os:cmd("rm " ++ WFile),
 
     ok;
+end_per_testcase(timeout, Config) ->
+    %% Wait a little for session to terminate
+    timer:sleep(1000),
+    co_test_lib:stop_app(co_test_app, serial()),
+
+    %% Restore the timeout for the co_node
+    OldTOut = ?config(timeout, Config),
+    co_node:set_option(serial(), sdo_timeout, OldTOut),
+    ok;
+
 end_per_testcase(_TestCase, _Config) ->
     %% Wait a little for session to terminate
     timer:sleep(1000),
@@ -528,7 +549,8 @@ stream_0file_block(Config) ->
 %%--------------------------------------------------------------------
 %% @spec notify(Config) -> ok 
 %% @doc 
-%% Sets a value for an index for which co_test_app subscribes.
+%% Sets a value for an index in the co_node dictionary on which 
+%% co_test_app subscribes.
 %% @end
 %%--------------------------------------------------------------------
 notify(Config) ->
@@ -540,7 +562,8 @@ notify(Config) ->
 	    ct:pal("Application notified",[]),
 	    ok;
 	Other ->
-	    ct:fail("Received other = ~p", [Other])
+	    ct:pal("Received other = ~p", [Other]),
+	    ct:fail("Received other")
     after 5000 ->
 	    ct:fail("Application not notified")
     end.
@@ -548,7 +571,7 @@ notify(Config) ->
 %%--------------------------------------------------------------------
 %% @spec mpdo(Config) -> ok 
 %% @doc 
-%% Sets a value for an index for which co_test_app subscribes.
+%% Sends an mpdo that is broadcasted to all subscribers.
 %% @end
 %%--------------------------------------------------------------------
 mpdo(Config) ->
@@ -560,10 +583,39 @@ mpdo(Config) ->
 	    ct:pal("Application notified",[]),
 	    ok;
 	Other ->
-	    ct:fail("Received other = ~p", [Other])
+	    ct:pal("Received other = ~p", [Other]),
+	    ct:fail("Received other")
     after 5000 ->
 	    ct:fail("Application not notified")
     end.
+
+%%--------------------------------------------------------------------
+%% @spec timeout(Config) -> ok 
+%% @doc 
+%% Negative test of what happens if the receiving causes a timeout.
+%% @end
+%%--------------------------------------------------------------------
+timeout(Config) ->
+
+    %% Set
+    {{Index, _T, _M, _Org}, NewValue} = ct:get_config({dict, timeout}),
+    "cocli: error: error: timed out\n" = 
+	os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, segment)),
+
+    receive 
+	{set, Index, NewValue} ->
+	    ct:pal("Application notified",[]),
+	    ok;
+	Other ->
+	    ct:pal("Received other = ~p", [Other]),
+	    ct:fail("Received other")
+    after 5000 ->
+	    ct:pal("Application not notified")
+    end,
+    
+    %% Get
+    get(Config, ct:get_config({dict, timeout}), segment).
+
 
 %%--------------------------------------------------------------------
 %% @spec break(Config) -> ok 
@@ -606,11 +658,32 @@ set(Config, {{Index, _T, _M, _Org}, NewValue}, BlockOrSegment) ->
     {Index, _Type, _Transfer, NewValue} = 
 	lists:keyfind(Index, 1, co_test_app:dict(serial())),
     
+    receive 
+	{set, Index, NewValue} ->
+	    ct:pal("Application set done",[]),
+	    ok;
+	Other1 ->
+	    ct:pal("Received other = ~p", [Other1]),
+	    ct:fail("Received other")
+    after 5000 ->
+	    ct:pal("Application set not done")
+    end,
+
     %% Restore old
     [] = os:cmd(co_test_lib:set_cmd(Config, Index, OldValue, BlockOrSegment)),
     {Index, _Type, _Transfer, OldValue} = 
 	lists:keyfind(Index, 1, co_test_app:dict(serial())),
 
+    receive 
+	{set, Index, OldValue} ->
+	    ct:pal("Application set done",[]),
+	    ok;
+	Other2 ->
+	    ct:pal("Received other = ~p", [Other2]),
+	    ct:fail("Received other")
+    after 5000 ->
+	    ct:pal("Application set not done")
+    end,
     ok;
 set(Config, {Index, NewValue}, BlockOrSegment) ->
     %% co_node internal dict
@@ -638,7 +711,8 @@ get(Config, {{Index, _T, _M, _Org}, _NewValue}, BlockOrSegment) ->
 	"0x6035 = \"Mine2\"\n" -> ok;
 	"0x6036 = \"Long string2\"\n" -> ok;
 	"0x6037 = 65\n" -> ok;
-	"0x6038 = 67\n" -> ok
+	"0x6038 = 67\n" -> ok;
+	"cocli: error: failed to retrive value for '0x7334' timed out\n" -> ok
     end,
 
     ct:pal("Result = ~p", [Result]),

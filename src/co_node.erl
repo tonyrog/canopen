@@ -594,6 +594,7 @@ set_option(Serial, Option, NewValue)
        Option == sdo_timeout;
        Option == blk_timeout;
        Option == atomic_limit ->
+    ?dbg(node, "set_option1: Option = ~p",[Option]),
     if is_integer(NewValue) andalso NewValue > 0 ->
 	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
        true ->
@@ -602,6 +603,7 @@ set_option(Serial, Option, NewValue)
     end;
 set_option(Serial, Option, NewValue) 
   when Option == pst ->
+    ?dbg(node, "set_option2: Option = ~p",[Option]),
     if is_integer(NewValue) andalso NewValue >= 0 ->
 	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
        true ->
@@ -611,6 +613,7 @@ set_option(Serial, Option, NewValue)
 set_option(Serial, Option, NewValue) 
   when Option == use_crc;
        Option == debug ->
+    ?dbg(node, "set_option3: Option = ~p",[Option]),
     if is_boolean(NewValue) ->
 	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
        true ->
@@ -619,6 +622,7 @@ set_option(Serial, Option, NewValue)
     end;
 set_option(Serial, Option, NewValue) 
   when Option == load_ratio ->
+    ?dbg(node, "set_option4: Option = ~p",[Option]),
     if is_float (NewValue) andalso NewValue > 0 andalso NewValue =< 1 ->
 	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
        true ->
@@ -628,7 +632,8 @@ set_option(Serial, Option, NewValue)
 set_option(_Serial, extended, _NewValue) ->
     {error, "Option extended can not be changed."};
 set_option(_Serial, Option, _NewValue) ->
-    {error, "Option " ++ atom_to_list(Option) + " unknwon."}.
+    ?dbg(node, "set_option6: Option = ~p",[Option]),
+    {error, "Option " ++ atom_to_list(Option) ++ " unknown."}.
 
 
 %%--------------------------------------------------------------------
@@ -1119,8 +1124,12 @@ handle_call({option, Option}, _From, Ctx) ->
 		debug -> {Option, Ctx#co_ctx.sdo#sdo_ctx.debug};
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
 	    end,
+    ?dbg(node, "~s: handle_call: option = ~p, reply = ~w", 
+	 [Ctx#co_ctx.name, Option, Reply]),    
     {reply, Reply, Ctx};
 handle_call({option, Option, NewValue}, _From, Ctx) ->
+    ?dbg(node, "~s: handle_call: option = ~p, new value = ~p", 
+	 [Ctx#co_ctx.name, Option, NewValue]),    
     Reply = case Option of
 		sdo_timeout -> Ctx#co_ctx.sdo#sdo_ctx {timeout = NewValue};
 		blk_timeout -> Ctx#co_ctx.sdo#sdo_ctx {blk_timeout = NewValue};
@@ -1685,9 +1694,16 @@ handle_dam_mpdo(Ctx, RId, Ix, Si, Data) ->
 	PidList ->
 	    lists:foreach(
 	      fun(Pid) ->
-		      ?dbg(node, "~s: Process ~p subscribes to index ~7.16.0#", 
-			   [Ctx#co_ctx.name, Pid, Ix]),
-		      Pid ! {notify, RId, Ix, Si, Data}
+		      case Pid of
+			  dead ->
+			      %% Warning ??
+			      ?dbg(node, "~s: Process subscribing to index "
+				   "~7.16.0# is dead", [Ctx#co_ctx.name, Ix]);
+			  P when is_pid(P)->
+			      ?dbg(node, "~s: Process ~p subscribes to index "
+				   "~7.16.0#", [Ctx#co_ctx.name, Pid, Ix]),
+			      Pid ! {notify, RId, Ix, Si, Data}
+		      end
 	      end, PidList)
     end,
     Ctx.

@@ -402,14 +402,14 @@ do_sync(S) ->
 do_send(S=#s {state = ?Operational},true) ->
     ?dbg(tpdo, "do_send:", []),
     if S#s.itmr =:= false ->
-	    ?dbg(tpdo, "do_send: indexes = ~p", [S#s.index_list]),
+	    ?dbg(tpdo, "do_send: indexes = ~w", [S#s.index_list]),
 	    Ds = map(fun({IX,SI}) -> 
 			     {ok, V} = 
 				 co_node:tpdo_value({IX, SI},  S#s.ctx), 
 			     V
 		     end,
 		     S#s.index_list),
-	    ?dbg(tpdo, "do_send: values = ~p, types = ~p", [Ds, S#s.type_list]),
+	    ?dbg(tpdo, "do_send: values = ~w, types = ~w", [Ds, S#s.type_list]),
 	    Data = co_codec:encode_pdo(Ds, S#s.type_list),
 	    ?dbg(tpdo, "do_send: data = ~p", [Data]),
 	    Frame = #can_frame { id = S#s.id,
