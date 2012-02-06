@@ -117,16 +117,22 @@ encode_pdo(Ds, Ts) ->
     end.
     
 %%
-%% concat bits from A and bits from B in such a way that:
-%% A = a0...am-1,  B = b0 .. bn-1  AB = a0..am-1,b0...bn-1
-%% the bits are formatted in a little endian way so that
-%% AB = a7,a6..a0,a15,..,a8,..
+%% concat bits from A and bits from B in such a way that simulates
+%% bitpacking from left to right in every byte, instead of the
+%% Erlang way right to left.
 %%
-%% The idea is to split A in (A1,A2) where A1 contains
-%% the bytes and A2 the tail bits. The split B in (B1,B2)
-%% where B1 is the head bits (8-sz(A1)) and B2 is the tail bits
-%% then combine as: A1,B1,A2,B2
+%% Example: A=a9,a8,a7,a6,a5,a4,a3,a2,a1,a0
+%%          B=b7,b6,b5,b4,b3,b2,b1,b0
+%%
+%% concat_bits =>
+%%                    B0                    B1                   Tail
+%%          a9,a8,a7,a6,a5,a4,a3,a2 | b7,b6,b5,b4,b3,b2,a1,a0 | b1,b0
+%%
+%% Erlang:
+%%          a9,a8,a7,a6,a5,a4,a3,a2 | a1,a0,b7,b6,b5,b4,b3,b2 | b1,b0
 %% 
+%%
+%%
 concat_bits(A, B) ->
     Am = bit_size(A),
     Ak = Am band 16#7,  %% number of tail bits
