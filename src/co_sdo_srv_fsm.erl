@@ -1,12 +1,39 @@
 %%%-------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
+%%% @author Malotte W Lönne <malotte@malotte.net>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%%    CANopen SDO server FSM
+%%%    CANopen SDO server FiniteStateMachine
 %%%
-%%% State diagrams:
-%%% <a href="../doc/co_sdo_srv_segment_download_sdl_diagram.jpg"> 
-%%% Download segment</a>
+%%% State diagrams: Download segment <br/>
+%%% <img src="../doc/co_sdo_srv_segment_download_state_diagram1.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_segment_download_state_diagram2.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_segment_download_state_diagram3.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_segment_download_state_diagram4.jpg"> </img>
+%%%
+%%% <a href="../doc/co_sdo_srv_segment_download_state_diagram1.jpg"> 
+%%% Download segment1 - s_initial</a><br/>
+%%% <a href="../doc/co_sdo_srv_segment_download_state_diagram2.jpg"> 
+%%% Download segment2 - s_writing_segment_started</a><br/>
+%%% <a href="../doc/co_sdo_srv_segment_download_state_diagram3.jpg"> 
+%%% Download segment3 - s_segmented_download</a><br/>
+%%% <a href="../doc/co_sdo_srv_segment_download_state_diagram4.jpg"> 
+%%% Download segment4 - s_writing_segment_end</a><br/>
+%%% 
+%%% State diagrams: Upload segment <br/>
+%%% <img src="../doc/co_sdo_srv_segment_upload_state_diagram1.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_segment_upload_state_diagram2.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_segment_upload_state_diagram3.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_segment_upload_state_diagram4.jpg"> </img>
+%%%
+%%% <a href="../doc/co_sdo_srv_segment_upload_state_diagram1.jpg"> 
+%%% Upload segment1 - s_initial</a><br/>
+%%% <a href="../doc/co_sdo_srv_segment_upload_state_diagram2.jpg"> 
+%%% Upload segment2 - s_reading_segment_started</a><br/>
+%%% <a href="../doc/co_sdo_srv_segment_upload_state_diagram3.jpg"> 
+%%% Upload segment3 - s_segmented_upload</a><br/>
+%%% <a href="../doc/co_sdo_srv_segment_upload_state_diagram4.jpg"> 
+%%% Upload segment4 - s_reading_segment</a><br/>
 %%% 
 %%% File: co_sdo_srv_fsm.erl<br/>
 %%% Created:  2 Jun 2010 by Tony Rogvall
@@ -33,7 +60,7 @@
 -export([s_initial/2]).
 -export([s_segmented_download/2]).
 -export([s_writing_segment_started/2]). %% Streamed
--export([s_writing_segment/2]).         %% Streamed
+-export([s_writing_segment_end/2]).         %% Streamed
 
 %% Segment upload
 -export([s_segmented_upload/2]).
@@ -129,7 +156,7 @@ init([Ctx,NodePid,Src,Dst]) ->
 %% <li> s_writing_block_started </li>
 %% <li> s_reading_segment_started </li>
 %% <li> s_reading_block_started </li>
-%% <li> s_writing_segment </li>
+%% <li> s_writing_segment_end </li>
 %% <li> s_segment_download </li>
 %% <li> s_segmented_upload </li>
 %% <li> s_block_download </li>
@@ -214,6 +241,10 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    ?dbg(srv,"start block upload error=~p\n", [Reason]),
 		    abort(S1, Reason)
 	    end;
+	?ma_ccs_abort_transfer(_IX,_SI,_Code) ->
+	    ?dbg(srv, "s_initial: abort_transfer, index = ~7.16.0#:~w, code = ~p\n",
+		 [_IX, _SI, _Code]),
+	    {stop, normal, S};	    
 	_ ->
 	    l_abort(M, S, s_initial)
     end;
@@ -370,7 +401,7 @@ start_segment_download(S) ->
 		    %% Called an application
 		    ?dbg(srv, "start_segmented_download: mref=~p\n", [Mref]),
 		    S1 = S#co_session {mref = Mref, buf = Buf1},
-		    {next_state, s_writing_segment, S1, ?TMO(S1)};
+		    {next_state, s_writing_segment_end, S1, ?TMO(S1)};
 		{ok, _Buf1} ->
 		    R = ?mk_scs_initiate_download_response(IX,SI),
 		    send(S, R),
@@ -401,7 +432,7 @@ start_segment_download(S) ->
 %% </ul>
 %% Next state can be:
 %% <ul>
-%% <li> s_writing_segment </li>
+%% <li> s_writing_segment_end </li>
 %% <li> s_segment_download </li>
 %% <li> stop </li>
 %% </ul>
@@ -433,7 +464,7 @@ s_segmented_download(M, S) when is_record(M, can_frame) ->
 		    send(S1,R),
 		    if Eod ->
 			    %% Wait for write reply from app
-			    {next_state, s_writing_segment, S1,?TMO(S1)};
+			    {next_state, s_writing_segment_end, S1,?TMO(S1)};
 		       true ->
 			    {next_state, s_segmented_download, S1,?TMO(S1)}
 		    end;
@@ -468,7 +499,7 @@ s_segmented_download(timeout, S) ->
 %% </ul>
 %% Next state can be:
 %% <ul>
-%% <li> s_writing_segment </li>
+%% <li> s_writing_segment_end </li>
 %% <li> s_segment_download </li>
 %% <li> stop </li>
 %% </ul>
@@ -511,37 +542,47 @@ s_writing_segment_started(M, S)  ->
 %% </ul>
 %% @end
 %%--------------------------------------------------------------------
--spec s_writing_segment(M::term(), S::#co_session{}) -> 
+-spec s_writing_segment_end(M::term(), S::#co_session{}) -> 
 		       {next_state, NextState::atom(), NextS::#co_session{}} |
 		       {next_state, NextState::atom(), NextS::#co_session{}, 
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_writing_segment({Mref, Reply} = M, S)  ->
-    ?dbg(srv, "s_writing_segment: Got event = ~p\n", [M]),
-    case {S#co_session.mref, Reply} of
-	{Mref, ok} ->
-	    %% Atomic reply
+s_writing_segment_end({Mref, Reply} = M, S)  ->
+    ?dbg(srv, "s_writing_segment_end: Got event = ~p\n", [M]),
+    Ok = case {S#co_session.mref, Reply} of
+	     {Mref, ok} ->
+		 %% Atomic reply
+		 ok;
+	     {Mref, {ok, Ref}} when is_reference(Ref)->
+		 %% Streamed reply
+		 ok;
+	     _Other ->
+		 not_ok
+	 end,
+    case Ok of
+	ok ->
 	    erlang:demonitor(Mref, [flush]),
-	    R = ?mk_scs_initiate_download_response(S#co_session.index, 
-						   S#co_session.subind),
-	    send(S,R),
+	    if S#co_session.exp =:= 1 ->
+		    ?dbg(srv, "s_writing_segment_end: expedited\n", []),
+		    %% No response has been sent
+		    R = ?mk_scs_initiate_download_response(S#co_session.index, 
+							   S#co_session.subind),
+		    send(S,R);
+	       true ->
+		    ?dbg(srv, "s_writing_segment_end: not expedited\n", []),
+		    do_nothing
+	    end,
 	    co_node:object_event(S#co_session.node_pid, 
 				 {S#co_session.index, S#co_session.subind}),
 	    {stop, normal, S};
-	{Mref, {ok, Ref}} when is_reference(Ref)->
-	    %% Streamed reply
-	    erlang:demonitor(Mref, [flush]),
-	    co_node:object_event(S#co_session.node_pid, 
-				 {S#co_session.index, S#co_session.subind}),
-	    {stop, normal, S};
-	_Other ->
-	    l_abort(M, S, s_writing)
+	not_ok ->
+    	    l_abort(M, S, s_writing)
     end;
-s_writing_segment(timeout, S) ->
+s_writing_segment_end(timeout, S) ->
     abort(S, ?abort_timed_out);
-s_writing_segment(M, S)  ->
-    ?dbg(srv, "s_writing_segment: Got event = ~p, aborting\n", [M]),
+s_writing_segment_end(M, S)  ->
+    ?dbg(srv, "s_writing_segment_end: Got event = ~p, aborting\n", [M]),
     demonitor_and_abort(M, S).
 
 
@@ -567,7 +608,7 @@ start_segmented_upload(S) ->
     if NBytes =/= 0, NBytes =< 4 andalso EofFlag =:= true ->
 	    case co_data_buf:read(Buf, NBytes) of
 		{ok, Data, true, _Buf1} ->
-		    ?dbg(srv, "start_segmented_upload, expediated, data = ~p", 
+		    ?dbg(srv, "start_segmented_upload, expedited, data = ~p", 
 			 [Data]),
 		    Data1 = co_sdo:pad(Data, 4),
 		    E=1,
@@ -1319,14 +1360,14 @@ handle_info({Mref, {ok, _Ref, _Data, _Eod} = Reply}, StateName, S) ->
 	    {next_state, StateName, S}
     end;
 handle_info({_Mref, ok} = Info, StateName, S) 
-  when StateName =:= s_writing_segment ->
+  when StateName =:= s_writing_segment_end ->
     %% "Converting" info to event
     apply(?MODULE, StateName, [Info, S]);
 handle_info({_Mref, ok} = Info, StateName, S) ->
     check_writing_block_end(Info, StateName, S);
 handle_info({_Mref, {ok, Ref}} = Info, StateName, S) 
   when  is_reference(Ref) andalso
-	StateName =:= s_writing_segment ->
+	StateName =:= s_writing_segment_end ->
     %% "Converting" info to event
     apply(?MODULE, StateName, [Info, S]);
 handle_info({_Mref, {ok, Ref}} = Info, StateName, S) when is_reference(Ref) ->

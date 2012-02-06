@@ -263,7 +263,7 @@ set_options_nok(_Config) ->
     ok.
 
 %%--------------------------------------------------------------------
-%% @spec set_options_nok(Config) -> ok 
+%% @spec unknown_option(Config) -> ok 
 %% @doc 
 %% Try get and set of unknown option.
 %% @end
