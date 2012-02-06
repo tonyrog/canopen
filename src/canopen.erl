@@ -2,13 +2,12 @@
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%% File    : canopen.erl <br/>
-%%% Description : CANopen application.
+%%% CANopen application.
 %%%
-%%% Created : 15 Jan 2008 by Tony Rogvall
+%%% File: canopen.erl <br/>
+%%% Created: 15 Jan 2008 by Tony Rogvall
 %%% @end
 %%%-------------------------------------------------------------------
-
 -module(canopen).
 
 -behaviour(application).
@@ -21,7 +20,7 @@
 %%      StartType = normal | {takeover, Node} | {failover, Node}
 %%      StartArgs = term()
 %% @doc
-%% Starts the canopen application, that is, the canopen suprevisor.
+%% Starts the canopen application, that is, the canopen supervisor.
 %%
 %% @end
 %%--------------------------------------------------------------------

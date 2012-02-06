@@ -1,9 +1,12 @@
 %%-------------------------------------------------------------------
-%% @author Malotte W Lonne <malotte@malotte.net>
-%% @copyright (C) 2011, Tony Rogvall
+%% @author Malotte W Lönne <malotte@malotte.net>
+%% @copyright (C) 2012, Tony Rogvall
 %% @doc
-%%    OS command CANOpen application.
-%% 
+%%    OS command CANopen application.
+%%    Implements index 16#1023.
+%%
+%% File: co_os_app.erl<br/>
+%% Created: December 2011 by Malotte W Lönne
 %% @end
 %%===================================================================
 

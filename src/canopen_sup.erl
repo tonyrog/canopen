@@ -1,10 +1,13 @@
 %%%-------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @copyright (C) 2011, Tony Rogvall
+%%% @author Marina Westman Lönne <malotte@malotte.net>
+%%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
 %%%    Supervisor for canopen application.
+%%%
+%%% File: canopen_sup.erl <br/>
+%%% Created:  5 November 2011 by Tony Rogvall
 %%% @end
-%%% Created :  5 November 2011
 %%%-------------------------------------------------------------------
 
 -module(canopen_sup).

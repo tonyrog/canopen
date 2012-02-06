@@ -1,8 +1,9 @@
 %%%-------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
+%%% @author Malotte W Lönne <malotte@malotte.net>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%% CANopen node
+%%% CANopen node.
 %%%
 %%% File    : co_node.erl <br/>
 %%% Created: 10 Jan 2008 by Tony Rogvall

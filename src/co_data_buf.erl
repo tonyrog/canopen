@@ -1,11 +1,12 @@
 %%%-------------------------------------------------------------------
 %%% @author Marina Westman Lönne <malotte@malotte.net>
-%%% @copyright (C) 2011, Marina Westman Lönne
+%%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
 %%% Intermediate data storage for an SDO session process.<br/>
 %%% Responsible for setting up a connection to an application
 %%% if needed.
 %%% 
+%%% File: co_data_buf.erl <br/>
 %%% Created: 12 Dec 2011 by Malotte W Lönne
 %%% @end
 %%%-------------------------------------------------------------------

@@ -1,8 +1,13 @@
-%%% File    : co_sdo.erl
-%%% Author  : Tony Rogvall <tony@rogvall.se>
-%%% Description : canopen protocol stack
-%%% Created : 12 Jan 2009 by Tony Rogvall <tony@rogvall.se>
-
+%%%-------------------------------------------------------------------
+%%% @author Tony Rogvall <tony@rogvall.se>
+%%% @copyright (C) 2012, Tony Rogvall
+%%% @doc
+%%% CANopen protocol stack.
+%%%
+%%% File: co_sdo.erl<br/>
+%%% Created: 12 Jan 2009 by Tony Rogvall  
+%%% @end
+%%%-------------------------------------------------------------------
 -module(co_sdo).
 
 -include_lib("can/include/can.hrl").

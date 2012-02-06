@@ -2,12 +2,12 @@
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%% File    : co_codec.erl
-%%%
-%%% Description : CANopen bit encoding
+%%% CANopen bit encoding.
 %%%                CANopen encode bytes in a little endian fashion.
 %%%                Compound data is encoded by first encoding the
 %%%                elements and the concatinating the result
+%%%
+%%% File    : co_codec.erl
 %%%
 %%% Created : 11 Feb 2009 by Tony Rogvall 
 %%% @end

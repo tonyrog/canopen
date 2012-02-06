@@ -1,20 +1,31 @@
-%%% File    : co_file.erl
-%%% Author  : Tony Rogvall <tony@rogvall.se>
-%%% Description : Utilities to load dictionary from file
-%%% Created :  3 Feb 2009 by Tony Rogvall <tony@rogvall.se>
-
+%%%-------------------------------------------------------------------
+%%% @author Tony Rogvall <tony@rogvall.se>
+%%% @copyright (C) 2012, Tony Rogvall
+%%% @doc
+%%% Utilities to load dictionary from file.
+%%%
+%%% File: co_file.erl<br/>
+%%% Created:  3 Feb 2009 by Tony Rogvall
+%%% @end
+%%%-------------------------------------------------------------------
 -module(co_file).
 
 -include("canopen.hrl").
 
--export([load/1, fold/3]).
+-export([load/1]).
 -import(lists, [map/2, seq/2, foreach/2]).
+%%--------------------------------------------------------------------
+%% @doc
+%% Load (symbolic) entries from file.
 %%
-%% Load (symbolic) entries from file
 %% The data can then be used to bootstrap can nodes
 %% The Data is return as:
 %% [ {Object, [Entry0,Entry1,...EntryN]} ]
 %%
+%% @end
+-spec load(File::string()) -> 
+		  {ok, list(term())} | {error, term()}.
+
 load(File) ->
     case file:consult(File) of
 	{ok,Objects} ->

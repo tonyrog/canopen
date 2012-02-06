@@ -2,9 +2,9 @@
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%% File    : co_crc.erl
-%%%
 %%% Description : CCITT CRC 16 (initial=0)
+%%%
+%%% File    : co_crc.erl
 %%%
 %%% Created : 5 Feb 2008 by Tony Rogvall 
 %%% @end

@@ -1,8 +1,13 @@
-%%% File    : co_lib.erl
-%%% Author  : Tony Rogvall <tony@rogvall.se>
-%%% Description : Can open utilities
-%%% Created : 15 Jan 2008 by Tony Rogvall 
-
+%%%-------------------------------------------------------------------
+%%% @author Tony Rogvall <tony@rogvall.se>
+%%% @copyright (C) 2012, Tony Rogvall
+%%% @doc
+%%% CANopen utilities.
+%%%
+%%% File: co_lib.erl<br/>
+%%% Created:  15 Jan 2008 by Tony Rogvall
+%%% @end
+%%%-------------------------------------------------------------------
 -module(co_lib).
 
 -import(lists, [map/2, reverse/1]).

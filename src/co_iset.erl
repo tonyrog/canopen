@@ -1,11 +1,8 @@
-%%% File    : co_iset.erl
-%%% Author  : Tony Rogvall <tony@iMac.local>
-%%% Description : Integer Set operations
-%%% Created : 26 Jan 2006 by Tony Rogvall <tony@iMac.local>
-
--module(co_iset).
-
-%%
+%%%-------------------------------------------------------------------
+%%% @author Tony Rogvall <tony@rogvall.se>
+%%% @copyright (C) 2012, Tony Rogvall
+%%% @doc
+%%% Integer Set operations.
 %% iset:
 %%
 %% representation:
@@ -34,6 +31,14 @@
 %%       last(D)
 %%       write(Device, D)
 %%
+%%%
+%%% File: co_iset.erl<br/>
+%%% Created:  26 Jan 2006 by Tony Rogvall
+%%% @end
+%%%-------------------------------------------------------------------
+-module(co_iset).
+
+%% @private
 
 -export([new/0, new/1, new/2]).
 -export([member/2, sizeof/1, is_equal/2, is_subset/2, is_psubset/2]).

@@ -1,13 +1,17 @@
 %%%-------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @copyright (C) 2010, Tony Rogvall
+%%% @author Malotte W Lönne <malotte@malotte.net>
+%%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%%  TPDO manager. This server manage ONE TPDO
-%%%  it receives updates from dictionary notifications
+%%%  TPDO manager. 
+%%%  This server manages ONE TPDO. <br/>
+%%%  It receives updates from dictionary notifications
 %%%  or application. It packs and sends the PDO handling
 %%%  inhibit timers and sync signals etc.
+%%%
+%%% File: co_tpdo.erl <br/>
+%%% Created: 16 Jun 2010 by Tony Rogvall
 %%% @end
-%%% Created : 16 Jun 2010 by Tony Rogvall <tony@rogvall.se>
 %%%-------------------------------------------------------------------
 -module(co_tpdo).
 

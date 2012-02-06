@@ -1,13 +1,14 @@
 %%% @author Marina Westman Lönne <malotte@malotte.net>
-%%% @copyright (C) 2012, Marina Westman Lönne
+%%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%%
-%%% Description: Defines behaviour for an application using the 
+%%% CANopen application behaviour.
+%%% Defines behaviour for an application using the 
 %%% {atomic, Module} transfer mode in communicating with the 
 %%% CANOpen node.
 %%%
+%%% File: co_app.erl <br/>
+%%% Created:  4 Jan 2012 by Marina Westman Lönne 
 %%% @end
-%%% Created :  4 Jan 2012 by Marina Westman Lönne <malotte@malotte.net>
 
 -module(co_app).
 

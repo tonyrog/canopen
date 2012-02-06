@@ -2,9 +2,9 @@
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%% File    : co_dict.erl
-%%% Description : CANopen runtime dictionary 
+%%% CANopen runtime dictionary.
 %%%
+%%% File    : co_dict.erl<br/>
 %%% Created : 6 Feb 2008 by Tony Rogvall
 %%% @end
 %%%-------------------------------------------------------------------
