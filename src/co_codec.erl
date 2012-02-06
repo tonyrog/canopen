@@ -1,41 +1,76 @@
-%%% File    : co_codec.erl
-%%% Author  : Tony Rogvall <tony@rogvall.se>
-%%% Description : CANopen bit encoding
+%%%-------------------------------------------------------------------
+%%% @author Tony Rogvall <tony@rogvall.se>
+%%% @copyright (C) 2012, Tony Rogvall
+%%% @doc
+%%% CANopen bit encoding.
 %%%                CANopen encode bytes in a little endian fashion.
 %%%                Compound data is encoded by first encoding the
 %%%                elements and the concatinating the result
-%%% Created : 11 Feb 2009 by Tony Rogvall <tony@rogvall.se>
+%%%
+%%% File    : co_codec.erl
+%%%
+%%% Created : 11 Feb 2009 by Tony Rogvall 
+%%% @end
+%%%-------------------------------------------------------------------
 
 -module(co_codec).
--include("../include/canopen.hrl").
+-include("canopen.hrl").
+
+-export([encode/2, decode/2,
+	 bitsize/1, bytesize/1]).
 
 -compile(export_all).
-
-%% encode/2
-%%   encode(Data, Type) :: Binary
+%%--------------------------------------------------------------------
+%% @doc
+%% Encodes data. 
 %%
+%% @end
+%%--------------------------------------------------------------------
+-spec encode(Data::term(), Type::integer() | atom()) -> 
+		    Bin::binary().
+
 encode(Data, Type) ->
     encode_e(Data,Type).
 
 %% decode/2
 %%    decode(Data, Type) -> {Value, BitsTail}
 %%
+%%--------------------------------------------------------------------
+%% @doc
+%% Decoded data. 
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec decode(Bin::binary(), Type::integer() | atom()) -> 
+		    {Value::term(), BitsTail::binary()}.
+
 decode(Data, Type) ->
     decode_e(Data,Type).
 
-%%  bitsize/1
-%%    bitsize(Type) :: non-negative
-%%  R14 name !!!
+%%--------------------------------------------------------------------
+%% @doc
+%% Calculates bit size for a Type
+%% R14 name !!!
+%% @end
+%%--------------------------------------------------------------------
+-spec bitsize(Type::integer() | atom()) -> 
+		    Size::pos_integer().
+
 bitsize(Type) ->
     bitsize_e(Type).
 
-%%  bytesize/1
-%%    bytesize(Type) :: non-negative 
-%%
+%%--------------------------------------------------------------------
+%% @doc
+%% Calculates byte size for a Type
+%% R14 name !!!
+%% @end
+%%--------------------------------------------------------------------
+-spec bytesize(Type::integer() | atom()) -> 
+		      Size::pos_integer().
+
 bytesize(Type) ->
     (bitsize_e(Type) + 7) bsr 3.
     
-
 encode_e(Data, ?INTEGER8)   -> encode_signed(Data, 8);
 encode_e(Data, ?INTEGER16)  -> encode_signed(Data, 16);
 encode_e(Data, ?INTEGER24)  -> encode_signed(Data, 24);

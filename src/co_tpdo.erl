@@ -1,13 +1,17 @@
 %%%-------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @copyright (C) 2010, Tony Rogvall
+%%% @author Malotte W Lönne <malotte@malotte.net>
+%%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%%  TPDO manager. This server manage ONE TPDO
-%%%  it receives updates from dictionary notifications
+%%%  TPDO manager. 
+%%%  This server manages ONE TPDO. <br/>
+%%%  It receives updates from dictionary notifications
 %%%  or application. It packs and sends the PDO handling
 %%%  inhibit timers and sync signals etc.
+%%%
+%%% File: co_tpdo.erl <br/>
+%%% Created: 16 Jun 2010 by Tony Rogvall
 %%% @end
-%%% Created : 16 Jun 2010 by Tony Rogvall <tony@rogvall.se>
 %%%-------------------------------------------------------------------
 -module(co_tpdo).
 
@@ -63,13 +67,18 @@
 %%%===================================================================
 
 %%--------------------------------------------------------------------
-%% @spec start(Ctx) -> {ok, Pid} | ignore | {error, Error}
-%%
 %% @doc
-%% Starts the server
-%%
+%% Starts the server.
+%% Arguments are:
+%% <ul>
+%% <li> Ctx - record tpdo_ctx(), see {@link canopen}. </li>
+%% <li> Param - record pdo_param(), see {@link canopen}. </li>
+%% </ul>
 %% @end
 %%--------------------------------------------------------------------
+-spec start(Ctx::#tpdo_ctx{}, Param::record()) -> 
+		   {ok, Pid::pid()} | ignore | {error, Error::atom()}.
+
 start(Ctx, Param) ->
     gen_server:start_link(?MODULE, [Ctx, Param, self()], []).
 
@@ -397,14 +406,14 @@ do_sync(S) ->
 do_send(S=#s {state = ?Operational},true) ->
     ?dbg(tpdo, "do_send:", []),
     if S#s.itmr =:= false ->
-	    ?dbg(tpdo, "do_send: indexes = ~p", [S#s.index_list]),
+	    ?dbg(tpdo, "do_send: indexes = ~w", [S#s.index_list]),
 	    Ds = map(fun({IX,SI}) -> 
 			     {ok, V} = 
 				 co_node:tpdo_value({IX, SI},  S#s.ctx), 
 			     V
 		     end,
 		     S#s.index_list),
-	    ?dbg(tpdo, "do_send: values = ~p, types = ~p", [Ds, S#s.type_list]),
+	    ?dbg(tpdo, "do_send: values = ~w, types = ~w", [Ds, S#s.type_list]),
 	    Data = co_codec:encode_pdo(Ds, S#s.type_list),
 	    ?dbg(tpdo, "do_send: data = ~p", [Data]),
 	    Frame = #can_frame { id = S#s.id,

@@ -49,9 +49,13 @@ app_dict() ->
 app_dict_cli() ->
     [{Name, {I,T,M,NewV}} || {Name, {{I,T,M,_OldV}, NewV}} <- ct:get_config(dict)].
 
-generate_file(File) ->
+generate_file(File, 0) ->
     {ok, F} = file:open(File, [write, raw, binary, delayed_write]),
-    write(F, "qwertyuiopasdfghjklzxcvbnm", 50),
+    file:close(F),
+    ok;
+generate_file(File, Size) ->
+    {ok, F} = file:open(File, [write, raw, binary, delayed_write]),
+    write(F, "abcdefgh", Size),
     file:close(F),
     ok.
 

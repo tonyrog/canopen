@@ -26,7 +26,7 @@
 -export([index_specification/2,
 	 write_begin/3, write/4,
 	 read_begin/3, read/3,
-	 abort/2]).
+	 abort/3]).
 
 %% Testing
 -ifdef(debug).
@@ -147,12 +147,12 @@ read(Pid, Ref, Bytes) ->
 %% Aborts stream transaction.
 %% @end
 %%--------------------------------------------------------------------
--spec abort(Pid::pid(), Ref::reference()) ->
-		   ok |
-		   {error, Reason::atom()}.
-abort(Pid, Ref) ->
-    ?dbg(?NAME," abort ref = ~p\n",[Ref]),
-    gen_server:call(Pid, {abort, Ref}).
+-spec abort(Pid::pid(), Ref::reference(), Reason::integer()) ->
+		   ok.
+
+abort(Pid, Ref, Reason) ->
+    ?dbg(?NAME," abort ref = ~p, reason = ~p\n",[Ref, Reason]),
+    gen_server:cast(Pid, {abort, Ref, Reason}).
     
 loop_data() ->
     gen_server:call(?MODULE, loop_data).
@@ -282,9 +282,6 @@ handle_call({write, Ref, Data, Eod}, _From, LoopData) ->
 	    ?dbg(?NAME, "handle_call: read error = wrong_ref\n", []), 
 	    {reply, {error, ?abort_internal_error}, LoopData}	    
     end;
-handle_call({abort, Ref}, _From, LoopData) ->
-    ?dbg(?NAME, "handle_call: abort ref = ~p\n",[Ref]),
-    {reply, ok, LoopData};
 handle_call(loop_data, _From, LoopData) ->
     ?dbg(?NAME, "LoopData = ~p\n", [LoopData]),
     {reply, ok, LoopData};
@@ -314,6 +311,9 @@ handle_call(Request, _From, LoopData) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({abort, _Ref, _Reason}, LoopData) ->
+    ?dbg(?NAME, "handle_call: abort ref = ~p, Reason\n",[_Ref, _Reason]),
+    {noreply, LoopData};
 handle_cast(_Msg, LoopData) ->
     {noreply, LoopData}.
 

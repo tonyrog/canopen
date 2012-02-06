@@ -3,15 +3,15 @@
 %%% @copyright (C) 2010, Tony Rogvall
 %%% @doc
 %%%    Formatting
-%%% @end
 %%% Created : 13 Feb 2009 by Tony Rogvall <tony@rogvall.se> 
+%%% @end
 %%%-------------------------------------------------------------------
 
 -module(co_format).
 
 -include_lib("can/include/can.hrl").
--include("../include/canopen.hrl").
--include("../include/sdo.hrl").
+-include("canopen.hrl").
+-include("sdo.hrl").
 
 -compile(export_all).
 

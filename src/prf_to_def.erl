@@ -1,4 +1,4 @@
-%%
+%% @hidden
 %% Convert prf (python file) to erlang def file
 %%
 

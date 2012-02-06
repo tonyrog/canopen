@@ -58,6 +58,9 @@ suite() ->
 %%--------------------------------------------------------------------
 all() -> 
     [start_of_co_node,
+     set_options_ok,
+     set_options_nok,
+     unknown_option,
      start_stop_app].
 %%     break].
 
@@ -216,6 +219,65 @@ start_of_co_node(_Config) ->
     ok.
 
 %%--------------------------------------------------------------------
+%% @spec set_options_ok(Config) -> ok 
+%% @doc 
+%% Change co_node options.
+%% @end
+%%--------------------------------------------------------------------
+set_options_ok(_Config) ->
+
+    Options = [{sdo_timeout, 2000},
+	       {blk_timeout, 1000},
+	       {pst, 64},
+	       {max_blksize, 64},
+	       {use_crc, false},
+	       {readbufsize, 64},
+	       {load_ratio, 0.7},
+	       {atomic_limit, 128},
+	       {time_stamp, 30000},
+	       {debug, false}],
+
+    lists:foreach(
+      fun(Option) -> set_option_ok(Option) end, Options),
+
+    ok.
+
+%%--------------------------------------------------------------------
+%% @spec set_options_nok(Config) -> ok 
+%% @doc 
+%% Try changing co_node options to illegal values.
+%% @end
+%%--------------------------------------------------------------------
+set_options_nok(_Config) ->
+
+    Options = [{extended, true},
+	       {pst, "String"},
+	       {max_blksize, -64},
+	       {use_crc, any},
+	       {load_ratio, 7},
+	       {time_stamp, 0}],
+
+    lists:foreach(
+      fun(Option) -> set_option_nok(Option) end, Options),
+
+    ok.
+
+%%--------------------------------------------------------------------
+%% @spec unknown_option(Config) -> ok 
+%% @doc 
+%% Try get and set of unknown option.
+%% @end
+%%--------------------------------------------------------------------
+unknown_option(_Config) ->
+    {error, "Unknown option unknown_option"} = 
+	co_node:get_option(serial(), unknown_option),
+    
+    {error, "Option unknown_option unknown."} = 
+	co_node:set_option(serial(), unknown_option, any),
+
+    ok.
+
+%%--------------------------------------------------------------------
 %% @spec start_stop_of_app(Config) -> ok 
 %% @doc 
 %% Verifies start and stop of an app connecting to the co_node.
@@ -255,3 +317,45 @@ serial() -> co_test_lib:serial().
 app_dict() -> co_test_lib:app_dict().
 
      
+set_option_ok({Option, NewValue}) ->
+    %% Fetch old value
+    {Option, OldValue} = co_node:get_option(serial(), Option),
+    
+    %% Set new value and check
+    ok = co_node:set_option(serial(), Option, NewValue),
+    {Option, NewValue} = co_node:get_option(serial(), Option),
+    
+    %% Restore and check
+    co_node:set_option(serial(), Option, OldValue),
+    {Option, OldValue} = co_node:get_option(serial(), Option),
+
+    ok.
+
+set_option_nok({Option, NewValue}) ->
+    %% Fetch old value
+    {Option, OldValue} = co_node:get_option(serial(), Option),
+    
+    %% Set new value and check
+    {error, R} = co_node:set_option(serial(), Option, NewValue),
+
+    case Option of
+	extended -> 
+	    R = "Option extended can not be changed.";
+	pst -> 
+	    R = "Option pst can only be set to a positive integer value or zero.";
+	max_blksize -> 
+	    R = "Option max_blksize can only be set to a positive integer value.";
+	use_crc -> 
+	    R = "Option use_crc can only be set to true or false.";
+	load_ratio -> 
+	    R = "Option load_ratio can only be set to a float value between 0 and 1.";
+	time_stamp -> 
+	    R = "Option time_stamp can only be set to a positive integer value.";
+	_Other -> ct:pal("Option = ~p, Reason = ~p", [Option, R]),
+		  ct:fail("Unexpected error reason")
+    end,
+    
+    %% Check old wasn't changed
+    {Option, OldValue} = co_node:get_option(serial(), Option),
+
+    ok.

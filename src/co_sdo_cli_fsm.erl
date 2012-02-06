@@ -996,8 +996,9 @@ l_abort(M, S, StateName) ->
     end.
 	    
 
-abort(S, Reason) ->
+abort(S=#co_session {buf = Buf}, Reason) ->
     Code = co_sdo:encode_abort_code(Reason),
+    co_data_buf:abort(Buf, Code),
     R = ?mk_ccs_abort_transfer(S#co_session.index, S#co_session.subind, Code),
     send(S, R),
     gen_server:reply(S#co_session.node_from, {error,Reason}),

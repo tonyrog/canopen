@@ -1,41 +1,51 @@
-%%% File    : co_dict.erl
-%%% Author  : Tony Rogvall <tony@PBook.lan>
-%%% Description : CANopen runtime dictionary 
-%%% Created :  6 Feb 2008 by Tony Rogvall <tony@PBook.lan>
-
+%%%-------------------------------------------------------------------
+%%% @author Tony Rogvall <tony@rogvall.se>
+%%% @copyright (C) 2012, Tony Rogvall
+%%% @doc
+%%% CANopen runtime dictionary.
+%%%
+%%% File    : co_dict.erl<br/>
+%%% Created : 6 Feb 2008 by Tony Rogvall
+%%% @end
+%%%-------------------------------------------------------------------
 -module(co_dict).
+-include("canopen.hrl").
 
 -export([new/0, new/1,
-	 from_file/1, from_file/2,
-	 to_file/2, to_fd/2, to_fd/3, 
-	 add_from_file/2,
 	 delete/1,
-	 first_object/1, first_object/2, 
-	 last_object/1, last_object/2, 
-	 next_object/2, next_object/3,
-	 prev_object/2, prev_object/3,
-	 find_object/5,
 	 add_object/3, add_entry/2,
 	 delete_object/2, delete_entry/2,
 	 update_object/2, update_entry/2,
 	 lookup_object/2, lookup_entry/2,
 	 set/4, direct_set/4, force_set/4,
 	 set_array/3, set_objects/3,
-	 value/3, direct_value/3
+	 value/3, direct_value/3,
+	 to_fd/2
 	]).
+
 -import(lists,[map/2, foreach/2]).
 
--include("../include/canopen.hrl").
-
-
-%%
-%% Note: this table contains two types of objects
-%%       {dict_object, index=<integer>, ...}
-%%       {dict_entry,  index={<integer>,<integer>}, ...}
-%% key position MUST be 2 on both records
-%%
+%%--------------------------------------------------------------------
+%% @doc
+%% Creates a dictionary.
+%% @end
+%%--------------------------------------------------------------------
+-spec new() -> Dict::term().
 new() ->
     new(public).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Creates a dictionary.
+%%
+%% Note: this table contains two types of objects
+%%       {dict_object, Index, ...}
+%%       {dict_entry,  {Index, SubInd}, ...}
+%% key position MUST be 2 on both records
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec new(Access::public | private | protected) -> Dict::term().
 
 new(Access) ->
     init(ets:new(co_dict, [{keypos,2},Access,ordered_set])).
@@ -182,6 +192,14 @@ to_file(Dict, File) ->
 	    Error
     end.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Writes a dictionary to a file.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec to_fd(Dict::term(), FileDescriptor::term()) -> ok.
+
 to_fd(Dict, Fd) ->
     to_fd(Dict, first_object(Dict), Fd).
     
@@ -236,15 +254,26 @@ read_entries(Dict, Ix, Sx, Es) ->
 	    lists:reverse(Es)
     end.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Deletes a dictionary
 %%
-%% Delete dictionary
-%%
+%% @end
+%%--------------------------------------------------------------------
+-spec delete(Dict::term()) -> ok.
+
 delete(Dict) ->
     ets:delete(Dict).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Add a new object to dictionary.
 %%
-%% Add a new object / new entry to dictionary
-%%
+%% @end
+%%--------------------------------------------------------------------
+-spec add_object(Dict::term(), Object::record(), list(Entry::record())) ->
+			ok | {error, badarg}.
+
 add_object(Dict, Object, Es) when is_record(Object, dict_object) ->
     lists:foreach(fun(E) -> add_entry(Dict, E) end, Es),
     try ets:insert_new(Dict, Object) of
@@ -254,6 +283,15 @@ add_object(Dict, Object, Es) when is_record(Object, dict_object) ->
 	    {error,badarg}
     end.    
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Add a new entry to dictionary.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec add_entry(Dict::term(), Entry::record()) ->
+		       ok | {error, badarg}.
+
 add_entry(Dict, Entry) when is_record(Entry, dict_entry) ->
     try ets:insert_new(Dict, Entry) of
 	_ -> ok
@@ -262,14 +300,29 @@ add_entry(Dict, Entry) when is_record(Entry, dict_entry) ->
 	    {error,badarg}
     end.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Update existing object in dictionary.
 %%
-%% Update existing object/entry
-%%
+%% @end
+%%--------------------------------------------------------------------
+-spec update_object(Dict::term(), Object::record()) ->
+			ok | {error, badarg}.
+
 update_object(Dict, Object) when is_record(Object, dict_object) ->
     case ets:member(Dict, Object#dict_object.index) of
 	false -> erlang:error(badarg);
 	true ->  ets:insert(Dict, Object)
     end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Update existing entry in dictionary.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec update_entry(Dict::term(), Entry::record()) ->
+		       ok | {error, badarg}.
 
 update_entry(Dict, Entry) when is_record(Entry, dict_entry) ->
     case ets:member(Dict, Entry#dict_entry.index) of
@@ -277,24 +330,42 @@ update_entry(Dict, Entry) when is_record(Entry, dict_entry) ->
 	true ->  ets:insert(Dict, Entry)
     end.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Delete existing object in dictionary.
 %%
-%% Delete an object/entry
-%%
+%% @end
+%%--------------------------------------------------------------------
+-spec delete_object(Dict::term(), Index::integer()) ->
+			ok | {error, badarg}.
+
 delete_object(Dict, Ix) when ?is_index(Ix) ->
     ets:delete(Dict, Ix),
     ets:match_delete(Dict, #dict_entry { index={Ix,'_'}, _ = '_' }).
     
+%%--------------------------------------------------------------------
+%% @doc
+%% Delete existing entry in dictionary.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec delete_entry(Dict::term(), Index::integer() | {integer(), integer()}) ->
+		       ok | {error, badarg}.
+
 delete_entry(Dict, Index={Ix,Sx}) when ?is_index(Ix), ?is_subind(Sx) ->
     ets:delete(Dict, Index);
 delete_entry(Dict, Ix) when ?is_index(Ix) ->
     delete_entry(Dict, {Ix,0}).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Lookup existing object in dictionary.
 %%
-%% Lookup object/entry in the dictionary
-%% return {ok,Entry} | {ok,Object}
-%%        {error, no_such_object}
-%%        {error, no_such_subindex}
-%%
+%% @end
+%%--------------------------------------------------------------------
+-spec lookup_object(Dict::term(), Index::integer()) ->
+			{ok, Object::record()} | {error, no_such_object}.
+
 lookup_object(Dict, Ix) when ?is_index(Ix) ->
     case ets:lookup(Dict, Ix) of
 	[O] ->
@@ -303,6 +374,17 @@ lookup_object(Dict, Ix) when ?is_index(Ix) ->
 	    i_fail(Dict,Ix)
     end.
 
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Lookup existing entry in dictionary.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec lookup_entry(Dict::term(), Index::integer() | {integer(), integer()}) ->
+			  {ok, Entry::record()} | 
+			  {error, no_such_object} |
+			  {error, no_such_subindex}.
 
 lookup_entry(Dict, Index={Ix,255}) ->
     case ets:lookup(Dict, Ix) of
@@ -326,14 +408,18 @@ lookup_entry(Dict, Index={Ix,Sx}) when ?is_index(Ix), ?is_subind(Sx) ->
 lookup_entry(Dict, Ix) when ?is_index(Ix) ->
     lookup_entry(Dict, {Ix,0}).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Set value of existing object in dictionary.
 %%
-%% Set object/entry value in existing entry
-%% return:
-%%     {error,bad_access}
-%%     {error,no_such_subindex}
-%%     {error,no_such_object}
-%%     ok 
-%%
+%% @end
+%%--------------------------------------------------------------------
+-spec set(Dict::term(), Index::integer(), SubInd::integer(), Value::term()) ->
+		 ok | 
+		 {error, no_such_object} |
+		 {error, no_such_subindex} |
+		 {error, bad_access}.
+
 set(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
     Index = {Ix, Si},
     try ets:lookup_element(Dict, Index, #dict_entry.access) of
@@ -350,9 +436,19 @@ set(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
 	    erlang:error(What)
     end.
 
-%% direct_set(Dict, Index, Value) 
-%%   Work as set but without checking access !
-%%
+%%--------------------------------------------------------------------
+%% @doc
+%% Set value of existing object in dictionary.
+%% Work as set but without checking access !
+%% @end
+%%--------------------------------------------------------------------
+-spec direct_set(Dict::term(), Index::integer(), SubInd::integer(), 
+		 Value::term()) ->
+		 ok | 
+		 {error, no_such_object} |
+		 {error, no_such_subindex} |
+		 {error, bad_access}.
+
 direct_set(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
     Index = {Ix, Si},
     case ets:update_element(Dict, Index, {#dict_entry.value, Value}) of
@@ -362,9 +458,19 @@ direct_set(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
 	    ok
     end.
 
-%% force_set(Dict, Index, Value) 
-%%   Work as direct_set but creates entry if it does not exist
-%%
+%%--------------------------------------------------------------------
+%% @doc
+%% Set value of existing object in dictionary.
+%% Work as direct_set but creates entry if it does not exist!
+%% @end
+%%--------------------------------------------------------------------
+-spec force_set(Dict::term(), Index::integer(), SubInd::integer(), 
+		 Value::term()) ->
+		 ok | 
+		 {error, no_such_object} |
+		 {error, no_such_subindex} |
+		 {error, bad_access}.
+
 force_set(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
     Index = {Ix, Si},
     case ets:update_element(Dict, Index, {#dict_entry.value, Value}) of
@@ -375,7 +481,17 @@ force_set(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
 	    ok
     end.
 
-%% set an array of values index 1..254
+%%--------------------------------------------------------------------
+%% @doc
+%% Sets an array of values for subindex 1..254.
+%% @end
+%%--------------------------------------------------------------------
+-spec set_array(Dict::term(), Index::integer(), list(Value::term())) ->
+		       ok | 
+		       {error, no_such_object} |
+		       {error, no_such_subindex} |
+		       {error, bad_access}.
+
 set_array(Dict, Ix, Values) ->
     set_array(Dict, Ix, 1, Values).
 
@@ -385,21 +501,32 @@ set_array(Dict, Ix, Si, [Value|Vs]) when Si < 255 ->
     direct_set(Dict, Ix, Si, Value),
     set_array(Dict, Ix, Si+1, Vs).
 
-%% set objects on consecutive indices
+%%--------------------------------------------------------------------
+%% @doc
+%% Set objects on consecutive indices.
+%% @end
+%%--------------------------------------------------------------------
+-spec set_objects(Dict::term(), Index::integer(), list(Obj::record())) ->
+			 ok | 
+			 {error, no_such_object} |
+			 {error, no_such_subindex} |
+			 {error, bad_access}.
+
 set_objects(Dict, Ix, [Obj|Objs]) ->
     set_array(Dict, Ix, 1, tuple_to_list(Obj)),
     set_objects(Dict, Ix+1, Objs);
 set_objects(_Dict, _Ix, []) ->
     ok.
 
-%%
-%%     Get object/entry value
-%% return:
-%%     {error,bad_access}
-%%     {error,no_such_subindex}
-%%     {error,no_such_object}
-%%     {ok,Value}
-%%
+%%--------------------------------------------------------------------
+%% @doc
+%% Get value of existing object in dictionary.
+%% @end
+%%--------------------------------------------------------------------
+-spec value(Dict::term(), Index::integer(), SubInd::integer()) ->
+		   {ok, Value::term()} | 
+		   {error, Reason::atom()}.
+
 value(Dict, Ix, Si) when ?is_index(Ix), ?is_subind(Si) ->
     Index = {Ix,Si},
     try ets:lookup_element(Dict, Index, #dict_entry.access) of
@@ -414,9 +541,16 @@ value(Dict, Ix, Si) when ?is_index(Ix), ?is_subind(Si) ->
 	    erlang:error(What)
     end.
 
-%% direct_value
-%%   Works as value/2 but without access check
-%%
+%%--------------------------------------------------------------------
+%% @doc
+%% Get value of existing object in dictionary.
+%% Works as value but without access check.
+%% @end
+%%--------------------------------------------------------------------
+-spec direct_value(Dict::term(), Index::integer(), SubInd::integer()) ->
+			  {ok, Value::term()} | 
+			  {error, Reason::atom()}.
+
 direct_value(Dict,Ix,Si) when ?is_index(Ix), ?is_subind(Si) ->
     ets:lookup_element(Dict, {Ix,Si}, #dict_entry.value).
     

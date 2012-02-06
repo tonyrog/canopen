@@ -1,32 +1,26 @@
 %%%-------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @copyright (C) 2010, Tony Rogvall
+%%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%% File    : canopen.erl
-%%% Description : CANopen application
+%%% CANopen application.
 %%%
-%%% Created : 15 Jan 2008 
+%%% File: canopen.erl <br/>
+%%% Created: 15 Jan 2008 by Tony Rogvall
 %%% @end
 %%%-------------------------------------------------------------------
-
 -module(canopen).
 
 -behaviour(application).
 
 -export([start/0, start/2, stop/1]).
 %%--------------------------------------------------------------------
-%% @private
 %% @spec start(StartType, StartArgs) -> {ok, Pid} |
 %%                                      {ok, Pid, State} |
 %%                                      {error, Reason}
 %%      StartType = normal | {takeover, Node} | {failover, Node}
 %%      StartArgs = term()
 %% @doc
-%% This function is called whenever an application is started using
-%% application:start/[1,2], and should start the processes of the
-%% application. If the application is structured according to the OTP
-%% design principles as a supervision tree, this means starting the
-%% top supervisor of the tree.
+%% Starts the canopen application, that is, the canopen supervisor.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -45,8 +39,16 @@ start(_StartType, _StartArgs) ->
 	    canopen_sup:start_link(Args)
     end.
 
+%% @private
 start() ->
     start(normal, []).
 
+%%--------------------------------------------------------------------
+%% @spec stop(State) -> ok
+%%
+%% @doc
+%% Stops the CANopen application.
+%% @end
+%%--------------------------------------------------------------------
 stop(_State) ->
     ok.

@@ -1,7 +1,10 @@
+%%% @author Tony Rogvall <tony@rogvall.se>
+%%% @copyright (C) 2012, Tony Rogvall
+%%% @doc
 %%% File    : canopen.hrl
-%%% Author  : Tony Rogvall <tony@PBook.local>
 %%% Description : Can Open definitions
 %%% Created :  9 Jan 2008 by Tony Rogvall <tony@PBook.local>
+%%% @end
 
 -ifndef(__CAN_OPEN_HRL__).
 -define(__CAN_OPEN_HRL__, true).

@@ -1,10 +1,14 @@
 %%%-------------------------------------------------------------------
-%%% @author Marina Westman LÃ¶nne <malotte@malotte.net>
-%%% @copyright (C) 2011, Marina Westman LÃ¶nne
+%%% @author Marina Westman Lönne <malotte@malotte.net>
+%%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%%
+%%% Intermediate data storage for an SDO session process.<br/>
+%%% Responsible for setting up a connection to an application
+%%% if needed.
+%%% 
+%%% File: co_data_buf.erl <br/>
+%%% Created: 12 Dec 2011 by Malotte W Lönne
 %%% @end
-%%% Created : 12 Dec 2011 
 %%%-------------------------------------------------------------------
 -module(co_data_buf).
 
@@ -14,10 +18,10 @@
 
 %% API
 -export([init/3, init/4, init/5,
-	 open/2,
 	 read/2,
 	 write/4,
 	 update/2,
+	 abort/2,
 	 load/1,
 	 eof/1,
 	 data_size/1]).
@@ -43,6 +47,56 @@
 %%%===================================================================
 %%% API
 %%%===================================================================
+%%--------------------------------------------------------------------
+%% @doc
+%% Initilizes the data buffer.
+%% @end
+%%--------------------------------------------------------------------
+-spec init(read | write, 
+	   Pid::pid(), Entry::#index_spec{}) -> 
+		  {ok, Buf::#co_data_buf{}} |
+		  {ok, Mref::reference(), Buf::#co_data_buf{}} |
+		  {error, Error::atom()};
+	  (read | write, 
+	   Dict::term(), Entry::#dict_entry{}) -> 
+		  {ok, Buf::#co_data_buf{}} |
+		  {error, Error::atom()};
+	  (read | write, 
+	   Pid::pid(), {Data::binary(), I::{integer(),integer()}}) -> 
+		  {ok, Buf::#co_data_buf{}} |
+		  {error, Error::atom()}.
+
+init(Access, Pid, E) ->
+    init(Access, Pid, E, undefined, undefined).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Initilizes the data buffer.
+%% @end
+%%--------------------------------------------------------------------
+-spec init(read | write, 
+	   Pid::pid(), Entry::#index_spec{}, BufSize::integer()) -> 
+		  {ok, Buf::#co_data_buf{}} |
+		  {ok, Mref::reference(), Buf::#co_data_buf{}} |
+		  {error, Error::atom()};
+	  (read | write, 
+	   Dict::term(), Entry::#dict_entry{}, BufSize::integer()) -> 
+		  {ok, Buf::#co_data_buf{}} |
+		  {error, Error::atom()};
+	  (read | write, 
+	   Pid::pid(), {Data::binary(), I::{integer(),integer()}},
+	   BufSize::integer()) -> 
+		  {ok, Buf::#co_data_buf{}} |
+		  {error, Error::atom()}.
+
+init(Access, Pid, E, BSize) ->
+    init(Access, Pid, E, BSize, undefined).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Initilizes the data buffer.
+%% @end
+%%--------------------------------------------------------------------
 -spec init(read | write, 
 	   Pid::pid(), Entry::#index_spec{}, 
 	   BufSize::integer(), LLevel::integer()) -> 
@@ -59,12 +113,6 @@
 	   BufSize::integer(), LLevel::integer()) -> 
 		  {ok, Buf::#co_data_buf{}} |
 		  {error, Error::atom()}.
-
-init(Access, Pid, E) ->
-    init(Access, Pid, E, undefined, undefined).
-
-init(Access, Pid, E, BSize) ->
-    init(Access, Pid, E, BSize, undefined).
 
 init(Access, Pid, E, BSize, LLevel) ->
     ?dbg(data_buf, 
@@ -130,6 +178,7 @@ init_i(Access, Pid, {Data, I}, BSize, LLevel) when is_binary(Data) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% If needed sets up connection to application.
 %% @end
 %%--------------------------------------------------------------------
 -spec open(read | write, Buf::#co_data_buf{}) -> {ok, NewBuf::#co_data_buf{}} |
@@ -137,7 +186,7 @@ init_i(Access, Pid, {Data, I}, BSize, LLevel) when is_binary(Data) ->
 						 {error, Error::atom()}. 
 
 open(Access, Buf=#co_data_buf {pid = _Pid, i = _I, mode = _M})  ->
-    ?dbg(data_buf, "open: access = ~p, pid = ~p, i = ~p, mode = ~p", 
+    ?dbg(data_buf, "open: access = ~p, pid = ~p, i = ~p, mode = ~w", 
 	 [Access, _Pid, _I, _M]),
     open_i(Access, Buf).
 
@@ -191,13 +240,14 @@ open_i(write, Buf) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% If needed fetch data from an application.
 %% @end
 %%--------------------------------------------------------------------
 -spec load(Buf::#co_data_buf{}) -> {ok, NewBuf::#co_data_buf{}} |
 				   {error, Error::atom()}.
 		  
 load(Buf) when is_record(Buf, co_data_buf) ->
-    ?dbg(data_buf, "load: available data = ~p, load_level = ~p", 
+    ?dbg(data_buf, "load: available data = ~w, load_level = ~p", 
 	 [size(Buf#co_data_buf.data),  Buf#co_data_buf.load_level]),
     if size(Buf#co_data_buf.data) =< Buf#co_data_buf.load_level andalso
        Buf#co_data_buf.eof =/= true ->
@@ -211,6 +261,8 @@ load(Buf) when is_record(Buf, co_data_buf) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% Reads data in the buffer.<br/>
+%% If needed more data is fetched from the application.
 %% @end
 %%--------------------------------------------------------------------
 -spec read(Buf::#co_data_buf{}, Bytes::integer) -> 
@@ -223,14 +275,14 @@ read(Buf, Bytes) when is_record(Buf, co_data_buf) ->
     if Bytes =< size(Buf#co_data_buf.data) ->
 	    %% Enough data is available
 	    <<Data:Bytes/binary, NewData/binary>> = Buf#co_data_buf.data,
-	    ?dbg(data_buf, "read: Data = ~p", [Data]),
+	    ?dbg(data_buf, "read: Data = ~w", [Data]),
 	    {ok, Data, Buf#co_data_buf.eof andalso (size(NewData) =:= 0),
 	     Buf#co_data_buf {data = NewData, size = size(NewData)}};
        true ->
 	    %% More data is asked for
 	    if Buf#co_data_buf.eof =:= true ->
 		    %% No more data to fetch
-		    ?dbg(data_buf, "read: Data = ~p, Eod = true", 
+		    ?dbg(data_buf, "read: Data = ~w, Eod = true", 
 			 [Buf#co_data_buf.data]),
 		    {ok, Buf#co_data_buf.data, true, 
 		     Buf#co_data_buf {data = (<<>>), size = 0}};
@@ -260,6 +312,8 @@ read_app_call(_Buf) ->
 	    
 %%--------------------------------------------------------------------
 %% @doc
+%% Write data to the buffer.<br/>
+%% If needed data is sent to the application.
 %% @end
 %%--------------------------------------------------------------------
 -spec write(Buf::#co_data_buf{}, Data::term(), EodFlag::boolean(), 
@@ -273,7 +327,7 @@ read_app_call(_Buf) ->
 write(Buf=#co_data_buf {mode = atomic, pid = Pid, type = Type, data = OldData, 
 		     tmp = TmpData, i = I}, 
       Data, true, segment) ->
-    ?dbg(data_buf, "write: mode = atomic, Data = ~p, Eod = ~p", [Data, true]),
+    ?dbg(data_buf, "write: mode = atomic, Data = ~w, Eod = ~p", [Data, true]),
     %% All data received, time to transfer to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     {Value, _} = co_codec:decode(DataToSend, Type),
@@ -283,7 +337,7 @@ write(Buf=#co_data_buf {mode = atomic, pid = Pid, type = Type, data = OldData,
 write(Buf=#co_data_buf {mode = atomic = _Mode, pid = Pid, type = Type, data = Data, 
 		     tmp = TmpData, i = I}, 
       N, true, block) ->
-    ?dbg(data_buf, "write: mode = ~p, N = ~p, Eod = ~p", [_Mode, N, true]),
+    ?dbg(data_buf, "write: mode = ~w, N = ~p, Eod = ~p", [_Mode, N, true]),
     %% All data received, time to transfer to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
@@ -295,7 +349,7 @@ write(Buf=#co_data_buf {mode = atomic = _Mode, pid = Pid, type = Type, data = Da
 write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type, 
 		     data = OldData, tmp = TmpData, i = I}, 
       Data, true, segment) ->
-    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", 
+    ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p", 
 	 [_Mode, Data, true]),
     %% All data received, time to transfer to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
@@ -310,7 +364,7 @@ write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type,
 write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type, 
 		     data = Data, tmp = TmpData, i = I}, 
       N, true, block) ->
-    ?dbg(data_buf, "write: mode = ~p, N = ~p, Eod = ~p", [_Mode, N, true]),
+    ?dbg(data_buf, "write: mode = ~w, N = ~p, Eod = ~p", [_Mode, N, true]),
     %% All data received, time to transfer to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
@@ -336,21 +390,21 @@ write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = OldData, ref 
 write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = Data, ref = Ref, 
 		     tmp = TmpData}, 
       N, true, block) ->
-    ?dbg(data_buf, "write: mode = ~p,  N = ~p, Eod = ~p", [_Mode, N, true]),
+    ?dbg(data_buf, "write: mode = ~w,  N = ~p, Eod = ~p", [_Mode, N, true]),
     %% All data received, time to transfer rest to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<Data/binary, DataToAdd/binary>>,
-    ?dbg(data_buf, "write: send Data = ~p", [DataToSend]),
+    ?dbg(data_buf, "write: send Data = ~w", [DataToSend]),
     app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}, Pid, 
 	     {write, Ref, DataToSend, true});
 write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = OldData, 
 		     ref = Ref, tmp = TmpData}, 
       Data, true, segment) ->
-    ?dbg(data_buf, "write: mode = ~p,  Data = ~p, Eod = ~p", [_Mode, Data, true]),
+    ?dbg(data_buf, "write: mode = ~w,  Data = ~w, Eod = ~p", [_Mode, Data, true]),
     %% All data received, time to transfer rest to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
-    ?dbg(data_buf, "write: send Data = ~p", [DataToSend]),
+    ?dbg(data_buf, "write: send Data = ~w", [DataToSend]),
     case Module:write(Pid, Ref, DataToSend, true) of
 	{ok ,Ref} ->
 	    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
@@ -360,13 +414,13 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = Old
 write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = Data, 
 		     ref = Ref, tmp = TmpData}, 
       N, true, block) ->
-    ?dbg(data_buf, "write: mode = ~p,  N = ~p, TmpData = ~p, Eod = ~p", 
+    ?dbg(data_buf, "write: mode = ~w,  N = ~p, TmpData = ~w, Eod = ~p", 
 	 [_Mode, N, TmpData, true]),
     %% All data received, time to transfer rest to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<Data/binary, DataToAdd/binary>>,
-    ?dbg(data_buf, "write: send Data = ~p", [DataToSend]),
+    ?dbg(data_buf, "write: send Data = ~w", [DataToSend]),
     case Module:write(Pid, Ref, DataToSend, true) of
 	{ok ,Ref} ->
 	    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
@@ -377,7 +431,7 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = Dat
 write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, type = Type, data = OldData, 
 		     i = {Index, SubInd}, tmp = TmpData}, 
       Data, true, segment) -> 
-    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [_Mode, Data, true]),
+    ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p", [_Mode, Data, true]),
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     {Value, _} = co_codec:decode(DataToSend, Type),
     ?dbg(data_buf, "write:store I = ~.16B:~.8B, Value = ~p", 
@@ -387,7 +441,7 @@ write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, type = Type, data = OldData
 write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, type = Type, data = OldData, 
 		     i = {Index, SubInd}, tmp = TmpData}, 
       N, true, block) -> 
-    ?dbg(data_buf, "write: mode = ~p, N = ~p, TmpData = ~p, Eod = ~p", 
+    ?dbg(data_buf, "write: mode = ~w, N = ~p, TmpData = ~w, Eod = ~p", 
 	 [_Mode, N, TmpData, true]),
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
@@ -400,7 +454,7 @@ write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, type = Type, data = OldData
 write(Buf=#co_data_buf {mode = data = _Mode, data = OldData, 
 		     i = {_Index, _SubInd}, tmp = TmpData}, 
       Data, true, segment) -> 
-    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [_Mode, Data, true]),
+    ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p", [_Mode, Data, true]),
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     ?dbg(data_buf, "write:store ?? I = ~.16B:~.8B, Data = ~p", 
 	 [_Index, _SubInd, DataToSend]),
@@ -412,13 +466,13 @@ write(Buf=#co_data_buf {mode = data = _Mode, data = OldData,
 write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = OldData, 
 		     write_size = WSize, ref = Ref, tmp = TmpData}, 
       Data, false, _DownloadMode) ->
-    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [_Mode, Data, false]),
+    ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p", [_Mode, Data, false]),
     %% Not the last data, store it
     NewData = <<OldData/binary, TmpData/binary>>,
     if size(NewData) >= WSize ->
 	    %% Time to send to app
 	    <<TransferData:WSize/binary, RestData/binary>> = NewData,
-	    ?dbg(data_buf, "write: send Data = ~p", [TransferData]),
+	    ?dbg(data_buf, "write: send Data = ~w", [TransferData]),
 	    app_call(Buf#co_data_buf {data = RestData, tmp = Data}, Pid, 
 		     {write, Ref, TransferData, false});
        true ->
@@ -427,13 +481,13 @@ write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = OldData,
 write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = OldData, 
 		     write_size = WSize, ref = Ref, tmp = TmpData}, 
       Data, false, _DownloadMode) ->
-    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p", [_Mode, Data, false]),
+    ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p", [_Mode, Data, false]),
     %% Not the last data, store it
     NewData = <<OldData/binary, TmpData/binary>>,
     if size(NewData) >= WSize ->
 	    %% Time to send to app
 	    <<TransferData:WSize/binary, RestData/binary>> = NewData,
-	    ?dbg(data_buf, "write: send Data = ~p", [TransferData]),
+	    ?dbg(data_buf, "write: send Data = ~w", [TransferData]),
 	    case Module:write(Pid, Ref, TransferData, false) of
 		{ok, Ref} ->
 		    {ok, Buf#co_data_buf {data = RestData, tmp = Data}};
@@ -446,7 +500,7 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = Old
 %% Transfer =/= streamed => check size limit and store if OK
 write(Buf=#co_data_buf {mode = _Mode, data = OldData, tmp = TmpData}, 
       Data, false, _DownloadMode) ->
-    ?dbg(data_buf, "write: mode = ~p, Data = ~p, Eod = ~p, storing", 
+    ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p, storing", 
 	 [_Mode, Data, false]),
     CheckLimitResult = check_limit(Buf, Data),
     if CheckLimitResult == ok ->
@@ -483,6 +537,7 @@ check_limit_i(Buf=#co_data_buf {data = OldData, tmp = TmpData}, Data) ->
  
 %%--------------------------------------------------------------------
 %% @doc
+%% Update buffer with reply from application.
 %% @end
 %%--------------------------------------------------------------------
 -spec update(Buf::#co_data_buf{}, 
@@ -525,7 +580,7 @@ update(Buf=#co_data_buf {access = write}, {ok, Ref, WSize}) ->
 	_OtherRef -> {error, ?abort_internal_error}
     end;
 update(Buf=#co_data_buf {data = OldData}, {ok, Ref, Data, Eod}) ->
-    ?dbg(data_buf, "update: Ref = ~p, Data ~p, Eod = ~p", [Ref, Data, Eod]),
+    ?dbg(data_buf, "update: Ref = ~p, Data ~w, Eod = ~p", [Ref, Data, Eod]),
     case Buf#co_data_buf.ref of
 	Ref -> 
 	    NewData = <<OldData/binary, Data/binary>>,
@@ -536,7 +591,7 @@ update(Buf=#co_data_buf {data = OldData}, {ok, Ref, Data, Eod}) ->
 update(Buf, ok) ->
     {ok, Buf};
 update(_Buf, Other) ->
-    ?dbg(data_buf, "update: Buf = ~p, Other = ~p", [_Buf, Other]),
+    ?dbg(data_buf, "update: Buf = ~w, Other = ~p", [_Buf, Other]),
     %% Error replies
     Other.
 
@@ -544,6 +599,26 @@ update(_Buf, Other) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% If needed abort connection with application.
+%% @end
+%%--------------------------------------------------------------------
+-spec abort(Buf::#co_data_buf{}, Reason::integer()) ->
+		   ok.
+
+abort(undefined, _Reason) -> 
+    ok;
+abort(_Buf=#co_data_buf {mode = atomic}, _Reason) -> 
+    ok;
+abort(_Buf=#co_data_buf {mode = {atomic, _Module}}, _Reason) -> 
+    ok;
+abort(_Buf=#co_data_buf {mode = streamed, pid = Pid, ref = Ref}, Reason) -> 
+    gen_server:cast(Pid, {abort, Ref, Reason});
+abort(_Buf=#co_data_buf {mode = {streamed, Module}, pid = Pid, ref = Ref}, Reason) -> 
+    Module:abort(Pid, Ref, Reason).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Check if all data is received from application.
 %% @end
 %%--------------------------------------------------------------------
 -spec eof(Buf::#co_data_buf{}) -> boolean().
@@ -553,6 +628,7 @@ eof(Buf) when is_record(Buf, co_data_buf) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% Get size of data in buffer.
 %% @end
 %%--------------------------------------------------------------------
 -spec data_size(Buf::#co_data_buf{}) -> integer().

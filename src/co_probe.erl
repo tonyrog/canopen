@@ -1,14 +1,20 @@
-%%
-%% Can dump program
-%%
-
+%%%-------------------------------------------------------------------
+%%% @author Tony Rogvall <tony@rogvall.se>
+%%% @copyright (C) 2012, Tony Rogvall
+%%% @doc
+%%% CAN dump program.
+%%%
+%%% File: co_probe.erl<br/>
+%%% @end
+%%%-------------------------------------------------------------------
 -module(co_probe).
 -export([start/0, init/0]).
 
 -include_lib("can/include/can.hrl").
--include("../include/canopen.hrl").
--include("../include/sdo.hrl").
+-include("canopen.hrl").
+-include("sdo.hrl").
 
+%% @private
 -record(s,
 	{
 	  id,    %% {Tx, Rx}

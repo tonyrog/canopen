@@ -1,10 +1,13 @@
 %%%-------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @copyright (C) 2011, Tony Rogvall
+%%% @author Marina Westman Lönne <malotte@malotte.net>
+%%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
 %%%    Supervisor for canopen application.
+%%%
+%%% File: canopen_sup.erl <br/>
+%%% Created:  5 November 2011 by Tony Rogvall
 %%% @end
-%%% Created :  5 November 2011
 %%%-------------------------------------------------------------------
 
 -module(canopen_sup).
@@ -12,7 +15,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/1, stop/1]).
+-export([start_link/1, stop/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -21,6 +24,14 @@
 %% API functions
 %% ===================================================================
 
+%%--------------------------------------------------------------------
+%% @spec start_link(Args) -> {ok, Pid} | ignore | {error, Error}
+%% @doc
+%% Starts the supervisor.
+%%
+%%   Args = [{serial, Serial}, {options, Options}]
+%% @end
+%%--------------------------------------------------------------------
 start_link(Args) ->
     case supervisor:start_link({local, ?MODULE}, ?MODULE, Args) of
 	{ok, Pid} ->
@@ -32,7 +43,14 @@ start_link(Args) ->
 	    Error
     end.
 
-stop(_StartArgs) ->
+%%--------------------------------------------------------------------
+%% @spec stop() -> ok
+%% @doc
+%% Stops the supervisor.
+%%
+%% @end
+%%--------------------------------------------------------------------
+stop() ->
     ok.
 
 
@@ -40,10 +58,21 @@ stop(_StartArgs) ->
 %% Supervisor callbacks
 %% ===================================================================
 
+%%--------------------------------------------------------------------
+%% @private
+%% @spec init(Args) -> {ok, {SupFlags, [ChildSpec]}} |
+%%                     ignore |
+%%                     {error, Reason}
+%% @doc
+%% Starts the co_node.
+%%
+%% @end
+%%--------------------------------------------------------------------
 init(Args) ->
     io:format("~p: Starting up\n", [?MODULE]),
     I = co_node,
     CoNode = {I, {I, start_link, [Args]}, permanent, 5000, worker, [I]},
     io:format("~p: About to start ~p\n", [?MODULE,CoNode]),
     {ok, { {one_for_one, 0, 300}, [CoNode]} }.
+
 
