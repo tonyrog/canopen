@@ -74,8 +74,8 @@
 			<integer>641</integer>
 			<key>Points</key>
 			<array>
-				<string>{427.5, 198}</string>
-				<string>{428, 234}</string>
+				<string>{454.5, 198}</string>
+				<string>{455, 234}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -97,7 +97,7 @@
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{378, 162}, {99, 36}}</string>
+			<string>{{405, 162}, {99, 36}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FontInfo</key>
@@ -136,7 +136,7 @@ buffer}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{388.64273, 125.46948}, {106.80542, 32}}</string>
+			<string>{{415.64273, 125.46948}, {106.80542, 32}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -208,8 +208,8 @@ buffer}</string>
 			<integer>597</integer>
 			<key>Points</key>
 			<array>
-				<string>{427.5, 108.00001}</string>
-				<string>{427.5, 162}</string>
+				<string>{454.5, 108.00001}</string>
+				<string>{454.5, 162}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -233,7 +233,7 @@ buffer}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{243, 163}, {26, 26}}</string>
+			<string>{{270, 162}, {26, 26}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>ID</key>
@@ -264,7 +264,7 @@ buffer}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{278.49908, 114.40738}, {63, 32}}</string>
+			<string>{{305.57251, 113.72481}, {63, 32}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -338,8 +338,8 @@ unknown}</string>
 			<integer>594</integer>
 			<key>Points</key>
 			<array>
-				<string>{427.5, 108.00001}</string>
-				<string>{256, 163}</string>
+				<string>{454.5, 108.00001}</string>
+				<string>{283, 162}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -365,7 +365,7 @@ unknown}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{415, 234}, {26, 26}}</string>
+			<string>{{442, 234}, {26, 26}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>ID</key>
@@ -396,7 +396,7 @@ unknown}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{18, 79}, {252, 38}}</string>
+			<string>{{18, 79}, {297, 38}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -435,14 +435,14 @@ unknown}</string>
 {\colortbl;\red255\green255\blue255;}
 \pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\qc
 
-\f0\fs48 \cf0 s_reading_segment}</string>
+\f0\fs48 \cf0 s_reading_block_segment}</string>
 				<key>VerticalPad</key>
 				<integer>0</integer>
 			</dict>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{324, 72}, {207, 36}}</string>
+			<string>{{351, 72}, {207, 36}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FontInfo</key>
@@ -473,14 +473,14 @@ unknown}</string>
 {\colortbl;\red255\green255\blue255;}
 \pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\qc
 
-\f0\fs24 \cf0 s_reading_segment}</string>
+\f0\fs24 \cf0 s_reading_block_segment}</string>
 				<key>VerticalPad</key>
 				<integer>0</integer>
 			</dict>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{254.5, 9}, {330.5, 49}}</string>
+			<string>{{281.5, 9}, {330.5, 49}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -519,7 +519,7 @@ unknown}</string>
 {\colortbl;\red255\green255\blue255;}
 \pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\qc
 
-\f0\fs62 \cf0 segment upload}</string>
+\f0\fs62 \cf0 block upload}</string>
 				<key>VerticalPad</key>
 				<integer>0</integer>
 			</dict>
@@ -577,7 +577,7 @@ unknown}</string>
 	<key>MasterSheets</key>
 	<array/>
 	<key>ModificationDate</key>
-	<string>2012-02-07 12:08:28 +0000</string>
+	<string>2012-02-07 13:05:50 +0000</string>
 	<key>Modifier</key>
 	<string>Marina Westman Lönne</string>
 	<key>NotesVisible</key>
@@ -654,8 +654,6 @@ unknown}</string>
 		<integer>0</integer>
 		<key>ExpandedCanvases</key>
 		<array/>
-		<key>FitInWindow</key>
-		<true/>
 		<key>Frame</key>
 		<string>{{115, 250}, {1014, 778}}</string>
 		<key>ListView</key>
@@ -669,9 +667,9 @@ unknown}</string>
 		<key>SidebarWidth</key>
 		<integer>138</integer>
 		<key>VisibleRegion</key>
-		<string>{{1, 1}, {865, 668}}</string>
+		<string>{{2.4379454e-39, -1.6010262e-25}, {0, 1.4012985e-45}}</string>
 		<key>Zoom</key>
-		<real>1</real>
+		<real>0.0</real>
 		<key>ZoomValues</key>
 		<array>
 			<array>

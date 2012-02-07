@@ -35,6 +35,48 @@
 %%% <a href="../doc/co_sdo_srv_segment_upload_state_diagram4.jpg"> 
 %%% Upload segment4 - s_reading_segment</a><br/>
 %%% 
+%%% State diagrams: Download block <br/>
+%%% <img src="../doc/co_sdo_srv_block_download_state_diagram1.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_block_download_state_diagram2.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_block_download_state_diagram3.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_block_download_state_diagram4.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_block_download_state_diagram5.jpg"> </img>
+%%%
+%%% <a href="../doc/co_sdo_srv_block_download_state_diagram1.jpg"> 
+%%% Download block1 - s_initial</a><br/>
+%%% <a href="../doc/co_sdo_srv_block_download_state_diagram2.jpg"> 
+%%% Download block2 - s_writing_block_started</a><br/>
+%%% <a href="../doc/co_sdo_srv_block_download_state_diagram3.jpg"> 
+%%% Download block3 - s_blocked_download</a><br/>
+%%% <a href="../doc/co_sdo_srv_block_download_state_diagram4.jpg"> 
+%%% Download block4 - s_block_download_end</a><br/>
+%%% <a href="../doc/co_sdo_srv_block_download_state_diagram5.jpg"> 
+%%% Download block5 - s_writing_block_end</a><br/>
+%%% 
+%%% State diagrams: Upload block <br/>
+%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram1.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram2.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram3.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram4.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram5.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram6.jpg"> </img>
+%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram7.jpg"> </img>
+%%%
+%%% <a href="../doc/co_sdo_srv_block_upload_state_diagram1.jpg"> 
+%%% Upload block1 - s_initial</a><br/>
+%%% <a href="../doc/co_sdo_srv_block_upload_state_diagram2.jpg"> 
+%%% Upload block2 - s_reading_block_started</a><br/>
+%%% <a href="../doc/co_sdo_srv_block_upload_state_diagram3.jpg"> 
+%%% Upload block3 - s_block_upload_start</a><br/>
+%%% <a href="../doc/co_sdo_srv_block_upload_state_diagram4.jpg"> 
+%%% Upload block4 - s_reading_block_segment</a><br/>
+%%% <a href="../doc/co_sdo_srv_block_upload_state_diagram5.jpg"> 
+%%% Upload block5 - s_block_upload_response</a><br/>
+%%% <a href="../doc/co_sdo_srv_block_upload_state_diagram6.jpg"> 
+%%% Upload block6 - s_block_upload_response_last</a><br/>
+%%% <a href="../doc/co_sdo_srv_block_upload_state_diagram7.jpg"> 
+%%% Upload block7 - s_block_pload_end_response</a><br/>
+%%% 
 %%% File: co_sdo_srv_fsm.erl<br/>
 %%% Created:  2 Jun 2010 by Tony Rogvall
 %%% @end
@@ -56,11 +98,13 @@
 -export([init/1, handle_event/3,
 	 handle_sync_event/4, handle_info/3, terminate/3, code_change/4]).
 
-%% Segment download
+%% Start state for all
 -export([s_initial/2]).
+
+%% Segment download
 -export([s_segmented_download/2]).
 -export([s_writing_segment_started/2]). %% Streamed
--export([s_writing_segment_end/2]).         %% Streamed
+-export([s_writing_segment_end/2]).     %% Streamed
 
 %% Segment upload
 -export([s_segmented_upload/2]).
@@ -1132,13 +1176,21 @@ s_block_download(M, S) when is_record(M, can_frame) ->
     NextSeq = S#co_session.blkseq+1,
     case M#can_frame.data of
 	?ma_block_segment(Last,CliSeq,Data) when CliSeq =:= NextSeq ->
-	    case co_data_buf:write(S#co_session.buf, Data, false, block) of
+	    S1 = if Last =:= 1 ->
+			 S#co_session {lastblk = Data};
+		    S#co_session.crc->
+			 S#co_session {blkcrc = 
+					  co_crc:update(S#co_session.blkcrc, Data)};
+		    true ->
+			  S
+		 end,
+	    case co_data_buf:write(S1#co_session.buf, Data, false, block) of
 		{ok, Buf} ->
-		    block_segment_written(S#co_session {buf = Buf, last = Last});
+		    block_segment_written(S1#co_session {buf = Buf, last = Last});
 		{ok, Buf, Mref} ->
 		    ?dbg(srv, "s_block_download: mref=~p\n", [Mref]),
-		    block_segment_written(S#co_session {buf = Buf, last = Last, 
-							mref = Mref});
+		    block_segment_written(S1#co_session {buf = Buf, last = Last, 
+							 mref = Mref});
 		{error, Reason} ->
 		    abort(S, Reason)
 	    end;
@@ -1196,24 +1248,41 @@ block_segment_written(S) ->
 
 s_block_download_end(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
-	?ma_ccs_block_download_end_request(N,CRC) ->
-	    %% CRC ??
-	    case co_data_buf:write(S#co_session.buf,N,true,block) of	    
-		{ok, Buf, Mref} ->
-		    %% Called an application
-		    ?dbg(srv, "s_block_download_end: mref=~p\n", [Mref]),
-		    S1 = S#co_session {mref = Mref, buf = Buf},
-		    {next_state, s_writing_block_end, S1, ?TMO(S1)};
-		    
-		{error,Reason} ->
-		    abort(S, Reason);
-
-		_ -> %% this can be any thing ok | true ..
-		    R = ?mk_scs_block_download_end_response(),
-		    send(S, R),
-		    co_node:object_event(S#co_session.node_pid, 
-					 {S#co_session.index,S#co_session.subind}),
-		    {stop, normal, S}
+	?ma_ccs_block_download_end_request(N,ClientCrc) ->
+	    %% CRC 
+	    NodeCrc = 
+		if S#co_session.crc ->
+			CrcN = 7 - N,
+			<<CrcData:CrcN/binary, _Pad/binary>> = S#co_session.lastblk,
+			Crc = co_crc:update(S#co_session.blkcrc,CrcData),
+			co_crc:final(Crc);
+		   true ->
+			ClientCrc
+		end,
+	    
+	    case ClientCrc of
+		NodeCrc ->
+		    %% CRC OK
+		    case co_data_buf:write(S#co_session.buf,N,true,block) of	    
+			{ok, Buf, Mref} ->
+			    %% Called an application
+			    ?dbg(srv, "s_block_download_end: mref=~p\n", [Mref]),
+			    S1 = S#co_session {mref = Mref, buf = Buf},
+			    {next_state, s_writing_block_end, S1, ?TMO(S1)};
+			{ok, _Buf} -> 
+			    R = ?mk_scs_block_download_end_response(),
+			    send(S, R),
+			    co_node:object_event(S#co_session.node_pid, 
+						 {S#co_session.index,
+						  S#co_session.subind}),
+			    {stop, normal, S};
+			{error,Reason} ->
+			    abort(S, Reason)
+		    end;
+		_Crc ->
+		    ?dbg(srv, "s_block_download_end: crc error, client_crc = ~p, "
+			 " node_crc = ~p", [ClientCrc, NodeCrc]),
+		    abort(S, ?abort_crc_error)
 	    end;
 	_ ->
 	    l_abort(M, S, s_block_download_end)

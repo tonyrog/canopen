@@ -14,7 +14,7 @@
 	<key>BackgroundGraphic</key>
 	<dict>
 		<key>Bounds</key>
-		<string>{{0, 0}, {867, 690}}</string>
+		<string>{{0, 0}, {867, 669}}</string>
 		<key>Class</key>
 		<string>SolidGraphic</string>
 		<key>ID</key>
@@ -36,7 +36,7 @@
 	<key>CanvasOrigin</key>
 	<string>{0, 0}</string>
 	<key>CanvasSize</key>
-	<string>{867, 690}</string>
+	<string>{867, 669}</string>
 	<key>ColumnAlign</key>
 	<integer>1</integer>
 	<key>ColumnSpacing</key>
@@ -74,7 +74,7 @@
 			<integer>641</integer>
 			<key>Points</key>
 			<array>
-				<string>{576, 234}</string>
+				<string>{625.5, 252}</string>
 				<string>{504, 322.44501}</string>
 			</array>
 			<key>Style</key>
@@ -93,6 +93,8 @@
 			<dict>
 				<key>ID</key>
 				<integer>633</integer>
+				<key>Info</key>
+				<integer>1</integer>
 			</dict>
 		</dict>
 		<dict>
@@ -136,7 +138,7 @@ to application}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{523.49359, 180.96811}, {82.276855, 32}}</string>
+			<string>{{559.86713, 170.39987}, {82.276855, 32}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -152,7 +154,7 @@ to application}</string>
 				<key>Offset</key>
 				<real>14.545450210571289</real>
 				<key>Position</key>
-				<real>0.66282749176025391</real>
+				<real>0.7419278621673584</real>
 				<key>RotationType</key>
 				<integer>0</integer>
 			</dict>
@@ -203,13 +205,15 @@ to application}</string>
 			<dict>
 				<key>ID</key>
 				<integer>633</integer>
+				<key>Info</key>
+				<integer>2</integer>
 			</dict>
 			<key>ID</key>
 			<integer>597</integer>
 			<key>Points</key>
 			<array>
-				<string>{508.81546, 151.38791}</string>
-				<string>{576, 234}</string>
+				<string>{504, 151}</string>
+				<string>{625.5, 216}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -233,7 +237,7 @@ to application}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{297, 269}, {26, 26}}</string>
+			<string>{{307, 226}, {26, 26}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>ID</key>
@@ -264,7 +268,7 @@ to application}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{338.70905, 200.2868}, {63, 32}}</string>
+			<string>{{383.26367, 171.3735}, {63, 32}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -277,10 +281,8 @@ to application}</string>
 			<dict>
 				<key>ID</key>
 				<integer>594</integer>
-				<key>Offset</key>
-				<real>14.545450210571289</real>
 				<key>Position</key>
-				<real>0.65923631191253662</real>
+				<real>0.48498004674911499</real>
 				<key>RotationType</key>
 				<integer>0</integer>
 			</dict>
@@ -338,8 +340,8 @@ unknown}</string>
 			<integer>594</integer>
 			<key>Points</key>
 			<array>
-				<string>{508.5, 151}</string>
-				<string>{310, 269}</string>
+				<string>{504, 151}</string>
+				<string>{320, 226}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -365,7 +367,7 @@ unknown}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{451.48755, 185.42601}, {82.276855, 32}}</string>
+			<string>{{473.35284, 171.69482}, {61.294312, 32}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -378,10 +380,8 @@ unknown}</string>
 			<dict>
 				<key>ID</key>
 				<integer>5</integer>
-				<key>Offset</key>
-				<real>14.545450210571289</real>
 				<key>Position</key>
-				<real>0.29634964466094971</real>
+				<real>0.21403264999389648</real>
 				<key>RotationType</key>
 				<integer>0</integer>
 			</dict>
@@ -439,7 +439,7 @@ unknown}</string>
 			<integer>5</integer>
 			<key>Points</key>
 			<array>
-				<string>{508.5, 151}</string>
+				<string>{504, 151}</string>
 				<string>{504, 322.44501}</string>
 			</array>
 			<key>Style</key>
@@ -543,7 +543,7 @@ unknown}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{405, 115}, {207, 36}}</string>
+			<string>{{400.5, 115}, {207, 36}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FontInfo</key>
@@ -678,7 +678,7 @@ unknown}</string>
 	<key>MasterSheets</key>
 	<array/>
 	<key>ModificationDate</key>
-	<string>2012-02-06 20:21:50 +0000</string>
+	<string>2012-02-07 12:12:26 +0000</string>
 	<key>Modifier</key>
 	<string>Marina Westman Lönne</string>
 	<key>NotesVisible</key>
@@ -758,7 +758,7 @@ unknown}</string>
 		<key>FitInWindow</key>
 		<true/>
 		<key>Frame</key>
-		<string>{{50, 36}, {1014, 799}}</string>
+		<string>{{78, 250}, {1014, 778}}</string>
 		<key>ListView</key>
 		<false/>
 		<key>OutlineWidth</key>
@@ -770,7 +770,7 @@ unknown}</string>
 		<key>SidebarWidth</key>
 		<integer>138</integer>
 		<key>VisibleRegion</key>
-		<string>{{1, 1}, {865, 689}}</string>
+		<string>{{1, 1}, {865, 668}}</string>
 		<key>Zoom</key>
 		<real>1</real>
 		<key>ZoomValues</key>

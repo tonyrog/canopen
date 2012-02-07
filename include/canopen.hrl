@@ -424,8 +424,8 @@
 	  size    :: uint32(),     %% Total data size (for block request)
 	  blksize :: uint8(),      %% Max number of segment per block
 	  blkseq  :: uint8(),      %% Block number to expect or to send
-	  blkseg  :: binary(),     %% last received block segment (7 bytes)
 	  blkbytes :: uint16(),    %% Number of bytes transfered so far
+	  lastblk  :: binary(),    %% last received block segment (7 bytes)
 	  blkcrc   :: uint16(),    %% Current block CRC value
 	  last     ::uint1(),      %% Flag indicating if last segment is received
 	  first    :: boolean(),   %% True for first block
