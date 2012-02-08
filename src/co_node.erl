@@ -30,6 +30,10 @@
 	 terminate/2,
 	 code_change/3]).
 
+%% 
+-export([save_dict/2]).
+-export([load_dict/2]).
+
 %% Application interface
 -export([subscribe/2, unsubscribe/2]).
 -export([reserve/3, unreserve/2]).
@@ -42,7 +46,6 @@
 
 %% CANopen application internal
 -export([add_entry/2, get_entry/2]).
--export([load_dict/2]).
 -export([set/3, value/2]).
 -export([store/6, fetch/6]).
 -export([subscribers/2]).
@@ -397,6 +400,19 @@ get_entry(Serial, Ix) ->
 
 load_dict(Serial, File) ->
     gen_server:call(serial_to_pid(Serial), {load_dict, File}).
+    
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Saves the Object Dictionary to a file.
+%%
+%% @end
+%%-------------------------------------------------------------------
+-spec save_dict(Serial::integer(), File::atom()) -> 
+		       ok | {error, Error::atom()}.
+
+save_dict(Serial, File) ->
+    gen_server:call(serial_to_pid(Serial), {save_dict, File}).
     
 
 %%--------------------------------------------------------------------
@@ -952,6 +968,14 @@ handle_call({load_dict, File}, _From, Ctx) ->
 	    {reply, ok, Ctx1};
 	{error, Error, Ctx1} ->
 	    {reply, Error, Ctx1}
+    end;
+
+handle_call({save_dict, File}, _From, Ctx=#co_ctx {dict = Dict}) ->
+    case co_dict:to_file(Dict, File) of
+	ok ->
+	    {reply, ok, Ctx};
+	{error, Error} ->
+	    {reply, Error, Ctx}
     end;
 
 handle_call({attach,Pid}, _From, Ctx) when is_pid(Pid) ->
@@ -2400,13 +2424,31 @@ set_tpdo_value(I,Value,Ctx)  when is_list(Value) andalso length(Value) > 16 ->
     %% ??
     set_tpdo_value(I,lists:sublist(Value,16),Ctx);
 %% Other conversions ???
-set_tpdo_value({_Ix, _Si} = I,Value,Ctx) ->
+set_tpdo_value({_Ix, _Si} = I, Value, 
+	       Ctx=#co_ctx {tpdo_cache = Cache, name = Name}) ->
     ?dbg(node, "~s: set_tpdo_value: Ix = ~.16#:~w, Value = ~p",
-	 [Ctx#co_ctx.name, _Ix, _Si, Value]), 
-    try ets:insert(Ctx#co_ctx.tpdo_cache,{I,Value}) of
-	true -> {ok, Ctx}
-    catch
-	error:Reason -> {{error,Reason}, Ctx}
+	 [Name, _Ix, _Si, Value]), 
+    case ets:lookup(Cache, I) of
+	[] ->
+	    io:format("WARNING!" 
+		      "~s: set_tpdo_value: unknown tpdo element\n", [Name]),
+	    {{error,unknown_tpdo_element}, Ctx};
+	[{I, OldValues}] ->
+	    NewValues = case OldValues of
+			    [0] -> [Value]; %% remove default
+			    _List -> OldValues ++ [Value]
+			end,
+	    ?dbg(node, "~s: set_tpdo_value: old = ~p, new = ~p",
+		 [Name, OldValues, NewValues]), 
+	    try ets:insert(Cache,{I,NewValues}) of
+		true -> {ok, Ctx}
+	    catch
+		error:Reason -> 
+		    io:format("WARNING!" 
+			      "~s: set_tpdo_value: insert of ~p failed, reason = ~w\n", 
+			      [Name, NewValues, Reason]),
+		    {{error,Reason}, Ctx}
+	    end
     end.
 
 %%
@@ -2452,7 +2494,7 @@ pdo_mapping(IX, _TpdoCtx=#tpdo_ctx {dict = Dict, res_table = ResTable,
     pdo_mapping(IX, ResTable, Dict, TpdoCache).
 pdo_mapping(IX, ResTable, Dict, TpdoCache) ->
     ?dbg(node, "pdo_mapping: ~7.16.0#", [IX]),
-    case tpdo_value({IX,0}, ResTable, Dict, TpdoCache) of
+    case co_dict:value(Dict, IX, 0) of
 	{ok,N} when N >= 0, N =< 64 ->
 	    MType = case IX of
 			_TPDO when IX >= ?IX_TPDO_MAPPING_FIRST, 
@@ -2478,7 +2520,7 @@ pdo_mapping(MType,IX,SI,Sn,ResTable,Dict,TpdoCache) ->
 pdo_mapping(MType,_IX,SI,Sn,Ts,Is,_ResTable,_Dict,_TpdoCache) when SI > Sn ->
     {MType, {reverse(Ts),reverse(Is)}};
 pdo_mapping(MType,IX,SI,Sn,Ts,Is,ResTable,Dict,TpdoCache) ->
-    case tpdo_value({IX,SI},ResTable,Dict,TpdoCache) of
+    case co_dict:value(Dict, IX, SI) of
 	{ok,Map} ->
 	    ?dbg(node, "pdo_mapping: index = ~7.16.0#:~w, map = ~11.16.0#", 
 		 [IX,SI,Map]),
@@ -2517,7 +2559,7 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
 	    case MType of
 		tpdo ->
 		    %% Store default value in cache ??
-		    ets:insert(TpdoCache, {{Ix, Si}, 0}),
+		    ets:insert(TpdoCache, {{Ix, Si}, [0]}),
 		    try Mod:tpdo_callback(Pid, {Ix, Si}, {co_node, tpdo_set}) of
 			Res -> Res %% Handle error??
 		    catch error:Reason ->
@@ -2553,7 +2595,7 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
 tpdo_value({Ix, Si}, #tpdo_ctx {res_table = ResTable, dict = Dict, 
 				   tpdo_cache = TpdoCache}) ->
 	     tpdo_value({Ix, Si}, ResTable, Dict, TpdoCache).
-tpdo_value({Ix, Si}, ResTable, Dict, TpdoCache) ->
+tpdo_value({Ix, Si} = I, ResTable, Dict, TpdoCache) ->
     case co_node:reserver_with_module(ResTable, Ix) of
 	[] ->
 	    ?dbg(node, "tpdo_value: No reserver for index ~7.16.0#", [Ix]),
@@ -2562,36 +2604,36 @@ tpdo_value({Ix, Si}, ResTable, Dict, TpdoCache) ->
 	    ?dbg(node, "tpdo_value: Process ~p has reserved index ~7.16.0#", 
 		 [Pid, Ix]),
 	    %% Value cached ??
-	    case ets:lookup(TpdoCache, {Ix, Si}) of
-		[{_Ix, Value}] -> 
-		    {ok, Value};
-		[] -> 
-		    try  Mod:value(Pid, {Ix, Si}) of
-			Res -> Res %% Handle error??
-		    catch error:Reason ->
-			    io:format("WARNING!" 
-				      "~p: ~p: entry: value call failed"
-				      "for process ~p module ~p, index ~7.16.0#"
-				      ":~w, reason ~p\n", 
-				      [self(), ?MODULE, Pid, Mod, Ix, Si, Reason]),
-			    {error,  ?abort_internal_error}
-		    end
-	    end;
+	    cache_value(TpdoCache, I);
 	{dead, _Mod} ->
 	    ?dbg(node, "tpdo_value: Reserver process for index ~7.16.0# dead.", 
 		 [Ix]),
 	    %% Value cached??
-	    case ets:lookup(TpdoCache, {Ix, Si}) of
-		[{_Ix, Value}] -> 
-		    {ok, Value};
-		[] -> 
-		    {error, ?abort_internal_error} %% ???
-	    end;
+	    cache_value(TpdoCache, I);
 	_Other ->
 	    ?dbg(node, "tpdo_value: Other case = ~p", [_Other]),
 	    {error, ?abort_internal_error}
     end.
 
+cache_value(Cache, I) ->
+    case ets:lookup(Cache, I) of
+	[] ->
+	    io:format("WARNING!" 
+		      "~p: tpdo_value: unknown tpdo element\n", [self()]),
+	    {error,?abort_internal_error};
+	[{I,[LastValue | []]}]  ->
+	    %% Leave last value in cache
+	    ?dbg(node, "cache_value: Last value = ~p.", [LastValue]),
+	    {ok, LastValue};
+	[{I, [FirstValue | Rest]}] ->
+	    %% Remove first value from list
+	    ?dbg(node, "cache_value: First value = ~p, rest = ~p.", 
+		 [FirstValue, Rest]),
+	    ets:insert(Cache, {I, Rest}),
+	    {more, FirstValue}
+    end.
+	    
+    
 rpdo_value({Ix,Si},Value,Type,Ctx) ->
     case co_node:reserver_with_module(Ctx#co_ctx.res_table, Ix) of
 	[] ->

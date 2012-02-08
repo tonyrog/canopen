@@ -9,7 +9,6 @@
 %% Created: December 2011 by Malotte W Lönne
 %% @end
 %%===================================================================
-
 -module(co_os_app).
 -include_lib("canopen/include/canopen.hrl").
 -include("co_app.hrl").

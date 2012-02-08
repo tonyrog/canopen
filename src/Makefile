@@ -8,6 +8,7 @@
 MODULES = \
 	co_app \
 	co_stream_app \
+	co_tpdo_app \
 	canopen \
 	canopen_sup \
 	co_codec \

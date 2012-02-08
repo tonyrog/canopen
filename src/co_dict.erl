@@ -20,7 +20,7 @@
 	 set/4, direct_set/4, force_set/4,
 	 set_array/3, set_objects/3,
 	 value/3, direct_value/3,
-	 to_fd/2
+	 to_file/2, to_fd/2
 	]).
 
 -import(lists,[map/2, foreach/2]).
@@ -223,7 +223,7 @@ to_fd(Dict, Ix, Fd) ->
 		    {access,co_lib:decode_access(O#dict_object.access)},
 		    {type,co_lib:decode_type(O#dict_object.type)} |
 		    Value]},
-	    io:format(Fd, "~p\n", [Var]),
+	    io:format(Fd, "~p.\n", [Var]),
 	    to_fd(Dict, next_object(Dict, Ix), Fd);
 	[O] ->
 	    Es = read_entries(Dict, Ix, -1, []),
@@ -232,7 +232,7 @@ to_fd(Dict, Ix, Fd) ->
 		    {access,co_lib:decode_access(O#dict_object.access)},
 		    {type,co_lib:decode_type(O#dict_object.type)} |
 		    Es]},
-	    io:format(Fd, "~p\n", [Obj]),
+	    io:format(Fd, "~p.\n", [Obj]),
 	    to_fd(Dict, next_object(Dict, Ix), Fd);
 	[] ->
 	    to_fd(Dict, next_object(Dict, Ix), Fd)

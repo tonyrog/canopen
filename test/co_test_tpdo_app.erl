@@ -18,6 +18,7 @@
 -include("co_app.hrl").
 
 -behaviour(gen_server).
+-behaviour(co_tpdo_app).
 
 -compile(export_all).
 
@@ -29,7 +30,8 @@
 	 terminate/2, code_change/3]).
 
 %% CO node callbacks
--export([tpdo_callback/3,
+-export([index_specification/2,
+	 tpdo_callback/3,
 	 value/2]).
 
 
@@ -238,12 +240,12 @@ handle_cast({callback, {_Ix, _Si} = I, {M, F} = MF} = Msg,
     ?dbg("handle_cast: callback called for ~.16B:~.8B with mf = ~w",
 	 [_Ix, _Si, MF]),
 %%    LD#loop_data.starter ! Msg,
-    case ets:lookup(tpdo_dict, I) of
-	[{I, _Type, Value}] ->
-	    ok = M:F(CoNode, I, Value);
-	[] ->
-	    ?dbg("handle_cast: callback - unknown index ", [])
-    end,
+%%    case ets:lookup(tpdo_dict, I) of
+%%	[{I, _Type, Value}] ->
+%%	    ok = M:F(CoNode, I, Value);
+%%	[] ->
+%%	    ?dbg("handle_cast: callback - unknown index ", [])
+%%    end,
     {noreply, LD#loop_data {callback = MF}};
 handle_cast({value, {_Ix, _Si}} = Msg, LD) ->
     ?dbg("handle_cast: value called for ~.16B:~.8B ",[_Ix, _Si]),

@@ -12,6 +12,8 @@ run(Serial) ->
 				     {options, [extended,
 						{max_blksize, 7},
 						{vendor,16#2A1},
-						{dict_file, "test.dict"},
-						{debug, true}]}]).
+						{debug, true}]}]),
+    
+    co_node:load_dict(Serial, filename:join(code:priv_dir(canopen), "default.dict")).
+
 

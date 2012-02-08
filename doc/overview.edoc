@@ -60,7 +60,12 @@ There are two behaviours defined for the above:
 
 ==== TPDO interface ====
 When an application has reserved an index that is included in a TPDO the TPDO process infor
-The application must thus have a function <code>Module:tpdo_callback()</code> that is called by the TPDO process when it builds its TPDO map. In this way the application is given a Module:Function that it should call as soon as the value of the given index is changed. It is god practise for the application to call this immediately to replace the default value stored in the co_node with the current value. 
+The application must thus have a function <code>Module:tpdo_callback()</code> that is called by the TPDO process when it builds its TPDO map. In this way the application is given a Module:Function that it should call as soon as the value of the given index is changed. It is god practise for the application to call this immediately to replace the default value stored in the co_node with the current value. <br/>
+
+There is one behaviour defined for the above:
+<ul>
+<li>co_tpdo_app - For applications reserving an index included in a TPDO. See {@link co_tpdo_app}.</li>
+</ul>
 
 === Modules ===
 ====Header files ====

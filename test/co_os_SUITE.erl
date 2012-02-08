@@ -115,6 +115,7 @@ groups() ->
 			    {skip_and_save,Reason::term(),Config1::list(tuple())}.
 init_per_suite(Config) ->
     co_test_lib:start_node(),
+    co_test_lib:load_dict(Config),
     Config.
 
 %%--------------------------------------------------------------------

@@ -304,10 +304,10 @@ handle_cast(_Msg, S) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info({timeout,Ref,inhibit}, S) when S#s.itmr =:= Ref ->
-    {noreply, do_send(S#s { itmr=false }, S#s.emit)};
+    {noreply, do_send(S#s { itmr=false }, S#s.emit, false)}; %% All ???
 handle_info({timeout,Ref,event}, S) when S#s.etmr =:= Ref ->
     ETmr = start_timer(S#s.event_timer,event), %% restart
-    {noreply, do_send(S#s { etmr=ETmr }, true)};
+    {noreply, do_send(S#s { etmr=ETmr }, true, true)}; %% All ???
 handle_info(_Info, S) ->
     {noreply, S}.
 
@@ -359,7 +359,7 @@ do_transmit(S=#s {state = ?Operational})->
     if S#s.transmission_type =:= ?TRANS_SYNC_ONCE ->
 	    S#s { emit=true }; %% send at next sync
        S#s.transmission_type >= ?TRANS_RTR_SYNC ->
-	    do_send(S,true);
+	    do_send(S,true,true);
        true ->
 	    S  %% ignore, produce error
     end;
@@ -372,7 +372,7 @@ do_rtr(S=#s {state = ?Operational}) ->
 	    if S#s.transmission_type =:= ?TRANS_RTR_SYNC ->
 		    S#s { emit=true };  %% send at next sync
 	       S#s.transmission_type =:= ?TRANS_RTR ->
-		    do_send(S, true);
+		    do_send(S, true, false); %% All ???
 	       true ->
 		    S %% Ignored
 	    end;
@@ -386,14 +386,14 @@ do_rtr(S) ->
 do_sync(S=#s {state = ?Operational}) ->
     ?dbg(tpdo, "do_sync:", []),
     if S#s.transmission_type =:= ?TRANS_RTR_SYNC ->
-	    do_send(S, S#s.emit);
+	    do_send(S, S#s.emit, false);
        S#s.transmission_type =:= ?TRANS_SYNC_ONCE ->
-	    do_send(S, S#s.emit);
+	    do_send(S, S#s.emit, false);
        S#s.transmission_type =< ?TRANS_SYNC_MAX ->
 	    Count = S#s.count - 1,
 	    ?dbg(tpdo, "do_sync: count=~w", [Count]),
 	    if Count =:= 0 ->
-		    do_send(S#s { count=S#s.transmission_type }, true);
+		    do_send(S#s { count=S#s.transmission_type }, true, false);
 	       true ->
 		    S#s { count=Count }
 	    end;
@@ -403,30 +403,44 @@ do_sync(S=#s {state = ?Operational}) ->
 do_sync(S) ->
     S.
 
-do_send(S=#s {state = ?Operational},true) ->
-    ?dbg(tpdo, "do_send:", []),
+do_send(S=#s {state = ?Operational, index_list = IL, type_list = TL, ctx = Ctx}, 
+	true, All) ->
+    ?dbg(tpdo, "do_send: all = ~p", [All]),
     if S#s.itmr =:= false ->
-	    ?dbg(tpdo, "do_send: indexes = ~w", [S#s.index_list]),
-	    Ds = map(fun({IX,SI}) -> 
-			     {ok, V} = 
-				 co_node:tpdo_value({IX, SI},  S#s.ctx), 
-			     V
-		     end,
-		     S#s.index_list),
-	    ?dbg(tpdo, "do_send: values = ~w, types = ~w", [Ds, S#s.type_list]),
-	    Data = co_codec:encode_pdo(Ds, S#s.type_list),
+	    ?dbg(tpdo, "do_send: indexes = ~w", [IL]),
+	    {More, ValueList} = tpdo_values(IL, Ctx, false, []),
+	    ?dbg(tpdo, "do_send: values = ~w, types = ~w, more = ~p", 
+		 [ValueList, TL, More]),
+	    Data = co_codec:encode_pdo(ValueList,TL),
 	    ?dbg(tpdo, "do_send: data = ~p", [Data]),
 	    Frame = #can_frame { id = S#s.id,
 				 len = byte_size(Data),
 				 data = Data },
 	    can:send_from(S#s.from, Frame),
 	    ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
-	    S#s { emit=false, itmr=ITmr };
+	    if All andalso More ->
+		    do_send(S, true, All);
+	       true ->
+		    S#s { emit=false, itmr=ITmr }
+	    end;
        true ->
 	    S#s { emit=true }  %% inhibit is running, delay transmission
     end;
-do_send(S,_) ->
+do_send(S,_,_) ->
     S.
+
+
+tpdo_values([], _Ctx, More, ValueList) ->
+    {More, lists:reverse(ValueList)};
+tpdo_values([Index | Rest], Ctx, More, ValueList) ->
+    case co_node:tpdo_value(Index, Ctx) of
+	{ok, Value} ->
+	    tpdo_values(Rest, Ctx, More, [Value | ValueList]);
+	{more, Value} ->
+	    tpdo_values(Rest, Ctx, true, [Value | ValueList]);
+	Error ->
+	    Error
+    end.
 
 %% Optionally start a timer
 start_timer(0, _Type) -> false;
