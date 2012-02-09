@@ -414,7 +414,9 @@ send_multi(Config) ->
     set(Config, SourceList),
     set(Config, SourceList),
 
-    %% Send tpdo with new value
+    %% Send tpdo with new value 3 times
+    co_node:pdo_event(serial(), CobId),
+    co_node:pdo_event(serial(), CobId),
     co_node:pdo_event(serial(), CobId),
 
     %% Receive values 3 times

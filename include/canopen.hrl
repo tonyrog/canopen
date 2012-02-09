@@ -483,7 +483,8 @@
 %% Node context
 -record(co_ctx,
 	{
-	  id,               %% can bus id
+	  short_nodeid,     %% can bus id
+	  ext_nodeid,       %% can bus id
 	  name,             %% node (process) name
 	  vendor,           %% CANopen vendor code
 	  serial,           %% string version of node serial number

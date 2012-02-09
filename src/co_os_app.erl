@@ -526,7 +526,7 @@ handle_info({Status, Reply} = _Info, LoopData) ->
     {noreply, LoopData#loop_data {state = executed,
 				  status = Status, 
 				  reply = Reply}};
-handle_info({notify, _RemoteId, {_Index, _SubInd}, _Value}, LoopData) ->
+handle_info({notify, _RemoteId, _Index, _SubInd, _Value}, LoopData) ->
     ?dbg(?NAME," handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w \n", 
 	      [_RemoteId, _Index, _SubInd, _Value]),
     {noreply, LoopData};

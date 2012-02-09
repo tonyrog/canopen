@@ -61,6 +61,7 @@ all() ->
      set_options_ok,
      set_options_nok,
      unknown_option,
+     restore_dict,
      start_stop_app].
 %%     break].
 
@@ -227,7 +228,8 @@ start_of_co_node(_Config) ->
 %%--------------------------------------------------------------------
 set_options_ok(_Config) ->
 
-    Options = [{sdo_timeout, 2000},
+    Options = [{name, "Test"},
+	       {sdo_timeout, 2000},
 	       {blk_timeout, 1000},
 	       {pst, 64},
 	       {max_blksize, 64},
@@ -251,7 +253,8 @@ set_options_ok(_Config) ->
 %%--------------------------------------------------------------------
 set_options_nok(_Config) ->
 
-    Options = [{extended, true},
+    Options = [{name, 7},
+	       {use_serial_as_nodeid, false},
 	       {pst, "String"},
 	       {max_blksize, -64},
 	       {use_crc, any},
@@ -277,6 +280,29 @@ unknown_option(_Config) ->
 	co_node:set_option(serial(), unknown_option, any),
 
     ok.
+
+%%--------------------------------------------------------------------
+%% @spec restore_dict(Config) -> ok 
+%% @doc 
+%% Verifies that a saved dict can be restored.
+%% @end
+%%--------------------------------------------------------------------
+restore_dict(_Config) ->
+    {Index, NewValue} = ct:get_config(dict_index),
+    {ok, OldValue} = co_node:value(serial(), Index),
+    ok = co_node:save_dict(serial()),
+
+    %% Change a value and see that it is changed
+    ok = co_node:set(serial(), Index, NewValue),
+    {ok, NewValue} = co_node:value(serial(), Index),
+
+    %% Restore the dictionary and see that the value is restored
+    ok = co_node:load_dict(serial()),
+    {ok, OldValue} = co_node:value(serial(), Index),
+
+    ok.
+
+
 
 %%--------------------------------------------------------------------
 %% @spec start_stop_of_app(Config) -> ok 
@@ -340,8 +366,12 @@ set_option_nok({Option, NewValue}) ->
     {error, R} = co_node:set_option(serial(), Option, NewValue),
 
     case Option of
-	extended -> 
-	    R = "Option extended can not be changed.";
+	name -> 
+	    R = "Option name can only be set to a string or an atom.";
+	ext_nodeid ->
+	    R = "Option ext_nodeid can not be changed.";
+	use_serial_as_nodeid -> 
+	    R = "Option use_serial_as_nodeid can only be true.";
 	pst -> 
 	    R = "Option pst can only be set to a positive integer value or zero.";
 	max_blksize -> 

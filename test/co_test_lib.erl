@@ -20,7 +20,7 @@ start_node() ->
 
 start_node(Serial) ->
     {ok, Pid} = co_node:start_link([{serial,Serial}, 
-				     {options, [extended, 
+				     {options, [{use_serial_as_nodeid, true},
 						{max_blksize, 7},
 						{vendor,16#2A1},
 						{debug, true}]}]),
