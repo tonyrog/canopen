@@ -23,6 +23,7 @@ MODULES = \
 	co_node \
 	co_os_app \
 	co_probe \
+	co_proc \
 	co_sdo \
 	co_sdo_cli_fsm \
 	co_sdo_srv_fsm \
