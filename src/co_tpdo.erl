@@ -372,7 +372,7 @@ do_rtr(S=#s {state = ?Operational}) ->
 	    if S#s.transmission_type =:= ?TRANS_RTR_SYNC ->
 		    S#s { emit=true };  %% send at next sync
 	       S#s.transmission_type =:= ?TRANS_RTR ->
-		    do_send(S, true);
+		    do_send(S, true); 
 	       true ->
 		    S %% Ignored
 	    end;
@@ -403,18 +403,15 @@ do_sync(S=#s {state = ?Operational}) ->
 do_sync(S) ->
     S.
 
-do_send(S=#s {state = ?Operational},true) ->
+do_send(S=#s {state = ?Operational, index_list = IL, type_list = TL, ctx = Ctx}, 
+	true) ->
     ?dbg(tpdo, "do_send:", []),
     if S#s.itmr =:= false ->
-	    ?dbg(tpdo, "do_send: indexes = ~w", [S#s.index_list]),
-	    Ds = map(fun({IX,SI}) -> 
-			     {ok, V} = 
-				 co_node:tpdo_value({IX, SI},  S#s.ctx), 
-			     V
-		     end,
-		     S#s.index_list),
-	    ?dbg(tpdo, "do_send: values = ~w, types = ~w", [Ds, S#s.type_list]),
-	    Data = co_codec:encode_pdo(Ds, S#s.type_list),
+	    ?dbg(tpdo, "do_send: indexes = ~w", [IL]),
+	    ValueList = tpdo_values(IL, Ctx, []),
+	    ?dbg(tpdo, "do_send: values = ~w, types = ~w", 
+		 [ValueList, TL]),
+	    Data = co_codec:encode_pdo(ValueList,TL),
 	    ?dbg(tpdo, "do_send: data = ~p", [Data]),
 	    Frame = #can_frame { id = S#s.id,
 				 len = byte_size(Data),
@@ -427,6 +424,19 @@ do_send(S=#s {state = ?Operational},true) ->
     end;
 do_send(S,_) ->
     S.
+
+
+tpdo_values([], _Ctx, ValueList) ->
+    lists:reverse(ValueList);
+tpdo_values([Index | Rest], Ctx, ValueList) ->
+    case co_node:tpdo_value(Index, Ctx) of
+	{ok, Value} ->
+	    tpdo_values(Rest, Ctx, [Value | ValueList]);
+	{error, Reason} = E->
+	    io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
+		      [self(), Reason]),
+	    E
+    end.
 
 %% Optionally start a timer
 start_timer(0, _Type) -> false;

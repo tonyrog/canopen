@@ -14,7 +14,7 @@
 	<key>BackgroundGraphic</key>
 	<dict>
 		<key>Bounds</key>
-		<string>{{0, 0}, {867, 690}}</string>
+		<string>{{0, 0}, {867, 669}}</string>
 		<key>Class</key>
 		<string>SolidGraphic</string>
 		<key>ID</key>
@@ -36,7 +36,7 @@
 	<key>CanvasOrigin</key>
 	<string>{0, 0}</string>
 	<key>CanvasSize</key>
-	<string>{867, 690}</string>
+	<string>{867, 669}</string>
 	<key>ColumnAlign</key>
 	<integer>1</integer>
 	<key>ColumnSpacing</key>
@@ -74,8 +74,8 @@
 			<integer>641</integer>
 			<key>Points</key>
 			<array>
-				<string>{427.5, 261}</string>
-				<string>{428, 324}</string>
+				<string>{427.5, 198}</string>
+				<string>{428, 234}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -97,7 +97,7 @@
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{378, 225}, {99, 36}}</string>
+			<string>{{378, 162}, {99, 36}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FontInfo</key>
@@ -136,7 +136,7 @@ buffer}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{388.64273, 188.70422}, {106.80542, 32}}</string>
+			<string>{{388.64273, 125.46948}, {106.80542, 32}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -152,7 +152,7 @@ buffer}</string>
 				<key>Offset</key>
 				<real>14.545450210571289</real>
 				<key>Position</key>
-				<real>0.74943488836288452</real>
+				<real>0.61980515718460083</real>
 				<key>RotationType</key>
 				<integer>0</integer>
 			</dict>
@@ -208,8 +208,8 @@ buffer}</string>
 			<integer>597</integer>
 			<key>Points</key>
 			<array>
-				<string>{427.5, 144}</string>
-				<string>{427.5, 225}</string>
+				<string>{427.5, 108.00001}</string>
+				<string>{427.5, 162}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -233,7 +233,7 @@ buffer}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{235, 226}, {26, 26}}</string>
+			<string>{{243, 163}, {26, 26}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>ID</key>
@@ -264,7 +264,7 @@ buffer}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{271.62317, 168.82707}, {63, 32}}</string>
+			<string>{{278.49908, 114.40738}, {63, 32}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -338,8 +338,8 @@ unknown}</string>
 			<integer>594</integer>
 			<key>Points</key>
 			<array>
-				<string>{427.5, 144}</string>
-				<string>{248, 226}</string>
+				<string>{427.5, 108.00001}</string>
+				<string>{256, 163}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -365,7 +365,7 @@ unknown}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{415, 324}, {26, 26}}</string>
+			<string>{{415, 234}, {26, 26}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>ID</key>
@@ -396,7 +396,7 @@ unknown}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{18, 115}, {252, 38}}</string>
+			<string>{{18, 79}, {252, 38}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -442,7 +442,7 @@ unknown}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{324, 108}, {207, 36}}</string>
+			<string>{{324, 72}, {207, 36}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FontInfo</key>
@@ -577,7 +577,7 @@ unknown}</string>
 	<key>MasterSheets</key>
 	<array/>
 	<key>ModificationDate</key>
-	<string>2012-02-06 20:47:27 +0000</string>
+	<string>2012-02-07 12:08:28 +0000</string>
 	<key>Modifier</key>
 	<string>Marina Westman Lönne</string>
 	<key>NotesVisible</key>
@@ -657,7 +657,7 @@ unknown}</string>
 		<key>FitInWindow</key>
 		<true/>
 		<key>Frame</key>
-		<string>{{74, 33}, {1014, 799}}</string>
+		<string>{{115, 250}, {1014, 778}}</string>
 		<key>ListView</key>
 		<false/>
 		<key>OutlineWidth</key>
@@ -669,7 +669,7 @@ unknown}</string>
 		<key>SidebarWidth</key>
 		<integer>138</integer>
 		<key>VisibleRegion</key>
-		<string>{{1, 1}, {865, 689}}</string>
+		<string>{{1, 1}, {865, 668}}</string>
 		<key>Zoom</key>
 		<real>1</real>
 		<key>ZoomValues</key>

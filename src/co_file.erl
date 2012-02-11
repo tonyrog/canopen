@@ -29,7 +29,7 @@
 load(File) ->
     case file:consult(File) of
 	{ok,Objects} ->
-	    io:format("object=~p\n", [Objects]),
+	    %% io:format("object=~p\n", [Objects]),
 	    try load_objects(Objects, []) of
 		Os -> {ok,Os}
 	    catch

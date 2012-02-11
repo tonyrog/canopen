@@ -8,6 +8,7 @@
 MODULES = \
 	co_app \
 	co_stream_app \
+	co_tpdo_app \
 	canopen \
 	canopen_sup \
 	co_codec \
@@ -22,6 +23,7 @@ MODULES = \
 	co_node \
 	co_os_app \
 	co_probe \
+	co_proc \
 	co_sdo \
 	co_sdo_cli_fsm \
 	co_sdo_srv_fsm \

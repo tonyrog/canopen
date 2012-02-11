@@ -9,9 +9,11 @@
 
 run(Serial) ->
     {ok, _Pid} = co_node:start_link([{serial,Serial}, 
-				     {options, [extended,
+				     {options, [{use_serial_as_nodeid, true},
 						{max_blksize, 7},
 						{vendor,16#2A1},
-						{dict_file, "test.dict"},
-						{debug, true}]}]).
+						{debug, true}]}]),
+    
+    co_node:load_dict(Serial, filename:join(code:priv_dir(canopen), "default.dict")).
+
 

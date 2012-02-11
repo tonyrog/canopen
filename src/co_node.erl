@@ -30,6 +30,11 @@
 	 terminate/2,
 	 code_change/3]).
 
+%% Admin interface
+-export([load_dict/1, load_dict/2]).
+-export([save_dict/1, save_dict/2]).
+-export([get_option/2, set_option/3]).
+
 %% Application interface
 -export([subscribe/2, unsubscribe/2]).
 -export([reserve/3, unreserve/2]).
@@ -42,7 +47,6 @@
 
 %% CANopen application internal
 -export([add_entry/2, get_entry/2]).
--export([load_dict/2]).
 -export([set/3, value/2]).
 -export([store/6, fetch/6]).
 -export([subscribers/2]).
@@ -51,12 +55,13 @@
 
 %% Debug interface
 -export([dump/1, loop_data/1]).
--export([get_option/2, set_option/3]).
 -export([nodeid/1]).
 -export([state/2]).
 -export([direct_set/3]).
 
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
+
+-define(BACKUP_FILE, filename:join(code:priv_dir(canopen), "backup.dict")).
 
 -define(COBID_TO_CANID(ID),
 	if ?is_cobid_extended((ID)) ->
@@ -82,23 +87,26 @@
 %% Description: Starts the CANOpen node.
 %%
 %% Options: 
-%%          extended - use extended (29-bit) ID <br/>
-%%          {time_stamp,  timeout()} - ( 60000 )  1m <br/>
-%%          {sdo_timeout, timeout()} - ( 1000 ) <br/>
-%%          {blk_timeout, timeout()} - ( 500 ) <br/>
-%%          {pst, integer()}         - ( 16 ) <br/>
-%%          {max_blksize, integer()} - ( 74 = 518 bytes) <br/>
-%%          {use_crc, boolean()}     - use crc for block (true) <br/>
-%%          {readbufsize, integer()} - size of buf when reading from app <br/>
-%%          {load_ratio, float()} - ratio when time to fill read_buf <br/> 
+%%          {use_serial_as_nodeid, boolean()} 
+%%          {short_nodeid, integer()} - 1-126
+%%          {time_stamp,  timeout()}  - ( 60000 )  1m <br/>
+%%          {sdo_timeout, timeout()}  - ( 1000 ) <br/>
+%%          {blk_timeout, timeout()}  - ( 500 ) <br/>
+%%          {pst, integer()}          - ( 16 ) <br/>
+%%          {max_blksize, integer()}  - ( 74 = 518 bytes) <br/>
+%%          {use_crc, boolean()}      - use crc for block (true) <br/>
+%%          {readbufsize, integer()}  - size of buf when reading from app <br/>
+%%          {load_ratio, float()}     - ratio when time to fill read_buf <br/> 
 %%          {atomic_limit, integer()} - limit to size of atomic variable <br/>
-%%          {debug, boolean()}         - Enable/Disable trace output<br/>
+%%          {debug, boolean()}        - Enable/Disable trace output<br/>
 %%         
 %% @end
 %%--------------------------------------------------------------------
 -spec start_link(list({serial, Serial::integer()} | 
-		      {options, list({vendor, integer()} | 
-				     extended |
+		      {options, list({use_serial_as_nodeid, boolean()} |
+				     {name, string()} |
+				     {vendor, integer()} | 
+				     {short_nodeid, integer()} |
 				     {time_stamp,  timeout()} |  
 				     {sdo_timeout, timeout()} |  
 				     {blk_timeout, timeout()} |  
@@ -117,18 +125,32 @@ start_link(Args) ->
     Serial = proplists:get_value(serial, Args, 0),
     Opts = proplists:get_value(options, Args, []),
 
-    S = serial(Serial),
-    NodeId = 
-	case proplists:get_value(extended,Opts,false) of
-	     false -> S bsr 8;
-	     true  -> (S bsr 8) bor ?COBID_ENTRY_EXTENDED
-	 end,
+    case verify_options(Opts) of
+	ok ->
+	    S = serial(Serial),
+	    NodeId = 
+		case proplists:get_value(use_serial_as_nodeid,Opts,false) of
+		    false -> S bsr 8;
+		    true  -> (S bsr 8) bor ?COBID_ENTRY_EXTENDED
+		end,
+	    
+	    Name = name(Opts, S),
+	    ?dbg(node, "Starting co_node with Name = ~p, Serial = ~.16#, "
+		 "NodeId = ~.16#", [Name, S, NodeId]),
+	    gen_server:start({local, Name}, ?MODULE, {S,NodeId,Name,Opts}, []);
+	E ->
+	    E
+    end.
 
-    Name = name(Opts, S),
-    ?dbg(node, "Starting co_node with Name = ~p, Serial = ~.16#, NodeId = ~.16#",
-	 [Name, S, NodeId]),
-    gen_server:start({local, Name}, ?MODULE, {S,NodeId,Name,Opts}, []).
-
+verify_options([]) ->
+    ok;
+verify_options([{Opt, Value} | Rest]) ->
+    case verify_option(Opt, Value) of
+	ok ->
+	    verify_options(Rest);
+	E ->
+	    E
+    end.
 %%
 %% Get serial number
 %%
@@ -156,6 +178,149 @@ name(Opts, Serial) ->
 				  
 stop(Serial) ->
     gen_server:call(serial_to_pid(Serial), stop).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Loads the default backup dict.
+%%
+%% @end
+%%-------------------------------------------------------------------
+-spec load_dict(Serial::integer()) -> 
+		       ok | {error, Error::atom()}.
+
+load_dict(Serial) ->
+    gen_server:call(serial_to_pid(Serial), {load_dict, ?BACKUP_FILE}).
+    
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Loads a new Object Dictionary from File.
+%%
+%% @end
+%%-------------------------------------------------------------------
+-spec load_dict(Serial::integer(), File::string()) -> 
+		       ok | {error, Error::atom()}.
+
+load_dict(Serial, File) ->
+    gen_server:call(serial_to_pid(Serial), {load_dict, File}).
+    
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Saves the Object Dictionary to a default backup file.
+%%
+%% @end
+%%-------------------------------------------------------------------
+-spec save_dict(Serial::integer()) -> 
+		       ok | {error, Error::atom()}.
+
+save_dict(Serial) ->
+    gen_server:call(serial_to_pid(Serial), {save_dict, ?BACKUP_FILE}).
+    
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Saves the Object Dictionary to a file.
+%%
+%% @end
+%%-------------------------------------------------------------------
+-spec save_dict(Serial::integer(), File::string()) -> 
+		       ok | {error, Error::atom()}.
+
+save_dict(Serial, File) ->
+    gen_server:call(serial_to_pid(Serial), {save_dict, File}).
+    
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Gets value of option variable. (For testing)
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_option(Serial::integer(), Option::atom()) -> 
+			{ok, {option, Value::term()}} | 
+			{error, unkown_option}.
+
+get_option(Serial, Option) ->
+    gen_server:call(serial_to_pid(Serial), {option, Option}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Sets value of option variable. (For testing)
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec set_option(Serial::integer(), Option::atom(), NewValue::term()) -> 
+			ok | {error, Reason::string()}.
+
+set_option(Serial, Option, NewValue) ->
+    ?dbg(node, "set_option: Option = ~p, NewValue = ~p",[Option, NewValue]),
+    case verify_option(Option, NewValue) of
+	ok ->
+	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});	    
+	{error, _Reason} = Error ->
+	    ?dbg(node, "set_option: option rejected, reason = ~p",[_Reason]),
+	    Error
+    end.
+
+verify_option(Option, NewValue) 
+  when Option == vendor;
+       Option == max_blksize;
+       Option == readbufsize;
+       Option == time_stamp; 
+       Option == sdo_timeout;
+       Option == blk_timeout;
+       Option == atomic_limit ->
+    if is_integer(NewValue) andalso NewValue > 0 ->
+	    ok;
+       true ->
+	    {error, "Option " ++ atom_to_list(Option) ++ 
+		 " can only be set to a positive integer value."}
+    end;
+verify_option(Option, NewValue) 
+  when Option == pst ->
+    if is_integer(NewValue) andalso NewValue >= 0 ->
+	    ok;
+       true ->
+	    {error, "Option " ++ atom_to_list(Option) ++ 
+		 " can only be set to a positive integer value or zero."}
+    end;
+verify_option(Option, NewValue) 
+  when Option == short_nodeid ->
+    if is_integer(NewValue) andalso NewValue > 0 andalso NewValue < 127->
+	    ok;
+       true ->
+	    {error, "Option " ++ atom_to_list(Option) ++ 
+		 " can only be set to a positive integer between 1 and 126."}
+    end;
+verify_option(Option, NewValue) 
+  when Option == use_serial_as_nodeid;
+       Option == use_crc;
+       Option == debug ->
+    if is_boolean(NewValue) ->
+	    ok;
+       true ->
+	    {error, "Option " ++ atom_to_list(Option) ++ 
+		 " can only be set to true or false."}
+    end;
+verify_option(Option, NewValue) 
+  when Option == load_ratio ->
+    if is_float (NewValue) andalso NewValue > 0 andalso NewValue =< 1 ->
+	    ok;
+       true ->
+	    {error, "Option " ++ atom_to_list(Option) ++ 
+		 " can only be set to a float value between 0 and 1."}
+    end;
+verify_option(Option, NewValue) 
+  when Option == name ->
+    if is_list(NewValue) orelse is_atom(NewValue)->
+	    ok;
+       true ->
+	    {error, "Option " ++ atom_to_list(Option) ++ 
+		 " can only be set to a string or an atom."}
+    end;
+verify_option(Option, _NewValue) ->
+    {error, "Option " ++ atom_to_list(Option) ++ " unknown."}.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -388,19 +553,6 @@ get_entry(Serial, Ix) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Loads a new Object Dictionary from File.
-%%
-%% @end
-%%-------------------------------------------------------------------
--spec load_dict(Serial::integer(), File::atom()) -> 
-		       ok | {error, Error::atom()}.
-
-load_dict(Serial, File) ->
-    gen_server:call(serial_to_pid(Serial), {load_dict, File}).
-    
-
-%%--------------------------------------------------------------------
-%% @doc
 %% Sets {Ix, Si} to Value.
 %% @end
 %%--------------------------------------------------------------------
@@ -567,78 +719,6 @@ state(Serial, stopped) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Gets value of option variable. (For testing)
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec get_option(Serial::integer(), Option::atom()) -> 
-			{ok, {option, Value::term()}} | 
-			{error, unkown_option}.
-
-get_option(Serial, Option) ->
-    gen_server:call(serial_to_pid(Serial), {option, Option}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Sets value of option variable. (For testing)
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec set_option(Serial::integer(), Option::atom(), NewValue::term()) -> 
-			ok | {error, Reason::string()}.
-
-set_option(Serial, Option, NewValue) 
-  when Option == vendor;
-       Option == max_blksize;
-       Option == readbufsize;
-       Option == time_stamp; 
-       Option == sdo_timeout;
-       Option == blk_timeout;
-       Option == atomic_limit ->
-    ?dbg(node, "set_option1: Option = ~p",[Option]),
-    if is_integer(NewValue) andalso NewValue > 0 ->
-	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to a positive integer value."}
-    end;
-set_option(Serial, Option, NewValue) 
-  when Option == pst ->
-    ?dbg(node, "set_option2: Option = ~p",[Option]),
-    if is_integer(NewValue) andalso NewValue >= 0 ->
-	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to a positive integer value or zero."}
-    end;
-set_option(Serial, Option, NewValue) 
-  when Option == use_crc;
-       Option == debug ->
-    ?dbg(node, "set_option3: Option = ~p",[Option]),
-    if is_boolean(NewValue) ->
-	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to true or false."}
-    end;
-set_option(Serial, Option, NewValue) 
-  when Option == load_ratio ->
-    ?dbg(node, "set_option4: Option = ~p",[Option]),
-    if is_float (NewValue) andalso NewValue > 0 andalso NewValue =< 1 ->
-	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to a float value between 0 and 1."}
-    end;
-set_option(_Serial, extended, _NewValue) ->
-    {error, "Option extended can not be changed."};
-set_option(_Serial, Option, _NewValue) ->
-    ?dbg(node, "set_option6: Option = ~p",[Option]),
-    {error, "Option " ++ atom_to_list(Option) ++ " unknown."}.
-
-
-%%--------------------------------------------------------------------
-%% @doc
 %% Send notification (from Nid). <br/>
 %% SubInd is set to 0.<br/>
 %% Executing in calling process context.<br/>
@@ -790,7 +870,8 @@ init({Serial, NodeId, NodeName, Opts}) ->
      },
     CobTable = create_cob_table(NodeId),
     Ctx = #co_ctx {
-      id     = NodeId,
+      ext_nodeid = NodeId,
+      short_nodeid = 0,
       name   = NodeName,
       vendor = proplists:get_value(vendor,Opts,0),
       serial = Serial,
@@ -833,18 +914,18 @@ init({Serial, NodeId, NodeName, Opts}) ->
 %%
 %%
 reset_application(Ctx) ->
-    io:format("Node '~s' id=~w reset_application\n", [Ctx#co_ctx.name, Ctx#co_ctx.id]),
+    io:format("Node '~s' id=~w reset_application\n", [Ctx#co_ctx.name, Ctx#co_ctx.ext_nodeid]),
     reset_communication(Ctx).
 
 reset_communication(Ctx) ->
     io:format("Node '~s' id=~w reset_communication\n",
-	      [Ctx#co_ctx.name, Ctx#co_ctx.id]),
+	      [Ctx#co_ctx.name, Ctx#co_ctx.ext_nodeid]),
     initialization(Ctx).
 
 initialization(Ctx) ->
     io:format("Node '~s' id=~w initialization\n",
-	      [Ctx#co_ctx.name, Ctx#co_ctx.id]),
-    BootMessage = #can_frame { id = ?NODE_GUARD_ID(Ctx#co_ctx.id),
+	      [Ctx#co_ctx.name, Ctx#co_ctx.ext_nodeid]),
+    BootMessage = #can_frame { id = ?NODE_GUARD_ID(Ctx#co_ctx.ext_nodeid),
 			       len = 1, data = <<0>> },
     can:send(BootMessage),
     Ctx#co_ctx { state = ?PreOperational }.
@@ -954,15 +1035,23 @@ handle_call({load_dict, File}, _From, Ctx) ->
 	    {reply, Error, Ctx1}
     end;
 
+handle_call({save_dict, File}, _From, Ctx=#co_ctx {dict = Dict}) ->
+    case co_dict:to_file(Dict, File) of
+	ok ->
+	    {reply, ok, Ctx};
+	{error, Error} ->
+	    {reply, Error, Ctx}
+    end;
+
 handle_call({attach,Pid}, _From, Ctx) when is_pid(Pid) ->
     case lists:keysearch(Pid, #app.pid, Ctx#co_ctx.app_list) of
 	false ->
 	    Mon = erlang:monitor(process, Pid),
 	    App = #app { pid=Pid, mon=Mon },
 	    Ctx1 = Ctx#co_ctx { app_list = [App |Ctx#co_ctx.app_list] },
-	    {reply, {ok, Ctx1#co_ctx.id}, Ctx1};
+	    {reply, {ok, Ctx1#co_ctx.ext_nodeid}, Ctx1};
 	{value,_} ->
-	    {reply, {error, already_attached, Ctx#co_ctx.id}, Ctx}
+	    {reply, {error, already_attached, Ctx#co_ctx.ext_nodeid}, Ctx}
     end;
 
 handle_call({detach,Pid}, _From, Ctx) when is_pid(Pid) ->
@@ -1035,7 +1124,7 @@ handle_call({reservers}, _From, Ctx)  ->
 
 handle_call(dump, _From, Ctx) ->
     io:format("  NAME: ~p\n", [Ctx#co_ctx.name]),
-    io:format("    ID: ~8.16.0B\n", [Ctx#co_ctx.id]),
+    io:format("    ID: ~8.16.0B\n", [Ctx#co_ctx.ext_nodeid]),
     io:format("VENDOR: ~8.16.0B\n", [Ctx#co_ctx.vendor]),
     io:format("SERIAL: ~8.16.0B\n", [Ctx#co_ctx.serial]),
     io:format(" STATE: ~s\n", [co_format:state(Ctx#co_ctx.state)]),
@@ -1112,6 +1201,10 @@ handle_call(loop_data, _From, Ctx) ->
 
 handle_call({option, Option}, _From, Ctx) ->
     Reply = case Option of
+		name -> {Option, Ctx#co_ctx.name};
+		short_nodeid -> {Option, Ctx#co_ctx.short_nodeid};
+		ext_nodeid -> {Option, Ctx#co_ctx.ext_nodeid};
+		use_serial_as_nodeid -> {Option, true};
 		sdo_timeout ->  {Option, Ctx#co_ctx.sdo#sdo_ctx.timeout};
 		blk_timeout -> {Option, Ctx#co_ctx.sdo#sdo_ctx.blk_timeout};
 		pst ->  {Option, Ctx#co_ctx.sdo#sdo_ctx.pst};
@@ -1121,7 +1214,6 @@ handle_call({option, Option}, _From, Ctx) ->
 		load_ratio -> {Option, Ctx#co_ctx.sdo#sdo_ctx.load_ratio};
 		atomic_limit -> {Option, Ctx#co_ctx.sdo#sdo_ctx.atomic_limit};
 		time_stamp -> {Option, Ctx#co_ctx.time_stamp_time};
-		extended -> {Option, ?is_nodeid_extended(Ctx#co_ctx.id)};
 		debug -> {Option, Ctx#co_ctx.sdo#sdo_ctx.debug};
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
 	    end,
@@ -1132,6 +1224,8 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
     ?dbg(node, "~s: handle_call: option = ~p, new value = ~p", 
 	 [Ctx#co_ctx.name, Option, NewValue]),    
     Reply = case Option of
+		name -> Ctx#co_ctx {name = NewValue}; %% Reg new name ??
+		short_nodeid -> Ctx#co_ctx {short_nodeid = NewValue}; %% Reg new nodeid ??
 		sdo_timeout -> Ctx#co_ctx.sdo#sdo_ctx {timeout = NewValue};
 		blk_timeout -> Ctx#co_ctx.sdo#sdo_ctx {blk_timeout = NewValue};
 		pst ->  Ctx#co_ctx.sdo#sdo_ctx {pst = NewValue};
@@ -1141,7 +1235,13 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
 		load_ratio -> Ctx#co_ctx.sdo#sdo_ctx {load_ratio = NewValue};
 		atomic_limit -> Ctx#co_ctx.sdo#sdo_ctx {atomic_limit = NewValue};
 		time_stamp -> Ctx#co_ctx {time_stamp_time = NewValue};
-		extended -> {error, "Option extended not possible to change"};
+		use_serial_as_nodeid -> 
+		    if NewValue == true ->
+			    Ctx;
+		       true ->
+			    {error, "Option " ++ atom_to_list(Option) ++
+				 " can only be true."}
+		    end;
 		debug -> put(dbg, NewValue),
 			 Ctx#co_ctx.sdo#sdo_ctx {debug = NewValue};
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
@@ -1158,7 +1258,7 @@ handle_call(stop, _From, Ctx) ->
     {stop, normal, ok, Ctx};
 
 handle_call(nodeid, _From, Ctx) ->
-    {reply, Ctx#co_ctx.id, Ctx};
+    {reply, Ctx#co_ctx.ext_nodeid, Ctx};
 
 handle_call({state, State}, _From, Ctx) ->
     broadcast_state(State, Ctx),
@@ -1384,7 +1484,10 @@ create_sub_table() ->
 %%    IX_RPDO_PARAM_FIRST - IX_RPDO_PARAM_LAST =>  cob_table
 %% 
 load_dict_init(undefined, Ctx) ->
-    {ok, Ctx};
+    case filelib:is_regular(?BACKUP_FILE) of
+	true -> load_dict_init(?BACKUP_FILE, Ctx);
+	false -> {ok, Ctx}
+    end;
 load_dict_init(File, Ctx) ->
     case load_dict_internal(filename:join(code:priv_dir(canopen), File), Ctx) of
 	{ok, NewCtx} -> {ok, NewCtx};
@@ -1527,7 +1630,7 @@ handle_can(Frame, Ctx) ->
 handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
     ?dbg(node, "~s: handle_nmt: ~p", [Ctx#co_ctx.name, M]),
     <<NodeId,Cs,_/binary>> = M#can_frame.data,
-    if NodeId == 0; NodeId == Ctx#co_ctx.id ->
+    if NodeId == 0; NodeId == Ctx#co_ctx.ext_nodeid ->
 	    case Cs of
 		?NMT_RESET_NODE ->
 		    reset_application(Ctx);
@@ -1556,9 +1659,9 @@ handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
 handle_node_guard(Frame, Ctx) when ?is_can_frame_rtr(Frame) ->
     ?dbg(node, "~s: handle_node_guard: request ~w", [Ctx#co_ctx.name,Frame]),
     NodeId = ?NODE_ID(Frame#can_frame.id),
-    if NodeId == 0; NodeId == Ctx#co_ctx.id ->
+    if NodeId == 0; NodeId == Ctx#co_ctx.ext_nodeid ->
 	    Data = Ctx#co_ctx.state bor Ctx#co_ctx.toggle,
-	    can:send(#can_frame { id = ?NODE_GUARD_ID(Ctx#co_ctx.id),
+	    can:send(#can_frame { id = ?NODE_GUARD_ID(Ctx#co_ctx.ext_nodeid),
 				  len = 1,
 				  data = <<Data>> }),
 	    Toggle = Ctx#co_ctx.toggle bxor 16#80,
@@ -1571,8 +1674,8 @@ handle_node_guard(Frame, Ctx) when Frame#can_frame.len >= 1 ->
     ?dbg(node, "~s: handle_node_guard: ~w", [Ctx#co_ctx.name,Frame]),
     NodeId = ?NODE_ID(Frame#can_frame.id),
     case Frame#can_frame.data of
-	<<_Toggle:1, State:7, _/binary>> when NodeId =/= Ctx#co_ctx.id ->
-	    %% Verify toggle if NodeId=slave and we are Ctx#co_ctx.id=master
+	<<_Toggle:1, State:7, _/binary>> when NodeId =/= Ctx#co_ctx.ext_nodeid ->
+	    %% Verify toggle if NodeId=slave and we are Ctx#co_ctx.ext_nodeid=master
 	    update_nmt_entry(NodeId, [{state,State}], Ctx);
 	_ ->
 	    Ctx
@@ -2382,7 +2485,7 @@ cob_map({pdo,Invalid,Rtr,Ext,DynCob}, S) ->
 	
 %% dynamically lookup nodeid (by serial)
 dyn_nodeid({cob,_I},Ctx) ->
-    Ctx#co_ctx.id;
+    Ctx#co_ctx.ext_nodeid;
 dyn_nodeid({cob,_I,Serial},Ctx) ->
     case ets:lookup(Ctx#co_ctx.node_map, Serial) of
 	[]       -> ?COBID_ENTRY_INVALID;
@@ -2400,13 +2503,31 @@ set_tpdo_value(I,Value,Ctx)  when is_list(Value) andalso length(Value) > 16 ->
     %% ??
     set_tpdo_value(I,lists:sublist(Value,16),Ctx);
 %% Other conversions ???
-set_tpdo_value({_Ix, _Si} = I,Value,Ctx) ->
+set_tpdo_value({_Ix, _Si} = I, Value, 
+	       Ctx=#co_ctx {tpdo_cache = Cache, name = Name}) ->
     ?dbg(node, "~s: set_tpdo_value: Ix = ~.16#:~w, Value = ~p",
-	 [Ctx#co_ctx.name, _Ix, _Si, Value]), 
-    try ets:insert(Ctx#co_ctx.tpdo_cache,{I,Value}) of
-	true -> {ok, Ctx}
-    catch
-	error:Reason -> {{error,Reason}, Ctx}
+	 [Name, _Ix, _Si, Value]), 
+    case ets:lookup(Cache, I) of
+	[] ->
+	    io:format("WARNING!" 
+		      "~s: set_tpdo_value: unknown tpdo element\n", [Name]),
+	    {{error,unknown_tpdo_element}, Ctx};
+	[{I, OldValues}] ->
+	    NewValues = case OldValues of
+			    [0] -> [Value]; %% remove default
+			    _List -> OldValues ++ [Value]
+			end,
+	    ?dbg(node, "~s: set_tpdo_value: old = ~p, new = ~p",
+		 [Name, OldValues, NewValues]), 
+	    try ets:insert(Cache,{I,NewValues}) of
+		true -> {ok, Ctx}
+	    catch
+		error:Reason -> 
+		    io:format("WARNING!" 
+			      "~s: set_tpdo_value: insert of ~p failed, reason = ~w\n", 
+			      [Name, NewValues, Reason]),
+		    {{error,Reason}, Ctx}
+	    end
     end.
 
 %%
@@ -2452,7 +2573,7 @@ pdo_mapping(IX, _TpdoCtx=#tpdo_ctx {dict = Dict, res_table = ResTable,
     pdo_mapping(IX, ResTable, Dict, TpdoCache).
 pdo_mapping(IX, ResTable, Dict, TpdoCache) ->
     ?dbg(node, "pdo_mapping: ~7.16.0#", [IX]),
-    case tpdo_value({IX,0}, ResTable, Dict, TpdoCache) of
+    case co_dict:value(Dict, IX, 0) of
 	{ok,N} when N >= 0, N =< 64 ->
 	    MType = case IX of
 			_TPDO when IX >= ?IX_TPDO_MAPPING_FIRST, 
@@ -2478,7 +2599,7 @@ pdo_mapping(MType,IX,SI,Sn,ResTable,Dict,TpdoCache) ->
 pdo_mapping(MType,_IX,SI,Sn,Ts,Is,_ResTable,_Dict,_TpdoCache) when SI > Sn ->
     {MType, {reverse(Ts),reverse(Is)}};
 pdo_mapping(MType,IX,SI,Sn,Ts,Is,ResTable,Dict,TpdoCache) ->
-    case tpdo_value({IX,SI},ResTable,Dict,TpdoCache) of
+    case co_dict:value(Dict, IX, SI) of
 	{ok,Map} ->
 	    ?dbg(node, "pdo_mapping: index = ~7.16.0#:~w, map = ~11.16.0#", 
 		 [IX,SI,Map]),
@@ -2517,7 +2638,7 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
 	    case MType of
 		tpdo ->
 		    %% Store default value in cache ??
-		    ets:insert(TpdoCache, {{Ix, Si}, 0}),
+		    ets:insert(TpdoCache, {{Ix, Si}, [0]}),
 		    try Mod:tpdo_callback(Pid, {Ix, Si}, {co_node, tpdo_set}) of
 			Res -> Res %% Handle error??
 		    catch error:Reason ->
@@ -2553,7 +2674,7 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
 tpdo_value({Ix, Si}, #tpdo_ctx {res_table = ResTable, dict = Dict, 
 				   tpdo_cache = TpdoCache}) ->
 	     tpdo_value({Ix, Si}, ResTable, Dict, TpdoCache).
-tpdo_value({Ix, Si}, ResTable, Dict, TpdoCache) ->
+tpdo_value({Ix, Si} = I, ResTable, Dict, TpdoCache) ->
     case co_node:reserver_with_module(ResTable, Ix) of
 	[] ->
 	    ?dbg(node, "tpdo_value: No reserver for index ~7.16.0#", [Ix]),
@@ -2562,36 +2683,36 @@ tpdo_value({Ix, Si}, ResTable, Dict, TpdoCache) ->
 	    ?dbg(node, "tpdo_value: Process ~p has reserved index ~7.16.0#", 
 		 [Pid, Ix]),
 	    %% Value cached ??
-	    case ets:lookup(TpdoCache, {Ix, Si}) of
-		[{_Ix, Value}] -> 
-		    {ok, Value};
-		[] -> 
-		    try  Mod:value(Pid, {Ix, Si}) of
-			Res -> Res %% Handle error??
-		    catch error:Reason ->
-			    io:format("WARNING!" 
-				      "~p: ~p: entry: value call failed"
-				      "for process ~p module ~p, index ~7.16.0#"
-				      ":~w, reason ~p\n", 
-				      [self(), ?MODULE, Pid, Mod, Ix, Si, Reason]),
-			    {error,  ?abort_internal_error}
-		    end
-	    end;
+	    cache_value(TpdoCache, I);
 	{dead, _Mod} ->
 	    ?dbg(node, "tpdo_value: Reserver process for index ~7.16.0# dead.", 
 		 [Ix]),
 	    %% Value cached??
-	    case ets:lookup(TpdoCache, {Ix, Si}) of
-		[{_Ix, Value}] -> 
-		    {ok, Value};
-		[] -> 
-		    {error, ?abort_internal_error} %% ???
-	    end;
+	    cache_value(TpdoCache, I);
 	_Other ->
 	    ?dbg(node, "tpdo_value: Other case = ~p", [_Other]),
 	    {error, ?abort_internal_error}
     end.
 
+cache_value(Cache, I) ->
+    case ets:lookup(Cache, I) of
+	[] ->
+	    io:format("WARNING!" 
+		      "~p: tpdo_value: unknown tpdo element\n", [self()]),
+	    {error,?abort_internal_error};
+	[{I,[LastValue | []]}]  ->
+	    %% Leave last value in cache
+	    ?dbg(node, "cache_value: Last value = ~p.", [LastValue]),
+	    {ok, LastValue};
+	[{I, [FirstValue | Rest]}] ->
+	    %% Remove first value from list
+	    ?dbg(node, "cache_value: First value = ~p, rest = ~p.", 
+		 [FirstValue, Rest]),
+	    ets:insert(Cache, {I, Rest}),
+	    {ok, FirstValue}
+    end.
+	    
+    
 rpdo_value({Ix,Si},Value,Type,Ctx) ->
     case co_node:reserver_with_module(Ctx#co_ctx.res_table, Ix) of
 	[] ->

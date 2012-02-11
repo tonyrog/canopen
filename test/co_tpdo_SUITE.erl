@@ -65,7 +65,8 @@ all() ->
      send_tpdo1,
      send_tpdo2,
      send_tpdo3,
-     send_tpdo4
+     send_tpdo4,
+     send_multi
     ].
 %%     break].
 
@@ -118,7 +119,9 @@ groups() ->
 			    {skip_and_save,Reason::term(),Config1::list(tuple())}.
 init_per_suite(Config) ->
     co_test_lib:start_node(),
+    co_test_lib:load_dict(Config),
     co_test_lib:start_node(?RPDO_NODE),
+    co_test_lib:load_dict(Config, ?RPDO_NODE),
 
     Config.
 
@@ -253,10 +256,10 @@ init_per_testcase(_TestCase, Config) ->
 end_per_testcase(TestCase, _Config) when TestCase == encode_decode ->
     ok;
 
-end_per_testcase(TestCase, _Config) when TestCase == send_tpdo0 ->
+end_per_testcase(TestCase, Config) when TestCase == send_tpdo0 ->
     %% Restore data
-    co_test_lib:reload_dict(serial()),
-    co_test_lib:reload_dict(?RPDO_NODE),
+    co_test_lib:load_dict(Config),
+    co_test_lib:load_dict(Config, ?RPDO_NODE),
     ok;
 
 end_per_testcase(_TestCase, _Config) ->
@@ -273,10 +276,65 @@ end_per_testcase(_TestCase, _Config) ->
 
 %%--------------------------------------------------------------------
 %% @doc 
-%% Verifies sending of tpdo
+%% Checks that encode - decode results in same as original
 %% @end
 %%--------------------------------------------------------------------
--spec send_tpdo1(Config::list(tuple())) -> ok.
+-spec encode_decode(Config::list(tuple())) -> ok.
+
+encode_decode(_Config) ->
+    %% Encode decode testing
+    %% {ValuesIn, TypesIn, ValuesOut, TypesOut}
+    Cases = 
+	[{["hej"], [{string, 64}], [[104,101,106,0,0,0,0,0]], [{string, 64}]},
+	 {["hej"], [{string, 64}], [[0,0,0]], [{string, 24}]},
+	 {["hejsanxx"], [{string, 64}], ["hejsanxx"], [{string, 64}]},
+	 {["hej"], [{string, 24}], ["hej"], [{string, 24}]},
+	 {[16#AAAA], [{integer, 32}], [16#AAAA], [{integer, 32}]},
+	 {[16#AAAA], [{unsigned, 16}], [16#AAAA], [{unsigned, 16}]},
+	 {[16#AAAA, 16#BBBB], [{unsigned, 16}, {unsigned, 16}], 
+	  [16#AAAA, 16#BBBB], [{unsigned, 16}, {unsigned, 16}]},
+	 {[16#AAAA, 16#BBBB], [{unsigned, 16}, {unsigned, 16}], 
+	  [16#BBBBAAAA], [{unsigned, 32}]},
+	 {[16#AAAAAAAA], [{unsigned, 16}], [16#AAAA], [{unsigned, 16}]},
+	 {[6], [{integer16, 32}], [not_used], [{integer16, 32}]}],
+
+    lists:foreach(
+      fun({ValuesIn, TsIn, ValuesOut, TsOut}) ->
+	      TsInX = [{co_lib:encode_type(T), S } || {T,S} <- TsIn],
+	      TsOutX = [{co_lib:encode_type(T), S } || {T,S} <- TsOut],
+	      try co_codec:encode(ValuesIn, TsInX) of
+		  Bin -> 
+		      try co_codec:decode(Bin, TsOutX) of
+			  {ValuesOut, _Rest} ->
+			      ok;
+			  {OtherValuesOut, Rest} ->
+			      %% Add other check when encoding - decoding
+			      %% 'too short' string ???
+			      ct:pal("Encoding values ~p with types ~w = ~w,\n "
+				     "resulting bin ~w,\n "
+				     "decoded ~p with types ~w = ~w,\n"
+				     "residue ~p",
+				     [ValuesIn, TsIn, TsInX, Bin, 
+				      OtherValuesOut, TsOut, TsInX, Rest])
+		      catch error:Reason2 ->
+			    ct:pal("Decode of ~p with ~w = ~w failed, reason ~p", 
+				   [Bin, TsOut, TsOutX, Reason2])
+		      end
+	      catch error:Reason1 ->
+		      ct:pal("Encode of ~p with ~w = ~w failed, reason ~p", 
+			     [ValuesIn, TsIn, TsInX, Reason1])
+	      end
+      end, Cases),
+    
+    ok.
+    
+
+%%--------------------------------------------------------------------
+%% @doc 
+%% Verifies sending of tpdo0 - co_node dictionary entries
+%% @end
+%%--------------------------------------------------------------------
+-spec send_tpdo0(Config::list(tuple())) -> ok.
 
 send_tpdo0(_Config) ->
     %% Set and read in dict
@@ -303,24 +361,110 @@ send_tpdo0(_Config) ->
     
     ok.
     
+%%--------------------------------------------------------------------
+%% @doc 
+%% Verifies sending of tpdo1 - 1 string to 1 string
+%% @end
+%%--------------------------------------------------------------------
+-spec send_tpdo1(Config::list(tuple())) -> ok.
 send_tpdo1(Config) ->
     send_tpdo(Config, tpdo1).
 
+%%--------------------------------------------------------------------
+%% @doc 
+%% Verifies sending of tpdo2 - 2 strings to 2 other strings
+%% @end
+%%--------------------------------------------------------------------
+-spec send_tpdo2(Config::list(tuple())) -> ok.
 send_tpdo2(Config) ->
     send_tpdo(Config, tpdo2).
 
+%%--------------------------------------------------------------------
+%% @doc 
+%% Verifies sending of tpdo3 - 1 integer to 1 integer
+%% @end
+%%--------------------------------------------------------------------
+-spec send_tpdo3(Config::list(tuple())) -> ok.
 send_tpdo3(Config) ->
     send_tpdo(Config, tpdo3).
 
+%%--------------------------------------------------------------------
+%% @doc 
+%% Verifies sending of tpdo4 2 unsigned to 1 unsigned
+%% @end
+%%--------------------------------------------------------------------
+-spec send_tpdo4(Config::list(tuple())) -> ok.
 send_tpdo4(Config) ->
     send_tpdo(Config, tpdo4).
+
+%%--------------------------------------------------------------------
+%% @doc 
+%% Verifies that multiple sets results in multiple receives.
+%% @end
+%%--------------------------------------------------------------------
+-spec send_multi(Config::list(tuple())) -> ok.
+
+send_multi(Config) ->
+    %% Wait for all processes to be up
+    timer:sleep(100),
+    {CobId, SourceList, TargetList} = ct:get_config(tpdo1),
+
+    %% Set values 3 times
+    set(Config, SourceList),
+    set(Config, SourceList),
+    set(Config, SourceList),
+
+    %% Send tpdo with new value 3 times
+    co_node:pdo_event(serial(), CobId),
+    co_node:pdo_event(serial(), CobId),
+    co_node:pdo_event(serial(), CobId),
+
+    %% Receive values 3 times
+    rec(TargetList),
+    rec(TargetList),
+    rec(TargetList),
+   
+    ok.
+    
+  
+%%--------------------------------------------------------------------
+%% @doc 
+%% Dummy test case to have a test environment running.
+%% Stores Config in ets table.
+%% @end
+%%--------------------------------------------------------------------
+-spec break(Config::list(tuple())) -> ok.
+
+break(Config) ->
+    ets:new(config, [set, public, named_table]),
+    ets:insert(config, Config),
+    test_server:break("Break for test development\n" ++
+		     "Get Config by ets:tab2list(config)"),
+    ok.
+
+
+%%--------------------------------------------------------------------
+%% Help functions
+%%--------------------------------------------------------------------
+serial() -> co_test_lib:serial().
+app_dict() -> co_test_lib:app_dict().
 
 send_tpdo(Config, Tpdo) ->
     %% Wait for all processes to be up
     timer:sleep(100),
     {CobId, SourceList, TargetList} = ct:get_config(Tpdo),
-     
+
     %% Set values
+    set(Config, SourceList),
+
+    %% Send tpdo with new value
+    co_node:pdo_event(serial(), CobId),
+
+    rec(TargetList),
+
+    ok.
+
+set(Config, SourceList) ->
     lists:foreach(
       fun({{Ix, Si} = SourceIndex, SourceValue}) -> 
 	      ct:pal("Setting ~.16B:~w to ~p",[Ix, Si, SourceValue]),
@@ -331,13 +475,8 @@ send_tpdo(Config, Tpdo) ->
     %% Wait for new values to be sent to co_node
     timer:sleep(100),
 
-    %% Send tpdo with new value
-    co_node:pdo_event(serial(), CobId),
-
-    rec(TargetList),
-
     ok.
-
+   
 
 rec([{TargetIndex, TargetValue}]) ->
     receive 
@@ -375,71 +514,3 @@ rec({TargetIndex1, TargetValue1}, {TargetIndex2, TargetValue2}) ->
 	    ct:fail("Application did not get set")
     end,
     ok.
-    
-  
-encode_decode(_Config) ->
-    %% Encode decode testing
-    %% {ValuesIn, TypesIn, ValuesOut, TypesOut}
-    Cases = 
-	[{["hej"], [{string, 64}], [[104,101,106,0,0,0,0,0]], [{string, 64}]},
-	 {["hej"], [{string, 64}], [[0,0,0]], [{string, 24}]},
-	 {["hejsanxx"], [{string, 64}], ["hejsanxx"], [{string, 64}]},
-	 {["hej"], [{string, 24}], ["hej"], [{string, 24}]},
-	 {[16#AAAA], [{integer, 32}], [16#AAAA], [{integer, 32}]},
-	 {[16#AAAA], [{unsigned, 16}], [16#AAAA], [{unsigned, 16}]},
-	 {[16#AAAA, 16#BBBB], [{unsigned, 16}, {unsigned, 16}], 
-	  [16#AAAA, 16#BBBB], [{unsigned, 16}, {unsigned, 16}]},
-	 {[16#AAAA, 16#BBBB], [{unsigned, 16}, {unsigned, 16}], 
-	  [16#BBBBAAAA], [{unsigned, 32}]},
-	 {[16#AAAAAAAA], [{unsigned, 16}], [16#AAAA], [{unsigned, 16}]},
-	 {[6], [{integer16, 32}], [not_used], [{integer16, 32}]}],
-
-    lists:foreach(
-      fun({ValuesIn, TsIn, ValuesOut, TsOut}) ->
-	      TsInX = [{co_lib:encode_type(T), S } || {T,S} <- TsIn],
-	      TsOutX = [{co_lib:encode_type(T), S } || {T,S} <- TsOut],
-	      try co_codec:encode(ValuesIn, TsInX) of
-		  Bin -> 
-		      try co_codec:decode(Bin, TsOutX) of
-			  {_ValuesOut, Rest} ->
-			      ct:pal("Encoding values ~p with types ~w = ~w,\n "
-				     "resulting bin ~w,\n "
-				     "decoded ~p with types ~w = ~w,\n"
-				     "residue ~p",
-				     [ValuesIn, TsIn, TsInX, Bin, 
-				      _ValuesOut, TsOut, TsInX, Rest])
-		      catch error:Reason2 ->
-			    ct:pal("Decode of ~p with ~w = ~w failed, reason ~p", 
-				   [Bin, TsOut, TsOutX, Reason2])
-		      end
-	      catch error:Reason1 ->
-		      ct:pal("Encode of ~p with ~w = ~w failed, reason ~p", 
-			     [ValuesIn, TsIn, TsInX, Reason1])
-	      end
-      end, Cases),
-    
-    ok.
-    
-
-%%--------------------------------------------------------------------
-%% @spec break(Config) -> ok 
-%% @doc 
-%% Dummy test case to have a test environment running.
-%% Stores Config in ets table.
-%% @end
-%%--------------------------------------------------------------------
-break(Config) ->
-    ets:new(config, [set, public, named_table]),
-    ets:insert(config, Config),
-    test_server:break("Break for test development\n" ++
-		     "Get Config by ets:tab2list(config)"),
-    ok.
-
-
-%%--------------------------------------------------------------------
-%% Help functions
-%%--------------------------------------------------------------------
-serial() -> co_test_lib:serial().
-app_dict() -> co_test_lib:app_dict().
-
-     

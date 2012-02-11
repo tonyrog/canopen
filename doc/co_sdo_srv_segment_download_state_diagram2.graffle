@@ -55,7 +55,7 @@
 	<array>
 		<dict>
 			<key>Bounds</key>
-			<string>{{378, 271}, {26, 26}}</string>
+			<string>{{288, 162}, {26, 26}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>ID</key>
@@ -86,7 +86,7 @@
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{447.54489, 185.73955}, {63, 32}}</string>
+			<string>{{325.30515, 101.9429}, {63, 32}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -102,7 +102,7 @@
 				<key>Offset</key>
 				<real>14.545450210571289</real>
 				<key>Position</key>
-				<real>0.51900535821914673</real>
+				<real>0.56891316175460815</real>
 				<key>RotationType</key>
 				<integer>0</integer>
 			</dict>
@@ -160,8 +160,8 @@ unknown}</string>
 			<integer>594</integer>
 			<key>Points</key>
 			<array>
-				<string>{589.5, 153}</string>
-				<string>{391, 271}</string>
+				<string>{445.5, 90}</string>
+				<string>{301, 162}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -187,7 +187,7 @@ unknown}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{563.17664, 200.58432}, {82.276855, 32}}</string>
+			<string>{{419.13928, 111.58111}, {82.276855, 32}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -203,7 +203,7 @@ unknown}</string>
 				<key>Offset</key>
 				<real>14.545450210571289</real>
 				<key>Position</key>
-				<real>0.53937250375747681</real>
+				<real>0.46507272124290466</real>
 				<key>RotationType</key>
 				<integer>0</integer>
 			</dict>
@@ -261,8 +261,8 @@ unknown}</string>
 			<integer>5</integer>
 			<key>Points</key>
 			<array>
-				<string>{589.5, 153}</string>
-				<string>{590, 271}</string>
+				<string>{445.5, 90}</string>
+				<string>{446, 171}</string>
 			</array>
 			<key>Style</key>
 			<dict>
@@ -288,7 +288,7 @@ unknown}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{577, 271}, {26, 26}}</string>
+			<string>{{433, 171}, {26, 26}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>ID</key>
@@ -319,7 +319,7 @@ unknown}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{63, 108}, {330.5, 38}}</string>
+			<string>{{0, 54}, {330.5, 38}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -365,7 +365,7 @@ unknown}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{486, 117}, {207, 36}}</string>
+			<string>{{342, 54}, {207, 36}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FontInfo</key>
@@ -403,7 +403,7 @@ unknown}</string>
 		</dict>
 		<dict>
 			<key>Bounds</key>
-			<string>{{407.5, 2}, {330.5, 49}}</string>
+			<string>{{281.5, 2}, {330.5, 49}}</string>
 			<key>Class</key>
 			<string>ShapedGraphic</string>
 			<key>FitText</key>
@@ -500,7 +500,7 @@ unknown}</string>
 	<key>MasterSheets</key>
 	<array/>
 	<key>ModificationDate</key>
-	<string>2012-02-06 12:15:16 +0000</string>
+	<string>2012-02-07 13:27:08 +0000</string>
 	<key>Modifier</key>
 	<string>Marina Westman Lönne</string>
 	<key>NotesVisible</key>
@@ -580,7 +580,7 @@ unknown}</string>
 		<key>FitInWindow</key>
 		<true/>
 		<key>Frame</key>
-		<string>{{50, 36}, {1014, 799}}</string>
+		<string>{{78, 104}, {1014, 799}}</string>
 		<key>ListView</key>
 		<false/>
 		<key>OutlineWidth</key>

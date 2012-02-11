@@ -20,17 +20,19 @@ start_node() ->
 
 start_node(Serial) ->
     {ok, Pid} = co_node:start_link([{serial,Serial}, 
-				     {options, [extended, 
+				     {options, [{use_serial_as_nodeid, true},
 						{max_blksize, 7},
 						{vendor,16#2A1},
-						{dict_file, ?DICT},
 						{debug, true}]}]),
     ct:pal("Started co_node ~p",[integer_to_list(Serial,16)]),
     {ok, Pid}.
 
+load_dict(C) ->
+    load_dict(C, serial()).
 
-reload_dict(Serial) ->
-    co_node:load_dict(Serial, filename:join(code:priv_dir(canopen), ?DICT)).
+load_dict(C, Serial) ->
+    DataDir = ?config(data_dir, C),
+    co_node:load_dict(Serial, filename:join(DataDir, ?DICT)).
 
 serial() ->
     case os:getenv("SERIAL") of

@@ -127,6 +127,7 @@ groups() ->
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
     co_test_lib:start_node(),
+    co_test_lib:load_dict(Config),
     {ok, _Mgr} = co_mgr:start(),
     ct:pal("Started co_mgr"),
     Config.
