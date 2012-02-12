@@ -11,10 +11,10 @@
 
 -ifdef(debug).
 -define(dbg(Tag, Format, Args),
-	Dbg = get(dbg),
-	if Dbg ->
+	case get(dbg) of
+	    true ->
 		io:format("~p: ~p: " ++ Format ++ "\n", [self(), ?MODULE] ++ Args);
-	   true ->
+	    _ ->
 		ok
 	end).
 -else.

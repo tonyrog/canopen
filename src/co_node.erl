@@ -54,7 +54,7 @@
 -export([tpdo_mapping/2, rpdo_mapping/2, tpdo_set/3, tpdo_value/2]).
 
 %% Debug interface
--export([dump/1, loop_data/1]).
+-export([dump/1, dump/2, loop_data/1]).
 -export([nodeid/1]).
 -export([state/2]).
 -export([direct_set/3]).
@@ -122,22 +122,15 @@
 start_link(Args) ->
     ?dbg(node, "start_link: Args = ~p", [Args]),
         
-    Serial = proplists:get_value(serial, Args, 0),
-    Opts = proplists:get_value(options, Args, []),
+    Serial = serial(proplists:get_value(serial, Args, 0)),
+    Opts = proplists:get_value(options, Args, []),	    
 
     case verify_options(Opts) of
 	ok ->
-	    S = serial(Serial),
-	    NodeId = 
-		case proplists:get_value(use_serial_as_nodeid,Opts,false) of
-		    false -> S bsr 8;
-		    true  -> (S bsr 8) bor ?COBID_ENTRY_EXTENDED
-		end,
-	    
-	    Name = name(Opts, S),
-	    ?dbg(node, "Starting co_node with Name = ~p, Serial = ~.16#, "
-		 "NodeId = ~.16#", [Name, S, NodeId]),
-	    gen_server:start({local, Name}, ?MODULE, {S,NodeId,Name,Opts}, []);
+	    Name = name(Opts, Serial),
+	    ?dbg(node, "Starting co_node with Name = ~p, Serial = ~.16#", 
+		 [Name, Serial]),
+	    gen_server:start({local, Name}, ?MODULE, {Serial,Name,Opts}, []);
 	E ->
 	    E
     end.
@@ -174,10 +167,10 @@ name(Opts, Serial) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec stop(Serial::integer()) -> ok | {error, Reason::atom()}.
+-spec stop(Identity::term()) -> ok | {error, Reason::atom()}.
 				  
-stop(Serial) ->
-    gen_server:call(serial_to_pid(Serial), stop).
+stop(Identity) ->
+    gen_server:call(identity_to_pid(Identity), stop).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -185,11 +178,11 @@ stop(Serial) ->
 %%
 %% @end
 %%-------------------------------------------------------------------
--spec load_dict(Serial::integer()) -> 
+-spec load_dict(Identity::term()) -> 
 		       ok | {error, Error::atom()}.
 
-load_dict(Serial) ->
-    gen_server:call(serial_to_pid(Serial), {load_dict, ?BACKUP_FILE}).
+load_dict(Identity) ->
+    gen_server:call(identity_to_pid(Identity), {load_dict, ?BACKUP_FILE}).
     
 
 %%--------------------------------------------------------------------
@@ -198,11 +191,11 @@ load_dict(Serial) ->
 %%
 %% @end
 %%-------------------------------------------------------------------
--spec load_dict(Serial::integer(), File::string()) -> 
+-spec load_dict(Identity::term(), File::string()) -> 
 		       ok | {error, Error::atom()}.
 
-load_dict(Serial, File) ->
-    gen_server:call(serial_to_pid(Serial), {load_dict, File}).
+load_dict(Identity, File) ->
+    gen_server:call(identity_to_pid(Identity), {load_dict, File}).
     
 
 %%--------------------------------------------------------------------
@@ -211,11 +204,11 @@ load_dict(Serial, File) ->
 %%
 %% @end
 %%-------------------------------------------------------------------
--spec save_dict(Serial::integer()) -> 
+-spec save_dict(Identity::term()) -> 
 		       ok | {error, Error::atom()}.
 
-save_dict(Serial) ->
-    gen_server:call(serial_to_pid(Serial), {save_dict, ?BACKUP_FILE}).
+save_dict(Identity) ->
+    gen_server:call(identity_to_pid(Identity), {save_dict, ?BACKUP_FILE}).
     
 
 %%--------------------------------------------------------------------
@@ -224,11 +217,11 @@ save_dict(Serial) ->
 %%
 %% @end
 %%-------------------------------------------------------------------
--spec save_dict(Serial::integer(), File::string()) -> 
+-spec save_dict(Identity::term(), File::string()) -> 
 		       ok | {error, Error::atom()}.
 
-save_dict(Serial, File) ->
-    gen_server:call(serial_to_pid(Serial), {save_dict, File}).
+save_dict(Identity, File) ->
+    gen_server:call(identity_to_pid(Identity), {save_dict, File}).
     
 
 %%--------------------------------------------------------------------
@@ -237,12 +230,12 @@ save_dict(Serial, File) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get_option(Serial::integer(), Option::atom()) -> 
+-spec get_option(Identity::term(), Option::atom()) -> 
 			{ok, {option, Value::term()}} | 
 			{error, unkown_option}.
 
-get_option(Serial, Option) ->
-    gen_server:call(serial_to_pid(Serial), {option, Option}).
+get_option(Identity, Option) ->
+    gen_server:call(identity_to_pid(Identity), {option, Option}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -250,14 +243,14 @@ get_option(Serial, Option) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec set_option(Serial::integer(), Option::atom(), NewValue::term()) -> 
+-spec set_option(Identity::term(), Option::atom(), NewValue::term()) -> 
 			ok | {error, Reason::string()}.
 
-set_option(Serial, Option, NewValue) ->
+set_option(Identity, Option, NewValue) ->
     ?dbg(node, "set_option: Option = ~p, NewValue = ~p",[Option, NewValue]),
     case verify_option(Option, NewValue) of
 	ok ->
-	    gen_server:call(serial_to_pid(Serial), {option, Option, NewValue});	    
+	    gen_server:call(identity_to_pid(Identity), {option, Option, NewValue});	    
 	{error, _Reason} = Error ->
 	    ?dbg(node, "set_option: option rejected, reason = ~p",[_Reason]),
 	    Error
@@ -287,11 +280,11 @@ verify_option(Option, NewValue)
     end;
 verify_option(Option, NewValue) 
   when Option == short_nodeid ->
-    if is_integer(NewValue) andalso NewValue > 0 andalso NewValue < 127->
+    if is_integer(NewValue) andalso NewValue >= 0 andalso NewValue < 127->
 	    ok;
        true ->
 	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to a positive integer between 1 and 126."}
+		 " can only be set to an integer between 0 and 126."}
     end;
 verify_option(Option, NewValue) 
   when Option == use_serial_as_nodeid;
@@ -324,25 +317,25 @@ verify_option(Option, _NewValue) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Attches the calling process to the CANnode idenified by Serial.
+%% Attches the calling process to the CANnode idenified by Identity.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec attach(Serial::integer()) -> {ok, Id::integer()} | {error, Error::atom()}.
+-spec attach(Identity::term()) -> {ok, Id::integer()} | {error, Error::atom()}.
 
-attach(Serial) ->
-    gen_server:call(serial_to_pid(Serial), {attach, self()}).
+attach(Identity) ->
+    gen_server:call(identity_to_pid(Identity), {attach, self()}).
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Detaches the calling process from the CANnode idenified by Serial.
+%% Detaches the calling process from the CANnode idenified by Identity.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec detach(Serial::integer()) -> ok | {error, Error::atom()}.
+-spec detach(Identity::term()) -> ok | {error, Error::atom()}.
 
-detach(Serial) ->
-    gen_server:call(serial_to_pid(Serial), {detach, self()}).
+detach(Identity) ->
+    gen_server:call(identity_to_pid(Identity), {detach, self()}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -351,12 +344,12 @@ detach(Serial) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec subscribe(Serial::integer(), Index::integer() | 
+-spec subscribe(Identity::term(), Index::integer() | 
 					  list(Index::integer())) -> 
 		       ok | {error, Error::atom()}.
 
-subscribe(Serial, Ix) ->
-    gen_server:call(serial_to_pid(Serial), {subscribe, Ix, self()}).
+subscribe(Identity, Ix) ->
+    gen_server:call(identity_to_pid(Identity), {subscribe, Ix, self()}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -365,11 +358,11 @@ subscribe(Serial, Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec unsubscribe(Serial::integer(), Index::integer() | 
+-spec unsubscribe(Identity::term(), Index::integer() | 
 					    list(Index::integer())) -> 
 		       ok | {error, Error::atom()}.
-unsubscribe(Serial, Ix) ->
-    gen_server:call(serial_to_pid(Serial), {unsubscribe, Ix, self()}).
+unsubscribe(Identity, Ix) ->
+    gen_server:call(identity_to_pid(Identity), {unsubscribe, Ix, self()}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -378,39 +371,39 @@ unsubscribe(Serial, Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec my_subscriptions(Serial::integer(), Pid::pid()) -> 
+-spec my_subscriptions(Identity::term(), Pid::pid()) -> 
 			      list(Index::integer()) | 
 			      {error, Error::atom()}.
-my_subscriptions(Serial, Pid) ->
-    gen_server:call(serial_to_pid(Serial), {subscriptions, Pid}).
+my_subscriptions(Identity, Pid) ->
+    gen_server:call(identity_to_pid(Identity), {subscriptions, Pid}).
 
 %%--------------------------------------------------------------------
-%% @spec my_subscriptions(Serial) -> [Index] | {error, Error}
+%% @spec my_subscriptions(Identity) -> [Index] | {error, Error}
 %%
 %% @doc
 %% Returns the Indexes for which the calling process has subscriptions.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec my_subscriptions(Serial::integer()) -> 
+-spec my_subscriptions(Identity::term()) -> 
 			      list(Index::integer()) | 
 			      {error, Error::atom()}.
-my_subscriptions(Serial) ->
-    gen_server:call(serial_to_pid(Serial), {subscriptions, self()}).
+my_subscriptions(Identity) ->
+    gen_server:call(identity_to_pid(Identity), {subscriptions, self()}).
 
 %%--------------------------------------------------------------------
-%% @spec all_subscribers(Serial) -> [Pid] | {error, Error}
+%% @spec all_subscribers(Identity) -> [Pid] | {error, Error}
 %%
 %% @doc
 %% Returns the Pids of all applications that subscribes to any Index.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec all_subscribers(Serial::integer()) -> 
+-spec all_subscribers(Identity::term()) -> 
 			     list(Pid::pid()) | 
 			     {error, Error::atom()}.
-all_subscribers(Serial) ->
-    gen_server:call(serial_to_pid(Serial), {subscribers}).
+all_subscribers(Identity) ->
+    gen_server:call(identity_to_pid(Identity), {subscribers}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -418,12 +411,12 @@ all_subscribers(Serial) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec all_subscribers(Serial::integer(), Ix::integer()) ->
+-spec all_subscribers(Identity::term(), Ix::integer()) ->
 			     list(Pid::pid()) | 
 			     {error, Error::atom()}.
 
-all_subscribers(Serial, Ix) ->
-    gen_server:call(serial_to_pid(Serial), {subscribers, Ix}).
+all_subscribers(Identity, Ix) ->
+    gen_server:call(identity_to_pid(Identity), {subscribers, Ix}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -433,11 +426,11 @@ all_subscribers(Serial, Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec reserve(Serial::integer(), Index::integer(), Module::atom()) -> 
+-spec reserve(Identity::term(), Index::integer(), Module::atom()) -> 
 		     ok | {error, Error::atom()}.
 
-reserve(Serial, Ix, Module) ->
-    gen_server:call(serial_to_pid(Serial), {reserve, Ix, Module, self()}).
+reserve(Identity, Ix, Module) ->
+    gen_server:call(identity_to_pid(Identity), {reserve, Ix, Module, self()}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -446,10 +439,10 @@ reserve(Serial, Ix, Module) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec unreserve(Serial::integer(), Index::integer()) -> 
+-spec unreserve(Identity::term(), Index::integer()) -> 
 		       ok | {error, Error::atom()}.
-unreserve(Serial, Ix) ->
-    gen_server:call(serial_to_pid(Serial), {unreserve, Ix, self()}).
+unreserve(Identity, Ix) ->
+    gen_server:call(identity_to_pid(Identity), {unreserve, Ix, self()}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -457,12 +450,12 @@ unreserve(Serial, Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec my_reservations(Serial::integer(), Pid::pid()) -> 
+-spec my_reservations(Identity::term(), Pid::pid()) -> 
 			     list(Index::integer()) | 
 			     {error, Error::atom()}.
 
-my_reservations(Serial, Pid) ->
-    gen_server:call(serial_to_pid(Serial), {reservations, Pid}).
+my_reservations(Identity, Pid) ->
+    gen_server:call(identity_to_pid(Identity), {reservations, Pid}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -470,12 +463,12 @@ my_reservations(Serial, Pid) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec my_reservations(Serial::integer()) ->
+-spec my_reservations(Identity::term()) ->
 			     list(Index::integer()) | 
 			     {error, Error::atom()}.
 
-my_reservations(Serial) ->
-    gen_server:call(serial_to_pid(Serial), {reservations, self()}).
+my_reservations(Identity) ->
+    gen_server:call(identity_to_pid(Identity), {reservations, self()}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -483,11 +476,11 @@ my_reservations(Serial) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec all_reservers(Serial::integer()) ->
+-spec all_reservers(Identity::term()) ->
 			   list(Pid::pid()) | {error, Error::atom()}.
 
-all_reservers(Serial) ->
-    gen_server:call(serial_to_pid(Serial), {reservers}).
+all_reservers(Identity) ->
+    gen_server:call(identity_to_pid(Identity), {reservers}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -495,11 +488,11 @@ all_reservers(Serial) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec reserver(Serial::integer(), Ix::integer()) ->
+-spec reserver(Identity::term(), Ix::integer()) ->
 		      list(Pid::pid()) | {error, Error::atom()}.
 
-reserver(Serial, Ix) ->
-    gen_server:call(serial_to_pid(Serial), {reserver, Ix}).
+reserver(Identity, Ix) ->
+    gen_server:call(identity_to_pid(Identity), {reserver, Ix}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -523,8 +516,8 @@ object_event(CoNodePid, Index) ->
 
 pdo_event(CoNodePid, CobId) when is_pid(CoNodePid) ->
     gen_server:cast(CoNodePid, {pdo_event, CobId});
-pdo_event(Serial, CobId) ->
-    gen_server:cast(serial_to_pid(Serial), {pdo_event, CobId}).
+pdo_event(Identity, CobId) ->
+    gen_server:cast(identity_to_pid(Identity), {pdo_event, CobId}).
 
 
 %%--------------------------------------------------------------------
@@ -533,11 +526,11 @@ pdo_event(Serial, CobId) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec add_entry(Serial::integer(), Entry::record()) -> 
+-spec add_entry(Identity::term(), Entry::record()) -> 
 		       ok | {error, Error::atom()}.
 
-add_entry(Serial, Ent) ->
-    gen_server:call(serial_to_pid(Serial), {add_entry, Ent}).
+add_entry(Identity, Ent) ->
+    gen_server:call(identity_to_pid(Identity), {add_entry, Ent}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -545,58 +538,58 @@ add_entry(Serial, Ent) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get_entry(Serial::integer(), Index::integer()) -> 
+-spec get_entry(Identity::term(), Index::integer()) -> 
 		       ok | {error, Error::atom()}.
 
-get_entry(Serial, Ix) ->
-    gen_server:call(serial_to_pid(Serial), {get_entry,Ix}).
+get_entry(Identity, Ix) ->
+    gen_server:call(identity_to_pid(Identity), {get_entry,Ix}).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Sets {Ix, Si} to Value.
 %% @end
 %%--------------------------------------------------------------------
--spec set(Serial::integer(), 
+-spec set(Identity::term(), 
 	  Index::{Ix::integer(), Si::integer()} |integer(), 
 	  Value::term()) -> 
 		 ok | {error, Error::atom()}.
 
-set(Serial, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    gen_server:call(serial_to_pid(Serial), {set,I,Value});   
-set(Serial, Ix, Value) when is_integer(Ix) ->
-    set(Serial, {Ix, 0}, Value).
+set(Identity, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
+    gen_server:call(identity_to_pid(Identity), {set,I,Value});   
+set(Identity, Ix, Value) when is_integer(Ix) ->
+    set(Identity, {Ix, 0}, Value).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Cache {Ix, Si} Value truncated to 64 bits.
 %% @end
 %%--------------------------------------------------------------------
--spec tpdo_set(Serial::integer(), 
+-spec tpdo_set(Identity::term(), 
 	       Index::{Ix::integer(), Si::integer()} | integer(), 
 	       Value::term()) -> 
 		      ok | {error, Error::atom()}.
 
-tpdo_set(Serial, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    ?dbg(node, "tpdo_set: Serial = ~.16#,  Ix = ~.16#:~w, Value = ~p",
-	 [Serial, Ix, Si, Value]), 
-    gen_server:call(serial_to_pid(Serial), {tpdo_set,I,Value});   
-tpdo_set(Serial, Ix, Value) when is_integer(Ix) ->
-    tpdo_set(Serial, {Ix, 0}, Value).
+tpdo_set(Identity, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
+    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Value = ~p",
+	 [Identity, Ix, Si, Value]), 
+    gen_server:call(identity_to_pid(Identity), {tpdo_set,I,Value});   
+tpdo_set(Identity, Ix, Value) when is_integer(Ix) ->
+    tpdo_set(Identity, {Ix, 0}, Value).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Set raw value (used to update internal read only tables etc)
 %% @end
 %%--------------------------------------------------------------------
--spec direct_set(Serial::integer(), 
+-spec direct_set(Identity::term(), 
 		 Index::{Ix::integer(), Si::integer()} | integer(), 
 		 Value::term()) -> 
 		 ok | {error, Error::atom()}.
 
-direct_set(Serial, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    gen_server:call(serial_to_pid(Serial), {direct_set,I,Value});
-direct_set(Serial, Ix, Value) when is_integer(Ix) ->
-    direct_set(Serial, {Ix, 0}, Value).
+direct_set(Identity, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
+    gen_server:call(identity_to_pid(Identity), {direct_set,I,Value});
+direct_set(Identity, Ix, Value) when is_integer(Ix) ->
+    direct_set(Identity, {Ix, 0}, Value).
 
 
 %%--------------------------------------------------------------------
@@ -605,14 +598,14 @@ direct_set(Serial, Ix, Value) when is_integer(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec value(Serial::integer(), 
+-spec value(Identity::term(), 
 	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
 		   Value::term() | {error, Error::atom()}.
 
-value(Serial, {Ix, Si} = I) when ?is_index(Ix), ?is_subind(Si)  ->
-    gen_server:call(serial_to_pid(Serial), {value,I});
-value(Serial, Ix) when is_integer(Ix) ->
-    value(Serial, {Ix, 0}).
+value(Identity, {Ix, Si} = I) when ?is_index(Ix), ?is_subind(Si)  ->
+    gen_server:call(identity_to_pid(Identity), {value,I});
+value(Identity, Ix) when is_integer(Ix) ->
+    value(Identity, {Ix, 0}).
 
 %% 
 %% Note on COBID for SDO service
@@ -634,18 +627,18 @@ value(Serial, Ix) when is_integer(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec store(Serial::integer() | atom(), Cobid::integer(), 
+-spec store(Identity::term() | atom(), Cobid::integer(), 
 	    Index::integer(), SubInd::integer(), 
 	    TransferMode:: block | segment,
 	    Term::{data, binary()} | {app, Pid::pid(), Module::atom()}) ->
 		   ok | {error, Error::atom()}.
 
-store(Serial, COBID, IX, SI, TransferMode, Term) 
+store(Identity, COBID, IX, SI, TransferMode, Term) 
   when ?is_index(IX), ?is_subind(SI) ->
-    ?dbg(node, "store: Serial = ~p, CobId = ~.16#, Ix = ~4.16.0B, Si = ~p, " ++
+    ?dbg(node, "store: Identity = ~p, CobId = ~.16#, Ix = ~4.16.0B, Si = ~p, " ++
 	     "Mode = ~p, Term = ~p", 
-	 [Serial, COBID, IX, SI, TransferMode, Term]),
-    Pid = serial_to_pid(Serial),
+	 [Identity, COBID, IX, SI, TransferMode, Term]),
+    Pid = identity_to_pid(Identity),
     gen_server:call(Pid, {store,TransferMode,COBID,IX,SI,Term}).
 
 
@@ -655,16 +648,16 @@ store(Serial, COBID, IX, SI, TransferMode, Term)
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec fetch(Serial::integer() | atom(), Cobid::integer(), 
+-spec fetch(Identity::term() | atom(), Cobid::integer(), 
 	    Index::integer(), SubInd::integer(),
  	    TransferMode:: block | segment,
 	    Term::data | {app, Pid::pid(), Module::atom()}) ->
 		   ok | {ok, Data::binary()} | {error, Error::atom()}.
 
 
-fetch(Serial, COBID, IX, SI, TransferMode, Term)
+fetch(Identity, COBID, IX, SI, TransferMode, Term)
   when ?is_index(IX), ?is_subind(SI) ->
-    gen_server:call(serial_to_pid(Serial), {fetch,TransferMode,COBID,IX,SI,Term}).
+    gen_server:call(identity_to_pid(Identity), {fetch,TransferMode,COBID,IX,SI,Term}).
 
 
 %%--------------------------------------------------------------------
@@ -673,10 +666,24 @@ fetch(Serial, COBID, IX, SI, TransferMode, Term)
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec dump(Serial::integer()) -> ok | {error, Error::atom()}.
+-spec dump(Identity::term()) -> ok | {error, Error::atom()}.
 
-dump(Serial) ->
-    gen_server:call(serial_to_pid(Serial), dump).
+dump(Identity) ->
+    dump(Identity, all).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Dumps data to standard output.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec dump(Identity::term(), Qualifier::all | no_dict) -> 
+		  ok | {error, Error::atom()}.
+
+dump(Identity, Qualifier) 
+  when Qualifier == all;
+       Qualifier == no_dict ->
+    gen_server:call(identity_to_pid(Identity), {dump, Qualifier}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -684,10 +691,10 @@ dump(Serial) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec loop_data(Serial::integer()) -> ok | {error, Error::atom()}.
+-spec loop_data(Identity::term()) -> ok | {error, Error::atom()}.
 
-loop_data(Serial) ->
-    gen_server:call(serial_to_pid(Serial), loop_data).
+loop_data(Identity) ->
+    gen_server:call(identity_to_pid(Identity), loop_data).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -695,11 +702,11 @@ loop_data(Serial) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec nodeid(Serial::integer()) -> 
+-spec nodeid(Identity::term()) -> 
 		    NodeId::integer() | {error, Error::atom()}.
 
-nodeid(Serial) ->
-    gen_server:call(serial_to_pid(Serial), nodeid).
+nodeid(Identity) ->
+    gen_server:call(identity_to_pid(Identity), nodeid).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -707,15 +714,15 @@ nodeid(Serial) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec state(Serial::integer(), State::operational | preoperational | stopped) -> 
+-spec state(Identity::term(), State::operational | preoperational | stopped) -> 
 		    NodeId::integer() | {error, Error::atom()}.
 
-state(Serial, operational) ->
-    gen_server:call(serial_to_pid(Serial), {state, ?Operational});
-state(Serial, preoperational) ->
-    gen_server:call(serial_to_pid(Serial), {state, ?PreOperational});
-state(Serial, stopped) ->
-    gen_server:call(serial_to_pid(Serial), {state, ?Stopped}).
+state(Identity, operational) ->
+    gen_server:call(identity_to_pid(Identity), {state, ?Operational});
+state(Identity, preoperational) ->
+    gen_server:call(identity_to_pid(Identity), {state, ?PreOperational});
+state(Identity, stopped) ->
+    gen_server:call(identity_to_pid(Identity), {state, ?Stopped}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -830,25 +837,31 @@ reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
 %% Description: Initiates the server
 %% @end
 %%--------------------------------------------------------------------
--spec init({Serial::integer(), NodeId::integer(), NodeName::atom(), 
-	    Opts::list(term())}) -> 
+-spec init({Identity::term(), NodeName::atom(), Opts::list(term())}) -> 
 		  {ok, State::record()} |
 		  {ok, State::record(), Timeout::integer()} |
 		  ignore               |
 		  {stop, Reason::atom()}.
 
 
-init({Serial, NodeId, NodeName, Opts}) ->
+init({Serial, NodeName, Opts}) ->
     can_router:start(),
     can_udp:start(0),
 
     %% Trace output enable/disable
     put(dbg, proplists:get_value(debug,Opts,false)), 
 
+    co_proc:reg(Serial),
+
+    {ShortNodeId, ExtNodeId} = nodeids(Serial,Opts),
+    reg({short_nodeid, ShortNodeId}),
+    reg({ext_nodeid, ExtNodeId}),
+    reg({name, NodeName}),
+
     Dict = create_dict(),
     SubTable = create_sub_table(),
-    ResTable =  ets:new(res_table, [public,ordered_set]),
-    TpdoCache = ets:new(tpdo_cache, [public,ordered_set]),
+    ResTable =  ets:new(co_res_table, [public,ordered_set]),
+    TpdoCache = ets:new(co_tpdo_cache, [public,ordered_set]),
     SdoCtx = #sdo_ctx {
       timeout         = proplists:get_value(sdo_timeout,Opts,1000),
       blk_timeout     = proplists:get_value(blk_timeout,Opts,500),
@@ -868,16 +881,16 @@ init({Serial, NodeId, NodeName, Opts}) ->
       tpdo_cache      = TpdoCache,
       res_table       = ResTable
      },
-    CobTable = create_cob_table(NodeId),
+    CobTable = create_cob_table(ExtNodeId, ShortNodeId),
     Ctx = #co_ctx {
-      ext_nodeid = NodeId,
-      short_nodeid = 0,
+      ext_nodeid = ExtNodeId,
+      short_nodeid = ShortNodeId,
       name   = NodeName,
       vendor = proplists:get_value(vendor,Opts,0),
       serial = Serial,
       state  = ?Initialisation,
-      node_map = ets:new(node_map, [{keypos,1}]),
-      nmt_table = ets:new(nmt_table, [{keypos,#nmt_entry.id}]),
+      node_map = ets:new(co_node_map, [{keypos,1}]),
+      nmt_table = ets:new(co_nmt_table, [{keypos,#nmt_entry.id}]),
       sub_table = SubTable,
       res_table = ResTable,
       dict = Dict,
@@ -898,7 +911,7 @@ init({Serial, NodeId, NodeName, Opts}) ->
     case load_dict_init(proplists:get_value(dict_file, Opts), Ctx) of
 	{ok, Ctx1} ->
 	    process_flag(trap_exit, true),
-	    if NodeId =:= 0 ->
+	    if ShortNodeId =:= 0 ->
 		    {ok, Ctx1#co_ctx { state = ?Operational }};
 	       true ->
 		    {ok, reset_application(Ctx1)}
@@ -908,26 +921,49 @@ init({Serial, NodeId, NodeName, Opts}) ->
 		      [Ctx#co_ctx.name]),
 	    {stop, Reason}
     end.
-	    
 
+nodeids(Serial, Opts) ->
+    {proplists:get_value(short_nodeid,Opts),
+     case proplists:get_value(use_serial_as_nodeid,Opts,false) of
+	 false -> undefined;
+	 true  -> (Serial bsr 8) bor ?COBID_ENTRY_EXTENDED
+     end}.
+
+reg({_, undefined}) ->	    
+    do_nothing;
+reg(Term) ->	
+    co_proc:reg(Term).
 %%
 %%
 %%
 reset_application(Ctx) ->
-    io:format("Node '~s' id=~w reset_application\n", [Ctx#co_ctx.name, Ctx#co_ctx.ext_nodeid]),
+    io:format("Node '~s' id=~w,~w reset_application\n", 
+	      [Ctx#co_ctx.name, Ctx#co_ctx.ext_nodeid, Ctx#co_ctx.short_nodeid]),
     reset_communication(Ctx).
 
 reset_communication(Ctx) ->
-    io:format("Node '~s' id=~w reset_communication\n",
-	      [Ctx#co_ctx.name, Ctx#co_ctx.ext_nodeid]),
+    io:format("Node '~s' id=~w,~w reset_communication\n",
+	      [Ctx#co_ctx.name, Ctx#co_ctx.ext_nodeid, Ctx#co_ctx.short_nodeid]),
     initialization(Ctx).
 
-initialization(Ctx) ->
-    io:format("Node '~s' id=~w initialization\n",
-	      [Ctx#co_ctx.name, Ctx#co_ctx.ext_nodeid]),
-    BootMessage = #can_frame { id = ?NODE_GUARD_ID(Ctx#co_ctx.ext_nodeid),
-			       len = 1, data = <<0>> },
-    can:send(BootMessage),
+initialization(Ctx=#co_ctx {name=Name, short_nodeid=SNodeId, ext_nodeid=XNodeId}) ->
+    io:format("Node '~s' id=~w,~w initialization\n",
+	      [Name, XNodeId, SNodeId]),
+
+    %% ??
+    if XNodeId =/= undefined ->
+	    can:send(#can_frame { id = ?NODE_GUARD_ID(XNodeId),
+				  len = 1, data = <<0>> });
+       true ->
+	    do_nothing
+    end,
+    if SNodeId =/= undefined ->
+	    can:send(#can_frame { id = ?NODE_GUARD_ID(SNodeId),
+				  len = 1, data = <<0>> });
+       true ->
+	    do_nothing
+    end,
+	   
     Ctx#co_ctx { state = ?PreOperational }.
 
 %%--------------------------------------------------------------------
@@ -1122,12 +1158,22 @@ handle_call({reservers}, _From, Ctx)  ->
     Res = reservers(Ctx#co_ctx.res_table),
     {reply, Res, Ctx};
 
-handle_call(dump, _From, Ctx) ->
-    io:format("  NAME: ~p\n", [Ctx#co_ctx.name]),
-    io:format("    ID: ~8.16.0B\n", [Ctx#co_ctx.ext_nodeid]),
-    io:format("VENDOR: ~8.16.0B\n", [Ctx#co_ctx.vendor]),
-    io:format("SERIAL: ~8.16.0B\n", [Ctx#co_ctx.serial]),
-    io:format(" STATE: ~s\n", [co_format:state(Ctx#co_ctx.state)]),
+handle_call({dump, Qualifier}, _From, Ctx) ->
+    io:format("   NAME: ~p\n", [Ctx#co_ctx.name]),
+    if Ctx#co_ctx.short_nodeid =/= undefined ->
+	    io:format(" NODEID: ~8.16.0B\n", [Ctx#co_ctx.short_nodeid]);
+       true ->
+	    io:format(" NODEID: ~p\n", [Ctx#co_ctx.short_nodeid])
+    end,
+
+    if Ctx#co_ctx.short_nodeid =/= undefined ->
+	    io:format("XNODEID: ~8.16.0B\n", [Ctx#co_ctx.ext_nodeid]);
+       true ->
+	    io:format("XNODEID: ~p\n", [Ctx#co_ctx.ext_nodeid])
+    end,
+    io:format(" VENDOR: ~8.16.0B\n", [Ctx#co_ctx.vendor]),
+    io:format(" SERIAL: ~8.16.0B\n", [Ctx#co_ctx.serial]),
+    io:format("  STATE: ~s\n", [co_format:state(Ctx#co_ctx.state)]),
 
     io:format("---- NMT TABLE ----\n"),
     ets:foldl(
@@ -1189,10 +1235,13 @@ handle_call(dump, _From, Ctx) ->
 	      end
       end,
       Ctx#co_ctx.tpdo_list ++ Ctx#co_ctx.app_list ++ Ctx#co_ctx.sdo_list),
-		  
-    io:format("---------DICT----------\n"),
-    co_dict:to_fd(Ctx#co_ctx.dict, user),
-    io:format("------------------------\n"),
+    if Qualifier == all ->
+	    io:format("---------DICT----------\n"),
+	    co_dict:to_fd(Ctx#co_ctx.dict, user),
+	    io:format("------------------------\n");
+       true ->
+	    do_nothing
+    end,
     {reply, ok, Ctx};
 
 handle_call(loop_data, _From, Ctx) ->
@@ -1380,7 +1429,10 @@ terminate(_Reason, Ctx) ->
       end,
       Ctx#co_ctx.tpdo_list),
 
-
+    case co_proc:alive() of
+	true -> co_proc:clear();
+	false -> do_nothing
+    end,
    ?dbg(node, "~s: terminate: cleaned up, exiting", [Ctx#co_ctx.name]),
     ok.
 
@@ -1398,14 +1450,22 @@ code_change(_OldVsn, Ctx, _Extra) ->
 %%--------------------------------------------------------------------
 
 %%
-%% Convert a node serial name to a local name
+%% Convert an identity to a pid
 %%
-serial_to_pid(Sn) when is_integer(Sn) ->
-    list_to_atom(co_lib:serial_to_string(Sn));
-serial_to_pid(Serial) when is_list(Serial) ->
-    serial_to_pid(co_lib:string_to_serial(Serial));
-serial_to_pid(Pid) when is_pid(Pid); is_atom(Pid) ->
-    Pid.
+identity_to_pid(Serial) when is_integer(Serial) ->
+    list_to_atom(co_lib:serial_to_string(Serial));
+identity_to_pid(Pid) when is_pid(Pid) ->
+    Pid;
+identity_to_pid(Term) ->
+    co_proc:lookup(Term).
+
+%% Needed ???
+call_node(Identity, Msg) ->
+    case identity_to_pid(Identity) of
+	Pid when is_pid(Pid) -> gen_server:call(Pid, Msg);
+	{error, _R} = E -> E 
+    end.
+	    
 
 %% 
 %% Create and initialize dictionary
@@ -1437,28 +1497,38 @@ create_dict() ->
 %% This match for the none extended format
 %% We may handle the mixed mode later on....
 %%
-create_cob_table(Nid) ->
-    T = ets:new(cob_table, [public]),
-    if ?is_nodeid_extended(Nid) ->
-	    SDORx = ?XCOB_ID(?SDO_RX,Nid),
-	    SDOTx = ?XCOB_ID(?SDO_TX,Nid),
-	    ets:insert(T, {?XCOB_ID(?NMT, 0), nmt});
+create_cob_table(ExtNid, ShortNid) ->
+    T = ets:new(co_cob_table, [public]),
+
+    if ExtNid =/= undefined ->
+	    XSDORx = ?XCOB_ID(?SDO_RX,ExtNid),
+	    XSDOTx = ?XCOB_ID(?SDO_TX,ExtNid),
+	    ets:insert(T, {XSDORx, {sdo_rx, XSDOTx}}),
+	    ets:insert(T, {XSDOTx, {sdo_tx, XSDORx}}),
+	    ets:insert(T, {?XCOB_ID(?NMT, 0), nmt}),
+	    ?dbg(node, "create_cob_table: XNid=~w, XSDORx=~w, XSDOTx=~w", 
+		 [ExtNid,XSDORx,XSDOTx]);
 	true ->
-	    SDORx = ?COB_ID(?SDO_RX,Nid),
-	    SDOTx = ?COB_ID(?SDO_TX,Nid),
-	    ets:insert(T, {?COB_ID(?NMT, 0), nmt})
+	    do_nothing
     end,
-    ?dbg(node, "create_cob_table Nid=~w, SDORx=~w, SDOTx=~w", 
-	 [Nid,SDORx,SDOTx]),
-    ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
-    ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
+    if ShortNid =/= undefined ->	
+	    SDORx = ?COB_ID(?SDO_RX,ShortNid),
+	    SDOTx = ?COB_ID(?SDO_TX,ShortNid),
+	    ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
+	    ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
+	    ets:insert(T, {?COB_ID(?NMT, 0), nmt}),
+	    ?dbg(node, "create_cob_table: ShortNid=~w, SDORx=~w, SDOTx=~w", 
+		 [ShortNid,SDORx,SDOTx]);
+	true ->
+	    do_nothing
+    end,
     T.
 
 %%
 %% Create subscription table
 %%
 create_sub_table() ->
-    T = ets:new(sub_table, [public,ordered_set]),
+    T = ets:new(co_sub_table, [public,ordered_set]),
     add_subscription(T, ?IX_COB_ID_SYNC_MESSAGE, self()),
     add_subscription(T, ?IX_COM_CYCLE_PERIOD, self()),
     add_subscription(T, ?IX_COB_ID_TIME_STAMP, self()),

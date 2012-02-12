@@ -149,40 +149,6 @@ end_per_suite(_Config) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Initialization before each test case group.
-%%
-%% GroupName = atom()
-%%   Name of the test case group that is about to run.
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding configuration data for the group.
-%% Reason = term()
-%%   The reason for skipping all test cases and subgroups in the group.
-%%
-%% @spec init_per_group(GroupName, Config0) ->
-%%               Config1 | {skip,Reason} | {skip_and_save,Reason,Config1}
-%% @end
-%%--------------------------------------------------------------------
-init_per_group(_GroupName, Config) ->
-    Config.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Cleanup after each test case group.
-%%
-%% GroupName = atom()
-%%   Name of the test case group that is finished.
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding configuration data for the group.
-%%
-%% @spec end_per_group(GroupName, Config0) ->
-%%               void() | {save_config,Config1}
-%% @end
-%%--------------------------------------------------------------------
-end_per_group(_GroupName, _Config) ->
-    ok.
-
-%%--------------------------------------------------------------------
-%% @doc
 %% Initialization before each test case
 %%
 %% TestCase - atom()
@@ -222,7 +188,7 @@ init_per_testcase(Case, Config) when Case == store_atomic_segment;
 				     Case == break ->
     ct:pal("Testcase: ~p", [Case]),
     {ok, _Pid} = co_test_app:start(serial(), app_dict()),
-    {ok, Cli} = co_test_app:start(co_mgr, app_dict_cli()),
+    {ok, Cli} = co_test_app:start({name, co_mgr}, app_dict_cli()),
     [{app, Cli} | Config];
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
@@ -531,12 +497,12 @@ store(Config, {{Index, _T, _M, SrvValue}, CliValue}, BlockOrSegment) ->
 fetch(Config, {{Index, _T, _M, SrvValue}, CliValue}, BlockOrSegment) ->
     %% Verify old value
     {Index, _Type, _Transfer, CliValue} = 
-	lists:keyfind(Index, 1, co_test_app:dict(co_mgr)),
+	lists:keyfind(Index, 1, co_test_app:dict({name, co_mgr})),
 
     %% Change to new
     ok = fetch_cmd(Config, Index, BlockOrSegment),
     {Index, _Type, _Transfer, SrvValue} = 
-	lists:keyfind(Index, 1, co_test_app:dict(co_mgr)),
+	lists:keyfind(Index, 1, co_test_app:dict({name, co_mgr})),
 
     ok.
 
