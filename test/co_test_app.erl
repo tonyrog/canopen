@@ -80,7 +80,7 @@ name(Serial) when is_integer(Serial) ->
 name({name, Name}) when is_atom(Name) ->
     %% co_mgr ??
     list_to_atom("co_test_app_" ++ atom_to_list(Name));
-name({Tag, Id}) when is_integer(Id)->
+name({_Tag, Id}) when is_integer(Id)->
     list_to_atom("co_test_app_" ++ integer_to_list(Id)).
 
    	
@@ -193,7 +193,7 @@ write_size(Pid, NewSize) when is_integer(NewSize) ->
 init([CoNode, Dict, Starter]) ->
     DictTable = ets:new(dict_table(self()), [public, named_table, ordered_set]),
     NameTable = ets:new(name_to_index, [private, ordered_set]),
-    {ok, _NodeId} = co_node:attach(CoNode),
+    ok = co_node:attach(CoNode),
     load_dict(CoNode, Dict, DictTable, NameTable),
     {ok, #loop_data {state=init, co_node = CoNode, dict=DictTable, 
 		     name_table=NameTable, starter = Starter}}.

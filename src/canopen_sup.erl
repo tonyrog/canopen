@@ -75,6 +75,6 @@ init(Args) ->
     CN = co_node,
     CoNode = {CN, {CN, start_link, [Args]}, permanent, 5000, worker, [CN]},
     io:format("~p: About to start ~p and ~p\n", [?MODULE,CoProc, CoNode]),
-    {ok, { {all_for_one, 0, 300}, [CoProc, CoNode]} }.
+    {ok, { {rest_for_one, 0, 300}, [CoProc, CoNode]} }.
 
 

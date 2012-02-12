@@ -251,7 +251,7 @@ loop_data() ->
 %% @end
 %%--------------------------------------------------------------------
 init([CoSerial]) ->
-    {ok, _NodeId} = co_node:attach(CoSerial),
+    ok = co_node:attach(CoSerial),
     co_node:reserve(CoSerial, ?IX_OS_COMMAND, ?MODULE),
     {ok, #loop_data {state=init, co_node = CoSerial}}.
 

@@ -175,7 +175,7 @@ loop_data() ->
 init({CoSerial, {Index, RFileName, WFileName}, Starter}) ->
     ct:pal(?NAME, "Starting with index = ~.16B, readfile = ~p, writefile = ~p\n",
 	   [Index, RFileName, WFileName]),
-    {ok, _NodeId} = co_node:attach(CoSerial),
+    ok = co_node:attach(CoSerial),
     ok = co_node:reserve(CoSerial, Index, ?MODULE),
     {ok, #loop_data {starter = Starter, co_node = CoSerial, index = Index,
 		     readfilename = RFileName, writefilename = WFileName}}.

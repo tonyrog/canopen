@@ -55,7 +55,6 @@
 
 %% Debug interface
 -export([dump/1, dump/2, loop_data/1]).
--export([nodeid/1]).
 -export([state/2]).
 -export([direct_set/3]).
 
@@ -231,7 +230,7 @@ save_dict(Identity, File) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec get_option(Identity::term(), Option::atom()) -> 
-			{ok, {option, Value::term()}} | 
+			{option, Value::term()} | 
 			{error, unkown_option}.
 
 get_option(Identity, Option) ->
@@ -287,6 +286,14 @@ verify_option(Option, NewValue)
 		 " can only be set to an integer between 0 and 126."}
     end;
 verify_option(Option, NewValue) 
+  when Option == ext_nodeid ->
+    if is_integer(NewValue) andalso NewValue > 127 ->
+	    ok;
+       true ->
+	    {error, "Option " ++ atom_to_list(Option) ++ 
+		 " can only be set to an integer value larger than 127."}
+    end;
+verify_option(Option, NewValue) 
   when Option == use_serial_as_nodeid;
        Option == use_crc;
        Option == debug ->
@@ -321,7 +328,7 @@ verify_option(Option, _NewValue) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec attach(Identity::term()) -> {ok, Id::integer()} | {error, Error::atom()}.
+-spec attach(Identity::term()) -> ok | {error, Error::atom()}.
 
 attach(Identity) ->
     gen_server:call(identity_to_pid(Identity), {attach, self()}).
@@ -695,18 +702,6 @@ dump(Identity, Qualifier)
 
 loop_data(Identity) ->
     gen_server:call(identity_to_pid(Identity), loop_data).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Returns the co_nodes nodeid.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec nodeid(Identity::term()) -> 
-		    NodeId::integer() | {error, Error::atom()}.
-
-nodeid(Identity) ->
-    gen_server:call(identity_to_pid(Identity), nodeid).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -1085,9 +1080,9 @@ handle_call({attach,Pid}, _From, Ctx) when is_pid(Pid) ->
 	    Mon = erlang:monitor(process, Pid),
 	    App = #app { pid=Pid, mon=Mon },
 	    Ctx1 = Ctx#co_ctx { app_list = [App |Ctx#co_ctx.app_list] },
-	    {reply, {ok, Ctx1#co_ctx.ext_nodeid}, Ctx1};
+	    {reply, ok, Ctx1};
 	{value,_} ->
-	    {reply, {error, already_attached, Ctx#co_ctx.ext_nodeid}, Ctx}
+	    {reply, {error, already_attache}, Ctx}
     end;
 
 handle_call({detach,Pid}, _From, Ctx) when is_pid(Pid) ->
@@ -1160,17 +1155,8 @@ handle_call({reservers}, _From, Ctx)  ->
 
 handle_call({dump, Qualifier}, _From, Ctx) ->
     io:format("   NAME: ~p\n", [Ctx#co_ctx.name]),
-    if Ctx#co_ctx.short_nodeid =/= undefined ->
-	    io:format(" NODEID: ~8.16.0B\n", [Ctx#co_ctx.short_nodeid]);
-       true ->
-	    io:format(" NODEID: ~p\n", [Ctx#co_ctx.short_nodeid])
-    end,
-
-    if Ctx#co_ctx.short_nodeid =/= undefined ->
-	    io:format("XNODEID: ~8.16.0B\n", [Ctx#co_ctx.ext_nodeid]);
-       true ->
-	    io:format("XNODEID: ~p\n", [Ctx#co_ctx.ext_nodeid])
-    end,
+    print_nodeid(" NODEID:", Ctx#co_ctx.short_nodeid),
+    print_nodeid("XNODEID:", Ctx#co_ctx.ext_nodeid),
     io:format(" VENDOR: ~8.16.0B\n", [Ctx#co_ctx.vendor]),
     io:format(" SERIAL: ~8.16.0B\n", [Ctx#co_ctx.serial]),
     io:format("  STATE: ~s\n", [co_format:state(Ctx#co_ctx.state)]),
@@ -1274,7 +1260,6 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
 	 [Ctx#co_ctx.name, Option, NewValue]),    
     Reply = case Option of
 		name -> Ctx#co_ctx {name = NewValue}; %% Reg new name ??
-		short_nodeid -> Ctx#co_ctx {short_nodeid = NewValue}; %% Reg new nodeid ??
 		sdo_timeout -> Ctx#co_ctx.sdo#sdo_ctx {timeout = NewValue};
 		blk_timeout -> Ctx#co_ctx.sdo#sdo_ctx {blk_timeout = NewValue};
 		pst ->  Ctx#co_ctx.sdo#sdo_ctx {pst = NewValue};
@@ -1284,15 +1269,13 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
 		load_ratio -> Ctx#co_ctx.sdo#sdo_ctx {load_ratio = NewValue};
 		atomic_limit -> Ctx#co_ctx.sdo#sdo_ctx {atomic_limit = NewValue};
 		time_stamp -> Ctx#co_ctx {time_stamp_time = NewValue};
-		use_serial_as_nodeid -> 
-		    if NewValue == true ->
-			    Ctx;
-		       true ->
-			    {error, "Option " ++ atom_to_list(Option) ++
-				 " can only be true."}
-		    end;
 		debug -> put(dbg, NewValue),
 			 Ctx#co_ctx.sdo#sdo_ctx {debug = NewValue};
+		NodeId when
+		      NodeId == short_nodeid;
+		      NodeId ==  ext_nodeid;
+		      NodeId == use_serial_as_nodeid -> 
+		    {error,  atom_to_list(Option) ++ " not possible to change yet."};
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
 	    end,
     case Reply of
@@ -1305,9 +1288,6 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
     end;
 handle_call(stop, _From, Ctx) ->
     {stop, normal, ok, Ctx};
-
-handle_call(nodeid, _From, Ctx) ->
-    {reply, Ctx#co_ctx.ext_nodeid, Ctx};
 
 handle_call({state, State}, _From, Ctx) ->
     broadcast_state(State, Ctx),
@@ -1700,7 +1680,9 @@ handle_can(Frame, Ctx) ->
 handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
     ?dbg(node, "~s: handle_nmt: ~p", [Ctx#co_ctx.name, M]),
     <<NodeId,Cs,_/binary>> = M#can_frame.data,
-    if NodeId == 0; NodeId == Ctx#co_ctx.ext_nodeid ->
+    if NodeId == 0; 
+       NodeId == Ctx#co_ctx.ext_nodeid; 
+       NodeId == Ctx#co_ctx.short_nodeid ->
 	    case Cs of
 		?NMT_RESET_NODE ->
 		    reset_application(Ctx);
@@ -1726,14 +1708,28 @@ handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
     end.
 
 
-handle_node_guard(Frame, Ctx) when ?is_can_frame_rtr(Frame) ->
+handle_node_guard(Frame, Ctx=#co_ctx {short_nodeid=SNodeId, ext_nodeid=XNodeId}) 
+  when ?is_can_frame_rtr(Frame) ->
     ?dbg(node, "~s: handle_node_guard: request ~w", [Ctx#co_ctx.name,Frame]),
     NodeId = ?NODE_ID(Frame#can_frame.id),
-    if NodeId == 0; NodeId == Ctx#co_ctx.ext_nodeid ->
+    if NodeId == 0; 
+       NodeId == SNodeId;
+       NodeId == XNodeId ->
 	    Data = Ctx#co_ctx.state bor Ctx#co_ctx.toggle,
-	    can:send(#can_frame { id = ?NODE_GUARD_ID(Ctx#co_ctx.ext_nodeid),
-				  len = 1,
-				  data = <<Data>> }),
+	    if XNodeId =/= undefined ->
+		    can:send(#can_frame { id = ?NODE_GUARD_ID(XNodeId),
+					  len = 1,
+					  data = <<Data>> });
+	       true ->
+		    do_nothing
+	    end,
+	    if SNodeId =/= undefined ->
+		    can:send(#can_frame { id = ?NODE_GUARD_ID(SNodeId),
+					  len = 1,
+					  data = <<Data>> });
+	       true ->
+		    do_nothing
+	    end,
 	    Toggle = Ctx#co_ctx.toggle bxor 16#80,
 	    Ctx#co_ctx { toggle = Toggle };
        true ->
@@ -1744,7 +1740,9 @@ handle_node_guard(Frame, Ctx) when Frame#can_frame.len >= 1 ->
     ?dbg(node, "~s: handle_node_guard: ~w", [Ctx#co_ctx.name,Frame]),
     NodeId = ?NODE_ID(Frame#can_frame.id),
     case Frame#can_frame.data of
-	<<_Toggle:1, State:7, _/binary>> when NodeId =/= Ctx#co_ctx.ext_nodeid ->
+	<<_Toggle:1, State:7, _/binary>> 
+	  when (NodeId =/= Ctx#co_ctx.ext_nodeid andalso
+		NodeId =/= Ctx#co_ctx.short_nodeid) ->
 	    %% Verify toggle if NodeId=slave and we are Ctx#co_ctx.ext_nodeid=master
 	    update_nmt_entry(NodeId, [{state,State}], Ctx);
 	_ ->
@@ -2871,8 +2869,10 @@ update_error_list([Code|Cs], SI, Ctx) ->
     [Code | update_error_list(Cs, SI+1, Ctx)].
     
 
-
-
+print_nodeid(Label, undefined) ->
+    io:format(Label ++ " not defined\n",[]);
+print_nodeid(Label, NodeId) ->
+    io:format(Label ++ " ~8.16.0B\n", [NodeId]).
 				       
 
 %% Optionally start a timer

@@ -507,7 +507,8 @@ fetch(Config, {{Index, _T, _M, SrvValue}, CliValue}, BlockOrSegment) ->
     ok.
 
 nodeid() ->
-    co_node:nodeid(serial()).
+    {ext_nodeid, NodeId} = co_node:get_option(serial(), ext_nodeid),
+    NodeId.
 
 store_cmd(Config, {Ix, Si}, BlockOrSegment) -> 
     co_mgr:store(nodeid(), Ix, Si, BlockOrSegment, 
