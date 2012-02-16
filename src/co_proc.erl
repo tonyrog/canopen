@@ -26,6 +26,7 @@
 -export([clear/0]).
 -export([clear/1]).
 -export([i/0]).
+-export([alive/0]).
 
 -record(ctx, 
 	{
@@ -47,7 +48,7 @@
 start_link([]) ->
     case whereis(?MODULE) of
 	Pid when is_pid(Pid) ->
-	    ok;
+	    {ok, Pid};
 	undefined ->
 	    gen_server:start({local, ?MODULE}, ?MODULE, [], [])
     end.
@@ -62,7 +63,7 @@ start_link([]) ->
 -spec stop() -> ok | {error, Reason::atom()}.
 				  
 stop() ->
-    gen_server:call(co_proc, stop).
+    gen_server:call(?MODULE, stop).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -72,7 +73,7 @@ stop() ->
 -spec reg(Term::term()) -> ok | {error, Error::term()}.
 
 reg(Term) ->
-    gen_server:call(co_proc, {reg, Term, self()}).
+    gen_server:call(?MODULE, {reg, Term, self()}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -82,7 +83,7 @@ reg(Term) ->
 -spec unreg(Term::term()) -> ok | {error, Error::term()}.
 
 unreg(Term) ->
-    gen_server:call(co_proc, {unreg, Term}).
+    gen_server:call(?MODULE, {unreg, Term}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -92,9 +93,15 @@ unreg(Term) ->
 -spec lookup(Term::term()) -> Pid::pid() | {error, Error::term()}.
 
 lookup(Term) ->
-    case ets:lookup(co_term_dict, Term) of
-	[{Term, Pid}] -> Pid;
-	[] -> {error, not_found}
+    io:format("co_proc: lookup ~p\n", [Term]),
+    case ets:info(co_term_dict, name) of
+	undefined -> 
+	    {error, no_process};
+	_N -> 
+	    case ets:lookup(co_term_dict, Term) of
+		[{Term, Pid}] -> Pid;
+		[] -> {error, not_found}
+	    end
     end.
 
 %%--------------------------------------------------------------------
@@ -128,7 +135,7 @@ regs(Pid) ->
 -spec clear() -> ok | {error, Error::term()}.
 
 clear()  ->
-    gen_server:call(co_proc, {clear, self()}).
+    gen_server:call(?MODULE, {clear, self()}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -138,7 +145,7 @@ clear()  ->
 -spec clear(Pid::pid()) -> ok | {error, Error::term()}.
 
 clear(Pid) when is_pid(Pid) ->
-    gen_server:call(co_proc, {clear, Pid}).
+    gen_server:call(?MODULE, {clear, Pid}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -150,6 +157,17 @@ clear(Pid) when is_pid(Pid) ->
 i() ->
     ets:tab2list(co_proc_dict).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Checks if the co_proc still is alive.
+%% @end
+%%--------------------------------------------------------------------
+alive() ->
+    case whereis(?MODULE) of
+	undefined -> false;
+	_PI -> true
+    end.
+	     
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -235,7 +253,10 @@ handle_call({clear, Pid}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
 	true -> 
 	    %% All entries removed
 	    [{Pid, Mon, _TermList}] = ets:lookup(PD, Pid),
-	    erlang:demonitor(Mon),
+	    case Mon of
+		{dead, _R} -> do_nothing;
+		_M -> erlang:demonitor(Mon)
+	    end,
 	    ets:delete(PD, Pid),
 	    {reply, ok, Ctx}
     catch 
@@ -273,7 +294,7 @@ handle_cast(_Msg, Ctx) ->
 
 handle_info({'DOWN',_Ref, process, Pid, Reason}, 
 	    Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
-    io:format("WARNING! ~p: Monitored process ~p died", [?MODULE, Pid]),
+    io:format("WARNING! ~p: Monitored process ~p died\n", [?MODULE, Pid]),
     ets:match_delete(TD, {'_', Pid}),
     ets:insert(PD, {Pid, {dead, Reason}, []}),
 %%    io:format("TD = ~p\nPD = ~p\n", [ets:tab2list(TD), ets:tab2list(PD)]),

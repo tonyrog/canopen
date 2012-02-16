@@ -5,15 +5,20 @@
 
 -module(co_test).
 
--export([run/1]).
+-export([run/1, halt/1]).
 
 run(Serial) ->
-    {ok, _Pid} = co_node:start_link([{serial,Serial}, 
-				     {options, [{use_serial_as_nodeid, true},
-						{max_blksize, 7},
-						{vendor,16#2A1},
-						{debug, true}]}]),
+    {ok, _PPid} = co_proc:start_link([]),
+    {ok, _NPid} = co_node:start_link([{serial,Serial}, 
+				      {options, [{use_serial_as_nodeid, true},
+						 {short_nodeid, 7},
+						 {max_blksize, 7},
+						 {vendor,16#2A1},
+						 {debug, true}]}]),
     
     co_node:load_dict(Serial, filename:join(code:priv_dir(canopen), "default.dict")).
 
 
+halt(Serial) ->
+    co_node:stop(Serial),
+    co_proc:stop().

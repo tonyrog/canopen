@@ -64,15 +64,17 @@ stop() ->
 %%                     ignore |
 %%                     {error, Reason}
 %% @doc
-%% Starts the co_node.
+%% Starts the co_proc and the co_node.
 %%
 %% @end
 %%--------------------------------------------------------------------
 init(Args) ->
     io:format("~p: Starting up\n", [?MODULE]),
-    I = co_node,
-    CoNode = {I, {I, start_link, [Args]}, permanent, 5000, worker, [I]},
-    io:format("~p: About to start ~p\n", [?MODULE,CoNode]),
-    {ok, { {one_for_one, 0, 300}, [CoNode]} }.
+    CP = co_proc,
+    CoProc = {CP, {CP, start_link, []}, permanent, 5000, worker, [CP]},
+    CN = co_node,
+    CoNode = {CN, {CN, start_link, [Args]}, permanent, 5000, worker, [CN]},
+    io:format("~p: About to start ~p and ~p\n", [?MODULE,CoProc, CoNode]),
+    {ok, { {rest_for_one, 0, 300}, [CoProc, CoNode]} }.
 
 

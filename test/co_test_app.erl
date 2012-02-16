@@ -64,23 +64,26 @@
 	}).
 
 %%--------------------------------------------------------------------
-%% @spec start(CoSerial) -> {ok, Pid} | ignore | {error, Error}
+%% @spec start(CoNode) -> {ok, Pid} | ignore | {error, Error}
 %% @doc
 %%
 %% Starts the server.
 %%
 %% @end
 %%--------------------------------------------------------------------
-start(CoSerial, Dict) ->
-    gen_server:start_link({local, name(CoSerial)}, 
-			  ?MODULE, [CoSerial, Dict, self()], []).
+start(CoNode, Dict) ->
+    gen_server:start_link({local, name(CoNode)}, 
+			  ?MODULE, [CoNode, Dict, self()], []).
 
 name(Serial) when is_integer(Serial) ->
-    list_to_atom("co_test_app" ++ integer_to_list(Serial));
-name(Serial) when is_atom(Serial) ->
+    list_to_atom("co_test_app_" ++ integer_to_list(Serial));
+name({name, Name}) when is_atom(Name) ->
     %% co_mgr ??
-    list_to_atom("co_test_app" ++ atom_to_list(Serial)).
-    	
+    list_to_atom("co_test_app_" ++ atom_to_list(Name));
+name({_Tag, Id}) when is_integer(Id)->
+    list_to_atom("co_test_app_" ++ integer_to_list(Id)).
+
+   	
 %%--------------------------------------------------------------------
 %% @spec stop() -> ok | {error, Error}
 %% @doc
@@ -89,8 +92,8 @@ name(Serial) when is_atom(Serial) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-stop(CoSerial) ->
-    gen_server:call(name(CoSerial), stop).
+stop(CoNode) ->
+    gen_server:call(name(CoNode), stop).
 
 %%--------------------------------------------------------------------
 %% @spec index_specification(Pid, {Index, SubInd}) -> 
@@ -159,11 +162,11 @@ abort(Pid, Ref) ->
     gen_server:call(Pid, {abort, Ref}).
     
 
-loop_data(CoSerial) ->
-    gen_server:call(name(CoSerial), loop_data).
+loop_data(CoNode) ->
+    gen_server:call(name(CoNode), loop_data).
 
-dict(CoSerial) ->
-    gen_server:call(name(CoSerial), dict).
+dict(CoNode) ->
+    gen_server:call(name(CoNode), dict).
 
 debug(Pid, TrueOrFalse) when is_boolean(TrueOrFalse) ->
     gen_server:call(Pid, {debug, TrueOrFalse}).
@@ -187,18 +190,18 @@ write_size(Pid, NewSize) when is_integer(NewSize) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-init([CoSerial, Dict, Starter]) ->
+init([CoNode, Dict, Starter]) ->
     DictTable = ets:new(dict_table(self()), [public, named_table, ordered_set]),
     NameTable = ets:new(name_to_index, [private, ordered_set]),
-    {ok, _NodeId} = co_node:attach(CoSerial),
-    load_dict(CoSerial, Dict, DictTable, NameTable),
-    {ok, #loop_data {state=init, co_node = CoSerial, dict=DictTable, 
+    ok = co_node:attach(CoNode),
+    load_dict(CoNode, Dict, DictTable, NameTable),
+    {ok, #loop_data {state=init, co_node = CoNode, dict=DictTable, 
 		     name_table=NameTable, starter = Starter}}.
 
 dict_table(Pid) ->
     list_to_atom("dict" ++ pid_to_list(Pid)).
 
-load_dict(CoSerial, Dict, DictTable, NameTable) ->
+load_dict(CoNode, Dict, DictTable, NameTable) ->
     ?dbg("Dict ~p", [Dict]),
     lists:foreach(fun({Name, 
 		       {{Index, _SubInd}, _Type, _Mode, _Value} = Entry}) ->
@@ -207,11 +210,11 @@ load_dict(CoSerial, Dict, DictTable, NameTable) ->
 			  ets:insert(NameTable, {Name, Index}),
 			  case Name of
 			      notify ->			      
-				  co_node:subscribe(CoSerial, Index);
+				  co_node:subscribe(CoNode, Index);
 			      mpdo ->			      
-				  co_node:subscribe(CoSerial, Index);
+				  co_node:subscribe(CoNode, Index);
 			      _Other ->
-				  co_node:reserve(CoSerial, Index, ?MODULE)
+				  co_node:reserve(CoNode, Index, ?MODULE)
 			  end
 		  end, Dict).
 

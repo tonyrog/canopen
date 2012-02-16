@@ -145,7 +145,7 @@ end_per_testcase(_TestCase, _Config) ->
 %% @spec start_of_co_proc(Config) -> ok 
 %% @doc 
 %% Dummy testcase verifying that the co_proc is up and running.
-%% The real start is done in init_per_suite.
+%% The real start is done in init_per_testcase.
 %% @end
 %%--------------------------------------------------------------------
 start_of_co_proc(_Config) -> 
@@ -153,6 +153,12 @@ start_of_co_proc(_Config) ->
     timer:sleep(100),
     ok.
 
+%%--------------------------------------------------------------------
+%% @spec reg(Config) -> ok 
+%% @doc 
+%% Verifies reg and unreg functions.
+%% @end
+%%--------------------------------------------------------------------
 reg_unreg(_Config) ->
     ok = co_proc:reg(one),
     [one] = co_proc:regs(),
@@ -160,6 +166,12 @@ reg_unreg(_Config) ->
     {error,not_found} = co_proc:regs(),
     ok.
 
+%%--------------------------------------------------------------------
+%% @spec reg(Config) -> ok 
+%% @doc 
+%% Verifies i function.
+%% @end
+%%--------------------------------------------------------------------
 i(_Config) ->
     [] = co_proc:i(),
     Pid = self(),
@@ -167,6 +179,12 @@ i(_Config) ->
     [{Pid, _Mon, [one]}] = co_proc:i(),
     ok.
 
+%%--------------------------------------------------------------------
+%% @spec reg(Config) -> ok 
+%% @doc 
+%% Verifies clear function.
+%% @end
+%%--------------------------------------------------------------------
 clear(_Config) ->
     ok = co_proc:reg(one),
     ok = co_proc:reg(two),
@@ -175,6 +193,12 @@ clear(_Config) ->
     {error,not_found} = co_proc:regs(),
     ok.
 
+%%--------------------------------------------------------------------
+%% @spec reg(Config) -> ok 
+%% @doc 
+%% Verifies monitoring of registered processes.
+%% @end
+%%--------------------------------------------------------------------
 monitor(_Config) ->
     Pid = spawn(
 	    fun() -> 

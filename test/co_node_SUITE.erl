@@ -371,7 +371,7 @@ set_option_nok({Option, NewValue}) ->
 	ext_nodeid ->
 	    R = "Option ext_nodeid can not be changed.";
 	use_serial_as_nodeid -> 
-	    R = "Option use_serial_as_nodeid can only be true.";
+	    R = "use_serial_as_nodeid not possible to change yet.";
 	pst -> 
 	    R = "Option pst can only be set to a positive integer value or zero.";
 	max_blksize -> 
