@@ -670,7 +670,7 @@ start_block_upload(S=#co_session {buf = Buf, ctx = Ctx, index = IX, subind = SI}
     Pst     = Ctx#sdo_ctx.pst,          %% protcol switch limit 
     R = ?mk_ccs_block_upload_request(CrcSup,IX,SI,BlkSize,Pst),
     send(S, R),
-    S1 = S#co_session { blksize = BlkSize, pst = Pst },
+    S1 = S#co_session { blksize = BlkSize, blkcrc = co_crc:init(), pst = Pst },
     {Reply, s_block_upload_response, S1#co_session {buf = Buf}, ?TMO(S)}.
 
 s_block_upload_response(M, S) when is_record(M, can_frame) ->
@@ -696,14 +696,22 @@ s_block_upload_response(timeout, S) ->
 %% Here we receice the block segments
 s_block_upload(M, S) when is_record(M, can_frame) ->
     NextSeq = S#co_session.blkseq+1,
+    Crc = S#co_session.blkcrc,
     case M#can_frame.data of
 	?ma_block_segment(Last,Seq,Data) when Seq =:= NextSeq ->
 	    ?dbg(cli, "s_block_upload: Data = ~p\n", [Data]),	    
-	    case co_data_buf:write(S#co_session.buf, Data, false, block) of
+	    S1 = if Last =:= 1 ->
+			 S#co_session {lastblk = Data};
+		    S#co_session.crc->
+			 S#co_session {blkcrc = co_crc:update(Crc, Data)};
+		    true ->
+			  S
+		 end,
+	    case co_data_buf:write(S1#co_session.buf, Data, false, block) of
 		{ok, Buf} ->
-		    block_segment_written(S#co_session {buf = Buf, last = Last});
+		    block_segment_written(S1#co_session {buf = Buf, last = Last});
 		{ok, Buf, Mref} when is_reference(Mref) ->
-		    block_segment_written(S#co_session {buf = Buf, last = Last, mref = Mref});		    %% Called an application
+		    block_segment_written(S1#co_session {buf = Buf, last = Last, mref = Mref});		    %% Called an application
 		{error, Reason} ->
 		    abort(S, Reason)
 	    end;
@@ -742,23 +750,40 @@ block_segment_written(S=#co_session {last = Last}) ->
 
 s_block_upload_end(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
-	?ma_scs_block_upload_end_request(N,CRC) ->
+	?ma_scs_block_upload_end_request(N,ServerCrc) ->
 	    %% CRC ??
-	    case co_data_buf:write(S#co_session.buf,N,true,block) of	    
-		{error,Reason} ->
-		    abort(S, Reason);
-		{ok, Buf, Mref} ->
-		    %% Called an application
-		    S1 = S#co_session {mref = Mref, buf = Buf},
-		    {next_state, s_writing_block_end, S1, ?TMO(S1)};
-		    
-		_ -> %% this can be any thing ok | true ..
-		    R = ?mk_scs_block_download_end_response(),
-		    send(S, R),
-		    gen_server:reply(S#co_session.node_from, ok),
-		    co_node:object_event(S#co_session.node_pid, 
-					 {S#co_session.index,S#co_session.subind}),
-		    {stop, normal, S}
+	    NodeCrc = 
+		if S#co_session.crc ->
+			CrcN = 7 - N,
+			<<CrcData:CrcN/binary, _Pad/binary>> = S#co_session.lastblk,
+			Crc = co_crc:update(S#co_session.blkcrc,CrcData),
+			co_crc:final(Crc);
+		   true ->
+			ServerCrc
+		end,
+	    
+	    case ServerCrc of
+		NodeCrc ->
+		    %% CRC OK
+		    case co_data_buf:write(S#co_session.buf,N,true,block) of	    
+			{ok, Buf, Mref} ->
+			    %% Called an application
+			    S1 = S#co_session {mref = Mref, buf = Buf},
+			    {next_state, s_writing_block_end, S1, ?TMO(S1)};
+			{ok, _Buf} -> 
+			    R = ?mk_scs_block_download_end_response(),
+			    send(S, R),
+			    gen_server:reply(S#co_session.node_from, ok),
+			    co_node:object_event(S#co_session.node_pid, 
+						 {S#co_session.index,S#co_session.subind}),
+			    {stop, normal, S};
+			{error,Reason} ->
+			    abort(S, Reason)
+		    end;
+		_Crc ->
+		    ?dbg(srv, "s_block_upload_end: crc error, server_crc = ~p, "
+			 " node_crc = ~p", [ServerCrc, NodeCrc]),
+		    abort(S, ?abort_crc_error)
 	    end;
 	_ ->
 	    l_abort(M, S, s_block_upload_end)

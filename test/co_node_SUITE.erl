@@ -254,7 +254,6 @@ set_options_ok(_Config) ->
 set_options_nok(_Config) ->
 
     Options = [{name, 7},
-	       {use_serial_as_nodeid, false},
 	       {pst, "String"},
 	       {max_blksize, -64},
 	       {use_crc, any},
@@ -368,10 +367,6 @@ set_option_nok({Option, NewValue}) ->
     case Option of
 	name -> 
 	    R = "Option name can only be set to a string or an atom.";
-	ext_nodeid ->
-	    R = "Option ext_nodeid can not be changed.";
-	use_serial_as_nodeid -> 
-	    R = "use_serial_as_nodeid not possible to change yet.";
 	pst -> 
 	    R = "Option pst can only be set to a positive integer value or zero.";
 	max_blksize -> 

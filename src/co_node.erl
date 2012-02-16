@@ -290,13 +290,14 @@ verify_option(Option, NewValue)
     end;
 verify_option(Option, NewValue) 
   when Option == ext_nodeid ->
-    if is_integer(NewValue) andalso NewValue > 127 ->
+    if is_integer(NewValue) andalso NewValue > 2#1111111 %% Min 8 bits ??
+       andalso NewValue < 2#1000000000000000000000000 -> %% Max 24 bits
 	    ok;
        NewValue =:= undefined ->
 	    ok;
        true ->
 	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to an integer value larger than 127"
+		 " can only be set to an integer value between 8 and 24 bits"
 	         " or undefined."}
     end;
 verify_option(Option, NewValue) 
@@ -1545,6 +1546,8 @@ change_nodeid(ext_nodeid, NewXNid,
 change_nodeid(short_nodeid, undefined, 
 	      _Ctx=#co_ctx {ext_nodeid = undefined}) -> 
     {error, "Not possible to remove last nodeid"};
+change_nodeid(short_nodeid, 0, Ctx) ->
+    {error, "NodeId 0 is reserved for the CANOpen manager co_mgr."};
 change_nodeid(short_nodeid, NewNid,
 	      Ctx=#co_ctx {short_nodeid = OldNid, cob_table = T}) ->
     delete_from_cob_table(T, false, OldNid),

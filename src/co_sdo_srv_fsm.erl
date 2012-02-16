@@ -1174,13 +1174,13 @@ start_block_download(S) ->
 
 s_block_download(M, S) when is_record(M, can_frame) ->
     NextSeq = S#co_session.blkseq+1,
+    Crc = S#co_session.blkcrc,
     case M#can_frame.data of
 	?ma_block_segment(Last,CliSeq,Data) when CliSeq =:= NextSeq ->
 	    S1 = if Last =:= 1 ->
 			 S#co_session {lastblk = Data};
 		    S#co_session.crc->
-			 S#co_session {blkcrc = 
-					  co_crc:update(S#co_session.blkcrc, Data)};
+			 S#co_session {blkcrc = co_crc:update(Crc, Data)};
 		    true ->
 			  S
 		 end,
