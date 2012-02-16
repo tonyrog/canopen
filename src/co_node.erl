@@ -281,17 +281,23 @@ verify_option(Option, NewValue)
   when Option == short_nodeid ->
     if is_integer(NewValue) andalso NewValue >= 0 andalso NewValue < 127->
 	    ok;
+       NewValue =:= undefined ->
+	    ok;
        true ->
 	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to an integer between 0 and 126."}
+		 " can only be set to an integer between 0 and 126"
+	         " or undefined."}
     end;
 verify_option(Option, NewValue) 
   when Option == ext_nodeid ->
     if is_integer(NewValue) andalso NewValue > 127 ->
 	    ok;
+       NewValue =:= undefined ->
+	    ok;
        true ->
 	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to an integer value larger than 127."}
+		 " can only be set to an integer value larger than 127"
+	         " or undefined."}
     end;
 verify_option(Option, NewValue) 
   when Option == use_serial_as_nodeid;
@@ -918,7 +924,7 @@ init({Serial, NodeName, Opts}) ->
     end.
 
 nodeids(Serial, Opts) ->
-    {proplists:get_value(short_nodeid,Opts),
+    {proplists:get_value(short_nodeid,Opts,undefined),
      case proplists:get_value(use_serial_as_nodeid,Opts,false) of
 	 false -> undefined;
 	 true  -> (Serial bsr 8) bor ?COBID_ENTRY_EXTENDED
@@ -1273,9 +1279,10 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
 			 Ctx#co_ctx.sdo#sdo_ctx {debug = NewValue};
 		NodeId when
 		      NodeId == short_nodeid;
-		      NodeId ==  ext_nodeid;
+		      NodeId == ext_nodeid;
 		      NodeId == use_serial_as_nodeid -> 
-		    {error,  atom_to_list(Option) ++ " not possible to change yet."};
+		    
+		    change_nodeid(Option, NewValue, Ctx);
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
 	    end,
     case Reply of
@@ -1479,31 +1486,77 @@ create_dict() ->
 %%
 create_cob_table(ExtNid, ShortNid) ->
     T = ets:new(co_cob_table, [public]),
-
-    if ExtNid =/= undefined ->
-	    XSDORx = ?XCOB_ID(?SDO_RX,ExtNid),
-	    XSDOTx = ?XCOB_ID(?SDO_TX,ExtNid),
-	    ets:insert(T, {XSDORx, {sdo_rx, XSDOTx}}),
-	    ets:insert(T, {XSDOTx, {sdo_tx, XSDORx}}),
-	    ets:insert(T, {?XCOB_ID(?NMT, 0), nmt}),
-	    ?dbg(node, "create_cob_table: XNid=~w, XSDORx=~w, XSDOTx=~w", 
-		 [ExtNid,XSDORx,XSDOTx]);
-	true ->
-	    do_nothing
-    end,
-    if ShortNid =/= undefined ->	
-	    SDORx = ?COB_ID(?SDO_RX,ShortNid),
-	    SDOTx = ?COB_ID(?SDO_TX,ShortNid),
-	    ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
-	    ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
-	    ets:insert(T, {?COB_ID(?NMT, 0), nmt}),
-	    ?dbg(node, "create_cob_table: ShortNid=~w, SDORx=~w, SDOTx=~w", 
-		 [ShortNid,SDORx,SDOTx]);
-	true ->
-	    do_nothing
-    end,
+    add_to_cob_table(T, true, ExtNid),
+    add_to_cob_table(T, false, ShortNid),
     T.
 
+add_to_cob_table(_T, _XFlag, undefined) ->
+    ok;
+add_to_cob_table(T, true, ExtNid) 
+  when ExtNid =/= undefined ->
+    XSDORx = ?XCOB_ID(?SDO_RX,ExtNid),
+    XSDOTx = ?XCOB_ID(?SDO_TX,ExtNid),
+    ets:insert(T, {XSDORx, {sdo_rx, XSDOTx}}),
+    ets:insert(T, {XSDOTx, {sdo_tx, XSDORx}}),
+    ets:insert(T, {?XCOB_ID(?NMT, 0), nmt}),
+    ?dbg(node, "add_to_cob_table: XNid=~w, XSDORx=~w, XSDOTx=~w", 
+	 [ExtNid,XSDORx,XSDOTx]);
+add_to_cob_table(T, false, ShortNid) 
+  when ShortNid =/= undefined->
+    ?dbg(node, "add_to_cob_table: ShortNid=~w", [ShortNid]),
+    SDORx = ?COB_ID(?SDO_RX,ShortNid),
+    SDOTx = ?COB_ID(?SDO_TX,ShortNid),
+    ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
+    ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
+    ets:insert(T, {?COB_ID(?NMT, 0), nmt}),
+    ?dbg(node, "add_to_cob_table: SDORx=~w, SDOTx=~w", [SDORx,SDOTx]).
+
+
+delete_from_cob_table(_T, _XFlag, undefined) ->
+    ok;
+delete_from_cob_table(T, true, ExtNid)
+  when ExtNid =/= undefined ->
+    XSDORx = ?XCOB_ID(?SDO_RX,ExtNid),
+    XSDOTx = ?XCOB_ID(?SDO_TX,ExtNid),
+    ets:delete(T, XSDORx),
+    ets:delete(T, XSDOTx),
+    ets:delete(T, ?XCOB_ID(?NMT,0)),
+    ?dbg(node, "delete_from_cob_table: XNid=~w, XSDORx=~w, XSDOTx=~w", 
+	 [ExtNid,XSDORx,XSDOTx]);
+delete_from_cob_table(T, false, ShortNid)
+  when ShortNid =/= undefined->
+    SDORx = ?COB_ID(?SDO_RX,ShortNid),
+    SDOTx = ?COB_ID(?SDO_TX,ShortNid),
+    ets:delete(T, SDORx),
+    ets:delete(T, SDOTx),
+    ets:delete(T, ?COB_ID(?NMT,0)),
+    ?dbg(node, "delete_from_cob_table: ShortNid=~w, SDORx=~w, SDOTx=~w", 
+	 [ShortNid,SDORx,SDOTx]).
+
+
+change_nodeid(ext_nodeid, undefined, 
+	      _Ctx=#co_ctx {short_nodeid = undefined}) -> 
+    {error, "Not possible to remove last nodeid"};
+change_nodeid(ext_nodeid, NewXNid, 
+	      Ctx=#co_ctx {ext_nodeid = OldXNid, cob_table = T}) ->
+    delete_from_cob_table(T, true, OldXNid),
+    add_to_cob_table(T, true, NewXNid),
+    Ctx#co_ctx {ext_nodeid = NewXNid};
+change_nodeid(short_nodeid, undefined, 
+	      _Ctx=#co_ctx {ext_nodeid = undefined}) -> 
+    {error, "Not possible to remove last nodeid"};
+change_nodeid(short_nodeid, NewNid,
+	      Ctx=#co_ctx {short_nodeid = OldNid, cob_table = T}) ->
+    delete_from_cob_table(T, false, OldNid),
+    add_to_cob_table(T, false, NewNid),
+    Ctx#co_ctx {short_nodeid = NewNid};
+change_nodeid(use_serial_as_nodeid, true, Ctx=#co_ctx {serial = Serial}) ->
+    NewXNid = (Serial bsr 8) bor ?COBID_ENTRY_EXTENDED,
+    change_nodeid(ext_nodeid, NewXNid, Ctx);
+change_nodeid(use_serial_as_nodeid, false, Ctx) ->
+    %% ??? Enough??
+    change_nodeid(ext_nodeid, undefined, Ctx).
+    
 %%
 %% Create subscription table
 %%
@@ -2747,7 +2800,7 @@ tpdo_value({Ix, Si} = I, ResTable, Dict, TpdoCache) ->
 	[] ->
 	    ?dbg(node, "tpdo_value: No reserver for index ~7.16.0#", [Ix]),
 	    co_dict:value(Dict, Ix, Si);
-	{Pid, Mod} when is_pid(Pid)->
+	{Pid, _Mod} when is_pid(Pid)->
 	    ?dbg(node, "tpdo_value: Process ~p has reserved index ~7.16.0#", 
 		 [Pid, Ix]),
 	    %% Value cached ??
