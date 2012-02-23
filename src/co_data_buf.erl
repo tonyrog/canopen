@@ -133,6 +133,22 @@ init_i(read, Pid, #index_spec{index = I, type = Type, transfer = {value, Value} 
 			     buf_size = BSize,
 			     load_level = LLevel,
 			     mode = M});
+init_i(read, Pid, 
+       #index_spec{index = {Ix, Si} = I, type = Type, transfer = {dict, Dict} = M},
+       BSize, LLevel) when is_pid(Pid) ->
+    %% Fetch data from dictionary
+    {ok, Value} = co_dict:value(Dict, Ix, Si),
+    Data = co_codec:encode(Value, Type),
+    open(read, #co_data_buf {access = read,
+			     pid = Pid,
+			     i = I,
+			     data = Data,
+			     size = size(Data),
+			     eof = true,
+			     type = Type,
+			     buf_size = BSize,
+			     load_level = LLevel,
+			     mode = M});
 init_i(Access, Pid, #index_spec{index = I, type = Type, transfer = Mode}, 
        BSize, LLevel)  when is_pid(Pid) ->
     open(Access, #co_data_buf {access = Access,
@@ -499,10 +515,10 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = Old
     end;
 %% Transfer =/= streamed => check size limit and store if OK
 write(Buf=#co_data_buf {mode = _Mode, data = OldData, tmp = TmpData}, 
-      Data, false, _DownloadMode) ->
+      Data, false, BlockOrSegment) ->
     ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p, storing", 
 	 [_Mode, Data, false]),
-    CheckLimitResult = check_limit(Buf, Data),
+    CheckLimitResult = check_limit(Buf, Data, BlockOrSegment),
     if CheckLimitResult == ok ->
 	    %% Move old from temp and store new in temp
 	    NewData = <<OldData/binary, TmpData/binary>>,
@@ -512,14 +528,14 @@ write(Buf=#co_data_buf {mode = _Mode, data = OldData, tmp = TmpData},
     end.
 
 %% Check limit based on transfer mode and type
-check_limit(Buf=#co_data_buf {mode = atomic}, Data) ->
-    check_limit_i(Buf, Data);
-check_limit(Buf=#co_data_buf {mode = {atomic, _M}}, Data) ->
-    check_limit_i(Buf, Data);
-check_limit(_Buf, _Data) ->
+check_limit(Buf=#co_data_buf {mode = atomic}, Data, BlockOrSegment) ->
+    check_limit_i(Buf, Data, BlockOrSegment);
+check_limit(Buf=#co_data_buf {mode = {atomic, _M}}, Data, BlockOrSegment) ->
+    check_limit_i(Buf, Data, BlockOrSegment);
+check_limit(_Buf, _Data, _BlockOrSegment) ->
     ok.
 
-check_limit_i(Buf=#co_data_buf {data = OldData, tmp = TmpData}, Data) ->
+check_limit_i(Buf=#co_data_buf {data = OldData, tmp = TmpData}, Data, BlockOrSegment) ->
     TypeSize = case Buf#co_data_buf.type of
 		   undefined -> 0;
 		   Type -> co_codec:bytesize(Type)
@@ -528,7 +544,13 @@ check_limit_i(Buf=#co_data_buf {data = OldData, tmp = TmpData}, Data) ->
 		0 -> Buf#co_data_buf.buf_size;
 		TS -> TS
 	    end,
-    DataSize = size(OldData) + size(TmpData) + size(Data),
+    DataSize = case BlockOrSegment of
+		   segment ->
+		       size(OldData) + size(TmpData) + size(Data);
+		   block ->
+		       %% Part of last data might be removed 
+		       size(OldData) + size(TmpData)
+	       end,
     if DataSize > Limit ->
 	    {error, ?abort_data_length_too_high};
        true ->
@@ -606,6 +628,8 @@ update(_Buf, Other) ->
 		   ok.
 
 abort(undefined, _Reason) -> 
+    ok;
+abort(_Buf=#co_data_buf {mode = {dict, _Dict}}, _Reason) -> 
     ok;
 abort(_Buf=#co_data_buf {mode = atomic}, _Reason) -> 
     ok;

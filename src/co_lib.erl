@@ -14,7 +14,6 @@
 
 -export([serial_to_string/1, string_to_serial/1]).
 -export([serial_to_xnodeid/1]).
--export([complete_nodeid/1]).
 -export([load_definition/1]).
 -export([load_dmod/2]).
 -export([object_by_name/2]).
@@ -44,15 +43,6 @@ string_to_serial(String) when is_list(String) ->
 serial_to_xnodeid(Serial) ->
     (Serial bsr 8).
 
-%% Add Extended flag if needed
-complete_nodeid(NodeId) ->
-    if ?is_nodeid(NodeId) ->
-	    %% Not extended
-	    NodeId;
-       true ->
-	    NodeId bor ?COBID_ENTRY_EXTENDED
-    end.
-    
 
 %% Encode/Decode category
 encode_category(optional) -> ?CATEGORY_OPTIONAL;

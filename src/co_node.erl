@@ -187,7 +187,7 @@ stop(Identity) ->
 		       ok | {error, Error::atom()}.
 
 load_dict(Identity) ->
-    gen_server:call(identity_to_pid(Identity), load_dict).
+    gen_server:call(identity_to_pid(Identity), load_dict, 10000).
     
 
 %%--------------------------------------------------------------------
@@ -200,7 +200,7 @@ load_dict(Identity) ->
 		       ok | {error, Error::atom()}.
 
 load_dict(Identity, File) ->
-    gen_server:call(identity_to_pid(Identity), {load_dict, File}).
+    gen_server:call(identity_to_pid(Identity), {load_dict, File}, 10000).
     
 
 %%--------------------------------------------------------------------
@@ -213,7 +213,7 @@ load_dict(Identity, File) ->
 		       ok | {error, Error::atom()}.
 
 save_dict(Identity) ->
-    gen_server:call(identity_to_pid(Identity), save_dict).
+    gen_server:call(identity_to_pid(Identity), save_dict, 10000).
     
 
 %%--------------------------------------------------------------------
@@ -226,7 +226,7 @@ save_dict(Identity) ->
 		       ok | {error, Error::atom()}.
 
 save_dict(Identity, File) ->
-    gen_server:call(identity_to_pid(Identity), {save_dict, File}).
+    gen_server:call(identity_to_pid(Identity), {save_dict, File}, 10000).
     
 
 %%--------------------------------------------------------------------
@@ -340,10 +340,13 @@ verify_option(Option, _NewValue) ->
 %%--------------------------------------------------------------------
 %% @doc
 %% Attches the calling process to the CANnode idenified by Identity.
-%%
+%% In return a dictionary reference is given so that the application
+%% can store its object in it if it wants, using the co_dict API.
 %% @end
 %%--------------------------------------------------------------------
--spec attach(Identity::term()) -> ok | {error, Error::atom()}.
+-spec attach(Identity::term()) -> 
+		    {ok, DictRef::term()} | 
+		    {error, Error::atom()}.
 
 attach(Identity) ->
     gen_server:call(identity_to_pid(Identity), {attach, self()}).
@@ -990,10 +993,7 @@ initialization(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
 	   
     Ctx#co_ctx { state = ?PreOperational }.
 
-add_xflag(undefined) ->
-    undefined;
-add_xflag(NodeId) ->
-    NodeId bor ?COBID_ENTRY_EXTENDED.
+
 %%--------------------------------------------------------------------
 %% @private
 %% @spec handle_call(Request, From, State) -> {reply, Reply, State} |  
@@ -1033,7 +1033,7 @@ handle_call({value,{Ix, Si}}, _From, Ctx) ->
     {reply, Result, Ctx};
 
 handle_call({store,Mode,NodeId,IX,SI,Term}, From, Ctx) ->
-    CobId = co_lib:complete_nodeid(NodeId),
+    CobId = complete_nodeid(NodeId),
     case lookup_sdo_server(CobId,Ctx) of
 	ID={Tx,Rx} ->
 	    ?dbg(node, "~s: store: ID = ~p", [Ctx#co_ctx.name,ID]),
@@ -1056,7 +1056,7 @@ handle_call({store,Mode,NodeId,IX,SI,Term}, From, Ctx) ->
     end;
 
 handle_call({fetch,Mode,NodeId,IX,SI, Term}, From, Ctx) ->
-    CobId = co_lib:complete_nodeid(NodeId),
+    CobId = complete_nodeid(NodeId),
     case lookup_sdo_server(CobId,Ctx) of
 	ID={Tx,Rx} ->
 	    ?dbg(node, "~s: fetch: ID = ~p", [Ctx#co_ctx.name,ID]),
@@ -1134,9 +1134,10 @@ handle_call({attach,Pid}, _From, Ctx) when is_pid(Pid) ->
 	    Mon = erlang:monitor(process, Pid),
 	    App = #app { pid=Pid, mon=Mon },
 	    Ctx1 = Ctx#co_ctx { app_list = [App |Ctx#co_ctx.app_list] },
-	    {reply, ok, Ctx1};
+	    {reply, {ok, Ctx#co_ctx.dict}, Ctx1};
 	{value,_} ->
-	    {reply, {error, already_attache}, Ctx}
+	    %% Already attached
+	    {reply, {ok, Ctx#co_ctx.dict}, Ctx}
     end;
 
 handle_call({detach,Pid}, _From, Ctx) when is_pid(Pid) ->
@@ -2630,15 +2631,15 @@ lookup_sdo_server(COBID, Ctx) ->
 		    NodeID = COBID band ?COBID_ENTRY_ID_MASK,
 		    Tx = ?XCOB_ID(?SDO_TX,NodeID),
 		    Rx = ?XCOB_ID(?SDO_RX,NodeID),
-		    ets:insert(Ctx#co_ctx.cob_table, {Rx,{sdo_rx,Tx}}),
-		    ets:insert(Ctx#co_ctx.cob_table, {Tx,{sdo_tx,Rx}}),
+		    %%ets:insert(Ctx#co_ctx.cob_table, {Rx,{sdo_rx,Tx}}),
+		    %%ets:insert(Ctx#co_ctx.cob_table, {Tx,{sdo_tx,Rx}}),
 		    {Tx,Rx};
 	       ?is_nodeid(COBID) ->
 		    NodeID = COBID band 16#7F,
 		    Tx = ?COB_ID(?SDO_TX,NodeID),
 		    Rx = ?COB_ID(?SDO_RX,NodeID),
-		    ets:insert(Ctx#co_ctx.cob_table, {Rx,{sdo_rx,Tx}}),
-		    ets:insert(Ctx#co_ctx.cob_table, {Tx,{sdo_tx,Rx}}),
+		    %%ets:insert(Ctx#co_ctx.cob_table, {Rx,{sdo_rx,Tx}}),
+		    %%ets:insert(Ctx#co_ctx.cob_table, {Tx,{sdo_tx,Rx}}),
 		    {Tx,Rx};
 	       true ->
 		    undefined
@@ -2648,8 +2649,18 @@ lookup_sdo_server(COBID, Ctx) ->
 
 lookup_cobid(COBID, Ctx) ->
     case ets:lookup(Ctx#co_ctx.cob_table, COBID) of
-	[{_,Entry}] -> Entry;
-	[] -> undefined
+	[{_,Entry}] -> 
+	    Entry;
+	[] -> 
+	    if ?is_cobid_extended(COBID) andalso 
+	       ?XFUNCTION_CODE(COBID) =:= ?SDO_TX ->
+		    {sdo_tx, ?XCOB_ID(?SDO_RX, ?XNODE_ID(COBID))};
+	       ?is_not_cobid_extended(COBID) andalso
+	       ?FUNCTION_CODE(COBID) =:= ?SDO_TX ->
+		    {sdo_tx, ?COB_ID(?SDO_RX, ?NODE_ID(COBID))};
+	       true ->
+		    undefined
+	    end
     end.
 
 %%
@@ -2962,6 +2973,20 @@ rpdo_value({Ix,Si},Value,Type,Ctx) ->
 	    {error, ?abort_internal_error}
     end.
 
+
+add_xflag(undefined) ->
+    undefined;
+add_xflag(NodeId) ->
+    NodeId bor ?COBID_ENTRY_EXTENDED.
+
+complete_nodeid(NodeId) ->
+    if ?is_nodeid(NodeId) ->
+	    %% Not extended
+	    NodeId;
+       true ->
+	    add_xflag(NodeId)
+    end.
+    
 
 
 %% Set error code - and send the emergency object (if defined)

@@ -22,7 +22,7 @@ start_node(Serial) ->
     {ok, PPid} = co_proc:start_link([]),
     ct:pal("Started co_proc ~p",[PPid]),
     {ok, Pid} = co_node:start_link([{serial,Serial}, 
-				     {options, [{use_serial_as_xnodeid, true},
+				     {options, [{use_serial_as_nodeid, true},
 						{max_blksize, 7},
 						{vendor,16#2A1},
 						{debug, true}]}]),

@@ -13,6 +13,7 @@
 -include("canopen.hrl").
 
 -export([load/1]).
+-export([load_objects/2]).
 -import(lists, [map/2, seq/2, foreach/2]).
 %%--------------------------------------------------------------------
 %% @doc
@@ -57,6 +58,7 @@ fold_objects(Fun, Acc, [Obj={O,_}|Os]) when is_record(O, dict_object) ->
 fold_objects(_Fun, Acc, []) ->
     Acc.
 
+%% @private
 load_objects([{object,Index,Options}|Es],Os) 
   when ?is_index(Index), is_list(Options) ->
     io:format("~p: Load object: ~8.16.0B\n", [?MODULE, Index]),

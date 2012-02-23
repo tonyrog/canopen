@@ -148,7 +148,7 @@ abort(Pid, Ref) ->
 %%--------------------------------------------------------------------
 init([CoSerial]) ->
     Dict = ets:new(my_dict, [public, ordered_set]),
-    {ok, _NodeId} = co_node:attach(CoSerial),
+    {ok, _DictRef} = co_node:attach(CoSerial),
     load_dict(CoSerial, Dict),
     {ok, #loop_data {state=init, co_node = CoSerial, dict=Dict}}.
 
