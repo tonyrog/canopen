@@ -9,9 +9,10 @@
 
 run(Serial) ->
     {ok, _PPid} = co_proc:start_link([]),
+    co_proc:debug(true),
     {ok, _NPid} = co_node:start_link([{serial,Serial}, 
-				      {options, [{use_serial_as_nodeid, true},
-						 {short_nodeid, 7},
+				      {options, [{use_serial_as_xnodeid, true},
+						 {nodeid, 7},
 						 {max_blksize, 7},
 						 {vendor,16#2A1},
 						 {debug, true}]}]),

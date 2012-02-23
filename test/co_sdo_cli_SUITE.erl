@@ -129,6 +129,7 @@ init_per_suite(Config) ->
     co_test_lib:start_node(),
     co_test_lib:load_dict(Config),
     {ok, _Mgr} = co_mgr:start(),
+    ok = co_node:set_option({name, co_mgr}, debug, true),
     ct:pal("Started co_mgr"),
     Config.
 
@@ -187,8 +188,10 @@ init_per_testcase(Case, Config) when Case == store_atomic_segment;
 				     Case == fetch_streamed_m_block;
 				     Case == break ->
     ct:pal("Testcase: ~p", [Case]),
-    {ok, _Pid} = co_test_app:start(serial(), app_dict()),
+    {ok, Pid} = co_test_app:start(serial(), app_dict()),
+    ok = co_test_app:debug(Pid, true),
     {ok, Cli} = co_test_app:start({name, co_mgr}, app_dict_cli()),
+    ok = co_test_app:debug(Cli, true),
     [{app, Cli} | Config];
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
@@ -506,15 +509,15 @@ fetch(Config, {{Index, _T, _M, SrvValue}, CliValue}, BlockOrSegment) ->
 
     ok.
 
-nodeid() ->
-    {ext_nodeid, NodeId} = co_node:get_option(serial(), ext_nodeid),
+xnodeid() ->
+    {xnodeid, NodeId} = co_node:get_option(serial(), xnodeid),
     NodeId.
 
 store_cmd(Config, {Ix, Si}, BlockOrSegment) -> 
-    co_mgr:store(nodeid(), Ix, Si, BlockOrSegment, 
+    co_mgr:store(xnodeid(), Ix, Si, BlockOrSegment, 
 		 {app, ?config(app, Config), co_test_app}).
 
 fetch_cmd(Config, {Ix, Si}, BlockOrSegment) ->
-    co_mgr:fetch(nodeid(), Ix, Si, BlockOrSegment, 
+    co_mgr:fetch(xnodeid(), Ix, Si, BlockOrSegment, 
 		 {app, ?config(app, Config), co_test_app}).
     

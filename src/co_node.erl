@@ -1,4 +1,4 @@
-%%%-------------------------------------------------------------------
+%%%------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @author Malotte W Lönne <malotte@malotte.net>
 %%% @copyright (C) 2012, Tony Rogvall
@@ -47,6 +47,7 @@
 
 %% CANopen application internal
 -export([add_entry/2, get_entry/2]).
+-export([get_object/2]).
 -export([set/3, value/2]).
 -export([store/6, fetch/6]).
 -export([subscribers/2]).
@@ -60,7 +61,7 @@
 
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
 
--define(BACKUP_FILE, filename:join(code:priv_dir(canopen), "backup.dict")).
+-define(BACKUP_FILE, "backup.dict").
 
 -define(COBID_TO_CANID(ID),
 	if ?is_cobid_extended((ID)) ->
@@ -86,8 +87,8 @@
 %% Description: Starts the CANOpen node.
 %%
 %% Options: 
-%%          {use_serial_as_nodeid, boolean()} 
-%%          {short_nodeid, integer()} - 1-126
+%%          {use_serial_as_xnodeid, boolean()} 
+%%          {nodeid, integer()}       - 1-126
 %%          {time_stamp,  timeout()}  - ( 60000 )  1m <br/>
 %%          {sdo_timeout, timeout()}  - ( 1000 ) <br/>
 %%          {blk_timeout, timeout()}  - ( 500 ) <br/>
@@ -97,15 +98,18 @@
 %%          {readbufsize, integer()}  - size of buf when reading from app <br/>
 %%          {load_ratio, float()}     - ratio when time to fill read_buf <br/> 
 %%          {atomic_limit, integer()} - limit to size of atomic variable <br/>
+%%          {load_default, boolean()} - load default dictionary file <br/>
+%%          {dict_file, string()}     - non default dictionary file to load,
+%%                                      overrides load_default <br/>
 %%          {debug, boolean()}        - Enable/Disable trace output<br/>
 %%         
 %% @end
 %%--------------------------------------------------------------------
 -spec start_link(list({serial, Serial::integer()} | 
-		      {options, list({use_serial_as_nodeid, boolean()} |
-				     {name, string()} |
+		      {options, list({use_serial_as_xnodeid, boolean()} |
+				     {name, string() | atom()} |
 				     {vendor, integer()} | 
-				     {short_nodeid, integer()} |
+				     {nodeid, integer()} |
 				     {time_stamp,  timeout()} |  
 				     {sdo_timeout, timeout()} |  
 				     {blk_timeout, timeout()} |  
@@ -115,6 +119,8 @@
 				     {readbufsize, integer()} |
 				     {load_ratio, float()} |
 				     {atomic_maxsize, integer()} |
+				     {load_default, boolean()} |
+				     {dict_file, string() | atom()} |
 				     {debug, boolean()})})) -> 
 			{ok, Pid::pid()} | ignore | {error, Error::atom()}.
 
@@ -181,7 +187,7 @@ stop(Identity) ->
 		       ok | {error, Error::atom()}.
 
 load_dict(Identity) ->
-    gen_server:call(identity_to_pid(Identity), {load_dict, ?BACKUP_FILE}).
+    gen_server:call(identity_to_pid(Identity), load_dict).
     
 
 %%--------------------------------------------------------------------
@@ -207,7 +213,7 @@ load_dict(Identity, File) ->
 		       ok | {error, Error::atom()}.
 
 save_dict(Identity) ->
-    gen_server:call(identity_to_pid(Identity), {save_dict, ?BACKUP_FILE}).
+    gen_server:call(identity_to_pid(Identity), save_dict).
     
 
 %%--------------------------------------------------------------------
@@ -278,7 +284,7 @@ verify_option(Option, NewValue)
 		 " can only be set to a positive integer value or zero."}
     end;
 verify_option(Option, NewValue) 
-  when Option == short_nodeid ->
+  when Option == nodeid ->
     if is_integer(NewValue) andalso NewValue >= 0 andalso NewValue < 127->
 	    ok;
        NewValue =:= undefined ->
@@ -289,7 +295,7 @@ verify_option(Option, NewValue)
 	         " or undefined."}
     end;
 verify_option(Option, NewValue) 
-  when Option == ext_nodeid ->
+  when Option == xnodeid ->
     if is_integer(NewValue) andalso NewValue > 2#1111111 %% Min 8 bits ??
        andalso NewValue < 2#1000000000000000000000000 -> %% Max 24 bits
 	    ok;
@@ -301,8 +307,9 @@ verify_option(Option, NewValue)
 	         " or undefined."}
     end;
 verify_option(Option, NewValue) 
-  when Option == use_serial_as_nodeid;
+  when Option == use_serial_as_xnodeid;
        Option == use_crc;
+       Option == load_default;
        Option == debug ->
     if is_boolean(NewValue) ->
 	    ok;
@@ -319,7 +326,8 @@ verify_option(Option, NewValue)
 		 " can only be set to a float value between 0 and 1."}
     end;
 verify_option(Option, NewValue) 
-  when Option == name ->
+  when Option == name;
+       Option == dict_file ->
     if is_list(NewValue) orelse is_atom(NewValue)->
 	    ok;
        true ->
@@ -552,11 +560,23 @@ add_entry(Identity, Ent) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get_entry(Identity::term(), Index::integer()) -> 
+-spec get_entry(Identity::term(), {Index::integer(), SubIndex::integer()}) -> 
 		       ok | {error, Error::atom()}.
 
-get_entry(Identity, Ix) ->
-    gen_server:call(identity_to_pid(Identity), {get_entry,Ix}).
+get_entry(Identity, Index) ->
+    gen_server:call(identity_to_pid(Identity), {get_entry,Index}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Gets the Object at Index in Object dictionary.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_object(Identity::term(), Index::integer()) -> 
+		       ok | {error, Error::atom()}.
+
+get_object(Identity, Ix) ->
+    gen_server:call(identity_to_pid(Identity), {get_object,Ix}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -856,8 +876,8 @@ init({Serial, NodeName, Opts}) ->
     co_proc:reg(Serial),
 
     {ShortNodeId, ExtNodeId} = nodeids(Serial,Opts),
-    reg({short_nodeid, ShortNodeId}),
-    reg({ext_nodeid, ExtNodeId}),
+    reg({nodeid, ShortNodeId}),
+    reg({xnodeid, ExtNodeId}),
     reg({name, NodeName}),
 
     Dict = create_dict(),
@@ -885,8 +905,8 @@ init({Serial, NodeName, Opts}) ->
      },
     CobTable = create_cob_table(ExtNodeId, ShortNodeId),
     Ctx = #co_ctx {
-      ext_nodeid = ExtNodeId,
-      short_nodeid = ShortNodeId,
+      xnodeid = ExtNodeId,
+      nodeid = ShortNodeId,
       name   = NodeName,
       vendor = proplists:get_value(vendor,Opts,0),
       serial = Serial,
@@ -910,7 +930,9 @@ init({Serial, NodeName, Opts}) ->
 
     can_router:attach(),
 
-    case load_dict_init(proplists:get_value(dict_file, Opts), Ctx) of
+    case load_dict_init(proplists:get_value(dict_file, Opts), 
+			proplists:get_value(load_default, Opts, true), 
+			Ctx) of
 	{ok, Ctx1} ->
 	    process_flag(trap_exit, true),
 	    if ShortNodeId =:= 0 ->
@@ -925,10 +947,10 @@ init({Serial, NodeName, Opts}) ->
     end.
 
 nodeids(Serial, Opts) ->
-    {proplists:get_value(short_nodeid,Opts,undefined),
-     case proplists:get_value(use_serial_as_nodeid,Opts,false) of
+    {proplists:get_value(nodeid,Opts,undefined),
+     case proplists:get_value(use_serial_as_xnodeid,Opts,false) of
 	 false -> undefined;
-	 true  -> (Serial bsr 8) bor ?COBID_ENTRY_EXTENDED
+	 true  -> co_lib:serial_to_xnodeid(Serial)
      end}.
 
 reg({_, undefined}) ->	    
@@ -940,21 +962,21 @@ reg(Term) ->
 %%
 reset_application(Ctx) ->
     io:format("Node '~s' id=~w,~w reset_application\n", 
-	      [Ctx#co_ctx.name, Ctx#co_ctx.ext_nodeid, Ctx#co_ctx.short_nodeid]),
+	      [Ctx#co_ctx.name, Ctx#co_ctx.xnodeid, Ctx#co_ctx.nodeid]),
     reset_communication(Ctx).
 
 reset_communication(Ctx) ->
     io:format("Node '~s' id=~w,~w reset_communication\n",
-	      [Ctx#co_ctx.name, Ctx#co_ctx.ext_nodeid, Ctx#co_ctx.short_nodeid]),
+	      [Ctx#co_ctx.name, Ctx#co_ctx.xnodeid, Ctx#co_ctx.nodeid]),
     initialization(Ctx).
 
-initialization(Ctx=#co_ctx {name=Name, short_nodeid=SNodeId, ext_nodeid=XNodeId}) ->
+initialization(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
     io:format("Node '~s' id=~w,~w initialization\n",
 	      [Name, XNodeId, SNodeId]),
 
     %% ??
     if XNodeId =/= undefined ->
-	    can:send(#can_frame { id = ?NODE_GUARD_ID(XNodeId),
+	    can:send(#can_frame { id = ?NODE_GUARD_ID(add_xflag(XNodeId)),
 				  len = 1, data = <<0>> });
        true ->
 	    do_nothing
@@ -968,6 +990,10 @@ initialization(Ctx=#co_ctx {name=Name, short_nodeid=SNodeId, ext_nodeid=XNodeId}
 	   
     Ctx#co_ctx { state = ?PreOperational }.
 
+add_xflag(undefined) ->
+    undefined;
+add_xflag(NodeId) ->
+    NodeId bor ?COBID_ENTRY_EXTENDED.
 %%--------------------------------------------------------------------
 %% @private
 %% @spec handle_call(Request, From, State) -> {reply, Reply, State} |  
@@ -983,7 +1009,8 @@ initialization(Ctx=#co_ctx {name=Name, short_nodeid=SNodeId, ext_nodeid=XNodeId}
 %%           {store, Block, CobId, Index, SubInd, Bin} | 
 %%           {fetch, Block, CobId, Index, SubInd} | 
 %%           {add_entry, Entry} | 
-%%           {get_entry, Entry} | 
+%%           {get_entry, {Index, SubIndex}} | 
+%%           {get_object, Index} | 
 %%           {load_dict, File} | 
 %%           {attach, Pid} | 
 %%           {detach, Pid}  
@@ -1005,8 +1032,9 @@ handle_call({value,{Ix, Si}}, _From, Ctx) ->
     Result = co_dict:value(Ctx#co_ctx.dict, Ix, Si),
     {reply, Result, Ctx};
 
-handle_call({store,Mode,COBID,IX,SI,Term}, From, Ctx) ->
-    case lookup_sdo_server(COBID,Ctx) of
+handle_call({store,Mode,NodeId,IX,SI,Term}, From, Ctx) ->
+    CobId = co_lib:complete_nodeid(NodeId),
+    case lookup_sdo_server(CobId,Ctx) of
 	ID={Tx,Rx} ->
 	    ?dbg(node, "~s: store: ID = ~p", [Ctx#co_ctx.name,ID]),
 	    case co_sdo_cli_fsm:store(Ctx#co_ctx.sdo,Mode,From,Tx,Rx,IX,SI,Term) of
@@ -1027,8 +1055,9 @@ handle_call({store,Mode,COBID,IX,SI,Term}, From, Ctx) ->
 	    {reply, {error, badarg}, Ctx}
     end;
 
-handle_call({fetch,Mode,COBID,IX,SI, Term}, From, Ctx) ->
-    case lookup_sdo_server(COBID,Ctx) of
+handle_call({fetch,Mode,NodeId,IX,SI, Term}, From, Ctx) ->
+    CobId = co_lib:complete_nodeid(NodeId),
+    case lookup_sdo_server(CobId,Ctx) of
 	ID={Tx,Rx} ->
 	    ?dbg(node, "~s: fetch: ID = ~p", [Ctx#co_ctx.name,ID]),
 	    case co_sdo_cli_fsm:fetch(Ctx#co_ctx.sdo,Mode,From,Tx,Rx,IX,SI,Term) of
@@ -1065,17 +1094,35 @@ handle_call({get_entry,Index}, _From, Ctx) ->
     Result = co_dict:lookup_entry(Ctx#co_ctx.dict, Index),
     {reply, Result, Ctx};
 
+handle_call({get_object,Index}, _From, Ctx) ->
+    Result = co_dict:lookup_object(Ctx#co_ctx.dict, Index),
+    {reply, Result, Ctx};
+
+handle_call(load_dict, From, Ctx=#co_ctx {serial = Serial}) ->
+    File = filename:join(code:priv_dir(canopen), 
+			 co_lib:serial_to_string(Serial) ++ ?BACKUP_FILE),
+    handle_call({load_dict, File}, From, Ctx);
 handle_call({load_dict, File}, _From, Ctx) ->
+    ?dbg(node, "~s: handle_call: load_dict, file = ~p", [Ctx#co_ctx.name, File]),    
     case load_dict_internal(File, Ctx) of
 	{ok, Ctx1} ->
+	    %% Inform applications (or only reservers ??)
+	    send_to_apps(load, Ctx),
 	    {reply, ok, Ctx1};
-	{error, Error, Ctx1} ->
-	    {reply, Error, Ctx1}
+	{error, Error} ->
+	    {reply, Error, Ctx}
     end;
 
+handle_call(save_dict, From, Ctx=#co_ctx {serial = Serial}) ->
+    File = filename:join(code:priv_dir(canopen), 
+			 co_lib:serial_to_string(Serial) ++ ?BACKUP_FILE),
+    handle_call({save_dict, File}, From, Ctx);
 handle_call({save_dict, File}, _From, Ctx=#co_ctx {dict = Dict}) ->
+    ?dbg(node, "~s: handle_call: save_dict, file = ~p", [Ctx#co_ctx.name, File]),    
     case co_dict:to_file(Dict, File) of
 	ok ->
+	    %% Inform applications (or only reservers ??)
+	    send_to_apps(save, Ctx),
 	    {reply, ok, Ctx};
 	{error, Error} ->
 	    {reply, Error, Ctx}
@@ -1162,8 +1209,8 @@ handle_call({reservers}, _From, Ctx)  ->
 
 handle_call({dump, Qualifier}, _From, Ctx) ->
     io:format("   NAME: ~p\n", [Ctx#co_ctx.name]),
-    print_nodeid(" NODEID:", Ctx#co_ctx.short_nodeid),
-    print_nodeid("XNODEID:", Ctx#co_ctx.ext_nodeid),
+    print_nodeid(" NODEID:", Ctx#co_ctx.nodeid),
+    print_nodeid("XNODEID:", Ctx#co_ctx.xnodeid),
     io:format(" VENDOR: ~8.16.0B\n", [Ctx#co_ctx.vendor]),
     io:format(" SERIAL: ~8.16.0B\n", [Ctx#co_ctx.serial]),
     io:format("  STATE: ~s\n", [co_format:state(Ctx#co_ctx.state)]),
@@ -1244,9 +1291,9 @@ handle_call(loop_data, _From, Ctx) ->
 handle_call({option, Option}, _From, Ctx) ->
     Reply = case Option of
 		name -> {Option, Ctx#co_ctx.name};
-		short_nodeid -> {Option, Ctx#co_ctx.short_nodeid};
-		ext_nodeid -> {Option, Ctx#co_ctx.ext_nodeid};
-		use_serial_as_nodeid -> {Option, true};
+		nodeid -> {Option, Ctx#co_ctx.nodeid};
+		xnodeid -> {Option, Ctx#co_ctx.xnodeid};
+		use_serial_as_xnodeid -> {Option, calc_use_serial(Ctx)};
 		sdo_timeout ->  {Option, Ctx#co_ctx.sdo#sdo_ctx.timeout};
 		blk_timeout -> {Option, Ctx#co_ctx.sdo#sdo_ctx.blk_timeout};
 		pst ->  {Option, Ctx#co_ctx.sdo#sdo_ctx.pst};
@@ -1279,10 +1326,9 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
 		debug -> put(dbg, NewValue),
 			 Ctx#co_ctx.sdo#sdo_ctx {debug = NewValue};
 		NodeId when
-		      NodeId == short_nodeid;
-		      NodeId == ext_nodeid;
-		      NodeId == use_serial_as_nodeid -> 
-		    
+		      NodeId == nodeid;
+		      NodeId == xnodeid;
+		      NodeId == use_serial_as_xnodeid -> 
 		    change_nodeid(Option, NewValue, Ctx);
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
 	    end,
@@ -1447,13 +1493,6 @@ identity_to_pid(Pid) when is_pid(Pid) ->
 identity_to_pid(Term) ->
     co_proc:lookup(Term).
 
-%% Needed ???
-call_node(Identity, Msg) ->
-    case identity_to_pid(Identity) of
-	Pid when is_pid(Pid) -> gen_server:call(Pid, Msg);
-	{error, _R} = E -> E 
-    end.
-	    
 
 %% 
 %% Create and initialize dictionary
@@ -1487,13 +1526,13 @@ create_dict() ->
 %%
 create_cob_table(ExtNid, ShortNid) ->
     T = ets:new(co_cob_table, [public]),
-    add_to_cob_table(T, true, ExtNid),
-    add_to_cob_table(T, false, ShortNid),
+    add_to_cob_table(T, xnodeid, add_xflag(ExtNid)),
+    add_to_cob_table(T, nodeid, ShortNid),
     T.
 
-add_to_cob_table(_T, _XFlag, undefined) ->
+add_to_cob_table(_T, _NidType, undefined) ->
     ok;
-add_to_cob_table(T, true, ExtNid) 
+add_to_cob_table(T, xnodeid, ExtNid) 
   when ExtNid =/= undefined ->
     XSDORx = ?XCOB_ID(?SDO_RX,ExtNid),
     XSDOTx = ?XCOB_ID(?SDO_TX,ExtNid),
@@ -1502,7 +1541,7 @@ add_to_cob_table(T, true, ExtNid)
     ets:insert(T, {?XCOB_ID(?NMT, 0), nmt}),
     ?dbg(node, "add_to_cob_table: XNid=~w, XSDORx=~w, XSDOTx=~w", 
 	 [ExtNid,XSDORx,XSDOTx]);
-add_to_cob_table(T, false, ShortNid) 
+add_to_cob_table(T, nodeid, ShortNid) 
   when ShortNid =/= undefined->
     ?dbg(node, "add_to_cob_table: ShortNid=~w", [ShortNid]),
     SDORx = ?COB_ID(?SDO_RX,ShortNid),
@@ -1513,10 +1552,11 @@ add_to_cob_table(T, false, ShortNid)
     ?dbg(node, "add_to_cob_table: SDORx=~w, SDOTx=~w", [SDORx,SDOTx]).
 
 
-delete_from_cob_table(_T, _XFlag, undefined) ->
+delete_from_cob_table(_T, _NidType, undefined) ->
     ok;
-delete_from_cob_table(T, true, ExtNid)
-  when ExtNid =/= undefined ->
+delete_from_cob_table(T, xnodeid, Nid)
+  when Nid =/= undefined ->
+    ExtNid = add_xflag(Nid),
     XSDORx = ?XCOB_ID(?SDO_RX,ExtNid),
     XSDOTx = ?XCOB_ID(?SDO_TX,ExtNid),
     ets:delete(T, XSDORx),
@@ -1524,7 +1564,7 @@ delete_from_cob_table(T, true, ExtNid)
     ets:delete(T, ?XCOB_ID(?NMT,0)),
     ?dbg(node, "delete_from_cob_table: XNid=~w, XSDORx=~w, XSDOTx=~w", 
 	 [ExtNid,XSDORx,XSDOTx]);
-delete_from_cob_table(T, false, ShortNid)
+delete_from_cob_table(T, nodeid, ShortNid)
   when ShortNid =/= undefined->
     SDORx = ?COB_ID(?SDO_RX,ShortNid),
     SDOTx = ?COB_ID(?SDO_TX,ShortNid),
@@ -1535,31 +1575,56 @@ delete_from_cob_table(T, false, ShortNid)
 	 [ShortNid,SDORx,SDOTx]).
 
 
-change_nodeid(ext_nodeid, undefined, 
-	      _Ctx=#co_ctx {short_nodeid = undefined}) -> 
+change_nodeid(xnodeid, NewXNid, Ctx=#co_ctx {xnodeid = NewXNid}) ->
+    %% No change
+    Ctx;
+change_nodeid(xnodeid, undefined, _Ctx=#co_ctx {nodeid = undefined}) -> 
     {error, "Not possible to remove last nodeid"};
-change_nodeid(ext_nodeid, NewXNid, 
-	      Ctx=#co_ctx {ext_nodeid = OldXNid, cob_table = T}) ->
-    delete_from_cob_table(T, true, OldXNid),
-    add_to_cob_table(T, true, NewXNid),
-    Ctx#co_ctx {ext_nodeid = NewXNid};
-change_nodeid(short_nodeid, undefined, 
-	      _Ctx=#co_ctx {ext_nodeid = undefined}) -> 
+change_nodeid(xnodeid, NewNid, Ctx=#co_ctx {xnodeid = OldNid, cob_table = T}) ->
+    execute_change(xnodeid, NewNid, OldNid, T),
+    Ctx#co_ctx {xnodeid = NewNid};
+change_nodeid(nodeid, NewNid, Ctx=#co_ctx {nodeid = NewNid}) ->
+    %% No change
+    Ctx;
+change_nodeid(nodeid, undefined, _Ctx=#co_ctx {xnodeid = undefined}) -> 
     {error, "Not possible to remove last nodeid"};
-change_nodeid(short_nodeid, 0, Ctx) ->
-    {error, "NodeId 0 is reserved for the CANOpen manager co_mgr."};
-change_nodeid(short_nodeid, NewNid,
-	      Ctx=#co_ctx {short_nodeid = OldNid, cob_table = T}) ->
-    delete_from_cob_table(T, false, OldNid),
-    add_to_cob_table(T, false, NewNid),
-    Ctx#co_ctx {short_nodeid = NewNid};
-change_nodeid(use_serial_as_nodeid, true, Ctx=#co_ctx {serial = Serial}) ->
-    NewXNid = (Serial bsr 8) bor ?COBID_ENTRY_EXTENDED,
-    change_nodeid(ext_nodeid, NewXNid, Ctx);
-change_nodeid(use_serial_as_nodeid, false, Ctx) ->
-    %% ??? Enough??
-    change_nodeid(ext_nodeid, undefined, Ctx).
+change_nodeid(nodeid, 0, _Ctx) ->
+    {error, "NodeId 0 is reserved for the CANopen manager co_mgr."};
+change_nodeid(nodeid, NewNid, Ctx=#co_ctx {nodeid = OldNid, cob_table = T}) ->
+    execute_change(nodeid, NewNid, OldNid, T),
+    Ctx#co_ctx {nodeid = NewNid};
+change_nodeid(use_serial_as_xnodeid, true, Ctx=#co_ctx {serial = Serial}) ->
+    NewXNid = co_lib:serial_to_xnodeid(Serial),
+    change_nodeid(xnodeid, NewXNid, Ctx);
+change_nodeid(use_serial_as_xnodeid, false, Ctx) ->
+    case  calc_use_serial(Ctx) of
+	true ->
+	    %% Serial was used as extended node id
+	    change_nodeid(xnodeid, undefined, Ctx);
+	false ->
+	    %% Serial was NOT used as nodeid so flag was already false
+	    Ctx
+    end.
+
+execute_change(NidType, NewNid, OldNid, T) ->  
+    ?dbg(node, "execute_change: NidType = ~p, OldNid = ~p, NewNid = ~p", 
+	 [NidType, OldNid, NewNid]),
+    delete_from_cob_table(T, NidType, OldNid),
+    co_proc:unreg({NidType, OldNid}),
+    add_to_cob_table(T, NidType, NewNid),
+    reg({NidType, NewNid}).
     
+  
+calc_use_serial(_Ctx=#co_ctx {xnodeid = OldXNid, serial = Serial}) ->
+    case co_lib:serial_to_xnodeid(Serial) of
+	OldXNid ->
+	    %% Serial was used as extended node id
+	    true;
+	_Other ->
+	    %% Serial was NOT used as nodeid so flag was already false
+	    false
+    end.
+   
 %%
 %% Create subscription table
 %%
@@ -1589,45 +1654,66 @@ create_sub_table() ->
 %%    IX_SDO_CLIENT_FIRST - IX_SDO_CLIENT_LAST =>  cob_table
 %%    IX_RPDO_PARAM_FIRST - IX_RPDO_PARAM_LAST =>  cob_table
 %% 
-load_dict_init(undefined, Ctx) ->
-    case filelib:is_regular(?BACKUP_FILE) of
-	true -> load_dict_init(?BACKUP_FILE, Ctx);
+load_dict_init(undefined, true, Ctx=#co_ctx {serial = Serial}) ->
+    File = filename:join(code:priv_dir(canopen), 
+			 co_lib:serial_to_string(Serial) ++ ?BACKUP_FILE),
+    case filelib:is_regular(File) of
+	true -> load_dict_init(File, true, Ctx);
 	false -> {ok, Ctx}
     end;
-load_dict_init(File, Ctx) ->
-    case load_dict_internal(filename:join(code:priv_dir(canopen), File), Ctx) of
-	{ok, NewCtx} -> {ok, NewCtx};
-	{error, Error, _OldCtx} -> {error, Error}
-    end.
+load_dict_init(undefined, false, Ctx) ->
+    %% ??
+    {ok, Ctx};
+load_dict_init(File, _Flag, Ctx) when is_list(File) ->
+    load_dict_internal(filename:join(code:priv_dir(canopen), File), Ctx); 
+load_dict_init(File, _Flag, Ctx) when is_atom(File) ->
+    load_dict_internal(filename:join(code:priv_dir(canopen), atom_to_list(File)), Ctx). 
 
-load_dict_internal(File, Ctx) ->
+load_dict_internal(File, Ctx=#co_ctx {dict = Dict}) ->
     ?dbg(node, "~s: load_dict_internal: Loading file = ~p", 
 	 [Ctx#co_ctx.name, File]),
     try co_file:load(File) of
 	{ok,Os} ->
 	    %% Install all objects
-	    foreach(
-	      fun({Obj,Es}) ->
-		      foreach(fun(E) -> ets:insert(Ctx#co_ctx.dict, E) end, Es),
-		      ets:insert(Ctx#co_ctx.dict, Obj)
-	      end, Os),
-	    %% Now update cob table
+	    ChangedIxs =
+		foldl(
+		  fun({Obj,Es}, OIxs) ->
+			  ChangedEIxs = 
+			      foldl(fun(E, EIxs) -> 
+					    I = E#dict_entry.index,
+					    ChangedI = case ets:lookup(Dict, I) of
+							   [E] -> []; %% No change
+							   [_E] -> [I]; %% Changed Entry
+							   [] -> [I] %% New Entry
+						       end,
+					    ets:insert(Dict, E),
+					    EIxs ++ ChangedI
+				    end, [], Es),
+			  ets:insert(Dict, Obj),
+			  {Ixs, _SubIxs} = lists:unzip(ChangedEIxs),
+			  OIxs ++ lists:usort(Ixs)
+		  end, [], Os),
+	    %% Now take action if needed
 	    Ctx1 = 
-		foldl(fun({Obj,_Es},Ctx0) ->
-			      I = Obj#dict_object.index,
+		foldl(fun(I, Ctx0) ->
 			      handle_notify(I, Ctx0)
-		      end, Ctx, Os),
+		      end, Ctx, ChangedIxs),
+
+	    %% Inform subscribers and reservers of changed indexes
+	    %%foreach(fun(Ix) -> inform_subscribers(Ix, Ctx1) end, ChangedIxs),
+	    %%foreach(fun(Ix) -> inform_reserver(Ix, Ctx1) end, ChangedIxs),
+
 	    {ok, Ctx1};
 	Error ->
 	    ?dbg(node, "~s: load_dict_internal: Failed loading file, error = ~p", 
 		 [Ctx#co_ctx.name, Error]),
-	    {error, Error, Ctx}
+	    Error
     catch
 	error:Reason ->
 	    ?dbg(node, "~s: load_dict_internal: Failed loading file, reason = ~p", 
 		 [Ctx#co_ctx.name, Reason]),
 
-	    {error, Reason, Ctx}
+	    {error, Reason}
     end.
 
 %%
@@ -1736,9 +1822,10 @@ handle_can(Frame, Ctx) ->
 handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
     ?dbg(node, "~s: handle_nmt: ~p", [Ctx#co_ctx.name, M]),
     <<NodeId,Cs,_/binary>> = M#can_frame.data,
+    XNid = add_xflag(Ctx#co_ctx.xnodeid),
     if NodeId == 0; 
-       NodeId == Ctx#co_ctx.ext_nodeid; 
-       NodeId == Ctx#co_ctx.short_nodeid ->
+       NodeId == XNid; 
+       NodeId == Ctx#co_ctx.nodeid ->
 	    case Cs of
 		?NMT_RESET_NODE ->
 		    reset_application(Ctx);
@@ -1764,16 +1851,17 @@ handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
     end.
 
 
-handle_node_guard(Frame, Ctx=#co_ctx {short_nodeid=SNodeId, ext_nodeid=XNodeId}) 
+handle_node_guard(Frame, Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId}) 
   when ?is_can_frame_rtr(Frame) ->
     ?dbg(node, "~s: handle_node_guard: request ~w", [Ctx#co_ctx.name,Frame]),
     NodeId = ?NODE_ID(Frame#can_frame.id),
+    XNid = add_xflag(XNodeId),
     if NodeId == 0; 
        NodeId == SNodeId;
-       NodeId == XNodeId ->
+       NodeId == XNid ->
 	    Data = Ctx#co_ctx.state bor Ctx#co_ctx.toggle,
 	    if XNodeId =/= undefined ->
-		    can:send(#can_frame { id = ?NODE_GUARD_ID(XNodeId),
+		    can:send(#can_frame { id = ?NODE_GUARD_ID(add_xflag(XNodeId)),
 					  len = 1,
 					  data = <<Data>> });
 	       true ->
@@ -1795,11 +1883,12 @@ handle_node_guard(Frame, Ctx=#co_ctx {short_nodeid=SNodeId, ext_nodeid=XNodeId})
 handle_node_guard(Frame, Ctx) when Frame#can_frame.len >= 1 ->
     ?dbg(node, "~s: handle_node_guard: ~w", [Ctx#co_ctx.name,Frame]),
     NodeId = ?NODE_ID(Frame#can_frame.id),
+    XNid = add_xflag(Ctx#co_ctx.xnodeid),
     case Frame#can_frame.data of
 	<<_Toggle:1, State:7, _/binary>> 
-	  when (NodeId =/= Ctx#co_ctx.ext_nodeid andalso
-		NodeId =/= Ctx#co_ctx.short_nodeid) ->
-	    %% Verify toggle if NodeId=slave and we are Ctx#co_ctx.ext_nodeid=master
+	  when (NodeId =/= XNid andalso
+		NodeId =/= Ctx#co_ctx.nodeid) ->
+	    %% Verify toggle if NodeId=slave and we are Ctx#co_ctx.xnodeid=master
 	    update_nmt_entry(NodeId, [{state,State}], Ctx);
 	_ ->
 	    Ctx
@@ -2066,6 +2155,18 @@ broadcast_state(State, Ctx) ->
       end,
       Ctx#co_ctx.app_list).
 
+send_to_apps(Msg, _Ctx=#co_ctx {name = Name, app_list = AList}) ->
+    lists:foreach(
+      fun(A) ->
+	      case A#app.pid of
+		  Pid -> 
+		      ?dbg(node, "~s: handle_call: sending ~w to app "
+			   "with pid = ~p", [Name, Msg, Pid]),
+		      gen_server:cast(Pid, Msg) 
+	      end
+      end,
+      AList).
+
     
 %%
 %% Dictionary entry has been updated
@@ -2074,6 +2175,7 @@ broadcast_state(State, Ctx) ->
 handle_notify(I, Ctx) ->
     NewCtx = handle_notify1(I, Ctx),
     inform_subscribers(I, NewCtx),
+    inform_reserver(I, NewCtx),
     NewCtx.
 
 handle_notify1(I, Ctx) ->
@@ -2164,8 +2266,6 @@ handle_notify1(I, Ctx) ->
 		    Ctx
 	    end;
 	_ ->
-	    ?dbg(node, "~s: handle_notify: index not in cob table ix=~7.16.0#", 
-		 [Ctx#co_ctx.name, I]),
 	    Ctx
     end.
 
@@ -2399,19 +2499,18 @@ subscriptions(Tab, Pid) when is_pid(Pid) ->
 subscribers(Tab) ->
     lists:usort([Pid || {Pid, _Ixs} <- ets:tab2list(Tab)]).
 
-inform_subscribers(I, Ctx) ->			
+inform_subscribers(I, _Ctx=#co_ctx {name = Name, sub_table = STable}) ->
     lists:foreach(
       fun(Pid) ->
 	      case self() of
 		  Pid -> do_nothing;
 		  _OtherPid ->
 		      ?dbg(node, "~s: inform_subscribers: "
-			   "Sending object event to ~p", 
-			   [Ctx#co_ctx.name, Pid]),
+			   "Sending object event to ~p", [Name, Pid]),
 		      gen_server:cast(Pid, {object_event, I}) 
 	      end
       end,
-      lists:usort(subscribers(Ctx#co_ctx.sub_table, I))).
+      lists:usort(subscribers(STable, I))).
 
 
 reservations(Tab, Pid) when is_pid(Pid) ->
@@ -2510,6 +2609,18 @@ reserver_pid(Tab, Ix) when ?is_index(Ix) ->
 	[{Ix, _Mod, Pid}] -> [Pid]
     end.
 
+inform_reserver(Ix, _Ctx=#co_ctx {name = Name, res_table = RTable}) ->
+    Self = self(),
+    case reserver_pid(RTable, Ix) of
+	[Self] -> do_nothing;
+	[] -> do_nothing;
+	[Pid] when is_pid(Pid) -> 
+	    ?dbg(node, "~s: inform_subscribers: "
+		 "Sending object event to ~p", [Name, Pid]),
+	    gen_server:cast(Pid, {object_event, Ix})
+    end.
+
+
 lookup_sdo_server(COBID, Ctx) ->
     case lookup_cobid(COBID, Ctx) of
 	{sdo_rx, SDOTx} -> 
@@ -2588,34 +2699,6 @@ update_nmt_value(Key,Value,E) when is_record(E, nmt_entry) ->
 %%
 %% 
 %%
-cob_map(PdoEnt,_S) when is_integer(PdoEnt) ->
-    PdoEnt;
-cob_map({pdo,Invalid,Rtr,Ext,Cob}, _S) when is_integer(Cob) ->
-    ?PDO_ENTRY(Invalid,Rtr,Ext,Cob);
-cob_map({pdo,Invalid,Rtr,Ext,DynCob}, S) ->
-    NodeId = dyn_nodeid(DynCob, S),
-    Cob = case DynCob of
-	      {cob,1}   -> ?PDO1_TX_ID(NodeId);
-	      {cob,1,_} -> ?PDO1_TX_ID(NodeId);
-	      {cob,2}   -> ?PDO2_TX_ID(NodeId);
-	      {cob,2,_} -> ?PDO2_TX_ID(NodeId);
-	      {cob,3}   -> ?PDO3_TX_ID(NodeId);
-	      {cob,3,_} -> ?PDO3_TX_ID(NodeId);
-	      {cob,4}   -> ?PDO4_TX_ID(NodeId);
-	      {cob,4,_} -> ?PDO4_TX_ID(NodeId)
-	  end,
-    ?PDO_ENTRY(Invalid,Rtr,Ext,Cob).
-
-	
-%% dynamically lookup nodeid (by serial)
-dyn_nodeid({cob,_I},Ctx) ->
-    Ctx#co_ctx.ext_nodeid;
-dyn_nodeid({cob,_I,Serial},Ctx) ->
-    case ets:lookup(Ctx#co_ctx.node_map, Serial) of
-	[]       -> ?COBID_ENTRY_INVALID;
-	[{_,NodeId}] -> NodeId
-    end.
-
 %%
 %% Callback functions for changes in tpdo elements
 %% Truncate data to 64 bits
@@ -2927,8 +3010,11 @@ update_error_list([Code|Cs], SI, Ctx) ->
 
 print_nodeid(Label, undefined) ->
     io:format(Label ++ " not defined\n",[]);
-print_nodeid(Label, NodeId) ->
-    io:format(Label ++ " ~8.16.0B\n", [NodeId]).
+print_nodeid(" NODEID:", NodeId) ->
+    io:format(" NODEID:" ++ " ~2.16.0B\n", [NodeId]);
+print_nodeid("XNODEID:", NodeId) ->
+    io:format("XNODEID:" ++ " ~6.16.0B\n", [NodeId]).
+
 				       
 
 %% Optionally start a timer
