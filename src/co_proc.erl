@@ -10,6 +10,8 @@
 %%%-------------------------------------------------------------------
 -module(co_proc).
 
+-include("co_debug.hrl").
+
 -behaviour(gen_server).
 
 %% API
@@ -27,6 +29,7 @@
 -export([clear/1]).
 -export([i/0]).
 -export([alive/0]).
+-export([debug/1]).
 
 -record(ctx, 
 	{
@@ -93,7 +96,7 @@ unreg(Term) ->
 -spec lookup(Term::term()) -> Pid::pid() | {error, Error::term()}.
 
 lookup(Term) ->
-    io:format("co_proc: lookup ~p\n", [Term]),
+    ?dbg(proc, "lookup Term = ~w", [Term]),    
     case ets:info(co_term_dict, name) of
 	undefined -> 
 	    {error, no_process};
@@ -167,6 +170,15 @@ alive() ->
 	undefined -> false;
 	_PI -> true
     end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Adjust debug flag.
+%% @end
+%%--------------------------------------------------------------------
+debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
+    gen_server:call(?MODULE, {debug, TrueOrFalse}).
+
 	     
 %%%===================================================================
 %%% gen_server callbacks
@@ -197,7 +209,9 @@ init([]) ->
 %%--------------------------------------------------------------------
 -spec handle_call(Request::{reg, Term::term(), Pid::pid()} |
 			   {unreg, Term::term()} |
-			   {clear, Pid::pid()},
+			   {clear, Pid::pid()} |
+			   {debug, TrueOrFalse::boolean()} |
+			   stop,
 		  From::pid(), Ctx::record()) ->
 			 {reply, Reply::term(), Ctx::record()} |
 			 {reply, Reply::term(), Ctx::record(), Timeout::timeout()} |
@@ -208,6 +222,7 @@ init([]) ->
 
 handle_call({reg, Term, Pid}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) 
   when is_pid(Pid) ->
+    ?dbg(proc, "handle_call: reg Term = ~w, Pid = ~w", [Term, Pid]),    
     case ets:lookup(TD, Term) of
 	[] ->
 	    ets:insert(TD, {Term, Pid}),
@@ -231,6 +246,7 @@ handle_call({reg, Term, Pid}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD})
 	    {reply, {error, already_registered}, Ctx}
     end;
 handle_call({unreg, Term}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
+    ?dbg(proc, "handle_call: unreg Term = ~w", [Term]),    
     case ets:lookup(TD, Term) of
 	[{Term, Pid}] ->
 	    ets:delete(TD, Term),
@@ -249,6 +265,7 @@ handle_call({unreg, Term}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
 	    {reply, ok, Ctx}
     end;
 handle_call({clear, Pid}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
+    ?dbg(proc, "handle_call: clear Pid = ~w", [Pid]),    
     try ets:match_delete(TD, {'_', Pid}) of
 	true -> 
 	    %% All entries removed
@@ -263,6 +280,9 @@ handle_call({clear, Pid}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
 	error:Reason ->
 	    {reply, {error, Reason}, Ctx}
     end;
+handle_call({debug, TrueOrFalse}, _From, Ctx) ->
+    put(dbg, TrueOrFalse),
+    {reply, ok, Ctx};
 handle_call(stop, _From, Ctx) ->
     {stop, normal, ok, Ctx}.
 

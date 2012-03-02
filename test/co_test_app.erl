@@ -73,7 +73,7 @@
 %%--------------------------------------------------------------------
 start(CoNode, Dict) ->
     gen_server:start_link({local, name(CoNode)}, 
-			  ?MODULE, [CoNode, Dict, self()], []).
+			  ?MODULE, {CoNode, Dict, self()}, []).
 
 name(Serial) when is_integer(Serial) ->
     list_to_atom("co_test_app_" ++ integer_to_list(Serial));
@@ -190,10 +190,10 @@ write_size(Pid, NewSize) when is_integer(NewSize) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-init([CoNode, Dict, Starter]) ->
+init({CoNode, Dict, Starter}) ->
     DictTable = ets:new(dict_table(self()), [public, named_table, ordered_set]),
     NameTable = ets:new(name_to_index, [private, ordered_set]),
-    ok = co_node:attach(CoNode),
+    {ok, _DictRef} = co_node:attach(CoNode),
     load_dict(CoNode, Dict, DictTable, NameTable),
     {ok, #loop_data {state=init, co_node = CoNode, dict=DictTable, 
 		     name_table=NameTable, starter = Starter}}.

@@ -153,7 +153,7 @@ loop_data() ->
 %%--------------------------------------------------------------------
 init([CoSerial, IndexList, Starter]) ->
     DictTable = ets:new(tpdo_dict, [public, named_table, ordered_set]),
-    ok = co_node:attach(CoSerial),
+    {ok, _DictRef} = co_node:attach(CoSerial),
     load_dict(CoSerial, DictTable, IndexList),
     {ok, #loop_data {co_node = CoSerial, tpdo_dict = DictTable, starter = Starter}}.
 

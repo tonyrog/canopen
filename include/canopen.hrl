@@ -483,8 +483,8 @@
 %% Node context
 -record(co_ctx,
 	{
-	  short_nodeid,     %% can bus id
-	  ext_nodeid,       %% can bus id
+	  nodeid,           %% can bus id
+	  xnodeid,          %% extended can bus id
 	  name,             %% node (process) name
 	  vendor,           %% CANopen vendor code
 	  serial,           %% string version of node serial number
@@ -631,8 +631,17 @@
 -define(IX_MANUF_SW_VERSION,           16#100A).
 -define(IX_GUARD_TIME,                 16#100C).
 -define(IX_LIFE_TIME_FACTOR,           16#100D).
+
 -define(IX_STORE_PARAMETERS,           16#1010).
+-define(SI_STORE_ALL, 1).
+-define(SI_STORE_COM, 2).
+-define(SI_STORE_APP, 3).
+
 -define(IX_RESTORE_DEFAULT_PARAMETERS, 16#1011).
+-define(SI_RESTORE_ALL, 1).
+-define(SI_RESTORE_COM, 2).
+-define(SI_SRETORE_APP, 3).
+
 -define(IX_COB_ID_TIME_STAMP,          16#1012).
 -define(IX_HIGHRES_TIME_STAMP,         16#1013).
 -define(IX_COB_ID_EMERGENCY,           16#1014).

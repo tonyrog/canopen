@@ -22,7 +22,7 @@
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
-%% co_app and co_stream_app callbacks
+%% co_stream_app callbacks
 -export([index_specification/2,
 	 write_begin/3, write/4,
 	 read_begin/3, read/3,
@@ -175,7 +175,7 @@ loop_data() ->
 init({CoSerial, {Index, RFileName, WFileName}, Starter}) ->
     ct:pal(?NAME, "Starting with index = ~.16B, readfile = ~p, writefile = ~p\n",
 	   [Index, RFileName, WFileName]),
-    ok = co_node:attach(CoSerial),
+    {ok, _DictRef} = co_node:attach(CoSerial),
     ok = co_node:reserve(CoSerial, Index, ?MODULE),
     {ok, #loop_data {starter = Starter, co_node = CoSerial, index = Index,
 		     readfilename = RFileName, writefilename = WFileName}}.

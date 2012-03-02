@@ -12,6 +12,7 @@
 -compile(export_all).
 
 -include_lib("common_test/include/ct.hrl").
+-include("canopen.hrl").
 
 %%--------------------------------------------------------------------
 %% COMMON TEST CALLBACK FUNCTIONS
@@ -61,6 +62,7 @@ all() ->
      set_options_ok,
      set_options_nok,
      unknown_option,
+     nodeid_changes,
      restore_dict,
      start_stop_app].
 %%     break].
@@ -128,39 +130,6 @@ end_per_suite(_Config) ->
     co_node:stop(serial()),
     ok.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Initialization before each test case group.
-%%
-%% GroupName = atom()
-%%   Name of the test case group that is about to run.
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding configuration data for the group.
-%% Reason = term()
-%%   The reason for skipping all test cases and subgroups in the group.
-%%
-%% @spec init_per_group(GroupName, Config0) ->
-%%               Config1 | {skip,Reason} | {skip_and_save,Reason,Config1}
-%% @end
-%%--------------------------------------------------------------------
-init_per_group(_GroupName, Config) ->
-    Config.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Cleanup after each test case group.
-%%
-%% GroupName = atom()
-%%   Name of the test case group that is finished.
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding configuration data for the group.
-%%
-%% @spec end_per_group(GroupName, Config0) ->
-%%               void() | {save_config,Config1}
-%% @end
-%%--------------------------------------------------------------------
-end_per_group(_GroupName, _Config) ->
-    ok.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -253,12 +222,24 @@ set_options_ok(_Config) ->
 %%--------------------------------------------------------------------
 set_options_nok(_Config) ->
 
-    Options = [{name, 7},
-	       {pst, "String"},
-	       {max_blksize, -64},
-	       {use_crc, any},
-	       {load_ratio, 7},
-	       {time_stamp, 0}],
+    Options = [{name, 7, 
+		"Option name can only be set to a string or an atom."},
+	       {pst, "String", 
+		"Option pst can only be set to a positive integer value or zero."},
+	       {max_blksize, -64, 
+		"Option max_blksize can only be set to a positive integer value."},
+	       {use_crc, any, 
+		"Option use_crc can only be set to true or false."},
+	       {load_ratio, 7, 
+		"Option load_ratio can only be set to a float value between 0 and 1."},
+	       {time_stamp, 0, 
+		"Option time_stamp can only be set to a positive integer value."},
+	       {xnodeid, 7, 
+		"Option xnodeid can only be set to an integer value between 8 and 24 bits or undefined."},
+	       {nodeid, 177,
+	       "Option nodeid can only be set to an integer between 0 and 126 or undefined."},
+	       {nodeid, 0, 
+		"NodeId 0 is reserved for the CANopen manager co_mgr."}],
 
     lists:foreach(
       fun(Option) -> set_option_nok(Option) end, Options),
@@ -281,6 +262,42 @@ unknown_option(_Config) ->
     ok.
 
 %%--------------------------------------------------------------------
+%% @spec unknown_option(Config) -> ok 
+%% @doc 
+%% Change nodeid options.
+%% @end
+%%--------------------------------------------------------------------
+nodeid_changes(_Config) ->
+    
+    set_option({nodeid, 7}),
+    set_option({xnodeid, undefined}),
+
+    %% Both nodeids can't be undefined
+    {error, "Not possible to remove last nodeid"} = 
+	co_node:set_option(serial(), nodeid, undefined),
+
+    set_option({xnodeid, co_lib:serial_to_xnodeid(serial())}),
+    set_option({nodeid, undefined}),
+
+    %% Both nodeids can't be undefined
+    {error, "Not possible to remove last nodeid"} = 
+	co_node:set_option(serial(), xnodeid, undefined),
+    {error, "Not possible to remove last nodeid"} = 
+	co_node:set_option(serial(), use_serial_as_xnodeid, false),
+
+    set_option({nodeid, 7}),
+
+    set_option({use_serial_as_xnodeid, false}),
+    {xnodeid, undefined} = co_node:get_option(serial(), xnodeid),
+
+    set_option({use_serial_as_xnodeid, true}),
+    XNodeId = co_lib:serial_to_xnodeid(serial()),
+    {xnodeid, XNodeId} = co_node:get_option(serial(), xnodeid),
+
+    ok.
+    
+
+%%--------------------------------------------------------------------
 %% @spec restore_dict(Config) -> ok 
 %% @doc 
 %% Verifies that a saved dict can be restored.
@@ -300,7 +317,6 @@ restore_dict(_Config) ->
     {ok, OldValue} = co_node:value(serial(), Index),
 
     ok.
-
 
 
 %%--------------------------------------------------------------------
@@ -347,39 +363,25 @@ set_option_ok({Option, NewValue}) ->
     %% Fetch old value
     {Option, OldValue} = co_node:get_option(serial(), Option),
     
-    %% Set new value and check
-    ok = co_node:set_option(serial(), Option, NewValue),
-    {Option, NewValue} = co_node:get_option(serial(), Option),
-    
-    %% Restore and check
-    co_node:set_option(serial(), Option, OldValue),
-    {Option, OldValue} = co_node:get_option(serial(), Option),
+    %% Change
+    set_option({Option, NewValue}),
+
+    %% Restore
+    set_option({Option, OldValue}),
 
     ok.
 
-set_option_nok({Option, NewValue}) ->
+set_option({Option, NewValue}) ->
+    %% Set new value and check
+    ok = co_node:set_option(serial(), Option, NewValue),
+    {Option, NewValue} = co_node:get_option(serial(), Option).
+
+set_option_nok({Option, NewValue, ErrMsg}) ->
     %% Fetch old value
     {Option, OldValue} = co_node:get_option(serial(), Option),
     
-    %% Set new value and check
-    {error, R} = co_node:set_option(serial(), Option, NewValue),
-
-    case Option of
-	name -> 
-	    R = "Option name can only be set to a string or an atom.";
-	pst -> 
-	    R = "Option pst can only be set to a positive integer value or zero.";
-	max_blksize -> 
-	    R = "Option max_blksize can only be set to a positive integer value.";
-	use_crc -> 
-	    R = "Option use_crc can only be set to true or false.";
-	load_ratio -> 
-	    R = "Option load_ratio can only be set to a float value between 0 and 1.";
-	time_stamp -> 
-	    R = "Option time_stamp can only be set to a positive integer value.";
-	_Other -> ct:pal("Option = ~p, Reason = ~p", [Option, R]),
-		  ct:fail("Unexpected error reason")
-    end,
+    %% Try setting new value
+    {error, ErrMsg} = co_node:set_option(serial(), Option, NewValue),
     
     %% Check old wasn't changed
     {Option, OldValue} = co_node:get_option(serial(), Option),

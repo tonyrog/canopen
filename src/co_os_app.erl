@@ -94,10 +94,11 @@ stop() ->
 		       {error, Reason::atom()}.
 
 index_specification(_Pid, {?IX_OS_COMMAND = _Index, 255} = I) ->
-    ?dbg(?NAME," index_specification type ~.16B \n",[_Index]),
-    reply_specification(I, ?UNSIGNED32, ?ACCESS_RO, {value, ?COMMAND_PAR});
+    ?dbg(?NAME,"index_specification: type ~.16B \n",[_Index]),
+    Value = ((?COMMAND_PAR band 16#ff) bsl 8) bor (?OBJECT_RECORD band 16#ff),
+    reply_specification(I, ?UNSIGNED32, ?ACCESS_RO, {value, Value});
 index_specification(_Pid, {?IX_OS_COMMAND, 0} = I) ->
-    reply_specification(I, ?UNSIGNED8, ?ACCESS_RO, atomic);
+    reply_specification(I, ?UNSIGNED8, ?ACCESS_RO, {value, 3});
 index_specification(_Pid, {?IX_OS_COMMAND, ?SI_OS_COMMAND} = I) ->
     reply_specification(I, ?OCTET_STRING, ?ACCESS_RW, streamed);
 index_specification(_Pid, {?IX_OS_COMMAND, ?SI_OS_STATUS} = I) ->
@@ -107,14 +108,14 @@ index_specification(_Pid, {?IX_OS_COMMAND, ?SI_OS_REPLY} = I) ->
 index_specification(Pid, Index) when is_integer(Index) ->
     index_specification(Pid, {Index, 0});
 index_specification(_Pid, {?IX_OS_COMMAND, _SubInd})  ->
-    ?dbg(?NAME," index_specification Unknown subindex ~.8B \n",[_SubInd]),
+    ?dbg(?NAME,"index_specification: Unknown subindex ~.8B \n",[_SubInd]),
     {error, ?abort_no_such_subindex};
 index_specification(_Pid, {_Index, _SubInd})  ->
-    ?dbg(?NAME," index_specification ~.16B:~.8B \n",[_Index, _SubInd]),
+    ?dbg(?NAME,"index_specification: Unknown index~.16B:~.8B \n",[_Index, _SubInd]),
     {error, ?abort_no_such_object}.
 
 reply_specification({_Index, _SubInd} = I, Type, Access, Mode) ->
-    ?dbg(?NAME," reply_specification ~.16B:~.8B, type = ~p, access = ~p, mode = ~p\n",
+    ?dbg(?NAME,"reply_specification: ~.16B:~.8B, type = ~p, access = ~p, mode = ~p\n",
 	 [_Index, _SubInd, Type, Access, Mode]),
     Spec = #index_spec{index = I,
 			type = Type,
@@ -251,7 +252,7 @@ loop_data() ->
 %% @end
 %%--------------------------------------------------------------------
 init([CoSerial]) ->
-    ok = co_node:attach(CoSerial),
+    {ok, _Dict} = co_node:attach(CoSerial),
     co_node:reserve(CoSerial, ?IX_OS_COMMAND, ?MODULE),
     {ok, #loop_data {state=init, co_node = CoSerial}}.
 
@@ -363,11 +364,7 @@ handle_call(loop_data, _From, LoopData) ->
     io:format("~p: LoopData = ~p\n", [?MODULE,LoopData]),
     {reply, ok, LoopData};
 handle_call({debug, TrueOrFalse}, _From, LoopData) ->
-    OldDebug = get(dbg),
-    io:format("handle_call: debug is = ~p, set it to ~p\n",[OldDebug,TrueOrFalse]),
     put(dbg, TrueOrFalse),
-    NewDebug = get(dbg),
-    io:format("handle_call: debug is = ~p\n",[NewDebug]),
     {reply, ok, LoopData};
 handle_call(stop, _From, LoopData) ->
     ?dbg(?NAME," handle_call: stop\n",[]),    
@@ -507,9 +504,7 @@ handle_cast(_Msg, LoopData) ->
 %% @end
 %%--------------------------------------------------------------------
 -type info()::
-	
 	{Status::integer(), Reply::term()} |
-	
 	{notify, RemoteId::term(), {Index::integer(), SubInd::integer()}, 
 	 Value::term()} |
 	%% Unknown info

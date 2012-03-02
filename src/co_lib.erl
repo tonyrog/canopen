@@ -13,6 +13,7 @@
 -import(lists, [map/2, reverse/1]).
 
 -export([serial_to_string/1, string_to_serial/1]).
+-export([serial_to_xnodeid/1]).
 -export([load_definition/1]).
 -export([load_dmod/2]).
 -export([object_by_name/2]).
@@ -28,7 +29,7 @@
 
 -include("../include/canopen.hrl").
 
-%% convert 4 bytes serial number to a string xx:xx:xx:xx
+%% Convert 4 bytes serial number to a string xx:xx:xx:xx
 serial_to_string(<<Serial:32>>) ->
     serial_to_string(Serial);
 serial_to_string(Serial) when is_integer(Serial) ->
@@ -36,6 +37,12 @@ serial_to_string(Serial) when is_integer(Serial) ->
 
 string_to_serial(String) when is_list(String) ->
     erlang:list_to_integer(String, 16).
+
+%% Convert Serial to extended nodeid 
+%% (remove least significant byte)
+serial_to_xnodeid(Serial) ->
+    (Serial bsr 8).
+
 
 %% Encode/Decode category
 encode_category(optional) -> ?CATEGORY_OPTIONAL;

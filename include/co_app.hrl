@@ -223,13 +223,15 @@
 
 
 %% Application get_entry return data
-%% transfer: streamed, {streamed,Mod}, atomic, {atomic,Mod}, {value,Value}
+%% transfer: streamed, {streamed,Mod}, atomic, {atomic,Mod}, {value,Value}, {dict, Dict}
+%% timeout is used when a longer session timeout than ordinary is needed
 -record(index_spec,
 	{
 	  index,
 	  type,
 	  access,
-	  transfer
+	  transfer,
+	  timeout
 	}).
 
 -endif.

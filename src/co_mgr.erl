@@ -52,7 +52,7 @@ start(Options) ->
 	    ok;
 	undefined ->
 	    co_node:start_link([{serial, 16#000000}, 
-				{options, [{name,?CO_MGR},{short_nodeid, 0}] ++
+				{options, [{name,?CO_MGR},{nodeid, 0}] ++
 				     Options}])
     end.
 
