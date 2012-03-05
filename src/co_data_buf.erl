@@ -24,7 +24,8 @@
 	 abort/2,
 	 load/1,
 	 eof/1,
-	 data_size/1]).
+	 data_size/1,
+	 timeout/1]).
 
 -record(co_data_buf,
 	{
@@ -40,6 +41,7 @@
 	  pid             ::pid(),
 	  ref             ::reference(),
 	  mode = undefined::term(),
+	  timeout = undefined::timeout(),
 	  eof = false     ::boolean()
 	}).
 
@@ -120,7 +122,8 @@ init(Access, Pid, E, BSize, LLevel) ->
 	 [E, Access, BSize, LLevel]),
     init_i(Access, Pid, E, BSize, LLevel).
 
-init_i(read, Pid, #index_spec{index = I, type = Type, transfer = {value, Value} = M},
+init_i(read, Pid, 
+       #index_spec{index = I, type = Type, transfer = {value, Value} = M, timeout = Tout},
      BSize, LLevel) when is_pid(Pid) ->
     Data = co_codec:encode(Value, Type),
     open(read, #co_data_buf {access = read,
@@ -132,9 +135,10 @@ init_i(read, Pid, #index_spec{index = I, type = Type, transfer = {value, Value} 
 			     type = Type,
 			     buf_size = BSize,
 			     load_level = LLevel,
-			     mode = M});
+			     mode = M,
+			     timeout = Tout});
 init_i(read, Pid, 
-       #index_spec{index = {Ix, Si} = I, type = Type, transfer = {dict, Dict} = M},
+       #index_spec{index = {Ix, Si} = I, type = Type, transfer = {dict, Dict} = M, timeout = Tout},
        BSize, LLevel) when is_pid(Pid) ->
     %% Fetch data from dictionary
     {ok, Value} = co_dict:value(Dict, Ix, Si),
@@ -148,8 +152,9 @@ init_i(read, Pid,
 			     type = Type,
 			     buf_size = BSize,
 			     load_level = LLevel,
-			     mode = M});
-init_i(Access, Pid, #index_spec{index = I, type = Type, transfer = Mode}, 
+			     mode = M,
+			     timeout = Tout});
+init_i(Access, Pid, #index_spec{index = I, type = Type, transfer = Mode, timeout = Tout}, 
        BSize, LLevel)  when is_pid(Pid) ->
     open(Access, #co_data_buf {access = Access,
 			       pid = Pid,
@@ -158,7 +163,8 @@ init_i(Access, Pid, #index_spec{index = I, type = Type, transfer = Mode},
 			       eof = false,
 			       buf_size = BSize,
 			       load_level = LLevel,
-			       mode = Mode});
+			       mode = Mode,
+			       timeout = Tout});
 init_i(read, Dict, #dict_entry{index = I, type = Type, value = Value}, BSize, LLevel) ->
     Data = co_codec:encode(Value, Type),
     {ok, #co_data_buf {access = read,
@@ -659,6 +665,16 @@ eof(Buf) when is_record(Buf, co_data_buf) ->
 
 data_size(Buf) ->
     Buf#co_data_buf.size.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Get timeout from buffer.
+%% @end
+%%--------------------------------------------------------------------
+-spec timeout(Buf::#co_data_buf{}) -> timeout().
+
+timeout(Buf) ->
+    Buf#co_data_buf.timeout.
 
 %%%===================================================================
 %%% Internal functions

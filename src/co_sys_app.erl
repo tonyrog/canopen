@@ -40,13 +40,8 @@
 
 -record(loop_data,
 	{
-	  state            ::atom(),
-	  command = ""     ::string(),   %% Subindex 1
-	  status = 0       ::integer(),  %% Subindex 2
-	  reply =""        ::string(),   %% Subindex 3
-	  co_node          ::atom(),     %% Name of co_node
-	  ref              ::reference(),%% Reference for communication with session
-	  read_buf = <<>>  ::binary()    %% Tmp buffer when uploading reply
+	  state           ::atom(),
+	  co_node         ::atom()     %% Name of co_node
 	}).
 
 
@@ -206,15 +201,10 @@ init(CoSerial) ->
 %% Index = Index in Object Dictionary <br/>
 %% SubInd =  SubIndex in Object Dictionary  <br/>
 %% Value =  Any value the node chooses to send.
-%% Ref - Reference in communication with the CANopen node.
 %%
 %% For description of requests compare with the correspondig functions:
 %% @see set/3  
 %% @see get/2 
-%% @see write_begin/3
-%% @see write/4
-%% @see read_begin/3
-%% @see read/3.
 %% @end
 %%--------------------------------------------------------------------
 -type call_request()::
@@ -324,10 +314,6 @@ handle_stop(LoopData=#loop_data {co_node = CoNode}) ->
 %% @doc
 %% Handling cast messages.
 %%
-%% Ref - Reference in communication with the CANopen node.
-%% 
-%% For description of message compare with the correspondig functions:
-%% @see abort/2  
 %% @end
 %%--------------------------------------------------------------------
 -type cast_msg()::term().
@@ -346,7 +332,6 @@ handle_cast(_Msg, LoopData) ->
 %% @doc
 %% Handling all non call/cast messages.
 %%
-%% Ref - Reference in communication with the CANopen node.
 %% RemoteId = Id of remote CANnode initiating the msg. <br/>
 %% Index = Index in Object Dictionary <br/>
 %% SubInd = Sub index in Object Disctionary  <br/>
@@ -397,7 +382,7 @@ terminate(_Reason, _LoopData) ->
 %% @spec code_change(OldVsn, LoopData, Extra) -> {ok, NewLoopData}
 %%
 %% @doc
-%% Convert process state when code is changed
+%% Convert process loop data when code is changed
 %%
 %% @end
 %%--------------------------------------------------------------------

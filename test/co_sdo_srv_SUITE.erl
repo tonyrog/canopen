@@ -1,10 +1,10 @@
 %%%-------------------------------------------------------------------
-%%% @author Marina Westman LÃ¶nne <malotte@malotte.net>
-%%% @copyright (C) 2011, Marina Westman LÃ¶nne
+%%% @author Marina Westman Lönne <malotte@malotte.net>
+%%% @copyright (C) 2011, Marina Westman Lönne
 %%% @doc
 %%%
 %%% @end
-%%% Created : 29 Nov 2011 by Marina Westman LÃ¶nne <malotte@malotte.net>
+%%% Created : 29 Nov 2011 by Marina Westman Lönne <malotte@malotte.net>
 %%%-------------------------------------------------------------------
 -module(co_sdo_srv_SUITE).
 
@@ -555,8 +555,8 @@ stream_0file_block(Config) ->
 %% @end
 %%--------------------------------------------------------------------
 notify(Config) ->
-    {{Index = {Ix, _Si}, _T, _M, _Org}, NewValue} = ct:get_config({dict, notify}),
-    [] = os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, segment)),
+    {{Index = {Ix, _Si}, Type, _M, _Org}, NewValue} = ct:get_config({dict, notify}),
+    [] = os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, Type, segment)),
     
     receive 
 	{object_event, Ix} ->
@@ -599,9 +599,9 @@ mpdo(Config) ->
 timeout(Config) ->
 
     %% Set
-    {{Index, _T, _M, _Org}, NewValue} = ct:get_config({dict, timeout}),
-    "cocli: error: error: timed out\n" = 
-	os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, segment)),
+    {{Index, Type, _M, _Org}, NewValue} = ct:get_config({dict, timeout}),
+    "cocli: error: set failed: timed out\r\n" = 
+	os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, Type, segment)),
 
     receive 
 	{set, Index, NewValue} ->
@@ -649,13 +649,13 @@ app_dict() -> co_test_lib:app_dict().
 %% Restores the old calue.
 %% @end
 %%--------------------------------------------------------------------
-set(Config, {{Index, _T, _M, _Org}, NewValue}, BlockOrSegment) ->
+set(Config, {{Index, Type, _M, _Org}, NewValue}, BlockOrSegment) ->
     %% Get old value
     {Index, _Type, _Transfer, OldValue} = 
 	lists:keyfind(Index, 1, co_test_app:dict(serial())),
 							
     %% Change to new
-    [] = os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, BlockOrSegment)),
+    [] = os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, Type, BlockOrSegment)),
     {Index, _Type, _Transfer, NewValue} = 
 	lists:keyfind(Index, 1, co_test_app:dict(serial())),
     
@@ -671,7 +671,7 @@ set(Config, {{Index, _T, _M, _Org}, NewValue}, BlockOrSegment) ->
     end,
 
     %% Restore old
-    [] = os:cmd(co_test_lib:set_cmd(Config, Index, OldValue, BlockOrSegment)),
+    [] = os:cmd(co_test_lib:set_cmd(Config, Index, OldValue, Type, BlockOrSegment)),
     {Index, _Type, _Transfer, OldValue} = 
 	lists:keyfind(Index, 1, co_test_app:dict(serial())),
 
@@ -686,9 +686,9 @@ set(Config, {{Index, _T, _M, _Org}, NewValue}, BlockOrSegment) ->
 	    ct:pal("Application set not done")
     end,
     ok;
-set(Config, {Index, NewValue}, BlockOrSegment) ->
+set(Config, {Index, NewValue, Type}, BlockOrSegment) ->
     %% co_node internal dict
-    [] = os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, BlockOrSegment)).
+    [] = os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, Type, BlockOrSegment)).
    
 
 
@@ -701,19 +701,20 @@ set(Config, {Index, NewValue}, BlockOrSegment) ->
 %% from the apps dictionary.
 %% @end
 %%--------------------------------------------------------------------
-get(Config, {{Index, _T, _M, _Org}, _NewValue}, BlockOrSegment) ->
+get(Config, {{Index, Type, _M, _Org}, _NewValue}, BlockOrSegment) ->
 
-    Result = os:cmd(co_test_lib:get_cmd(Config, Index, BlockOrSegment)),
+    Result = os:cmd(co_test_lib:get_cmd(Config, Index, Type, BlockOrSegment)),
 
     %% For now ....
     case Result of
-	"0x6033 = 1701734733\n" -> ok;
+	
+	"0x6033 = \"Mine\"\n" -> ok;
 	"0x6034 = \"Long string\"\n" -> ok;
 	"0x6035 = \"Mine2\"\n" -> ok;
 	"0x6036 = \"Long string2\"\n" -> ok;
-	"0x6037 = 65\n" -> ok;
-	"0x6038 = 67\n" -> ok;
-	"cocli: error: failed to retrive value for '0x7334' timed out\n" -> ok
+	"0x6037 = \"A\"\n" -> ok;
+	"0x6038 = \"C\"\n" -> ok;
+	"cocli: error: failed to retrive value for '0x7334' timed out\r\n" -> ok
     end,
 
     ct:pal("Result = ~p", [Result]),
@@ -722,9 +723,9 @@ get(Config, {{Index, _T, _M, _Org}, _NewValue}, BlockOrSegment) ->
     %% {Index, _Type, _Transfer, Value} = lists:keyfind(Index, 1, co_test_app:dict(serial())),
     
     ok;
-get(Config, {Index, _NewValue}, BlockOrSegment) ->
+get(Config, {Index, _NewValue, Type}, BlockOrSegment) ->
     %% co_node internal dict
-    Result = os:cmd(co_test_lib:get_cmd(Config, Index, BlockOrSegment)),
+    Result = os:cmd(co_test_lib:get_cmd(Config, Index, Type, BlockOrSegment)),
     ct:pal("Result = ~p", [Result]),
     
     Result = "0x2002 = \"New string aaaaabbbbbbbccccccddddddeeeee\"\n".

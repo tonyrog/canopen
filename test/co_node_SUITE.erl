@@ -304,7 +304,7 @@ nodeid_changes(_Config) ->
 %% @end
 %%--------------------------------------------------------------------
 restore_dict(_Config) ->
-    {Index, NewValue} = ct:get_config(dict_index),
+    {Index, NewValue, _Type} = ct:get_config(dict_index),
     {ok, OldValue} = co_node:value(serial(), Index),
     ok = co_node:save_dict(serial()),
 

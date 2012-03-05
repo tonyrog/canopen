@@ -14,6 +14,22 @@
 
 -compile(export_all).
 
+timeout(S) ->
+    BufTimeout = 
+	if S#co_session.buf =/= undefined ->
+		co_data_buf:timeout(S#co_session.buf);
+	   true ->
+		undefined
+	end,
+    if BufTimeout =/= undefined ->
+	    BufTimeout;
+       true ->
+	    (S#co_session.ctx)#sdo_ctx.timeout
+    end.
+
+block_timeout(S) ->
+    (S#co_session.ctx)#sdo_ctx.blk_timeout.
+
 next_blksize(S) ->
     %% We may want to alter this ...
     (S#co_session.ctx)#sdo_ctx.max_blksize.

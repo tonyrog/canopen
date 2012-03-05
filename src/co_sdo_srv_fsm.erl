@@ -178,11 +178,11 @@ init([Ctx,NodePid,Src,Dst]) ->
       first = true,
       node_pid = NodePid,
       ctx      = Ctx,
+      buf = undefined,
       streamed = false
-      %% th is not the transfer handle
       %% transfer is setup when we know the item
      },
-    {ok, s_initial, S0, ?TMO(S0)}.
+    {ok, s_initial, S0, timeout(S0)}.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -228,7 +228,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    %% Application called, wait for reply
 		    ?dbg(srv, "s_initial: mref=~p\n", [Mref]),
 		    S2 = S1#co_session { buf=Buf, mref=Mref },
-		    {next_state, s_writing_segment_started,S2,?TMO(S2)};
+		    {next_state, s_writing_segment_started,S2,timeout(S2)};
 		{error,Reason} ->
 		    abort(S1, Reason)
 	    end;
@@ -244,7 +244,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    %% Application called, wait for reply
 		    ?dbg(srv, "s_initial: mref=~p\n", [Mref]),
 		    S2 = S1#co_session { buf=Buf, mref=Mref },
-		    {next_state, s_writing_block_started,S2,?TMO(S2)};
+		    {next_state, s_writing_block_started,S2,timeout(S2)};
 		{error,Reason} ->
 		    abort(S1, Reason)
 	    end;
@@ -258,7 +258,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    %% Application called, wait for reply
 		    ?dbg(srv, "s_initial: mref=~p\n", [Mref]),
 		    S2 = S1#co_session {mref = Mref, buf = Buf},
-		    {next_state, s_reading_segment_started, S2, ?TMO(S2)};
+		    {next_state, s_reading_segment_started, S2, timeout(S2)};
 		{error,Reason} ->
 		    abort(S1, Reason)
 	    end;
@@ -280,7 +280,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    %% Application called, wait for reply
 		    ?dbg(srv, "s_initial: mref=~p\n", [Mref]),
 		    S2 = S1#co_session {mref = Mref, buf = Buf},
-		    {next_state, s_reading_block_started, S2, ?TMO(S2)};
+		    {next_state, s_reading_block_started, S2, timeout(S2)};
 		{error,Reason} ->
 		    ?dbg(srv,"start block upload error=~p\n", [Reason]),
 		    abort(S1, Reason)
@@ -445,7 +445,7 @@ start_segment_download(S) ->
 		    %% Called an application
 		    ?dbg(srv, "start_segmented_download: mref=~p\n", [Mref]),
 		    S1 = S#co_session {mref = Mref, buf = Buf1},
-		    {next_state, s_writing_segment_end, S1, ?TMO(S1)};
+		    {next_state, s_writing_segment_end, S1, timeout(S1)};
 		{ok, _Buf1} ->
 		    R = ?mk_scs_initiate_download_response(IX,SI),
 		    send(S, R),
@@ -463,7 +463,7 @@ start_segment_download(S) ->
 	    S1 = S#co_session {t=1},
 	    R  = ?mk_scs_initiate_download_response(IX,SI),
 	    send(S1, R),
-	    {next_state, s_segmented_download, S1, ?TMO(S1)}
+	    {next_state, s_segmented_download, S1, timeout(S1)}
     end.
 
  
@@ -508,9 +508,9 @@ s_segmented_download(M, S) when is_record(M, can_frame) ->
 		    send(S1,R),
 		    if Eod ->
 			    %% Wait for write reply from app
-			    {next_state, s_writing_segment_end, S1,?TMO(S1)};
+			    {next_state, s_writing_segment_end, S1,timeout(S1)};
 		       true ->
-			    {next_state, s_segmented_download, S1,?TMO(S1)}
+			    {next_state, s_segmented_download, S1,timeout(S1)}
 		    end;
 		{ok, Buf} ->
 		    S1 = S#co_session {t = T, buf = Buf},
@@ -523,7 +523,7 @@ s_segmented_download(M, S) when is_record(M, can_frame) ->
 						  S1#co_session.subind}),
 			    {stop, normal, S1};
 		       true ->
-			    {next_state, s_segmented_download, S1,?TMO(S1)}
+			    {next_state, s_segmented_download, S1,timeout(S1)}
 		    end;
 		{error,Reason} ->
 		    abort(S,Reason)
@@ -672,7 +672,7 @@ start_segmented_upload(S) ->
 	    R=?mk_scs_initiate_upload_response(N,E,SizeInd,
 					       IX,SI,Data),
 	    send(S, R),
-	    {next_state, s_segmented_upload, S, ?TMO(S)};
+	    {next_state, s_segmented_upload, S, timeout(S)};
        true ->
 	    ?dbg(srv, "start_segmented_upload, sizeind = 1, size = ~p",[NBytes]),
 	    N=0, E=0, SizeInd=1,
@@ -680,7 +680,7 @@ start_segmented_upload(S) ->
 	    R=?mk_scs_initiate_upload_response(N,E,SizeInd,
 					       IX,SI,Data),
 	    send(S, R),
-	    {next_state, s_segmented_upload, S, ?TMO(S)}
+	    {next_state, s_segmented_upload, S, timeout(S)}
     end.
 
 
@@ -727,7 +727,7 @@ read_segment(S) ->
 	    %% Called an application
 	    ?dbg(srv, "s_segmented_upload: mref=~p\n", [Mref]),
 	    S1 = S#co_session {mref = Mref, buf = Buf},
-	    {next_state, s_reading_segment, S1, ?TMO(S1)};
+	    {next_state, s_reading_segment, S1, timeout(S1)};
 	{error,Reason} ->
 	    abort(S,Reason)
     end.
@@ -746,7 +746,7 @@ upload_segment(S, Data, Eod) ->
 	    R = ?mk_scs_upload_segment_response(S#co_session.t,N,0,Data1),
 	    send(S,R),
 	    S1 = S#co_session {t=T1},
-	    {next_state, s_segmented_upload, S1, ?TMO(S1)}
+	    {next_state, s_segmented_upload, S1, timeout(S1)}
     end.
 
 %%--------------------------------------------------------------------
@@ -858,7 +858,7 @@ start_block_upload(S) ->
     R = ?mk_scs_block_upload_response(CrcSup,?UINT1(NBytes > 0),IX,SI,NBytes),
     S1 = S#co_session { crc=DoCrc, blkcrc=co_crc:init(), blkbytes=0, buf=Buf },
     send(S1, R),
-    {next_state, s_block_upload_start,S1,?TMO(S1)}.
+    {next_state, s_block_upload_start,S1,timeout(S1)}.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -901,7 +901,7 @@ read_block_segment(S) ->
 	    %% Called an application
 	    ?dbg(srv, "read_block_segment: mref=~p\n", [Mref]),
 	    S1 = S#co_session {mref = Mref, buf = Buf},
-	    {next_state, s_reading_block_segment, S1, ?TMO(S1)};
+	    {next_state, s_reading_block_segment, S1, timeout(S1)};
 	{error,Reason} ->
 	    abort(S,Reason)
     end.
@@ -924,10 +924,10 @@ upload_block_segment(S, Data, Eod) ->
     send(S1, R),
     if Eod ->
 	    ?dbg(srv, "upload_block_segment: Last = ~p\n", [Last]),
-	    {next_state, s_block_upload_response_last, S1, ?TMO(S1)};
+	    {next_state, s_block_upload_response_last, S1, timeout(S1)};
        Seq =:= S#co_session.blksize ->
 	    ?dbg(srv, "upload_block_segment: Seq = ~p\n", [Seq]),
-	    {next_state, s_block_upload_response, S1, ?TMO(S1)};
+	    {next_state, s_block_upload_response, S1, timeout(S1)};
        true ->
 	    read_block_segment(S1#co_session {blkseq = Seq + 1})
     end.
@@ -999,7 +999,7 @@ s_block_upload_response_last(M, S) when is_record(M, can_frame) ->
 		end,
 	    R = ?mk_scs_block_upload_end_request(N,CRC),
 	    send(S1, R),
-	    {next_state, s_block_upload_end_response, S1, ?TMO(S1)};
+	    {next_state, s_block_upload_end_response, S1, timeout(S1)};
 	?ma_ccs_block_upload_response(_AckSeq,_BlkSize) ->
 	    abort(S, ?abort_invalid_sequence_number);	    
 	_ ->
@@ -1149,7 +1149,7 @@ start_block_download(S) ->
     S1 = S#co_session { crc=DoCrc, blkcrc=co_crc:init(), blksize=BlkSize},
     R = ?mk_scs_block_initiate_download_response(GenCrc,IX,SI,BlkSize),
     send(S1, R),
-    {next_state, s_block_download, S1, ?TMO(S1)}.
+    {next_state, s_block_download, S1, block_timeout(S1)}.
 
 
 %%--------------------------------------------------------------------
@@ -1217,13 +1217,13 @@ block_segment_written(S) ->
 	    R = ?mk_scs_block_download_response(NextSeq,BlkSize),
 	    send(S1, R),
 	    if Last =:= 1 ->
-		    {next_state, s_block_download_end, S1,?TMO(S1)};
+		    {next_state, s_block_download_end, S1,timeout(S1)};
 	       true ->
-		    {next_state, s_block_download, S1, ?TMO(S1)}
+		    {next_state, s_block_download, S1, timeout(S1)}
 	    end;
        true ->
 	    S1 = S#co_session {blkseq=NextSeq},
-	    {next_state, s_block_download, S1, ?BLKTMO(S1)}
+	    {next_state, s_block_download, S1, block_timeout(S1)}
     end.
 
 %%--------------------------------------------------------------------
@@ -1268,7 +1268,7 @@ s_block_download_end(M, S) when is_record(M, can_frame) ->
 			    %% Called an application
 			    ?dbg(srv, "s_block_download_end: mref=~p\n", [Mref]),
 			    S1 = S#co_session {mref = Mref, buf = Buf},
-			    {next_state, s_writing_block_end, S1, ?TMO(S1)};
+			    {next_state, s_writing_block_end, S1, timeout(S1)};
 			{ok, _Buf} -> 
 			    R = ?mk_scs_block_download_end_response(),
 			    send(S, R),
@@ -1510,6 +1510,10 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+timeout(S) -> co_session:timeout(S).
+
+block_timeout(S) -> co_session:block_timeout(S).
+
 demonitor_and_abort(M, S) ->
     case S#co_session.mref of
 	Mref when is_reference(Mref)->
@@ -1529,7 +1533,7 @@ l_abort(M, S, StateName) ->
 	    {stop, normal, S};
 	?ma_scs_abort_transfer(_IX,_SI,_Code) ->
 	    %% probably a delayed abort for an old session ignore
-	    {next_state, StateName, S, ?TMO(S)};
+	    {next_state, StateName, S, timeout(S)};
 	_ ->
 	    %% we did not expect this command abort
 	    abort(S, ?abort_command_specifier)

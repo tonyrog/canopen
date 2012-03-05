@@ -22,7 +22,7 @@ start_node(Serial) ->
     {ok, PPid} = co_proc:start_link([]),
     ct:pal("Started co_proc ~p",[PPid]),
     {ok, Pid} = co_node:start_link([{serial,Serial}, 
-				     {options, [{use_serial_as_nodeid, true},
+				     {options, [{use_serial_as_xnodeid, true},
 						{max_blksize, 7},
 						{vendor,16#2A1},
 						{debug, true}]}]),
@@ -87,33 +87,33 @@ stop_app(App, CoNode, CoNodeString) ->
 	_Pid -> App:stop(CoNode)
     end.
 
-set_cmd(Config, Index, Value, block) ->
-    set_cmd(Config, Index, Value, " -b");
-set_cmd(Config, Index, Value, segment) ->
-    set_cmd(Config, Index, Value, "");
-set_cmd(Config, Index, Value, BFlag) ->
-    Cmd = set_cmd1(Config, Index, Value, BFlag),
+set_cmd(Config, Index, Value, Type, block) ->
+    set_cmd(Config, Index, Value, Type, " -b");
+set_cmd(Config, Index, Value, Type, segment) ->
+    set_cmd(Config, Index, Value, Type, "");
+set_cmd(Config, Index, Value, Type, BFlag) ->
+    Cmd = set_cmd1(Config, Index, Value, Type, BFlag),
     ct:pal("Command = ~p",[Cmd]),
     Cmd.
 
-set_cmd1(Config, Index, Value, BFlag) ->
-    cocli(Config) ++ BFlag ++ " -s " ++ 
-	serial_as_c_string(serial()) ++ " set " ++ 
-	index_as_c_string(Index) ++ " \"" ++ Value ++ "\"".
+set_cmd1(Config, Index, Value, Type, BFlag) ->
+    cocli(Config) ++ BFlag ++ " -T " ++ atom_to_list(Type) ++
+	" -s " ++ serial_as_c_string(serial()) ++ 
+	" set " ++ index_as_c_string(Index) ++ " \"" ++ Value ++ "\"".
 
-get_cmd(Config, Index, block) ->
-    get_cmd(Config, Index, " -b");
-get_cmd(Config, Index, segment) ->
-    get_cmd(Config, Index, "");
-get_cmd(Config, Index, BFlag) ->
-    Cmd = get_cmd1(Config, Index, BFlag),
+get_cmd(Config, Index, Type, block) ->
+    get_cmd(Config, Index, Type, " -b");
+get_cmd(Config, Index, Type, segment) ->
+    get_cmd(Config, Index, Type, "");
+get_cmd(Config, Index, Type, BFlag) ->
+    Cmd = get_cmd1(Config, Index, Type, BFlag),
     ct:pal("Command = ~p",[Cmd]),
     Cmd.
 
-get_cmd1(Config, Index, BFlag) ->
-    cocli(Config) ++ BFlag ++ " -s " ++ 
-	serial_as_c_string(serial()) ++ " get " ++ 
-	index_as_c_string(Index).
+get_cmd1(Config, Index, Type, BFlag) ->
+    cocli(Config) ++ BFlag ++ " -T " ++ atom_to_list(Type) ++
+	" -s " ++ serial_as_c_string(serial()) ++ 
+	" get " ++ index_as_c_string(Index).
 
 file_cmd(Config, Index, Direction, block) ->
     file_cmd(Config, Index, Direction, " -b");
