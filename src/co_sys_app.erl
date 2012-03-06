@@ -18,7 +18,7 @@
 -behaviour(co_app).
 
 %% API
--export([start/1, stop/0]).
+-export([start/1, stop/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -29,8 +29,8 @@
 	 set/3, get/2]).
 
 %% Test
--export([loop_data/0,
-	 debug/1]).
+-export([loop_data/1,
+	 debug/2]).
 
 -define(NAME, co_sys).
 
@@ -56,18 +56,21 @@
 		   {error, Error::atom()}.
 
 start(CoSerial) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, CoSerial,[]).
+    gen_server:start_link({local, name(CoSerial)}, ?MODULE, CoSerial,[]).
 	
 %%--------------------------------------------------------------------
 %% @doc
 %% Stops the server.
 %% @end
 %%--------------------------------------------------------------------
--spec stop() -> ok | 
+-spec stop(CoSerial::integer()) -> ok | 
 		{error, Error::atom()}.
 
-stop() ->
-    gen_server:call(?MODULE, stop).
+stop(CoSerial) ->
+    case whereis(name(CoSerial)) of
+	undefined -> do_nothing;
+	Pid -> gen_server:call(Pid, stop)
+    end.
 
 %%--------------------------------------------------------------------
 %%% CAllbacks for co_app and co_stream_app behavious
@@ -103,7 +106,7 @@ index_specification(_Pid, {?IX_RESTORE_DEFAULT_PARAMETERS = _Index, 255} = I) ->
     reply_specification(I, ?UNSIGNED32, ?ACCESS_RO, {value, Value});
 index_specification(_Pid, {?IX_RESTORE_DEFAULT_PARAMETERS, 0} = I) ->
     reply_specification(I, ?UNSIGNED8, ?ACCESS_RO, {value, 1});
-index_specification(_Pid, {?IX_RESTORE_DEFAULT_PARAMETERS, ?SI_STORE_ALL} = I) ->
+index_specification(_Pid, {?IX_RESTORE_DEFAULT_PARAMETERS, ?SI_RESTORE_ALL} = I) ->
     reply_specification(I, ?UNSIGNED32, ?ACCESS_RW, atomic, 9000);
 index_specification(Pid, Index) when is_integer(Index) ->
     index_specification(Pid, {Index, 0});
@@ -162,12 +165,12 @@ get(Pid, {Index, SubInd}) ->
 
 %% Test functions
 %% @private
-debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
-    gen_server:call(?MODULE, {debug, TrueOrFalse}).
+debug(Pid, TrueOrFalse) when is_boolean(TrueOrFalse) ->
+    gen_server:call(Pid, {debug, TrueOrFalse}).
 
 %% @private
-loop_data() ->
-    gen_server:call(?MODULE, loop_data).
+loop_data(Pid) ->
+    gen_server:call(Pid, loop_data).
 
 
 
@@ -187,10 +190,8 @@ loop_data() ->
 %% @end
 %%--------------------------------------------------------------------
 init(CoSerial) ->
-    {ok, _Dict} = co_node:attach(CoSerial),
-    co_node:reserve(CoSerial, ?IX_STORE_PARAMETERS, ?MODULE),
-    co_node:reserve(CoSerial, ?IX_RESTORE_DEFAULT_PARAMETERS, ?MODULE),
     {ok, #loop_data {state=init, co_node = CoSerial}}.
+
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -316,13 +317,18 @@ handle_stop(LoopData=#loop_data {co_node = CoNode}) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--type cast_msg()::term().
+-type cast_msg()::go.
 
 -spec handle_cast(Msg::cast_msg(), LoopData::#loop_data{}) ->
 			 {noreply, LoopData::#loop_data{}} |
 			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
 			 {stop, Reason::atom(), LoopData::#loop_data{}}.
 			 
+handle_cast(go, LoopData=#loop_data {co_node = CoSerial}) ->
+    {ok, _Dict} = co_node:attach(CoSerial),
+    co_node:reserve(CoSerial, ?IX_STORE_PARAMETERS, ?MODULE),
+    co_node:reserve(CoSerial, ?IX_RESTORE_DEFAULT_PARAMETERS, ?MODULE),
+    {noreply, LoopData#loop_data {state = running}};
 handle_cast(_Msg, LoopData) ->
     ?dbg(?NAME," handle_cast: Message = ~p. ", [_Msg]),
     {noreply, LoopData}.
@@ -393,3 +399,5 @@ code_change(_OldVsn, LoopData, _Extra) ->
     {ok, LoopData}.
 
      
+name(CoSerial) ->
+    list_to_atom(atom_to_list(?MODULE) ++ integer_to_list(CoSerial)).

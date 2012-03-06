@@ -12,12 +12,3 @@
   {entry,4,[{access,ro},{value,16#12345678}]}   %% serial
  ]}.
 
-%% TPDO entry - 0
-{tpdo, 0, 16#20002222, [{transmission_type,{sync,2}}]}.
-%% TPDO map - 0
-{tpdo_map, 0, [{16#2001, 0, 32},{16#3001,0,32}]}.
-
-%% RPDO entry - 0
-{rpdo, 0, 16#20003333, []}.
-%% RPDO map - 0
-{rpdo_map, 0, [{16#3001, 0, 32}]}.

@@ -14,6 +14,10 @@
 -include_lib("common_test/include/ct.hrl").
 -include("canopen.hrl").
 
+%% Flags to indicate if store/restore command is valid
+-define(EVAS, 1935767141). %% $e + ($v bsl 8) + ($a bsl 16) + ($s bsl 24)
+-define(DOAL, 1819238756). %% $d + ($a bsl 8) + ($o bsl 16) + ($l bsl 24)
+
 %%--------------------------------------------------------------------
 %% COMMON TEST CALLBACK FUNCTIONS
 %%--------------------------------------------------------------------
@@ -64,6 +68,8 @@ all() ->
      unknown_option,
      nodeid_changes,
      restore_dict,
+     save_and_load,
+     save_and_load_nok,
      start_stop_app].
 %%     break].
 
@@ -318,6 +324,55 @@ restore_dict(_Config) ->
 
     ok.
 
+
+%%--------------------------------------------------------------------
+%% @spec save_and_load(Config) -> ok 
+%% @doc 
+%% Saves and loads a dict using SDO:s.
+%% @end
+%%--------------------------------------------------------------------
+save_and_load(Config) ->
+    {Index, NewValue, _Type} = ct:get_config(dict_index),
+    {ok, OldValue} = co_node:value(serial(), Index),
+
+    [] = 
+	os:cmd(co_test_lib:set_cmd(Config, 
+				   {?IX_STORE_PARAMETERS, ?SI_STORE_ALL}, 
+				   ?EVAS, unsigned32, segment, 9000)),
+
+    %% Change a value and see that it is changed
+    ok = co_node:set(serial(), Index, NewValue),
+    {ok, NewValue} = co_node:value(serial(), Index),
+
+    %% Restore the dictionary and see that the value is restored
+    [] = 
+	os:cmd(co_test_lib:set_cmd(Config, 
+				   {?IX_RESTORE_DEFAULT_PARAMETERS, ?SI_RESTORE_ALL}, 
+				   ?DOAL, unsigned32, segment, 9000)),
+    
+    {ok, OldValue} = co_node:value(serial(), Index),
+
+    ok.
+
+%%--------------------------------------------------------------------
+%% @spec save_and_load_nok(Config) -> ok 
+%% @doc 
+%% Verifies that load and save only works with correct values
+%% @end
+%%--------------------------------------------------------------------
+save_and_load_nok(Config) ->
+
+    "cocli: error: set failed: local control error\r\n" = 
+	os:cmd(co_test_lib:set_cmd(Config, 
+				   {?IX_STORE_PARAMETERS, ?SI_STORE_ALL}, 
+				   1935, unsigned32, segment, 9000)),
+
+    "cocli: error: set failed: local control error\r\n" = 
+	os:cmd(co_test_lib:set_cmd(Config, 
+				   {?IX_RESTORE_DEFAULT_PARAMETERS, ?SI_RESTORE_ALL}, 
+				   1935, unsigned32, segment, 9000)),
+    
+    ok.
 
 %%--------------------------------------------------------------------
 %% @spec start_stop_of_app(Config) -> ok 

@@ -81,13 +81,18 @@ all() ->
      get_streamed_m_segment,
      set_streamed_m_block,
      get_streamed_m_block,
+     set_atomic_int,
+     get_atomic_int,
+     set_atomic_si,
+     get_atomic_si,
      stream_file_segment,
      stream_file_block,
      stream_0file_segment,
      stream_0file_block,
      notify,
      mpdo,
-     timeout].
+     timeout,
+     change_timeout].
 %%     break].
 
 
@@ -508,6 +513,46 @@ get_streamed_m_block(Config) ->
 
 
 %%--------------------------------------------------------------------
+%% @spec set_atomic_int(Config) -> ok 
+%% @doc 
+%% Sets an integer value using segment between cocli and co_node and atomic 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+set_atomic_int(Config) ->
+    set(Config, ct:get_config({dict, atomic_int}), segment).
+
+%%--------------------------------------------------------------------
+%% @spec get_atomic_inc(Config) -> ok 
+%% @doc 
+%% Gets an integer value using segment between cocli and co_node and atomic 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+get_atomic_int(Config) ->
+    get(Config, ct:get_config({dict, atomic_int}), segment).
+
+%%--------------------------------------------------------------------
+%% @spec set_atomic_si(Config) -> ok 
+%% @doc 
+%% Sets an integer value using segment between cocli and co_node and atomic 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+set_atomic_si(Config) ->
+    set(Config, ct:get_config({dict, atomic_si}), segment).
+
+%%--------------------------------------------------------------------
+%% @spec get_atomic_inc(Config) -> ok 
+%% @doc 
+%% Gets an integer value using segment between cocli and co_node and atomic 
+%% between co_node and application.
+%% @end
+%%--------------------------------------------------------------------
+get_atomic_si(Config) ->
+    get(Config, ct:get_config({dict, atomic_si}), segment).
+
+%%--------------------------------------------------------------------
 %% @spec stream_file_segment(Config) -> ok 
 %% @doc 
 %% Tests streaming of file cocli -> co_test_stream_app -> cocli 
@@ -522,7 +567,6 @@ stream_file_segment(Config) ->
 %% Tests streaming of file cocli -> co_test_stream_app -> cocli 
 %% @end
 %%--------------------------------------------------------------------
-
 stream_file_block(Config) ->
     stream_file(Config, block, 50).
 
@@ -558,16 +602,8 @@ notify(Config) ->
     {{Index = {Ix, _Si}, Type, _M, _Org}, NewValue} = ct:get_config({dict, notify}),
     [] = os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, Type, segment)),
     
-    receive 
-	{object_event, Ix} ->
-	    ct:pal("Application notified",[]),
-	    ok;
-	Other ->
-	    ct:pal("Received other = ~p", [Other]),
-	    ct:fail("Received other")
-    after 5000 ->
-	    ct:fail("Application not notified")
-    end.
+    wait({object_event, Ix}, 5000),
+    ok.
 
 %%--------------------------------------------------------------------
 %% @spec mpdo(Config) -> ok 
@@ -579,16 +615,9 @@ mpdo(Config) ->
     {{Index = {Ix, _Si}, _T, _M, _Org}, NewValue} = ct:get_config({dict, mpdo}),
     "ok\n" = os:cmd(co_test_lib:notify_cmd(Config, Index, NewValue, segment)),
     
-    receive 
-	{notify, Ix} ->
-	    ct:pal("Application notified",[]),
-	    ok;
-	Other ->
-	    ct:pal("Received other = ~p", [Other]),
-	    ct:fail("Received other")
-    after 5000 ->
-	    ct:fail("Application not notified")
-    end.
+    wait({notify, Ix}, 5000),
+    
+    ok.
 
 %%--------------------------------------------------------------------
 %% @spec timeout(Config) -> ok 
@@ -603,19 +632,29 @@ timeout(Config) ->
     "cocli: error: set failed: timed out\r\n" = 
 	os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, Type, segment)),
 
-    receive 
-	{set, Index, NewValue} ->
-	    ct:pal("Application notified",[]),
-	    ok;
-	Other ->
-	    ct:pal("Received other = ~p", [Other]),
-	    ct:fail("Received other")
-    after 5000 ->
-	    ct:pal("Application not notified")
-    end,
+    wait({set, Index, NewValue}, 5000),
     
     %% Get
-    get(Config, ct:get_config({dict, timeout}), segment).
+    "cocli: error: failed to retrieve value for '0x7334' timed out\r\n" =
+	os:cmd(co_test_lib:get_cmd(Config, Index, Type, segment)).
+
+%%--------------------------------------------------------------------
+%% @spec change_timeout(Config) -> ok 
+%% @doc 
+%% A test of having an application that changes the session timeout
+%% @end
+%%--------------------------------------------------------------------
+change_timeout(Config) ->
+
+    %% Set
+    {{Index, Type, _M, _Org}, NewValue} = ct:get_config({dict, change_timeout}),
+    [] = os:cmd(co_test_lib:set_cmd(Config, Index, NewValue, Type, segment, 4000)),
+
+    wait({set, Index, NewValue}, 5000),
+
+    %% Get
+    Result = os:cmd(co_test_lib:get_cmd(Config, Index, Type, segment, 4000)),
+    {Index, NewValue} = co_test_lib:parse_get_result(Result).
 
 
 %%--------------------------------------------------------------------
@@ -659,32 +698,15 @@ set(Config, {{Index, Type, _M, _Org}, NewValue}, BlockOrSegment) ->
     {Index, _Type, _Transfer, NewValue} = 
 	lists:keyfind(Index, 1, co_test_app:dict(serial())),
     
-    receive 
-	{set, Index, NewValue} ->
-	    ct:pal("Application set done",[]),
-	    ok;
-	Other1 ->
-	    ct:pal("Received other = ~p", [Other1]),
-	    ct:fail("Received other")
-    after 5000 ->
-	    ct:pal("Application set not done")
-    end,
+    wait({set, Index, NewValue}, 5000),
 
     %% Restore old
     [] = os:cmd(co_test_lib:set_cmd(Config, Index, OldValue, Type, BlockOrSegment)),
     {Index, _Type, _Transfer, OldValue} = 
 	lists:keyfind(Index, 1, co_test_app:dict(serial())),
 
-    receive 
-	{set, Index, OldValue} ->
-	    ct:pal("Application set done",[]),
-	    ok;
-	Other2 ->
-	    ct:pal("Received other = ~p", [Other2]),
-	    ct:fail("Received other")
-    after 5000 ->
-	    ct:pal("Application set not done")
-    end,
+    wait({set, Index, OldValue}, 5000),
+
     ok;
 set(Config, {Index, NewValue, Type}, BlockOrSegment) ->
     %% co_node internal dict
@@ -701,35 +723,38 @@ set(Config, {Index, NewValue, Type}, BlockOrSegment) ->
 %% from the apps dictionary.
 %% @end
 %%--------------------------------------------------------------------
-get(Config, {{Index, Type, _M, _Org}, _NewValue}, BlockOrSegment) ->
+get(Config, {{Index, Type, _M, Org}, _NewValue}, BlockOrSegment) ->
 
     Result = os:cmd(co_test_lib:get_cmd(Config, Index, Type, BlockOrSegment)),
-
-    %% For now ....
-    case Result of
-	
-	"0x6033 = \"Mine\"\n" -> ok;
-	"0x6034 = \"Long string\"\n" -> ok;
-	"0x6035 = \"Mine2\"\n" -> ok;
-	"0x6036 = \"Long string2\"\n" -> ok;
-	"0x6037 = \"A\"\n" -> ok;
-	"0x6038 = \"C\"\n" -> ok;
-	"cocli: error: failed to retrive value for '0x7334' timed out\r\n" -> ok
-    end,
-
     ct:pal("Result = ~p", [Result]),
 
+    {Index, Org} = co_test_lib:parse_get_result(Result),
+    
     %% Get value from cocli and compare with dict
     %% {Index, _Type, _Transfer, Value} = lists:keyfind(Index, 1, co_test_app:dict(serial())),
     
     ok;
-get(Config, {Index, _NewValue, Type}, BlockOrSegment) ->
+get(Config, {Index, NewValue, Type}, BlockOrSegment) ->
     %% co_node internal dict
     Result = os:cmd(co_test_lib:get_cmd(Config, Index, Type, BlockOrSegment)),
     ct:pal("Result = ~p", [Result]),
     
-    Result = "0x2002 = \"New string aaaaabbbbbbbccccccddddddeeeee\"\n".
+    {Index, NewValue} = co_test_lib:parse_get_result(Result).
 
+
+
+wait(For, Time) ->
+    receive 
+	For ->
+	    ct:pal("Received ~p as expected",[For]),
+	    ok;
+	Other ->
+	    ct:pal("Received other = ~p", [Other]),
+	    ct:fail("Received other")
+    after Time ->
+	    ct:pal("Nothing received, timeout",[])
+    end.
+    
 
 
 stream_file(Config, TransferMode, Size) ->

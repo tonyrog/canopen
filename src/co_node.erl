@@ -871,7 +871,7 @@ reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
 
 init({Serial, NodeName, Opts}) ->
     can_router:start(),
-    can_udp:start(0),
+    can_udp:start(1, [{ttl, 0}]),
 
     %% Trace output enable/disable
     put(dbg, proplists:get_value(debug,Opts,false)), 
@@ -941,8 +941,13 @@ init({Serial, NodeName, Opts}) ->
 	    if ShortNodeId =:= 0 ->
 		    {ok, Ctx1#co_ctx { state = ?Operational }};
 	       true ->
+		    %% Start app that handles save and load SDOs (1010/1011)
+		    {ok, SysPid} = co_sys_app:start(Serial),
+		    co_sys_app:debug(SysPid, get(dbg)),
+		    gen_server:cast(SysPid, go),
+		    
 		    {ok, reset_application(Ctx1)}
-	    end;
+		end;
 	{error, Reason} ->
 	    io:format("WARNING! ~p: Loading of dict failed, exiting\n", 
 		      [Ctx#co_ctx.name]),
@@ -1438,6 +1443,9 @@ handle_info(_Info, Ctx) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, Ctx) ->
+    
+    co_sys_app:stop(Ctx#co_ctx.serial),
+
     %% Stop all apps ??
     lists:foreach(
       fun(A) ->

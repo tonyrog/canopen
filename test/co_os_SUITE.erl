@@ -12,6 +12,7 @@
 -compile(export_all).
 
 -include_lib("common_test/include/ct.hrl").
+-include("canopen.hrl").
 
 %%--------------------------------------------------------------------
 %% COMMON TEST CALLBACK FUNCTIONS
@@ -262,12 +263,14 @@ start_stop_app(_Config) ->
 os_command(Config) ->
     Command = "pwd",
     %% Send command
-    [] = os:cmd(co_test_lib:set_cmd(Config, {16#1023, 1}, Command, octet_string, segment)),
+    [] = os:cmd(co_test_lib:set_cmd(Config, 
+				    {?IX_OS_COMMAND, ?SI_OS_COMMAND}, 
+				    Command, octet_string, segment)),
     
     Result = get_result(Config),
     ct:pal("Result ~p", [Result]),
     
-    verify_result("0x1", Result),
+    verify_result(1, Result),
 
     ok.
 
@@ -281,18 +284,20 @@ os_command(Config) ->
 os_command_slow(Config) ->
     Command = "sleep 2",
     %% Send command
-    [] = os:cmd(co_test_lib:set_cmd(Config, {16#1023, 1}, Command, octet_string, segment)),
+    [] = os:cmd(co_test_lib:set_cmd(Config, 
+				    {?IX_OS_COMMAND, ?SI_OS_COMMAND}, 
+				    Command, octet_string, segment)),
  
     Result = get_result(Config),
     ct:pal("Result ~p", [Result]),
-    verify_result("0xff", Result),
+    verify_result(16#ff, Result),
 
     %% Wait for command to be executed
     timer:sleep(2000),
     
     Result1 = get_result(Config),
     ct:pal("Result ~p", [Result1]),
-    verify_result("0x0", Result1),
+    verify_result(0, Result1),
 
     ok.
 
@@ -306,12 +311,14 @@ os_command_slow(Config) ->
 os_command_seq(Config) ->
     Command = "pwd; cd /; pwd",
     %% Send command
-    [] = os:cmd(co_test_lib:set_cmd(Config, {16#1023, 1}, Command, octet_string, segment)),
+    [] = os:cmd(co_test_lib:set_cmd(Config, 
+				    {?IX_OS_COMMAND, ?SI_OS_COMMAND}, 
+				    Command, octet_string, segment)),
     
     Result = get_result(Config),
     ct:pal("Result ~p", [Result]),
     
-    verify_result("0x1", Result),
+    verify_result(1, Result),
 
     ok.
 
@@ -339,20 +346,27 @@ app_dict() -> co_test_lib:app_dict().
      
 get_result(Config) -> 
     %% Command
-    Cmd = os:cmd(co_test_lib:get_cmd(Config, {16#1023, 1}, octet_string, segment)),
+    Cmd = os:cmd(co_test_lib:get_cmd(Config, 
+				     {?IX_OS_COMMAND, ?SI_OS_COMMAND}, 
+				     octet_string, segment)),
     
     %% Status
-    Status = os:cmd(co_test_lib:get_cmd(Config, {16#1023, 2}, unsigned8, segment)),
+    Status = os:cmd(co_test_lib:get_cmd(Config, 
+					{?IX_OS_COMMAND, ?SI_OS_STATUS}, 
+					unsigned8, segment)),
     
     %% Reply
-    Reply = os:cmd(co_test_lib:get_cmd(Config, {16#1023, 3}, octet_string, segment)),
+    Reply = os:cmd(co_test_lib:get_cmd(Config, 
+				       {?IX_OS_COMMAND, ?SI_OS_REPLY}, 
+				       octet_string, segment)),
 
-    {Cmd, Status, Reply}.
+    {co_test_lib:parse_get_result(Cmd), 
+     co_test_lib:parse_get_result(Status), 
+     co_test_lib:parse_get_result(Reply)}.
 
 verify_result(ExpectedStatus, {Cmd, Status, Reply}) ->
     
-    "0x1023:1 = " ++ _ = Cmd, 
-    "0x1023:3 = " ++ _ = Reply,
-    
-    ["0x1023:2", "=", ExpectedStatus] = string:tokens(Status, " \n").
+    {{?IX_OS_COMMAND, ?SI_OS_COMMAND}, _} = Cmd, 
+    {{?IX_OS_COMMAND, ?SI_OS_STATUS}, ExpectedStatus} = Status,
+    {{?IX_OS_COMMAND, ?SI_OS_REPLY}, _} = Reply.
     

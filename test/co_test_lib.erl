@@ -87,57 +87,62 @@ stop_app(App, CoNode, CoNodeString) ->
 	_Pid -> App:stop(CoNode)
     end.
 
-set_cmd(Config, Index, Value, Type, block) ->
-    set_cmd(Config, Index, Value, Type, " -b");
-set_cmd(Config, Index, Value, Type, segment) ->
-    set_cmd(Config, Index, Value, Type, "");
 set_cmd(Config, Index, Value, Type, BFlag) ->
-    Cmd = set_cmd1(Config, Index, Value, Type, BFlag),
+    set_cmd(Config, Index, Value, Type, BFlag, undefined).
+
+set_cmd(Config, Index, Value, Type, BFlag, Tout) ->
+    Cmd = set_cmd1(Config, Index, Value, Type, BFlag, Tout),
     ct:pal("Command = ~p",[Cmd]),
     Cmd.
 
-set_cmd1(Config, Index, Value, Type, BFlag) ->
-    cocli(Config) ++ BFlag ++ " -T " ++ atom_to_list(Type) ++
-	" -s " ++ serial_as_c_string(serial()) ++ 
-	" set " ++ index_as_c_string(Index) ++ " \"" ++ Value ++ "\"".
+set_cmd1(Config, Index, Value, Type, BFlag, Tout) ->
+    cocli(Config) ++ bflag(BFlag) ++ " -T " ++ atom_to_list(Type) ++
+	" -s " ++ serial_as_c_string(serial()) ++ timeout(Tout) ++
+	" set " ++ index_as_c_string(Index) ++ value(Value).
 
-get_cmd(Config, Index, Type, block) ->
-    get_cmd(Config, Index, Type, " -b");
-get_cmd(Config, Index, Type, segment) ->
-    get_cmd(Config, Index, Type, "");
 get_cmd(Config, Index, Type, BFlag) ->
-    Cmd = get_cmd1(Config, Index, Type, BFlag),
+    get_cmd(Config, Index, Type, BFlag, undefined).
+    
+get_cmd(Config, Index, Type, BFlag, Tout) ->
+    Cmd = get_cmd1(Config, Index, Type, BFlag, Tout),
     ct:pal("Command = ~p",[Cmd]),
     Cmd.
 
-get_cmd1(Config, Index, Type, BFlag) ->
-    cocli(Config) ++ BFlag ++ " -T " ++ atom_to_list(Type) ++
-	" -s " ++ serial_as_c_string(serial()) ++ 
-	" get " ++ index_as_c_string(Index).
+get_cmd1(Config, Index, Type, BFlag, Tout) ->
+    cocli(Config) ++ bflag(BFlag) ++ " -T " ++ atom_to_list(Type) ++
+	" -s " ++ serial_as_c_string(serial()) ++ timeout(Tout) ++
+	" -e" ++ " get " ++ index_as_c_string(Index).
 
-file_cmd(Config, Index, Direction, block) ->
-    file_cmd(Config, Index, Direction, " -b");
-file_cmd(Config, Index, Direction, segment) ->
-    file_cmd(Config, Index, Direction, "");
 file_cmd(Config, Index, Direction, BFlag) ->
-    cocli(Config) ++ BFlag ++ " -s " ++ 
+    cocli(Config) ++ bflag(BFlag) ++ " -s " ++ 
 	serial_as_c_string(serial()) ++ " " ++ 
 	Direction ++ " " ++ index_as_c_string(Index) ++ " " ++
 	filename:join(?config(priv_dir, Config), "tmp_file").
     
-notify_cmd(Config, Index, Value, block) ->
-    notify_cmd(Config, Index, Value, " -b");
-notify_cmd(Config, Index, Value, segment) ->
-    notify_cmd(Config, Index, Value, "");
 notify_cmd(Config, Index, Value, BFlag) ->
     Cmd = notify_cmd1(Config, Index, Value, BFlag),
     ct:pal("Command = ~p",[Cmd]),
     Cmd.
 
 notify_cmd1(Config, Index, Value, BFlag) ->
-    cocli(Config) ++ BFlag ++ " -s " ++ 
+    cocli(Config) ++ bflag(BFlag) ++ " -s " ++ 
 	serial_as_c_string(serial()) ++ " notify " ++
-	index_as_c_string(Index) ++ " \"" ++ Value ++ "\"".
+	index_as_c_string(Index) ++ value(Value).
+
+bflag(segment) ->
+    "";
+bflag(block) ->
+    " -b".
+
+timeout(undefined) ->
+    "";
+timeout(Tout) ->
+    " -y " ++ integer_to_list(Tout).
+
+value(Value) when is_integer(Value) ->
+    " " ++ integer_to_list(Value);
+value(Value) when is_list(Value) ->
+" \"" ++ Value ++ "\"".
 
 index_as_c_string({Index, 0}) ->
     "0x" ++ integer_to_list(Index,16);
@@ -156,10 +161,21 @@ serial_as_c_string(Serial) ->
 	6 -> "0x80" ++ S1
     end.
 	     
+
+parse_get_result(S) ->
+    {ok, Tokens, _End} = erl_scan:string(S),
+    {ok, [Abs]} = erl_parse:parse_exprs(Tokens),
+    erl_parse:normalise(Abs).
     
+full_index(Ix) when is_integer(Ix) ->
+    {Ix, 0};
+full_index({_Ix, _Si} = I) ->
+    I.
+
 cocli(C) ->
     DataDir = ?config(data_dir, C),
-    filename:join(DataDir, ct:get_config(cocli)).
+    %% Harcoded to use port +1 as in co_node.erl
+    filename:join(DataDir, ct:get_config(cocli)) ++ " -i 1".
 
 type(T) -> co_lib:encode_type(T).
 
