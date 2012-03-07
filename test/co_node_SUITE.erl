@@ -74,32 +74,6 @@ all() ->
 %%     break].
 
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Returns a list of test case group definitions.
-%%
-%% Group = {GroupName,Properties,GroupsAndTestCases}
-%% GroupName = atom()
-%%   The name of the group.
-%% Properties = [parallel | sequence | Shuffle | {RepeatType,N}]
-%%   Group properties that may be combined.
-%% GroupsAndTestCases = [Group | {group,GroupName} | TestCase]
-%% TestCase = atom()
-%%   The name of a test case.
-%% Shuffle = shuffle | {shuffle,Seed}
-%%   To get cases executed in random order.
-%% Seed = {integer(),integer(),integer()}
-%% RepeatType = repeat | repeat_until_all_ok | repeat_until_all_fail |
-%%              repeat_until_any_ok | repeat_until_any_fail
-%%   To get execution of cases repeated.
-%% N = integer() | forever
-%%
-%% @spec: groups() -> [Group]
-%% @end
-%%--------------------------------------------------------------------
-groups() ->
-    [].
-
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -118,8 +92,7 @@ groups() ->
 %% @end
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
-    co_test_lib:start_node(),
-    co_test_lib:load_dict(Config),
+    co_test_lib:start_node(Config),
     Config.
 
 %%--------------------------------------------------------------------

@@ -187,7 +187,6 @@ load_dict(CoSerial, DictTable, IndexList) ->
 %% Required to at least handle get and set requests as specified above.
 %% Handling all non call/cast messages.
 %% Required to at least handle a notify msg as specified above. <br/>
-%% RemoteId = Id of remote CANnode initiating the msg. <br/>
 %% Index = Index in Object Dictionary <br/>
 %% SubInd = Sub index in Object Disctionary  <br/>
 %% Value = Any value the node chooses to send.
@@ -266,9 +265,9 @@ handle_cast(_Msg, LD) ->
 %%                                   {noreply, LD, Timeout} |
 %%                                   {stop, Reason, LD}
 %%
-%% Info = {notify, RemoteId, Index, SubInd, Value}
+%% Info = {notify, RemoteCobId, Index, SubInd, Value}
 %% LD = term()
-%% RemoteId = integer()
+%% RemoteCobId = integer()
 %% Index = integer()
 %% SubInd = integer()
 %% Value = term()
@@ -276,7 +275,7 @@ handle_cast(_Msg, LD) ->
 %% @doc
 %% Handling all non call/cast messages.
 %% Required to at least handle a notify msg as specified above. <br/>
-%% RemoteId = Id of remote CANnode initiating the msg. <br/>
+%% RemoteCobId = Id of remote CANnode initiating the msg. <br/>
 %% Index = Index in Object Dictionary <br/>
 %% SubInd = Sub index in Object Disctionary  <br/>
 %% Value = Any value the node chooses to send.

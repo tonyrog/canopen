@@ -200,7 +200,6 @@ init({CoSerial, {Index, RFileName, WFileName}, Starter}) ->
 %% Handling call messages.
 %% Handling all non call/cast messages.
 %% Required to at least handle a notify msg as specified above. <br/>
-%% RemoteId = Id of remote CANnode initiating the msg. <br/>
 %% Index = Index in Object Dictionary <br/>
 %% SubInd = Sub index in Object Disctionary  <br/>
 %% Value = Any value the node chooses to send.
@@ -322,9 +321,9 @@ handle_cast(_Msg, LoopData) ->
 %%                                   {noreply, LoopData, Timeout} |
 %%                                   {stop, Reason, LoopData}
 %%
-%% Info = {notify, RemoteId, Index, SubInd, Value}
+%% Info = {notify, RemoteCobId, Index, SubInd, Value}
 %% LoopData = term()
-%% RemoteId = integer()
+%% RemoteCobId = integer()
 %% Index = integer()
 %% SubInd = integer()
 %% Value = term()
@@ -332,16 +331,16 @@ handle_cast(_Msg, LoopData) ->
 %% @doc
 %% Handling all non call/cast messages.
 %% Required to at least handle a notify msg as specified above. <br/>
-%% RemoteId = Id of remote CANnode initiating the msg. <br/>
+%% RemoteCobId = Id of remote CANnode initiating the msg. <br/>
 %% Index = Index in Object Dictionary <br/>
 %% SubInd = Sub index in Object Disctionary  <br/>
 %% Value = Any value the node chooses to send.
 %% 
 %% @end
 %%--------------------------------------------------------------------
-handle_info({notify, RemoteId, {Index, SubInd}, Value}, LoopData) ->
+handle_info({notify, _RemoteCobId, {Index, SubInd}, Value}, LoopData) ->
     ?dbg(?NAME, "handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w \n", 
-	      [RemoteId, Index, SubInd, Value]),
+	      [_RemoteCobId, Index, SubInd, Value]),
     {noreply, LoopData};
 handle_info(Info, LoopData) ->
     ?dbg(?NAME, "handle_info: Unknown Info ~p\n", [Info]),

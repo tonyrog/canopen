@@ -70,35 +70,6 @@ all() ->
     ].
 %%     break].
 
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Returns a list of test case group definitions.
-%%
-%% Group = {GroupName,Properties,GroupsAndTestCases}
-%% GroupName = atom()
-%%   The name of the group.
-%% Properties = [parallel | sequence | Shuffle | {RepeatType,N}]
-%%   Group properties that may be combined.
-%% GroupsAndTestCases = [Group | {group,GroupName} | TestCase]
-%% TestCase = atom()
-%%   The name of a test case.
-%% Shuffle = shuffle | {shuffle,Seed}
-%%   To get cases executed in random order.
-%% Seed = {integer(),integer(),integer()}
-%% RepeatType = repeat | repeat_until_all_ok | repeat_until_all_fail |
-%%              repeat_until_any_ok | repeat_until_any_fail
-%%   To get execution of cases repeated.
-%% N = integer() | forever
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec groups() -> list(Group::tuple()).
-
-groups() ->
-    [].
-
-
 %%--------------------------------------------------------------------
 %% @doc
 %% Initialization before the whole suite
@@ -118,10 +89,10 @@ groups() ->
 			    {skip,Reason::term()} | 
 			    {skip_and_save,Reason::term(),Config1::list(tuple())}.
 init_per_suite(Config) ->
-    co_test_lib:start_node(),
-    co_test_lib:load_dict(Config),
-    co_test_lib:start_node(?RPDO_NODE),
-    co_test_lib:load_dict(Config, ?RPDO_NODE),
+    co_test_lib:start_node(Config),
+    co_test_lib:start_node(Config, ?RPDO_NODE),
+
+    co_node:dump(serial(), no_dict),
 
     Config.
 
@@ -140,44 +111,6 @@ end_per_suite(_Config) ->
     co_node:stop(serial()),
     ok.
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Initialization before each test case group.
-%%
-%% GroupName = atom()
-%%   Name of the test case group that is about to run.
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding configuration data for the group.
-%% Reason = term()
-%%   The reason for skipping all test cases and subgroups in the group.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec init_per_group(Group::atom(), Config0::list(tuple())) ->
-			    (Config1::list(tuple())) | 
-			    {skip,Reason::term()} | 
-			    {skip_and_save,Reason::term(),Config1::list(tuple())}.
-
-init_per_group(_GroupName, Config) ->
-    Config.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Cleanup after each test case group.
-%%
-%% GroupName = atom()
-%%   Name of the test case group that is finished.
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding configuration data for the group.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec end_per_group(Group::atom(), Config::list(tuple())) -> 
-			   ok |
-			   {save_config,Config1::list(tuple())}.
-
-end_per_group(_GroupName, _Config) ->
-    ok.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -225,7 +158,9 @@ init_per_testcase(_TestCase, Config) ->
 
     %% Redo mapping, i.e. calls to tpdo_callback
     ok = co_node:state(serial(), preoperational),
+    co_node:dump(serial(), no_dict),
     ok = co_node:state(serial(), operational),
+    co_node:dump(serial(), no_dict),
     ct:pal("Changed state to operational", []),    
     timer:sleep(100),
 

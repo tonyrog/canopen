@@ -94,36 +94,7 @@ all() ->
      timeout,
      change_timeout].
 %%     break].
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Returns a list of test case group definitions.
-%%
-%% Group = {GroupName,Properties,GroupsAndTestCases}
-%% GroupName = atom()
-%%   The name of the group.
-%% Properties = [parallel | sequence | Shuffle | {RepeatType,N}]
-%%   Group properties that may be combined.
-%% GroupsAndTestCases = [Group | {group,GroupName} | TestCase]
-%% TestCase = atom()
-%%   The name of a test case.
-%% Shuffle = shuffle | {shuffle,Seed}
-%%   To get cases executed in random order.
-%% Seed = {integer(),integer(),integer()}
-%% RepeatType = repeat | repeat_until_all_ok | repeat_until_all_fail |
-%%              repeat_until_any_ok | repeat_until_any_fail
-%%   To get execution of cases repeated.
-%% N = integer() | forever
-%%
-%% @spec: groups() -> [Group]
-%% @end
-%%--------------------------------------------------------------------
-groups() ->
-    [].
-
-
-%%--------------------------------------------------------------------
+%--------------------------------------------------------------------
 %% @doc
 %% Initialization before the whole suite
 %%
@@ -140,8 +111,7 @@ groups() ->
 %% @end
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
-    co_test_lib:start_node(),
-    co_test_lib:load_dict(Config),
+    co_test_lib:start_node(Config),
     Config.
 
 %%--------------------------------------------------------------------
@@ -156,40 +126,6 @@ init_per_suite(Config) ->
 %%--------------------------------------------------------------------
 end_per_suite(_Config) ->
     co_node:stop(serial()),
-    ok.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Initialization before each test case group.
-%%
-%% GroupName = atom()
-%%   Name of the test case group that is about to run.
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding configuration data for the group.
-%% Reason = term()
-%%   The reason for skipping all test cases and subgroups in the group.
-%%
-%% @spec init_per_group(GroupName, Config0) ->
-%%               Config1 | {skip,Reason} | {skip_and_save,Reason,Config1}
-%% @end
-%%--------------------------------------------------------------------
-init_per_group(_GroupName, Config) ->
-    Config.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Cleanup after each test case group.
-%%
-%% GroupName = atom()
-%%   Name of the test case group that is finished.
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding configuration data for the group.
-%%
-%% @spec end_per_group(GroupName, Config0) ->
-%%               void() | {save_config,Config1}
-%% @end
-%%--------------------------------------------------------------------
-end_per_group(_GroupName, _Config) ->
     ok.
 
 %%--------------------------------------------------------------------

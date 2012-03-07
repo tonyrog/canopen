@@ -1,10 +1,10 @@
 %%%-------------------------------------------------------------------
-%%% @author Marina Westman LÃ¶nne <malotte@malotte.net>
-%%% @copyright (C) 2011, Marina Westman LÃ¶nne
+%%% @author Marina Westman Lönne <malotte@malotte.net>
+%%% @copyright (C) 2011, Marina Westman Lönne
 %%% @doc
 %%%
 %%% @end
-%%% Created : 29 Nov 2011 by Marina Westman LÃ¶nne <malotte@malotte.net>
+%%% Created : 29 Nov 2011 by Marina Westman Lönne <malotte@malotte.net>
 %%%-------------------------------------------------------------------
 -module(co_test_lib).
 
@@ -15,14 +15,20 @@
 
 -define(DICT, "test.dict").
 
-start_node() ->
-    start_node(serial()).
+start_node(C) ->
+    start_node(C, serial()).
 
-start_node(Serial) ->
+start_node(C, Serial) ->
+    DataDir = ?config(data_dir, C),
+    Dict = filename:join(DataDir, ?DICT),
+    can_router:start(),
+    can_udp:start(1, [{ttl, 0}]),
+
     {ok, PPid} = co_proc:start_link([]),
     ct:pal("Started co_proc ~p",[PPid]),
     {ok, Pid} = co_node:start_link([{serial,Serial}, 
 				     {options, [{use_serial_as_xnodeid, true},
+						{dict_file, Dict},
 						{max_blksize, 7},
 						{vendor,16#2A1},
 						{debug, true}]}]),

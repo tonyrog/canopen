@@ -280,6 +280,7 @@ handle_call(_Request, _From, S) ->
 %%--------------------------------------------------------------------
 handle_cast({state, State}, S=#s {offset = I, ctx = Ctx}) 
   when State == ?Operational ->
+    ?dbg(tpdo, "handle_cast: state ~p", [State]),
     {Ts,Is} = tpdo_mapping(I, Ctx),
     {noreply, S#s {state = State, type_list = Ts, index_list = Is}};
 handle_cast({state, State}, S) ->
@@ -341,7 +342,6 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 tpdo_mapping(Offset, Ctx) ->
-    %% cob_id is changed!
     ?dbg(tpdo, "tpdo_mapping: offset=~8.16.0#", [Offset]),
     case co_node:tpdo_mapping(Offset, Ctx) of
 	{tpdo, Mapping} -> 

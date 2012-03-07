@@ -8,6 +8,9 @@
 -export([run/1, halt/1]).
 
 run(Serial) ->
+    can_router:start(),
+    can_udp:start(1, [{ttl, 0}]),
+
     {ok, _PPid} = co_proc:start_link([]),
     co_proc:debug(true),
     {ok, _NPid} = co_node:start_link([{serial,Serial}, 

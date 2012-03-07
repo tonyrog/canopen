@@ -14,6 +14,7 @@
 
 -export([load/1]).
 -export([load_objects/2]).
+-export([func/1]).
 -import(lists, [map/2, seq/2, foreach/2]).
 %%--------------------------------------------------------------------
 %% @doc

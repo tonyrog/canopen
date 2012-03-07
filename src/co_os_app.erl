@@ -492,20 +492,20 @@ handle_cast(_Msg, LoopData) ->
 %% Handling all non call/cast messages.
 %%
 %% Ref - Reference in communication with the CANopen node.
-%% RemoteId = Id of remote CANnode initiating the msg. <br/>
+%% RemoteCobId = CobId of remote CANnode initiating the msg. <br/>
 %% Index = Index in Object Dictionary <br/>
 %% SubInd = Sub index in Object Disctionary  <br/>
 %% Value = Any value the node chooses to send.
 %% 
 %% Info types:
 %% {Status, Reply} - When spawned process has finished executing. <br/>
-%% {notify, _RemoteId, {_Index, _SubInd}, _Value} - 
+%% {notify, RemoteCobId, {Index, SubInd}, Value} - 
 %%   When Index subscribed to by this process has been updated. <br/>
 %% @end
 %%--------------------------------------------------------------------
 -type info()::
 	{Status::integer(), Reply::term()} |
-	{notify, RemoteId::term(), {Index::integer(), SubInd::integer()}, 
+	{notify, RemoteCobId::term(), {Index::integer(), SubInd::integer()}, 
 	 Value::term()} |
 	%% Unknown info
 	term().
@@ -521,9 +521,9 @@ handle_info({Status, Reply} = _Info, LoopData) ->
     {noreply, LoopData#loop_data {state = executed,
 				  status = Status, 
 				  reply = Reply}};
-handle_info({notify, _RemoteId, _Index, _SubInd, _Value}, LoopData) ->
+handle_info({notify, _RemoteCobId, _Index, _SubInd, _Value}, LoopData) ->
     ?dbg(?NAME," handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w \n", 
-	      [_RemoteId, _Index, _SubInd, _Value]),
+	      [_RemoteCobId, _Index, _SubInd, _Value]),
     {noreply, LoopData};
 handle_info(_Info, LoopData) ->
     ?dbg(?NAME," handle_info: Unknown Info ~p\n", [_Info]),
