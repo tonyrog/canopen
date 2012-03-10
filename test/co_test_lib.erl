@@ -24,16 +24,21 @@ start_node(C, Serial) ->
     can_router:start(),
     can_udp:start(1, [{ttl, 0}]),
 
-    {ok, PPid} = co_proc:start_link([]),
+    {ok, PPid} = co_proc:start_link([{unlinked, true}]),
     ct:pal("Started co_proc ~p",[PPid]),
-    {ok, Pid} = co_node:start_link([{serial,Serial}, 
-				     {options, [{use_serial_as_xnodeid, true},
-						{dict_file, Dict},
-						{max_blksize, 7},
-						{vendor,16#2A1},
-						{debug, true}]}]),
+    {ok, Pid} = co_node:start_link(Serial, 
+				   [{use_serial_as_xnodeid, true},
+				    {dict_file, Dict},
+				    {max_blksize, 7},
+				    {vendor,16#2A1},
+				    {unlinked, true},
+				    {debug, true}]),
     ct:pal("Started co_node ~p, pid = ~p",[integer_to_list(Serial,16), Pid]),
     {ok, Pid}.
+
+stop_node(_Config) ->
+    co_proc:stop(),
+    co_node:stop(serial()).
 
 load_dict(C) ->
     load_dict(C, serial()).

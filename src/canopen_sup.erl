@@ -70,11 +70,14 @@ stop() ->
 %%--------------------------------------------------------------------
 init(Args) ->
     io:format("~p: Starting up\n", [?MODULE]),
+    io:format("~p: init: Args = ~p\n", [?MODULE, Args]),
     CP = co_proc,
     CoProc = {CP, {CP, start_link, []}, permanent, 5000, worker, [CP]},
     CN = co_node,
-    CoNode = {CN, {CN, start_link, [Args]}, permanent, 5000, worker, [CN]},
-    io:format("~p: About to start ~p and ~p\n", [?MODULE,CoProc, CoNode]),
+    Serial = proplists:get_value(serial, Args, 0),
+    Opts = proplists:get_value(options, Args, []),	    
+    CoNode = {CN, {CN, start_link, [Serial, Opts]}, permanent, 5000, worker, [CN]},
+    io:format("~p: About to start ~p and ~p\n", [?MODULE, CoProc, CoNode]),
     {ok, { {rest_for_one, 0, 300}, [CoProc, CoNode]} }.
 
 

@@ -29,6 +29,8 @@
 -export([clear/1]).
 -export([i/0]).
 -export([alive/0]).
+
+%% Test functions
 -export([debug/1]).
 
 -record(ctx, 
@@ -46,14 +48,21 @@
 %% Starts the server.
 %% @end
 %%--------------------------------------------------------------------
--spec start_link([]) -> {ok, Pid::pid()} | ignore | {error, Error::term()}.
+-spec start_link(list(tuple())) -> 
+			{ok, Pid::pid()} | ignore | {error, Error::term()}.
 
-start_link([]) ->
+start_link(Opts) ->
+    io:format("co_proc: start_link: Opts = ~p\n", [Opts]),
+    F =	case proplists:get_value(unlinked,Opts,false) of
+	    true -> start;
+	    false -> start_link
+	end,
+    
     case whereis(?MODULE) of
 	Pid when is_pid(Pid) ->
 	    {ok, Pid};
 	undefined ->
-	    gen_server:start({local, ?MODULE}, ?MODULE, [], [])
+	    gen_server:F({local, ?MODULE}, ?MODULE, [], [])
     end.
 
 
@@ -179,7 +188,7 @@ alive() ->
 debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
     gen_server:call(?MODULE, {debug, TrueOrFalse}).
 
-	     
+	
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -196,6 +205,8 @@ debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
 		  ignore |
 		  {stop, Reason::term()}.
 init([]) ->
+    io:format("co_proc: init:\n", []),
+
     PD = ets:new(co_proc_dict, [protected, named_table, ordered_set]),
     TD = ets:new(co_term_dict, [protected, named_table, ordered_set]),
     {ok, #ctx {proc_dict = PD, term_dict = TD}}.

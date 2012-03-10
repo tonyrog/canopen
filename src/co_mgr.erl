@@ -51,9 +51,8 @@ start(Options) ->
 	Pid when is_pid(Pid) ->
 	    ok;
 	undefined ->
-	    co_node:start_link([{serial, 16#000000}, 
-				{options, [{name,?CO_MGR},{nodeid, 0}] ++
-				     Options}])
+	    co_node:start_link(16#000000, 
+			       [{name,?CO_MGR},{nodeid, 0}] ++ Options)
     end.
 
 

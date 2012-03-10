@@ -11,14 +11,15 @@ run(Serial) ->
     can_router:start(),
     can_udp:start(1, [{ttl, 0}]),
 
-    {ok, _PPid} = co_proc:start_link([]),
+    {ok, _PPid} = co_proc:start_link([{unlinked, true}]),
     co_proc:debug(true),
-    {ok, _NPid} = co_node:start_link([{serial,Serial}, 
-				      {options, [{use_serial_as_xnodeid, true},
-						 {nodeid, 7},
-						 {max_blksize, 7},
-						 {vendor,16#2A1},
-						 {debug, true}]}]),
+    {ok, _NPid} = co_node:start(Serial, 
+				[{use_serial_as_xnodeid, true},
+				 {nodeid, 7},
+				 {max_blksize, 7},
+				 {vendor,16#2A1},
+				 {unlinked, true},
+				 {debug, true}]),
     
     co_node:load_dict(Serial, filename:join(code:priv_dir(canopen), "default.dict")).
 

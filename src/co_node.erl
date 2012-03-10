@@ -19,7 +19,7 @@
 -include("co_debug.hrl").
 
 %% API
--export([start_link/1, stop/1]).
+-export([start_link/2, stop/1]).
 -export([attach/1, detach/1]).
 
 %% gen_server callbacks
@@ -54,7 +54,7 @@
 -export([reserver_with_module/2]).
 -export([tpdo_mapping/2, rpdo_mapping/2, tpdo_set/3, tpdo_value/2]).
 
-%% Debug interface
+%% Test interface
 -export([dump/1, dump/2, loop_data/1]).
 -export([state/2]).
 -export([direct_set/3]).
@@ -102,40 +102,28 @@
 %%          {dict_file, string()}     - non default dictionary file to load,
 %%                                      overrides load_last_saved <br/>
 %%          {debug, boolean()}        - Enable/Disable trace output<br/>
+%%          {unlinked, boolean()}     - Start process linked (default) or not <br/>
 %%         
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(list({serial, Serial::integer()} | 
-		      {options, list({use_serial_as_xnodeid, boolean()} |
-				     {name, string() | atom()} |
-				     {vendor, integer()} | 
-				     {nodeid, integer()} |
-				     {time_stamp,  timeout()} |  
-				     {sdo_timeout, timeout()} |  
-				     {blk_timeout, timeout()} |  
-				     {pst, integer()} |          
-				     {max_blksize, integer()} |  
-				     {use_crc, boolean()} |
-				     {readbufsize, integer()} |
-				     {load_ratio, float()} |
-				     {atomic_maxsize, integer()} |
-				     {load_last_saved, boolean()} |
-				     {dict_file, string() | atom()} |
-				     {debug, boolean()})})) -> 
-			{ok, Pid::pid()} | ignore | {error, Error::atom()}.
+start_link(S, Opts) ->
+    %% Trace output enable/disable
+    put(dbg, proplists:get_value(debug,Opts,false)), 
 
-start_link(Args) ->
-    ?dbg(node, "start_link: Args = ~p", [Args]),
-        
-    Serial = serial(proplists:get_value(serial, Args, 0)),
-    Opts = proplists:get_value(options, Args, []),	    
+    F =	case proplists:get_value(unlinked,Opts,false) of
+	    true -> start;
+	    false -> start_link
+	end,
 
+    ?dbg(node, "start_link: Serial = ~p, Opts = ~p", [S, Opts]),
+    Serial = serial(S),
+    
     case verify_options(Opts) of
 	ok ->
 	    Name = name(Opts, Serial),
 	    ?dbg(node, "Starting co_node with Name = ~p, Serial = ~.16#", 
 		 [Name, Serial]),
-	    gen_server:start({local, Name}, ?MODULE, {Serial,Name,Opts}, []);
+	    gen_server:F({local, Name}, ?MODULE, {Serial,Name,Opts}, []);
 	E ->
 	    E
     end.
@@ -310,7 +298,8 @@ verify_option(Option, NewValue)
   when Option == use_serial_as_xnodeid;
        Option == use_crc;
        Option == load_last_saved;
-       Option == debug ->
+       Option == debug;
+       Option == unlinked ->
     if is_boolean(NewValue) ->
 	    ok;
        true ->

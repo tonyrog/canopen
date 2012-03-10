@@ -100,7 +100,7 @@ all() ->
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
     co_test_lib:start_node(Config),
-    {ok, _Mgr} = co_mgr:start(),
+    {ok, _Mgr} = co_mgr:start([{unlinked, true}]),
     ok = co_node:set_option({name, co_mgr}, debug, true),
     ct:pal("Started co_mgr"),
     Config.
@@ -115,9 +115,9 @@ init_per_suite(Config) ->
 %% @spec end_per_suite(Config) -> _
 %% @end
 %%--------------------------------------------------------------------
-end_per_suite(_Config) ->
-    co_node:stop(serial()),
+end_per_suite(Config) ->
     co_mgr:stop(),
+    co_test_lib:stop_node(Config),
     ok.
 
 %%--------------------------------------------------------------------

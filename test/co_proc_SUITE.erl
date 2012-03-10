@@ -116,7 +116,7 @@ end_per_suite(_Config) ->
 %%--------------------------------------------------------------------
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
-    {ok, _Pid} = co_proc:start_link([]),
+    {ok, _Pid} = co_proc:start_link([{unlinked, true}]),
     Config.
 
 

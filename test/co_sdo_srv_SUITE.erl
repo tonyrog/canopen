@@ -124,8 +124,8 @@ init_per_suite(Config) ->
 %% @spec end_per_suite(Config) -> _
 %% @end
 %%--------------------------------------------------------------------
-end_per_suite(_Config) ->
-    co_node:stop(serial()),
+end_per_suite(Config) ->
+    co_test_lib:stop_node(Config),
     ok.
 
 %%--------------------------------------------------------------------
