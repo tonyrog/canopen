@@ -18,7 +18,7 @@
 -behaviour(co_app).
 
 %% API
--export([start/1, stop/1]).
+-export([start_link/1, stop/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -50,12 +50,12 @@
 %% Starts the server.
 %% @end
 %%--------------------------------------------------------------------
--spec start(CoSerial::integer()) -> 
+-spec start_link(CoSerial::integer()) -> 
 		   {ok, Pid::pid()} | 
 		   ignore | 
 		   {error, Error::atom()}.
 
-start(CoSerial) ->
+start_link(CoSerial) ->
     gen_server:start_link({local, name(CoSerial)}, ?MODULE, CoSerial,[]).
 	
 %%--------------------------------------------------------------------
@@ -190,7 +190,10 @@ loop_data(Pid) ->
 %% @end
 %%--------------------------------------------------------------------
 init(CoSerial) ->
-    {ok, #loop_data {state=init, co_node = CoSerial}}.
+    {ok, _Dict} = co_node:attach(CoSerial),
+    co_node:reserve(CoSerial, ?IX_STORE_PARAMETERS, ?MODULE),
+    co_node:reserve(CoSerial, ?IX_RESTORE_DEFAULT_PARAMETERS, ?MODULE),
+    {ok, #loop_data {state=running, co_node = CoSerial}}.
 
 
 %%--------------------------------------------------------------------
@@ -324,11 +327,6 @@ handle_stop(LoopData=#loop_data {co_node = CoNode}) ->
 			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
 			 {stop, Reason::atom(), LoopData::#loop_data{}}.
 			 
-handle_cast(go, LoopData=#loop_data {co_node = CoSerial}) ->
-    {ok, _Dict} = co_node:attach(CoSerial),
-    co_node:reserve(CoSerial, ?IX_STORE_PARAMETERS, ?MODULE),
-    co_node:reserve(CoSerial, ?IX_RESTORE_DEFAULT_PARAMETERS, ?MODULE),
-    {noreply, LoopData#loop_data {state = running}};
 handle_cast(_Msg, LoopData) ->
     ?dbg(?NAME," handle_cast: Message = ~p. ", [_Msg]),
     {noreply, LoopData}.
@@ -399,4 +397,4 @@ code_change(_OldVsn, LoopData, _Extra) ->
 
      
 name(CoSerial) ->
-    list_to_atom(atom_to_list(?MODULE) ++ integer_to_list(CoSerial)).
+    list_to_atom(atom_to_list(?MODULE) ++ integer_to_list(CoSerial,16)).

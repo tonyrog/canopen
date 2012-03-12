@@ -88,7 +88,6 @@ all() ->
 			    {skip_and_save,Reason::term(),Config1::list(tuple())}.
 init_per_suite(Config) ->
     co_test_lib:start_node(Config),
-
     Config.
 
 %%--------------------------------------------------------------------
@@ -104,45 +103,6 @@ init_per_suite(Config) ->
 
 end_per_suite(Config) ->
     co_test_lib:stop_node(Config),
-    ok.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Initialization before each test case group.
-%%
-%% GroupName = atom()
-%%   Name of the test case group that is about to run.
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding configuration data for the group.
-%% Reason = term()
-%%   The reason for skipping all test cases and subgroups in the group.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec init_per_group(Group::atom(), Config0::list(tuple())) ->
-			    (Config1::list(tuple())) | 
-			    {skip,Reason::term()} | 
-			    {skip_and_save,Reason::term(),Config1::list(tuple())}.
-
-init_per_group(_GroupName, Config) ->
-    Config.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Cleanup after each test case group.
-%%
-%% GroupName = atom()
-%%   Name of the test case group that is finished.
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding configuration data for the group.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec end_per_group(Group::atom(), Config::list(tuple())) -> 
-			   ok |
-			   {save_config,Config1::list(tuple())}.
-
-end_per_group(_GroupName, _Config) ->
     ok.
 
 %%--------------------------------------------------------------------
@@ -169,8 +129,8 @@ end_per_group(_GroupName, _Config) ->
 init_per_testcase(Case, Config) when Case == os_command;
 				     Case == os_command_slow;
 				     Case == os_command_seq ->
-    {ok, _Pid} = co_os_app:start(serial()),
-    ok = co_os_app:debug(true),
+    {ok, Pid} = co_os_app:start_link(serial()),
+    ok = co_os_app:debug(Pid, true),
     Config;
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
@@ -198,7 +158,7 @@ end_per_testcase(Case, _Config) when Case == start_stop_app;
 				     Case == os_command_seq ->
     case whereis(co_os_app) of
 	undefined  -> do_nothing;
-	_Pid ->  co_os_app:stop()
+	_Pid ->  co_os_app:stop(serial())
     end,
     ok;
 end_per_testcase(_TestCase, _Config) ->
@@ -216,13 +176,13 @@ end_per_testcase(_TestCase, _Config) ->
 -spec start_stop_app(Config::list(tuple())) -> ok.
 
 start_stop_app(_Config) ->
-    {ok, _Pid} = co_os_app:start(serial()),
+    {ok, Pid} = co_os_app:start_link(serial()),
 
     %% Check that is it up
-    ok = co_os_app:debug(true),
+    ok = co_os_app:debug(Pid, true),
     timer:sleep(1000),
 
-    ok = co_os_app:stop(),
+    ok = co_os_app:stop(serial()),
     ok.
 
 %%--------------------------------------------------------------------

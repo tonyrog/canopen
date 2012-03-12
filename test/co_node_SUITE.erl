@@ -128,6 +128,13 @@ end_per_suite(Config) ->
 %%               Config1 | {skip,Reason} | {skip_and_save,Reason,Config1}
 %% @end
 %%--------------------------------------------------------------------
+init_per_testcase(Case, Config) when Case == save_and_load;
+				     Case == save_and_load_nok ->
+
+    ct:pal("Testcase: ~p", [Case]),
+    {ok, Pid} = co_sys_app:start_link(serial()),
+    ok = co_sys_app:debug(Pid, true),
+    Config;
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
     Config.
@@ -148,6 +155,13 @@ init_per_testcase(_TestCase, Config) ->
 %%--------------------------------------------------------------------
 end_per_testcase(start_stop_app, _Config) ->
     co_test_lib:stop_app(co_test_app, serial()),
+    ok;
+end_per_testcase(Case, _Config) when Case == save_and_load;
+				     Case == save_and_load_nok ->
+    case whereis(co_sys_app) of
+	undefined  -> do_nothing;
+	_Pid ->  co_sys_app:stop(serial())
+    end,
     ok;
 end_per_testcase(_TestCase, _Config) ->
     ok.

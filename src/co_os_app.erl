@@ -19,7 +19,7 @@
 -behaviour(co_stream_app).
 
 %% API
--export([start/1, stop/0]).
+-export([start_link/1, stop/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -36,8 +36,8 @@
 -export([execute_command/2]).
 
 %% Test
--export([loop_data/0,
-	 debug/1]).
+-export([loop_data/1,
+	 debug/2]).
 
 -define(NAME, os_cmd).
 -define(WRITE_SIZE, 56).    %% Size of data chunks when receiving
@@ -59,24 +59,27 @@
 %% Starts the server.
 %% @end
 %%--------------------------------------------------------------------
--spec start(CoSerial::integer()) -> 
+-spec start_link(CoSerial::integer()) -> 
 		   {ok, Pid::pid()} | 
 		   ignore | 
 		   {error, Error::atom()}.
 
-start(CoSerial) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [CoSerial],[]).
+start_link(CoSerial) ->
+    gen_server:start_link({local,  name(CoSerial)}, ?MODULE, [CoSerial],[]).
 	
 %%--------------------------------------------------------------------
 %% @doc
 %% Stops the server.
 %% @end
 %%--------------------------------------------------------------------
--spec stop() -> ok | 
+-spec stop(CoSerial::integer()) -> ok | 
 		{error, Error::atom()}.
 
-stop() ->
-    gen_server:call(?MODULE, stop).
+stop(CoSerial) ->
+    case whereis(name(CoSerial)) of
+	undefined -> do_nothing;
+	Pid -> gen_server:call(Pid, stop)
+    end.
 
 %%--------------------------------------------------------------------
 %%% CAllbacks for co_app and co_stream_app behavious
@@ -227,12 +230,12 @@ abort(Pid, Ref, Reason) ->
     
 %% Test functions
 %% @private
-debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
-    gen_server:call(?MODULE, {debug, TrueOrFalse}).
+debug(Pid, TrueOrFalse) when is_boolean(TrueOrFalse) ->
+    gen_server:call(Pid, {debug, TrueOrFalse}).
 
 %% @private
-loop_data() ->
-    gen_server:call(?MODULE, loop_data).
+loop_data(Pid) ->
+    gen_server:call(Pid, loop_data).
 
 
 
@@ -560,3 +563,5 @@ code_change(_OldVsn, LoopData, _Extra) ->
     {ok, LoopData}.
 
      
+name(CoSerial) ->
+    list_to_atom(atom_to_list(?MODULE) ++ integer_to_list(CoSerial,16)).

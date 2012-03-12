@@ -929,8 +929,7 @@ init({Serial, NodeName, Opts}) ->
 		    {ok, Ctx1#co_ctx { state = ?Operational }};
 	       true ->
 		    %% Start app that handles save and load SDOs (1010/1011)
-		    Ctx2 = start_sys_app(Ctx1),
-		    {ok, reset_application(Ctx2)}
+		    {ok, reset_application(Ctx1)}
 		end;
 	{error, Reason} ->
 	    io:format("WARNING! ~p: Loading of dict failed, exiting\n", 

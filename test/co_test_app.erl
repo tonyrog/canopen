@@ -76,12 +76,12 @@ start(CoNode, Dict) ->
 			  ?MODULE, {CoNode, Dict, self()}, []).
 
 name(Serial) when is_integer(Serial) ->
-    list_to_atom("co_test_app_" ++ integer_to_list(Serial));
+    list_to_atom("co_test_app_" ++ integer_to_list(Serial,16));
 name({name, Name}) when is_atom(Name) ->
     %% co_mgr ??
     list_to_atom("co_test_app_" ++ atom_to_list(Name));
 name({_Tag, Id}) when is_integer(Id)->
-    list_to_atom("co_test_app_" ++ integer_to_list(Id)).
+    list_to_atom("co_test_app_" ++ integer_to_list(Id,16)).
 
    	
 %%--------------------------------------------------------------------

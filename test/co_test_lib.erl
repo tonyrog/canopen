@@ -18,9 +18,11 @@
 start_node(C) ->
     start_node(C, serial()).
 
-start_node(C, Serial) ->
+start_node(C, Serial) when is_list(C) ->
     DataDir = ?config(data_dir, C),
     Dict = filename:join(DataDir, ?DICT),
+    start_node(Serial, Dict);
+start_node(Serial, Dict) ->
     can_router:start(),
     can_udp:start(1, [{ttl, 0}]),
 
