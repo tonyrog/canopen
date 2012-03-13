@@ -2,8 +2,10 @@
 %% @author Malotte W Lönne <malotte@malotte.net>
 %% @copyright (C) 2012, Tony Rogvall
 %% @doc
-%%    OS command CANopen application.
-%%    Implements index 16#1023.
+%%    OS command CANopen application.<br/>
+%%    Implements index 16#1023 (os_command).<br/>
+%%    os_command makes it possible to send an os command 
+%%    to a CANOpen node and have it executed there. <br/>
 %%
 %% File: co_os_app.erl<br/>
 %% Created: December 2011 by Malotte W Lönne
@@ -444,12 +446,12 @@ handle_read(Bytes, LoopData=#loop_data {ref = Ref, read_buf = Data}) ->
     
 
 handle_stop(LoopData) ->
-    case whereis(list_to_atom(co_lib:serial_to_string(LoopData#loop_data.co_node))) of
-	undefined -> 
-	    do_nothing; %% Not possible to detach and unsubscribe
-	_Pid ->
+    case co_node:alive(LoopData#loop_data.co_node) of
+	true ->
 	    co_node:unreserve(LoopData#loop_data.co_node, ?IX_OS_COMMAND),
-	    co_node:detach(LoopData#loop_data.co_node)
+	    co_node:detach(LoopData#loop_data.co_node);
+	false -> 
+	    do_nothing %% Not possible to detach and unsubscribe
     end,
     ?dbg(?NAME," handle_stop: detached.\n",[]),
     {stop, normal, ok, LoopData}.

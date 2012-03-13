@@ -14,16 +14,21 @@
 
 -export([start/0, start/2, stop/1]).
 %%--------------------------------------------------------------------
-%% @spec start(StartType, StartArgs) -> {ok, Pid} |
-%%                                      {ok, Pid, State} |
-%%                                      {error, Reason}
-%%      StartType = normal | {takeover, Node} | {failover, Node}
-%%      StartArgs = term()
 %% @doc
-%% Starts the canopen application, that is, the canopen supervisor.
+%% Starts the canopen application, that is, the canopen supervisor.<br/>
+%% Arguments are ignored, instead the options for the application servers are 
+%% retreived from the application environment (sys.config).
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec start(StartType:: normal | 
+			{takeover, Node::atom()} | 
+			{failover, Node::atom()}, 
+	    StartArgs::term()) -> 
+		   {ok, Pid::pid()} |
+		   {ok, Pid::pid(), State::term()} |
+		   {error, Reason::term()}.
+
 start(_StartType, _StartArgs) ->
     io:format("~p: Starting up\n", [?MODULE]),
     case application:get_env(serial) of
@@ -44,11 +49,12 @@ start() ->
     start(normal, []).
 
 %%--------------------------------------------------------------------
-%% @spec stop(State) -> ok
-%%
 %% @doc
-%% Stops the CANopen application.
+%% Stops the application.
+%%
 %% @end
 %%--------------------------------------------------------------------
+-spec stop(State::term()) -> ok | {error, Error::term()}.
+
 stop(_State) ->
     ok.

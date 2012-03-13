@@ -196,23 +196,18 @@ load_dict(CoSerial, DictTable, IndexList) ->
 handle_call(loop_data, _From, LD) ->
     io:format("~p: LD = ~p", [?MODULE, LD]),
     {reply, ok, LD};
-handle_call(stop, _From, LD) ->
+handle_call(stop, _From, LD=#loop_data {co_node = CoNode}) ->
     ?dbg("handle_call: stop",[]),
-    CoNode = case LD#loop_data.co_node of
-		 co_mgr -> co_mgr;
-		 Serial ->
-		     list_to_atom(co_lib:serial_to_string(Serial))
-	     end,
-    case whereis(CoNode) of
-	undefined -> 
-	    do_nothing; %% Not possible to detach and unsubscribe
-	_Pid ->
+    case co_node:alive(CoNode) of
+	true ->
 	    lists:foreach(
 	      fun({{Index, _SubInd}, _Type, _Value}) ->
-		      co_node:unreserve(LD#loop_data.co_node, Index)
+		      co_node:unreserve(CoNode, Index)
 	      end, ets:tab2list(LD#loop_data.tpdo_dict)),
 	    ?dbg("stop: unsubscribed.",[]),
-	    co_node:detach(LD#loop_data.co_node)
+	    co_node:detach(CoNode);
+	false -> 
+	    do_nothing %% Not possible to detach and unsubscribe
     end,
     ?dbg("handle_call: stop detached.",[]),
     {stop, normal, ok, LD};

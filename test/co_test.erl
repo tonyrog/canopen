@@ -5,11 +5,15 @@
 
 -module(co_test).
 
--export([run/1, halt/1]).
+-export([run/1, run/2, halt/1]).
 
 run(Serial) ->
     Dict = filename:join(code:priv_dir(canopen), "default.dict"),
     co_test_lib:start_node(Serial, Dict).
+
+run(Serial, Port) ->
+    Dict = filename:join(code:priv_dir(canopen), "default.dict"),
+    co_test_lib:start_node(Serial, Dict, Port).
 
 halt(Serial) ->
     co_node:stop(Serial),

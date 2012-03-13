@@ -2,8 +2,10 @@
 %% @author Malotte W Lönne <malotte@malotte.net>
 %% @copyright (C) 2012, Tony Rogvall
 %% @doc
-%%    System command CANopen application.
-%%    Implements index 16#1010, 16#1011.
+%%    System command CANopen application.<br/>
+%%    Implements index 16#1010 (save), 16#1011(load).<br/>
+%%    save - stores the CANOpen node dictionary.<br/>
+%%    load - restores the CANOpen node dictionary.<br/>
 %%
 %% File: co_os_app.erl<br/>
 %% Created: December 2011 by Malotte W Lönne
@@ -302,13 +304,13 @@ handle_restore(LoopData, _NotOk) ->
 
 
 handle_stop(LoopData=#loop_data {co_node = CoNode}) ->
-    case whereis(list_to_atom(co_lib:serial_to_string(CoNode))) of
-	undefined -> 
-	    do_nothing; %% Not possible to detach and unsubscribe
-	_Pid ->
+    case co_node:alive(LoopData#loop_data.co_node) of
+	true ->
 	    co_node:unreserve(CoNode, ?IX_STORE_PARAMETERS),
 	    co_node:unreserve(CoNode, ?IX_RESTORE_DEFAULT_PARAMETERS),
-	    co_node:detach(CoNode)
+	    co_node:detach(CoNode);
+	false -> 
+	    do_nothing %% Not possible to detach and unsubscribe
     end,
     ?dbg(?NAME," handle_stop: detached.",[]),
     {stop, normal, ok, LoopData}.
@@ -336,19 +338,18 @@ handle_cast(_Msg, LoopData) ->
 %% @doc
 %% Handling all non call/cast messages.
 %%
+%% Info types:
+%% {notify, RemoteCobId, Index, SubInd, Value} - 
+%%   When Index subscribed to by this process has been updated. <br/>
 %% RemoteCobId = Id of remote CANnode initiating the msg. <br/>
 %% Index = Index in Object Dictionary <br/>
 %% SubInd = Sub index in Object Disctionary  <br/>
 %% Value = Any value the node chooses to send.
 %% 
-%% Info types:
-%% {notify, RemoteCobId, {Index, SubInd}, Value} - 
-%%   When Index subscribed to by this process has been updated. <br/>
 %% @end
 %%--------------------------------------------------------------------
 -type info()::
-	{notify, RemoteCobId::term(), {Index::integer(), SubInd::integer()}, 
-	 Value::term()} |
+	{notify, RemoteCobId::term(), Index::integer(), SubInd::integer(), Value::term()} |
 	%% Unknown info
 	term().
 

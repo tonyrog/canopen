@@ -14,17 +14,17 @@
 
 -export([load/1]).
 -export([load_objects/2]).
--export([func/1]).
 -import(lists, [map/2, seq/2, foreach/2]).
 %%--------------------------------------------------------------------
 %% @doc
 %% Load (symbolic) entries from file.
 %%
-%% The data can then be used to bootstrap can nodes
-%% The Data is return as:
+%% The data can then be used to bootstrap can nodes. <br/>
+%% The Data is return as: <br/>
 %% [ {Object, [Entry0,Entry1,...EntryN]} ]
 %%
 %% @end
+%%--------------------------------------------------------------------
 -spec load(File::string()) -> 
 		  {ok, list(term())} | {error, term()}.
 
@@ -350,29 +350,10 @@ nodeid({extended,ID}) when ID > 0, ID =< 16#1FFFFFF ->
 nodeid(_) ->
     erlang:error(badarg).
 
-%% Encode symbol connection set function code
-func(nmt) -> ?NMT;
-func(sync) -> ?SYNC;
-func(time_stamp) -> ?TIME_STAMP;
-func(pdo1_tx) -> ?PDO1_TX;
-func(pdo1_rx) -> ?PDO1_RX;
-func(pdo2_tx) -> ?PDO2_TX;
-func(pdo2_rx) -> ?PDO2_RX;
-func(pdo3_tx) -> ?PDO3_TX;
-func(pdo3_rx) -> ?PDO3_RX;
-func(pdo4_tx) -> ?PDO4_TX;
-func(pdo4_rx) -> ?PDO4_RX;
-func(sdo_tx) -> ?SDO_TX;
-func(sdo_rx) -> ?SDO_RX;
-func(node_guard) -> ?NODE_GUARD;
-func(lss) -> ?LSS;
-func(emergency) -> ?EMERGENCY;
-func(F) when F >= 0, F < 15 -> F;
-func(_) -> erlang:error(badarg).
-
+%% 
 %% Combine nodeid with function code
 cobid(F, N) ->
-    Func = func(F),
+    Func = co_lib:encode_func(F),
     NodeID = nodeid(N),
     if ?is_nodeid_extended(NodeID) ->
 	    NodeID1 = NodeID band ?COBID_ENTRY_ID_MASK,

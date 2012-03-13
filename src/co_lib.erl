@@ -22,12 +22,13 @@
 -export([encode_type/1]).
 -export([encode_struct/1]).
 -export([encode_access/1]).
+-export([encode_func/1]).
 -export([encode_transmission/1]).
 -export([decode_type/1]).
 -export([decode_struct/1]).
 -export([decode_access/1]).
 
--include("../include/canopen.hrl").
+-include("canopen.hrl").
 
 %% Convert 4 bytes serial number to a string xx:xx:xx:xx
 serial_to_string(<<Serial:32>>) ->
@@ -211,6 +212,33 @@ decode_transmission(N) when is_integer(N), N >= 0, N =< ?TRANS_SYNC_MAX ->
     {sync,N};
 decode_transmission(N) when is_integer(N), N >= 0, N =< 255 ->
     N.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Encode function codes.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec encode_func(Func::atom()) -> FuncCode::integer().
+
+encode_func(nmt) -> ?NMT;
+encode_func(sync) -> ?SYNC;
+encode_func(time_stamp) -> ?TIME_STAMP;
+encode_func(pdo1_tx) -> ?PDO1_TX;
+encode_func(pdo1_rx) -> ?PDO1_RX;
+encode_func(pdo2_tx) -> ?PDO2_TX;
+encode_func(pdo2_rx) -> ?PDO2_RX;
+encode_func(pdo3_tx) -> ?PDO3_TX;
+encode_func(pdo3_rx) -> ?PDO3_RX;
+encode_func(pdo4_tx) -> ?PDO4_TX;
+encode_func(pdo4_rx) -> ?PDO4_RX;
+encode_func(sdo_tx) -> ?SDO_TX;
+encode_func(sdo_rx) -> ?SDO_RX;
+encode_func(node_guard) -> ?NODE_GUARD;
+encode_func(lss) -> ?LSS;
+encode_func(emergency) -> ?EMERGENCY;
+encode_func(F) when F >= 0, F < 15 -> F;
+encode_func(_) -> erlang:error(badarg).
 
 %% Encode COBID
 %% encode_cobid(pdo1)

@@ -3,34 +3,34 @@
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
 %%% Integer Set operations.
-%% iset:
 %%
-%% representation:
-%%  List of interval and points
+%% Representation:<br/>
+%%  List of interval and points.<br/>
 %%
-%%  Points
+%%  Points:<br/>
 %%       A sorted list of values and/or closed intervals where
 %%       intervals are represented as pairs with as {Low,High}.
 %%       It may also be the empty list if no specific points are
-%%       given even though Max and Min has values.
+%%       given even though Max and Min has values.<br/>
 %%
 %%  operations:
-%%       new()
-%%       new(Points)
-%%       new(Min, Max)
-%%       new(Min, Max, Points)
-%%       intersect(D1, D2)
-%%       difference(D1,D2)
-%%       union(D1, D2)
-%%       is_equal(D1, D2)
-%%       is_subset(D1, D2)
-%%       is_psubset(D1,D2)
-%%       sizeof(D)
-%%       member(N, D)
-%%       first(D)
-%%       last(D)
-%%       write(Device, D)
-%%
+%% <ul>
+%%       <li>new()</li>
+%%       <li>new(Points)</li>
+%%       <li>new(Min, Max)</li>
+%%       <li>new(Min, Max, Points)</li>
+%%       <li>intersect(D1, D2)</li>
+%%       <li>difference(D1,D2)</li>
+%%       <li>union(D1, D2)</li>
+%%       <li>is_equal(D1, D2)</li>
+%%       <li>is_subset(D1, D2)</li>
+%%       <li>is_psubset(D1,D2)</li>
+%%       <li>sizeof(D)</li>
+%%       <li>member(N, D)</li>
+%%       <li>first(D)</li>
+%%       <li>last(D)</li>
+%%       <li>write(Device, D)</li>
+%% </ul>
 %%%
 %%% File: co_iset.erl<br/>
 %%% Created:  26 Jan 2006 by Tony Rogvall

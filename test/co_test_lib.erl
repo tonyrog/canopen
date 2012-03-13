@@ -38,9 +38,25 @@ start_node(Serial, Dict) ->
     ct:pal("Started co_node ~p, pid = ~p",[integer_to_list(Serial,16), Pid]),
     {ok, Pid}.
 
+start_node(Serial, Dict, Port) ->
+    can_router:start(),
+    can_udp:start(Port, [{ttl, 0}]),
+
+    {ok, PPid} = co_proc:start_link([{unlinked, true}]),
+    ct:pal("Started co_proc ~p",[PPid]),
+    {ok, Pid} = co_node:start_link(Serial, 
+				   [{use_serial_as_xnodeid, true},
+				    {dict_file, Dict},
+				    {max_blksize, 7},
+				    {vendor,16#2A1},
+				    {unlinked, true},
+				    {debug, true}]),
+    ct:pal("Started co_node ~p, pid = ~p",[integer_to_list(Serial,16), Pid]),
+    {ok, Pid}.
+
 stop_node(_Config) ->
-    co_proc:stop(),
-    co_node:stop(serial()).
+    co_node:stop(serial()),
+    co_proc:stop().
 
 load_dict(C) ->
     load_dict(C, serial()).

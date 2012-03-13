@@ -357,31 +357,24 @@ handle_call({debug, TrueOrFalse}, _From, LD) ->
     {reply, ok, LD};
 handle_call({write_size, NewSize}, _From, LD) ->
     {reply, ok, LD#loop_data {write_size = NewSize}};
-handle_call(stop, _From, LD) ->
-    ?dbg("handle_call: stop",[]),
-    CoNode = case LD#loop_data.co_node of
-		 co_mgr -> co_mgr;
-		 Serial ->
-		     list_to_atom(co_lib:serial_to_string(Serial))
-	     end,
-    case whereis(CoNode) of
-	undefined -> 
-	    do_nothing; %% Not possible to detach and unsubscribe
-	_Pid ->
+handle_call(stop, _From, LD=#loop_data {co_node = CoNode}) ->
+    case co_node:alive(CoNode) of
+	true ->
 	    Name2Index = ets:tab2list(LD#loop_data.name_table),
 	    lists:foreach(
 	      fun({{Index, _SubInd}, _Type, _Transfer, _Value}) ->
 		      case lists:keyfind(Index, 2, Name2Index) of
 			  {notify, Ix} ->
-			      co_node:unsubscribe(LD#loop_data.co_node, Ix);
+			      co_node:unsubscribe(CoNode, Ix);
 			  {mpdo, Ix} ->
-			      co_node:unsubscribe(LD#loop_data.co_node, Ix);
+			      co_node:unsubscribe(CoNode, Ix);
 			  {_Any, Ix} ->
-			      co_node:unreserve(LD#loop_data.co_node, Ix)
+			      co_node:unreserve(CoNode, Ix)
 		      end
 	      end, ets:tab2list(LD#loop_data.dict)),
-	    ?dbg("stop: unsubscribed.",[]),
-	    co_node:detach(LD#loop_data.co_node)
+	    co_node:detach(CoNode);
+	false -> 
+	    do_nothing %% Not possible to detach and unsubscribe
     end,
     ?dbg("handle_call: stop detached.",[]),
     {stop, normal, ok, LD};

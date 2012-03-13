@@ -3,13 +3,11 @@
 %%% @author Malotte W Lönne <malotte@malotte.net>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%%    CANopen SDO server FiniteStateMachine
+%%%    CANopen SDO Server Finite State Machine
+%%%
+%%%    Started by the CANOpen node when an SDO session is initialized.
 %%%
 %%% State diagrams: Download segment <br/>
-%%% <img src="../doc/co_sdo_srv_segment_download_state_diagram1.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_segment_download_state_diagram2.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_segment_download_state_diagram3.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_segment_download_state_diagram4.jpg"> </img>
 %%%
 %%% <a href="../doc/co_sdo_srv_segment_download_state_diagram1.jpg"> 
 %%% Download segment1 - s_initial</a><br/>
@@ -21,10 +19,6 @@
 %%% Download segment4 - s_writing_segment_end</a><br/>
 %%% 
 %%% State diagrams: Upload segment <br/>
-%%% <img src="../doc/co_sdo_srv_segment_upload_state_diagram1.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_segment_upload_state_diagram2.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_segment_upload_state_diagram3.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_segment_upload_state_diagram4.jpg"> </img>
 %%%
 %%% <a href="../doc/co_sdo_srv_segment_upload_state_diagram1.jpg"> 
 %%% Upload segment1 - s_initial</a><br/>
@@ -36,11 +30,6 @@
 %%% Upload segment4 - s_reading_segment</a><br/>
 %%% 
 %%% State diagrams: Download block <br/>
-%%% <img src="../doc/co_sdo_srv_block_download_state_diagram1.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_block_download_state_diagram2.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_block_download_state_diagram3.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_block_download_state_diagram4.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_block_download_state_diagram5.jpg"> </img>
 %%%
 %%% <a href="../doc/co_sdo_srv_block_download_state_diagram1.jpg"> 
 %%% Download block1 - s_initial</a><br/>
@@ -54,13 +43,6 @@
 %%% Download block5 - s_writing_block_end</a><br/>
 %%% 
 %%% State diagrams: Upload block <br/>
-%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram1.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram2.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram3.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram4.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram5.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram6.jpg"> </img>
-%%% <img src="../doc/co_sdo_srv_block_upload_state_diagram7.jpg"> </img>
 %%%
 %%% <a href="../doc/co_sdo_srv_block_upload_state_diagram1.jpg"> 
 %%% Upload block1 - s_initial</a><br/>
@@ -469,15 +451,16 @@ start_segment_download(S) ->
  
 %%--------------------------------------------------------------------
 %% @doc
-%% Downloading segments.<br/>
+%% Sending segments.<br/>
 %% Expected events are:
 %% <ul>
 %% <li>download_segment_request</li>
 %% </ul>
 %% Next state can be:
 %% <ul>
-%% <li> s_writing_segment_end </li>
+%% <li> s_reading_segment </li>
 %% <li> s_segment_download </li>
+%% <li> s_segment_download_end</li>
 %% <li> stop </li>
 %% </ul>
 %% @end

@@ -286,13 +286,13 @@ handle_call(loop_data, _From, LoopData) ->
     {reply, ok, LoopData};
 handle_call(stop, _From, LoopData) ->
     ?dbg(?NAME, "handle_call: stop\n",[]),
-    case whereis(list_to_atom(co_lib:serial_to_string(LoopData#loop_data.co_node))) of
-	undefined -> 
-	    do_nothing; %% Not possible to detach and unsubscribe
-	_Pid ->
+    case co_node:alive(LoopData#loop_data.co_node) of
+	true ->
 	    co_node:unreserve(LoopData#loop_data.co_node, LoopData#loop_data.index),
 	    ?dbg(?NAME, "stop: unsubscribed.\n",[]),
-	    co_node:detach(LoopData#loop_data.co_node)
+	    co_node:detach(LoopData#loop_data.co_node);
+	false -> 
+	    do_nothing %% Not possible to detach and unsubscribe
     end,
     ?dbg(?NAME, "handle_call: stop detached.\n",[]),
     {stop, normal, ok, LoopData};

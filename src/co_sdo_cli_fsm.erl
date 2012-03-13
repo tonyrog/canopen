@@ -1,10 +1,15 @@
 %%%-------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @copyright (C) 2010, Tony Rogvall
+%%% @author Malotte W Lönne <malotte@malotte.net>
+%%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%%   CANopen SDO client FSM
+%%%   CANopen SDO Client Finite State Machine
+%%%
+%%%    Started by the CANOpen node when an SDO session is initialized.
+%%%
+%%% File: co_sdo_srv_fsm.erl<br/>
+%%% Created:  4 Jun 2010 by Tony Rogvall
 %%% @end
-%%% Created :  4 Jun 2010 by Tony Rogvall <tony@rogvall.se>
 %%%-------------------------------------------------------------------
 -module(co_sdo_cli_fsm).
 
@@ -93,9 +98,6 @@ fetch(Ctx,Block,From,Src,Dst,IX,SI,Term) ->
 %%                     ignore |
 %%                     {stop, StopReason}
 %% @doc
-%% Whenever a gen_fsm is started using gen_fsm:start/[3,4] or
-%% gen_fsm:start_link/[3,4], this function is called by the new
-%% process to initialize.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -107,6 +109,7 @@ init([Action,Mode,Ctx,From,NodePid,Src,Dst,IX,SI,Term]) ->
     S = new_session(Ctx,From,NodePid,Src,Dst,IX,SI),
     apply(?MODULE, Action, [S, Mode, Term]).
 
+%% @private
 store(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, {app, Pid, Module}) 
   when is_pid(Pid), is_atom(Module) ->
     case read_begin(Ctx, IX, SI, Pid, Module) of
@@ -145,6 +148,7 @@ store(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, {data, Data})
 	    abort(S, Reason)
     end.
 
+%% @private
 fetch(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, {app, Pid, Module}) 
   when is_pid(Pid), is_atom(Module) ->
     case write_begin(Ctx, IX, SI, Pid, Module) of
@@ -215,24 +219,16 @@ write_begin(Ctx, Index, SubInd, Pid, Mod) ->
     
 
 
-%%--------------------------------------------------------------------
-%% @private
-%% @spec state_name(Event, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState}
-%% @doc
-%% There should be one instance of this function for each possible
-%% state name. Whenever a gen_fsm receives an event sent using
-%% gen_fsm:send_event/2, the instance of this function with the same
-%% name as the current state name StateName is called to handle
-%% the event. It is also called if a timeout occurs.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
+%% SEGMENT DOWNLOAD
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%--------------------------------------------------------------------
+%% @doc 
+%% Start downloading segments.
 %% @end
 %%--------------------------------------------------------------------
-state_name(_Event, _State) ->
-    dummy_for_edoc.
-
 start_segmented_download(S=#co_session {buf = Buf, index = IX, subind = SI}, Reply) ->
     NBytes = co_data_buf:data_size(Buf),
     EofFlag = co_data_buf:eof(Buf),
@@ -263,6 +259,28 @@ start_segmented_download(S=#co_session {buf = Buf, index = IX, subind = SI}, Rep
 	    send(S, R),
 	    {Reply, s_segmented_download, S, timeout(S)}
     end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Reading and sending segments.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>initiate_download_response</li>
+%% <li>download_segment_response</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_reading_segment </li>
+%% <li> s_segment_download </li>
+%% <li> s_segment_download_end </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_segmented_download(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
 
 s_segmented_download(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
@@ -308,6 +326,26 @@ send_segment(S, Data, Eod) ->
        true ->
 	    {next_state, s_segmented_download, S, timeout(S)}
     end.
+ 
+%%--------------------------------------------------------------------
+%% @doc
+%% Finalizing download of segments.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>initiate_download_response</li>
+%% <li>download_segment_response</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> stop </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_segmented_download_end(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
 
 s_segmented_download_end(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
@@ -327,10 +365,27 @@ s_segmented_download_end(M, S) when is_record(M, can_frame) ->
 s_segmented_download_end(timeout, S) ->
     abort(S, ?abort_timed_out).
 
-%%
-%% state: reading_segment_started (for application stored data)
-%%    next_state:  segmented_download
-%%
+%%--------------------------------------------------------------------
+%% @doc
+%% Initializing reading for application stored data.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>{Mref, {ok, Value}}</li>
+%% <li>{Mref, {ok, Ref, Size}}</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_segment_download </li>
+%% <li> s_segment_download_end </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_reading_segment_started(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
+
 s_reading_segment_started({Mref, Reply} = M, S)  ->
     ?dbg(cli, "s_reading_segment_started: Got event = ~p\n", [M]),
     case {S#co_session.mref, Reply} of
@@ -363,6 +418,28 @@ s_reading_segment_started(M, S)  ->
     ?dbg(cli, "s_reading_segment_started: Got event = ~p, aborting\n", [M]),
     demonitor_and_abort(M, S).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Reading application stored data.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>{Mref, {ok, Ref, Data, Eod}}</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_segment_download </li>
+%% <li> s_segment_download_end </li>
+%% <li> s_reading_segment </li>
+%% <li> stop </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_reading_segment(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
+
 s_reading_segment(timeout, S) ->
     abort(S, ?abort_timed_out);
 s_reading_segment(M, S)  ->
@@ -372,13 +449,36 @@ s_reading_segment(M, S)  ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
 %% SEGMENTED UPLOAD 
+%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start_segmented_upload(S=#co_session {index = IX, subind = SI}, Reply) ->
     ?dbg(cli, "start_segmented_upload: ~4.16.0B:~p", [IX, SI]),
     R = ?mk_ccs_initiate_upload_request(IX,SI),
     send(S, R),
     {Reply, s_segmented_upload_response, S, timeout(S)}.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Receiving first segment.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>initiate_upload_response</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_writing_segment </li>
+%% <li> s_segmented_upload </li>
+%% <li> stop </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_segmented_upload_response(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
 
 s_segmented_upload_response(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
@@ -428,6 +528,27 @@ s_segmented_upload_response(M, S) when is_record(M, can_frame) ->
 s_segmented_upload_response(timeout, S) ->
     abort(S, ?abort_timed_out).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Receiving segments.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>upload_segment_response</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_writing_segment </li>
+%% <li> s_segmented_upload </li>
+%% <li> stop </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_segmented_upload(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
+
 s_segmented_upload(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
 	?ma_scs_upload_segment_response(T,_N,_C,_D) when T =/= S#co_session.t ->
@@ -465,10 +586,26 @@ s_segmented_upload(M, S) when is_record(M, can_frame) ->
 s_segmented_upload(timeout, S) ->
     abort(S, ?abort_timed_out).
 
-%%
-%% state: writing_segment_started (for application stored data)
-%%    next_state:  s_segmented_upload_response
-%%
+%%--------------------------------------------------------------------
+%% @doc
+%% Initializing write for application stored data.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>{Mref, {ok, Ref, Size}}</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_segmented_upload_response </li>
+%% <li> stop </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_writing_segment_started(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
+
 s_writing_segment_started({Mref, Reply} = M, S)  ->
     ?dbg(cli, "s_writing_segment_started: Got event = ~p\n", [M]),
     case S#co_session.mref of
@@ -486,10 +623,26 @@ s_writing_segment_started(M, S)  ->
     demonitor_and_abort(M, S).
 
 
-%%
-%% state: s_writing_segment (for application stored data)
-%%    next_state:  No state
-%%
+%%--------------------------------------------------------------------
+%% @doc
+%% Writing segments to application. <br/>
+%% Expected events are:
+%% <ul>
+%% <li>{Mref, ok}</li>
+%% <li>{Mref, {ok, Ref}}</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> stop </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_writing_segment(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
+
 s_writing_segment({Mref, Reply} = M, S)  ->
     ?dbg(cli, "s_writing_segment: Got event = ~p\n", [M]),
     case {S#co_session.mref, Reply} of
@@ -518,7 +671,9 @@ s_writing_segment(M, S)  ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
 %% BLOCK DOWNLOAD
+%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start_block_download(S=#co_session {buf = Buf, ctx = Ctx, index = IX, subind = SI}, Reply) ->
     NBytes = co_data_buf:data_size(Buf),
@@ -528,6 +683,27 @@ start_block_download(S=#co_session {buf = Buf, ctx = Ctx, index = IX, subind = S
     send(S, R),
     {Reply, s_block_initiate_download_response, S, timeout(S)}.
     
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Block download initialization.<br/>
+%% Expected events are:
+%% <ul>
+%% <li> block_initiate_download_response</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_reading_block_segment </li>
+%% <li> s_block_download_response </li>
+%% <li> s_block_download_response_last </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_block_initiate_download_response(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
 
 s_block_initiate_download_response(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
@@ -586,6 +762,27 @@ send_block_segment(S, Data, Eod) ->
 	    read_block_segment(S1#co_session {blkseq = Seq + 1})
     end.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Downloading block segments.<br/>
+%% Expected events are:
+%% <ul>
+%% <li> block_download_response</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_reading_block_segment </li>
+%% <li> s_block_download_response </li>
+%% <li> s_block_download_response_last </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_block_download_response(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
+
 s_block_download_response(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
 	?ma_scs_block_download_response(AckSeq,BlkSize) when 
@@ -599,6 +796,25 @@ s_block_download_response(M, S) when is_record(M, can_frame) ->
 s_block_download_response(timeout, S) ->
     abort(S, ?abort_timed_out).    
 	
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Downloading last block segment.<br/>
+%% Expected events are:
+%% <ul>
+%% <li> block_download_response</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_block_download_end_response </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_block_download_response_last(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
 
 s_block_download_response_last(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
@@ -619,6 +835,25 @@ s_block_download_response_last(timeout, S) ->
     abort(S, ?abort_timed_out).    
 
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Finalizing downloading blocks.<br/>
+%% Expected events are:
+%% <ul>
+%% <li> block_download_end_response</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> stop </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_block_download_end_response(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
+
 s_block_download_end_response(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
 	?ma_scs_block_download_end_response() ->
@@ -630,10 +865,26 @@ s_block_download_end_response(M, S) when is_record(M, can_frame) ->
 s_block_download_end_response(timeout, S) ->
     abort(S, ?abort_timed_out).
 
-%%
-%% state: reading_block_started (for application stored data)
-%%    next_state:  blocked_upload
-%%
+%%--------------------------------------------------------------------
+%% @doc
+%% Initilize reading data from application.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>{Mref, {ok, Value}</li>
+%% <li>{Mref, {ok, Ref, Size}</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li>  s_block_initiate_download_response</li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_reading_block_started(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
+
 s_reading_block_started({Mref, Reply} = M, S)  ->
     ?dbg(cli, "s_reading_block_started: Got event = ~p\n", [M]),
     case {S#co_session.mref, Reply} of
@@ -662,7 +913,9 @@ s_reading_block_started(M, S)  ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%
 %% BLOCK UPLOAD 
+%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 start_block_upload(S=#co_session {buf = Buf, ctx = Ctx, index = IX, subind = SI}, Reply) ->
     CrcSup = ?UINT1(Ctx#sdo_ctx.use_crc),
@@ -672,6 +925,27 @@ start_block_upload(S=#co_session {buf = Buf, ctx = Ctx, index = IX, subind = SI}
     send(S, R),
     S1 = S#co_session { blksize = BlkSize, blkcrc = co_crc:init(), pst = Pst },
     {Reply, s_block_upload_response, S1#co_session {buf = Buf}, timeout(S)}.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Uploading block segments.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>block_upload_response</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_block_upload </li>
+%% <li> s_writing_segment (protocol switch)</li>
+%% <li> s_segmented_upload (protocol switch)</li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_block_upload_response(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
 
 s_block_upload_response(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
@@ -693,7 +967,26 @@ s_block_upload_response(M, S) when is_record(M, can_frame) ->
 s_block_upload_response(timeout, S) ->
     abort(S, ?abort_timed_out).
 
-%% Here we receice the block segments
+%%--------------------------------------------------------------------
+%% @doc
+%% Receiving block segments.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>block_segment</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_block_upload </li>
+%% <li> s_block_upload_end </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_block_upload(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
+
 s_block_upload(M, S) when is_record(M, can_frame) ->
     NextSeq = S#co_session.blkseq+1,
     Crc = S#co_session.blkcrc,
@@ -748,6 +1041,26 @@ block_segment_written(S=#co_session {last = Last}) ->
     end.
 
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Block upload, last block.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>block_upload_end_request</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_writing_block_end </li>
+%% <li> stop </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_block_upload_end(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
+
 s_block_upload_end(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
 	?ma_scs_block_upload_end_request(N,ServerCrc) ->
@@ -791,10 +1104,25 @@ s_block_upload_end(M, S) when is_record(M, can_frame) ->
 s_block_upload_end(timeout, S) ->
     abort(S, ?abort_timed_out).
 		
-%%
-%% state: writing_block_started (for application stored data)
-%%    next_state:  s_block_download
-%%
+%%--------------------------------------------------------------------
+%% @doc
+%% Initialize writing data to application.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>{Mref, {ok, Ref, WriteSze}}</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_block_upload_response </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_writing_block_started(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
+
 s_writing_block_started({Mref, Reply} = M, S)  ->
     ?dbg(cli, "s_writing_block_started: Got event = ~p\n", [M]),
     case {S#co_session.mref, Reply} of
@@ -809,6 +1137,25 @@ s_writing_block_started(M, S)  ->
     ?dbg(cli, "s_writing_block_started: Got event = ~p, aborting\n", [M]),
     demonitor_and_abort(M, S).
 
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Writing last data to application.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>{Mref, {ok, Ref}}</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> stop </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_writing_block_end(M::term(), S::#co_session{}) -> 
+		       {next_state, NextState::atom(), NextS::#co_session{}} |
+		       {next_state, NextState::atom(), NextS::#co_session{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextS::#co_session{}}.
 
 s_writing_block_end(M, S)  ->
     %% All correct messages should be taken care of in handle_info()

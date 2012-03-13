@@ -1,10 +1,15 @@
 %%%-------------------------------------------------------------------
-%%% @author Malotte W LÃ¶nne <malotte@malotte.net>
-%%% @copyright (C) 2010, Tony Rogvall
+%%% @author Malotte W Lönne <malotte@malotte.net>
+%%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%%    CANopen set fsm
+%%%    CANopen set Finite State Machine.<br/>
+%%%    Used by the CANOpen node when unpacking of an RPDO requires setting
+%%%    of an index belonging to an application.
+%%%
+%%% File: co_set_fsm.erl<br/>
+%%% Created:  18 Jan 2012<br/>
+%%%
 %%% @end
-%%% Created :  18 Jan 2012
 %%%-------------------------------------------------------------------
 -module(co_set_fsm).
 
@@ -44,9 +49,7 @@
 %% @spec start(App, Index, Data) -> {ok, Pid} | ignore | {error, Error}
 %%
 %% @doc
-%% Creates a gen_fsm process which calls Module:init/1 to
-%% initialize. To ensure a synchronized start-up procedure, this
-%% function does not return until Module:init/1 has returned.
+%% Start the fsm.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -66,9 +69,6 @@ start(App, Index = {_Ix, _Si}, Data)  ->
 %%                     ignore |
 %%                     {stop, StopReason}
 %% @doc
-%% Whenever a gen_fsm is started using gen_fsm:start/[3,4] or
-%% gen_fsm:start_link/[3,4], this function is called by the new
-%% process to initialize.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -138,27 +138,25 @@ start_writing(LD, Reply) ->
  
 
 %%--------------------------------------------------------------------
-%% @spec state_name(Event, State) ->
-%%                   {next_state, NextStateName, NextState} |
-%%                   {next_state, NextStateName, NextState, Timeout} |
-%%                   {stop, Reason, NewState}
 %% @doc
-%% There should be one instance of this function for each possible
-%% state name. Whenever a gen_fsm receives an event sent using
-%% gen_fsm:send_event/2, the instance of this function with the same
-%% name as the current state name StateName is called to handle
-%% the event. It is also called if a timeout occurs.
-%%
+%% Initializing write for application stored data.<br/>
+%% Expected events are:
+%% <ul>
+%% <li>{Mref, {ok, Ref, Size}}</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> s_writing </li>
+%% <li> stop </li>
+%% </ul>
 %% @end
 %%--------------------------------------------------------------------
-state_name(_Event, _State) ->
-    dummy_for_edoc.
+-spec s_writing_started(M::term(), LD::#loop_data{}) -> 
+			       {next_state, NextState::atom(), NextLD::#loop_data{}} |
+			       {next_state, NextState::atom(), NextLD::#loop_data{}, 
+				Tout::timeout()} |
+			       {stop, Reason::atom(), NextS::#loop_data{}}.
 
-
-%%
-%% state: writing_started (for application stored data)
-%%    next_state:  writing
-%%
 s_writing_started({Mref, Reply} = _M, LD)  ->
     ?dbg(set, "s_writing_started: Got event = ~p", [_M]),
     case {LD#loop_data.mref, Reply} of
@@ -178,10 +176,26 @@ s_writing_started(_M, LD)  ->
 
 
 
-%%
-%% state: s_writing (for application stored data)
-%%    next_state:  No state
-%%
+%%--------------------------------------------------------------------
+%% @doc
+%% Writing to application. <br/>
+%% Expected events are:
+%% <ul>
+%% <li>{Mref, ok}</li>
+%% <li>{Mref, {ok, Ref}}</li>
+%% </ul>
+%% Next state can be:
+%% <ul>
+%% <li> stop </li>
+%% </ul>
+%% @end
+%%--------------------------------------------------------------------
+-spec s_writing(M::term(), LD::#loop_data{}) -> 
+		       {next_state, NextState::atom(), NextLD::#loop_data{}} |
+		       {next_state, NextState::atom(), NextLD::#loop_data{}, 
+			Tout::timeout()} |
+		       {stop, Reason::atom(), NextLD::#loop_data{}}.
+
 s_writing({Mref, Reply} = _M, LD)  ->
     ?dbg(set, "s_writing: Got event = ~p", [_M]),
     case {LD#loop_data.mref, Reply} of
@@ -255,8 +269,6 @@ handle_sync_event(_Event, _From, StateName, State) ->
 %% NOTE!!! This actually where all the replies from the application
 %% are received. They are then normally sent on to the appropriate
 %% state-function.
-%% The exception is the reply to the read-call sent from co_data_buf as
-%% this can arrive in any state and should just fill the buffer.
 %%
 %% @end
 %%--------------------------------------------------------------------

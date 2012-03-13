@@ -182,6 +182,14 @@ add_objects(Dict, [{Obj,Es}|Os]) when is_record(Obj, dict_object) ->
 add_objects(_Dict, []) ->
     ok.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Writes a dictionary to a file.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec to_file(Dict::term(), FileName::string()) -> ok.
+
 to_file(Dict, File) ->
     case file:open(File, [write]) of
 	{ok,Fd} ->

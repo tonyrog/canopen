@@ -34,6 +34,7 @@
 -export([load_dict/1, load_dict/2]).
 -export([save_dict/1, save_dict/2]).
 -export([get_option/2, set_option/3]).
+-export([alive/1]).
 
 %% Application interface
 -export([subscribe/2, unsubscribe/2]).
@@ -43,7 +44,7 @@
 -export([all_subscribers/1, all_subscribers/2]).
 -export([all_reservers/1, reserver/2]).
 -export([object_event/2, pdo_event/2]).
--export([notify/3, notify/4]). %% To send MPOs
+-export([notify/3, notify/4, notify/5]). %% To send MPOs
 
 %% CANopen application internal
 -export([add_entry/2, get_entry/2]).
@@ -164,6 +165,17 @@ name(Opts, Serial) ->
 				  
 stop(Identity) ->
     gen_server:call(identity_to_pid(Identity), stop).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Checks if the co_node is alive.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec alive(Identity::term()) -> Reply::boolean().
+				  
+alive(Identity) ->
+    is_process_alive(identity_to_pid(Identity)).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -740,47 +752,51 @@ state(Identity, stopped) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Send notification (from Nid). <br/>
+%% Send notification (from CobId). <br/>
 %% SubInd is set to 0.<br/>
 %% Executing in calling process context.<br/>
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec notify(Nid::integer(), Ix::integer(), Value::term()) -> 
+-spec notify(CobId::integer(), Ix::integer(), Value::term()) -> 
 		    ok | {error, Error::atom()}.
 
-notify(Nid,Index,Value) ->
-    notify(Nid,Index,0,Value).
+notify(CobId,Index,Value) ->
+    notify(CobId,Index,0,Value).
 
 %%--------------------------------------------------------------------
-%% @spec notify(Nid, Index, SubInd, Value) -> ok | {error, Error}
-%%
 %% @doc
-%% Send notification (from Nid). <br/>
+%% Send notification (from CobId). <br/>
 %% Executing in calling process context.<br/>
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec notify(Nid::integer(), Ix::integer(), Si::integer(), Value::term()) -> 
+-spec notify(CobId::integer(), Ix::integer(), Si::integer(), Value::term()) -> 
 		    ok | {error, Error::atom()}.
 
-notify(Nid,Index,Subind,Value) ->
-    io:format("~p: notify: Nid = ~.16#, Index = ~7.16.0#:~w, Value = ~8.16.0B\n",
-	      [self(), Nid, Index, Subind, Value]),
-
-    if ?is_nodeid_extended(Nid) ->
-	    ?dbg(node, "notify: Nid ~.16# is extended",[Nid]),
-	    CobId = ?XCOB_ID(?PDO1_TX, Nid);
-	true ->
-	    ?dbg(node, "notify: Nid ~.16# is not extended",[Nid]),
-	    CobId = ?COB_ID(?PDO1_TX, Nid)
-    end,
+notify(CobId,Index,Subind,Value) ->
     FrameID = ?COBID_TO_CANID(CobId),
     Frame = #can_frame { id=FrameID, len=0, 
 			 data=(<<16#80,Index:16/little,Subind:8,Value:32/little>>) },
-    ?dbg(node, "notify: Sending frame ~p from Nid = ~.16# (CobId = ~.16#, CanId = ~.16#)",
-	 [Frame, Nid, CobId, FrameID]),
+    ?dbg(node, "notify: Sending frame ~p from CobId = ~.16#, CanId = ~.16#)",
+	 [Frame, CobId, FrameID]),
     can:send(Frame).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Send notification (from NodeId). <br/>
+%% Executing in calling process context.<br/>
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec notify({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
+	     Func::atom(), Ix::integer(), Si::integer(), Value::term()) -> 
+		    ok | {error, Error::atom()}.
+
+notify({xnodeid, XNid}, Func, Index, Subind, Value) ->
+    notify(?XCOB_ID(co_lib:encode_func(Func), XNid),Index,Subind,Value);
+notify({nodeid, Nid}, Func, Index, Subind, Value) ->
+    notify(?COB_ID(co_lib:encode_func(Func), Nid),Index,Subind,Value).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -949,14 +965,6 @@ reg({_, undefined}) ->
 reg(Term) ->	
     co_proc:reg(Term).
 
-start_sys_app(Ctx=#co_ctx {serial = Serial}) ->
-    {ok, SysPid} = co_sys_app:start(Serial),
-    co_sys_app:debug(SysPid, get(dbg)),
-    Mon = erlang:monitor(process, SysPid),
-    App = #app { pid=SysPid, mon=Mon },
-    gen_server:cast(SysPid, go),
-    Ctx#co_ctx { app_list = [App |Ctx#co_ctx.app_list] }.
-    
 %%
 %%
 %%
@@ -1291,6 +1299,11 @@ handle_call({option, Option}, _From, Ctx) ->
 		name -> {Option, Ctx#co_ctx.name};
 		nodeid -> {Option, Ctx#co_ctx.nodeid};
 		xnodeid -> {Option, Ctx#co_ctx.xnodeid};
+		id -> if Ctx#co_ctx.nodeid =/= undefined ->
+			      {nodeid, Ctx#co_ctx.nodeid};
+			 true ->
+			      {xnodeid, Ctx#co_ctx.xnodeid}
+		      end;
 		use_serial_as_xnodeid -> {Option, calc_use_serial(Ctx)};
 		sdo_timeout ->  {Option, Ctx#co_ctx.sdo#sdo_ctx.timeout};
 		blk_timeout -> {Option, Ctx#co_ctx.sdo#sdo_ctx.blk_timeout};
@@ -1503,8 +1516,6 @@ code_change(_OldVsn, Ctx, _Extra) ->
 %%
 %% Convert an identity to a pid
 %%
-identity_to_pid(Serial) when is_integer(Serial) ->
-    list_to_atom(co_lib:serial_to_string(Serial));
 identity_to_pid(Pid) when is_pid(Pid) ->
     Pid;
 identity_to_pid(Term) ->
@@ -1823,9 +1834,22 @@ handle_can(Frame, Ctx) ->
 			{1, 0} ->
 			    %% DAM-MPDO, destination is a group
 			    handle_dam_mpdo(Ctx, COBID, Ix, Si, Data);
-			_Other ->
-			    ?dbg(node, "~s: handle_can: frame not handled: "
+			{1, Nid} when Nid == Ctx#co_ctx.nodeid ->
+			    %% DAM-MPDO, destination is this node
+			    handle_dam_mpdo(Ctx, COBID, Ix, Si, Data);
+			{1, OtherNid} ->
+			    %% DAM-MPDO, destination is some other node
+			    Ctx;
+			{0, 0} ->
+			    %% Reserved
+			    ?dbg(node, "~s: handle_can: SAM-MPDO: Addr = 0, reserved "
 				 "Frame = ~w", [Ctx#co_ctx.name, Frame]),
+			    Ctx;
+			{0, SourceNid} ->
+			    ?dbg(node, "~s: handle_can: SAM-MPDO from ~2.16.0B"
+				 "not handled yet. Frame = ~w", 
+				 [Ctx#co_ctx.name, SourceNid, Frame]),
+			    %% handle_sam_mpdo()
 			    Ctx
 		    end;
 		_Other ->
@@ -2023,21 +2047,34 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
 %%
 handle_dam_mpdo(Ctx, CobId, Ix, Si, Data) ->
     ?dbg(node, "~s: handle_dam_mpdo: Index = ~7.16.0#", [Ctx#co_ctx.name,Ix]),
+    %% Updating dict. Maybe object_changed instead of notify ??
+    %% How handle CobId ??
+    try co_dict:set(Ctx#co_ctx.dict, Ix, Si, Data) of
+	ok -> ok;
+	Error -> 
+	    ?dbg(node, "~s: handle_dam_mpdo: Failed updating index ~7.16.0#, "
+		 "error = ~p", [Ctx#co_ctx.name, Ix, Error])
+    catch
+	error:Reason -> 
+	    ?dbg(node, "~s: handle_dam_mpdo: Crashed updating index ~7.16.0#, "
+		 "reason = ~p", [Ctx#co_ctx.name, Ix, Reason])
+    end,
     case lists:usort(subscribers(Ctx#co_ctx.sub_table, Ix) ++
-		     reserver_pid(Ctx#co_ctx.res_table, Ix)) of
+			 reserver_pid(Ctx#co_ctx.res_table, Ix)) of
 	[] ->
-	    ?dbg(node, "~s: No subscribers for index ~7.16.0#", [Ctx#co_ctx.name, Ix]);
+	    ?dbg(node, "~s: handle_dam_mpdo: No subscribers for index ~7.16.0#", 
+		 [Ctx#co_ctx.name, Ix]);
 	PidList ->
 	    lists:foreach(
 	      fun(Pid) ->
 		      case Pid of
 			  dead ->
 			      %% Warning ??
-			      ?dbg(node, "~s: Process subscribing to index "
-				   "~7.16.0# is dead", [Ctx#co_ctx.name, Ix]);
+			      ?dbg(node, "~s: handle_dam_mpdo: Process subscribing "
+				   "to index ~7.16.0# is dead", [Ctx#co_ctx.name, Ix]);
 			  P when is_pid(P)->
-			      ?dbg(node, "~s: Process ~p subscribes to index "
-				   "~7.16.0#", [Ctx#co_ctx.name, Pid, Ix]),
+			      ?dbg(node, "~s: handle_dam_mpdo: Process ~p subscribes "
+				   "to index ~7.16.0#", [Ctx#co_ctx.name, Pid, Ix]),
 			      Pid ! {notify, CobId, Ix, Si, Data}
 		      end
 	      end, PidList)
