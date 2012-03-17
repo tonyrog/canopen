@@ -141,15 +141,21 @@ load_objects([{tpdo,I,ID,Opts}|Es],Os) ->
 %%
 %% TPDO mapping
 %%
-load_objects([{tpdo_map,I,Map}|Es], Os) ->
+load_objects([{tpdo_map,I,Map, Opts}|Es], Os) ->
     io:format("~p: Load TPDO-MAP: ~w\n", [?MODULE, I]),
     Index = ?IX_TPDO_MAPPING_FIRST + I,
+    Type = proplists:get_value(pdo_type,Opts,pdo),
     N = length(Map),
+    Si0Value = case Type of
+		   pdo -> N;
+		   sam_mpdo -> ?SAM_MPDO;
+		   dam_mpdo -> ?DAM_MPDO
+	       end,
     Obj={#dict_object { index = Index, type=?PDO_MAPPING,
 			struct=?OBJECT_RECORD, access=?ACCESS_RW },
 	 [
 	  #dict_entry { index={Index,0}, type=?UNSIGNED8,
-			access=?ACCESS_RW, value=N }
+			access=?ACCESS_RW, value=Si0Value }
 	  | map(fun({Si,{Mi,Ms,Bl}}) ->
 			#dict_entry { index={Index,Si}, type=?UNSIGNED32,
 				      access=?ACCESS_RW,
@@ -233,6 +239,7 @@ load_objects([{mpdo_scanner,I,Map}|Es], Os) ->
 					access=?ACCESS_RW,
 					value=?TMPDO_MAP(Bs,Li,Ls) }
 		  end, lists:zip(seq(1,N), Map))]},
+    io:format("~p: MPDO-SCANNER: ~w\n", [?MODULE, Obj]),
     load_objects(Es, [Obj|Os]);
 
 load_objects([], Os) ->

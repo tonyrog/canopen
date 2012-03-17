@@ -16,5 +16,4 @@ run(Serial, Port) ->
     co_test_lib:start_node(Serial, Dict, Port).
 
 halt(Serial) ->
-    co_node:stop(Serial),
-    co_proc:stop().
+    co_test_lib:stop_node(Serial).

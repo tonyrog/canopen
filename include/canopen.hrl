@@ -441,7 +441,8 @@
 	{
 	  pid,    %% application pid
 	  mon,    %% application monitor
-	  mod     %% application module - init/restart etc
+	  mod,    %% application module - init/restart etc
+	  rc=0    %% restart_counter
 	 }).
 
 %% SDO session descriptor
@@ -455,9 +456,11 @@
 %% TPDO process context
 -record(tpdo_ctx,
 	{
+	  nodeid, %% (Short) CANOpen node id
 	  dict,       %% copy of dictionary in co_ctx
 	  tpdo_cache, %% copy of tpdo cache in co_ctx
-	  res_table   %% copy of reserver table in co_ctx
+	  res_table,  %% copy of reserver table in co_ctx
+	  debug
 	}).
 
 %% TPDO descriptor
@@ -466,7 +469,8 @@
 	  offset, %% Offset from IX_TPDO_PARAM_FIRST
 	  cob_id, %% Active TPDO cobid
 	  pid,    %% gen_server pid
-	  mon     %% gen_server monitor
+	  mon,    %% gen_server monitor
+	  rc=0    %% restart_counter
 	}).
 
 %% Action on upload / download
@@ -750,15 +754,20 @@
 -define(TRANS_EVENT_SPECIFIC,  254).  %% async
 -define(TRANS_EVENT_PROFILE,   255).  %% async
 
+%% MPDO Flags
+-define(SAM_MPDO,   254).  %% 
+-define(DAM_MPDO,   255).  %% 
+-define(MPDO_DATA_SIZE,   32).  %% 
+
 %% PDO mapping remote access
 -define(PDO_MAP(Index,Subind,BitLen),
 	( ((Index) bsl 16) bor ((Subind) bsl 8) bor BitLen)).
 
 -define(PDO_MAP_INDEX(Map),  (((Map) bsr 16) band 16#ffff)).
--define(PDO_MAP_SUBIND(Map), (((Map) bsr 8) band 16#FF)).
--define(PDO_MAP_BITS(Map),   ((Map) band 16#FF)).
+-define(PDO_MAP_SUBIND(Map), (((Map) bsr 8) band 16#ff)).
+-define(PDO_MAP_BITS(Map),   ((Map) band 16#ff)).
 
-%% Receive MPDO map  UNSIGNED64 entry
+%% Receive MPDO map  UNSIGNED64 entry (Dispatch List)
 %% BlockSize:8  - number of consecutive sub-indices used
 %%    Index:16  - local dictionary index
 %%   Subind:8   - local dictionary sub-index (base)
@@ -773,7 +782,7 @@
 	    (((RSubind) band 16#ff) bsl 8) bor 
 	    ((Nid) band 16#ff)).
 
-%% Transmit MPDO map UNSIGNED32 entry
+%% Transmit MPDO map UNSIGNED32 entry (Scan List) 
 %% BlockSize:8  - number of consecutive sub-indices used
 %%    Index:16  - local dictionary index
 %%   Subind:8   - local dictionary sub-index (base)
@@ -781,5 +790,10 @@
 	(((BlockSize) band 16#ff) bsl 24) bor 
 	    (((Index) band 16#ffff) bsl 8) bor
 	    ((Subind) band 16#ff)).
+
+-define(TMPDO_MAP_SIZE(Map),   (((Map)  bsr 24) band 16#ff)).
+-define(TMPDO_MAP_INDEX(Map),  (((Map) bsr 8) band 16#ffff)).
+-define(TMPDO_MAP_SUBIND(Map), ((Map)  band 16#ff)).
+
 
 -endif.

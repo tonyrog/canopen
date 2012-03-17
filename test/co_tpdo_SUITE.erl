@@ -1,10 +1,11 @@
 %%%-------------------------------------------------------------------
-%%% @author Marina Westman LÃ¶nne <malotte@malotte.net>
-%%% @copyright (C) 2012, Marina Westman LÃ¶nne
+%%% @author Marina Westman Lönne <malotte@malotte.net>
+%%% @copyright (C) 2012, Marina Westman Lönne
 %%% @doc
+%%%   Test of TPDO functionality.
 %%%
+%%% Created : 11 Jan 2012 by Marina Westman Lönne
 %%% @end
-%%% Created : 11 Jan 2012 by Marina Westman LÃ¶nne <malotte@malotte.net>
 %%%-------------------------------------------------------------------
 -module(co_tpdo_SUITE).
 
@@ -23,11 +24,6 @@
 %% @doc
 %%  Returns list of tuples to set default properties
 %%  for the suite.
-%%
-%% Function: suite() -> Info
-%%
-%% Info = [tuple()]
-%%   List of key/value pairs.
 %%
 %% Note: The suite/0 function is only meant to be used to return
 %% default data values, not perform any other operations.
@@ -137,16 +133,6 @@ init_per_testcase(TestCase, Config) when TestCase == encode_decode ->
     ct:pal("Testcase: ~p", [TestCase]),
     Config;
 
-init_per_testcase(TestCase, Config) when TestCase == send_tpdo0 ->
-    ct:pal("Testcase: ~p", [TestCase]),
-    %% Redo mapping, i.e. calls to tpdo_callback
-    ok = co_node:state(serial(), preoperational),
-    ok = co_node:state(serial(), operational),
-    ct:pal("Changed state to operational", []),    
-    timer:sleep(100),
-
-    Config;
-
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
 
@@ -191,18 +177,15 @@ init_per_testcase(_TestCase, Config) ->
 end_per_testcase(TestCase, _Config) when TestCase == encode_decode ->
     ok;
 
-end_per_testcase(TestCase, Config) when TestCase == send_tpdo0 ->
-    %% Restore data
-    co_test_lib:load_dict(Config),
-    co_test_lib:load_dict(Config, ?RPDO_NODE),
-    ok;
-
-end_per_testcase(_TestCase, _Config) ->
+end_per_testcase(_TestCase, Config) ->
     case whereis(co_test_tpdo_app) of
 	undefined  -> do_nothing;
 	_Pid ->  co_test_tpdo_app:stop()
     end,
     co_test_lib:stop_app(co_test_app, serial()),
+    %% Restore data
+    co_test_lib:load_dict(Config),
+    co_test_lib:load_dict(Config, ?RPDO_NODE),
     ok.
 
 %%--------------------------------------------------------------------

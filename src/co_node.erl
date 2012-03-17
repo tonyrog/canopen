@@ -43,7 +43,7 @@
 -export([my_reservations/1, my_reservations/2]).
 -export([all_subscribers/1, all_subscribers/2]).
 -export([all_reservers/1, reserver/2]).
--export([object_event/2, pdo_event/2]).
+-export([object_event/2, pdo_event/2, dam_mpdo_event/3]).
 -export([notify/3, notify/4, notify/5]). %% To send MPOs
 
 %% CANopen application internal
@@ -63,6 +63,7 @@
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
 
 -define(LAST_SAVED_FILE, "last.dict").
+-define(RESTART_LIMIT, 10). %% Add clear timer ??
 
 -define(COBID_TO_CANID(ID),
 	if ?is_cobid_extended((ID)) ->
@@ -540,10 +541,26 @@ object_event(CoNodePid, Index) ->
 -spec pdo_event(CoNode::pid() | integer(), CobId::integer()) ->
 		       ok | {error, Error::atom()}.
 
-pdo_event(CoNodePid, CobId) when is_pid(CoNodePid) ->
-    gen_server:cast(CoNodePid, {pdo_event, CobId});
 pdo_event(Identity, CobId) ->
     gen_server:cast(identity_to_pid(Identity), {pdo_event, CobId}).
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Tells the co_node that an DAM-MPDO should be transmitted.
+%% @end
+%%--------------------------------------------------------------------
+-spec dam_mpdo_event(CoNode::pid() | integer(), CobId::integer(), 
+		    DestinationNode::integer() | broadcast) ->
+		       ok | {error, Error::atom()}.
+
+dam_mpdo_event(Identity, CobId, Destination) 
+  when Destination == broadcast orelse
+       (is_integer(Destination) andalso Destination) =< 127 ->
+    gen_server:cast(identity_to_pid(Identity), {dam_mpdo_event, CobId, Destination});
+dam_mpdo_event(_Identity, _CobId, _Destination) ->
+    ?dbg(node, "dam_mpdo_event: Invalid destination = ~p", [_Destination]),
+    {error, invalid_destination}.
 
 
 %%--------------------------------------------------------------------
@@ -868,8 +885,8 @@ reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec init({Identity::term(), NodeName::atom(), Opts::list(term())}) -> 
-		  {ok, State::record()} |
-		  {ok, State::record(), Timeout::integer()} |
+		  {ok, Context::record()} |
+		  {ok, Context::record(), Timeout::integer()} |
 		  ignore               |
 		  {stop, Reason::atom()}.
 
@@ -905,6 +922,7 @@ init({Serial, NodeName, Opts}) ->
       res_table       = ResTable
      },
     TpdoCtx = #tpdo_ctx {
+      nodeid          = ShortNodeId,
       dict            = Dict,
       tpdo_cache      = TpdoCache,
       res_table       = ResTable
@@ -944,7 +962,6 @@ init({Serial, NodeName, Opts}) ->
 	    if ShortNodeId =:= 0 ->
 		    {ok, Ctx1#co_ctx { state = ?Operational }};
 	       true ->
-		    %% Start app that handles save and load SDOs (1010/1011)
 		    {ok, reset_application(Ctx1)}
 		end;
 	{error, Reason} ->
@@ -1001,12 +1018,12 @@ initialization(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @spec handle_call(Request, From, State) -> {reply, Reply, State} |  
-%%                                            {reply, Reply, State, Timeout} |
-%%                                            {noreply, State} |
-%%                                            {noreply, State, Timeout} |
-%%                                            {stop, Reason, Reply, State} |
-%%                                            {stop, Reason, State}
+%% @spec handle_call(Request, From, Context) -> {reply, Reply, Context} |  
+%%                                            {reply, Reply, Context, Timeout} |
+%%                                            {noreply, Context} |
+%%                                            {noreply, Context, Timeout} |
+%%                                            {stop, Reason, Reply, Context} |
+%%                                            {stop, Reason, Context}
 %% Request = {set, Index, SubInd, Value} | 
 %%           {direct_set, Index, SubInd, Value} | 
 %%           {value, {index, SubInd}} | 
@@ -1288,6 +1305,7 @@ handle_call({dump, Qualifier}, _From, Ctx) ->
        true ->
 	    do_nothing
     end,
+    io:format("  DEBUG: ~p\n", [get(dbg)]),
     {reply, ok, Ctx};
 
 handle_call(loop_data, _From, Ctx) ->
@@ -1363,9 +1381,9 @@ handle_call(_Request, _From, Ctx) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% Function: handle_cast(Msg, State) -> {noreply, State} |
-%%                                      {noreply, State, Timeout} |
-%%                                      {stop, Reason, State}
+%% Function: handle_cast(Msg, Context) -> {noreply, Context} |
+%%                                      {noreply, Context, Timeout} |
+%%                                      {stop, Reason, Context}
 %% Description: Handling cast messages
 %% @end
 %%--------------------------------------------------------------------
@@ -1386,14 +1404,26 @@ handle_cast({pdo_event, CobId}, Ctx) ->
 		 [Ctx#co_ctx.name]),
 	    {noreply,Ctx}
     end;
+handle_cast({dam_mpdo_event, CobId, Destination}, Ctx) ->
+    ?dbg(node, "~s: handle_cast: dam_mpdo_event, CobId = ~.16B", 
+	 [Ctx#co_ctx.name, CobId]),
+    case lists:keysearch(CobId, #tpdo.cob_id, Ctx#co_ctx.tpdo_list) of
+	{value, T} ->
+	    co_tpdo:transmit(T#tpdo.pid, Destination), %% ??
+	    {noreply,Ctx};
+	_ ->
+	    ?dbg(node, "~s: handle_cast: pdo_event, no tpdo process found", 
+		 [Ctx#co_ctx.name]),
+	    {noreply,Ctx}
+    end;
 handle_cast(_Msg, Ctx) ->
     {noreply, Ctx}.
 
 %%--------------------------------------------------------------------
 %% @private
-%% Function: handle_info(Info, State) -> {noreply, State} |
-%%                                       {noreply, State, Timeout} |
-%%                                       {stop, Reason, State}
+%% Function: handle_info(Info, Context) -> {noreply, Context} |
+%%                                       {noreply, Context, Timeout} |
+%%                                       {stop, Reason, Context}
 %% Description: Handling all non call/cast messages
 %% @end
 %%--------------------------------------------------------------------
@@ -1458,7 +1488,7 @@ handle_info(_Info, Ctx) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% Function: terminate(Reason, State) -> void()
+%% Function: terminate(Reason, Context) -> void()
 %% Description: This function is called by a gen_server when it is about to
 %% terminate. It should be the opposite of Module:init/1 and do any necessary
 %% cleaning up. When it returns, the gen_server terminates with Reason.
@@ -1502,7 +1532,7 @@ terminate(_Reason, Ctx) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% Func: code_change(OldVsn, State, Extra) -> {ok, NewState}
+%% Func: code_change(OldVsn, Context, Extra) -> {ok, NewContext}
 %% Description: Convert process state when code is changed
 %% @end
 %%--------------------------------------------------------------------
@@ -1608,8 +1638,8 @@ change_nodeid(xnodeid, NewXNid, Ctx=#co_ctx {xnodeid = NewXNid}) ->
     Ctx;
 change_nodeid(xnodeid, undefined, _Ctx=#co_ctx {nodeid = undefined}) -> 
     {error, "Not possible to remove last nodeid"};
-change_nodeid(xnodeid, NewNid, Ctx=#co_ctx {xnodeid = OldNid, cob_table = T}) ->
-    execute_change(xnodeid, NewNid, OldNid, T),
+change_nodeid(xnodeid, NewNid, Ctx=#co_ctx {xnodeid = OldNid}) ->
+    execute_change(xnodeid, NewNid, OldNid, Ctx),
     Ctx#co_ctx {xnodeid = NewNid};
 change_nodeid(nodeid, NewNid, Ctx=#co_ctx {nodeid = NewNid}) ->
     %% No change
@@ -1618,8 +1648,8 @@ change_nodeid(nodeid, undefined, _Ctx=#co_ctx {xnodeid = undefined}) ->
     {error, "Not possible to remove last nodeid"};
 change_nodeid(nodeid, 0, _Ctx) ->
     {error, "NodeId 0 is reserved for the CANopen manager co_mgr."};
-change_nodeid(nodeid, NewNid, Ctx=#co_ctx {nodeid = OldNid, cob_table = T}) ->
-    execute_change(nodeid, NewNid, OldNid, T),
+change_nodeid(nodeid, NewNid, Ctx=#co_ctx {nodeid = OldNid}) ->
+    execute_change(nodeid, NewNid, OldNid, Ctx),
     Ctx#co_ctx {nodeid = NewNid};
 change_nodeid(use_serial_as_xnodeid, true, Ctx=#co_ctx {serial = Serial}) ->
     NewXNid = co_lib:serial_to_xnodeid(Serial),
@@ -1634,13 +1664,15 @@ change_nodeid(use_serial_as_xnodeid, false, Ctx) ->
 	    Ctx
     end.
 
-execute_change(NidType, NewNid, OldNid, T) ->  
+execute_change(NidType, NewNid, OldNid, Ctx=#co_ctx { cob_table = T}) ->  
     ?dbg(node, "execute_change: NidType = ~p, OldNid = ~p, NewNid = ~p", 
 	 [NidType, OldNid, NewNid]),
     delete_from_cob_table(T, NidType, OldNid),
     co_proc:unreg({NidType, OldNid}),
     add_to_cob_table(T, NidType, NewNid),
-    reg({NidType, NewNid}).
+    reg({NidType, NewNid}),
+    send_to_apps({nodeid_change, NidType, OldNid, NewNid}, Ctx),
+    send_to_tpdos({nodeid_change, NidType, OldNid, NewNid}, Ctx).
     
   
 calc_use_serial(_Ctx=#co_ctx {xnodeid = OldXNid, serial = Serial}) ->
@@ -2138,10 +2170,10 @@ handle_tpdo_process(T, Reason, Ctx) ->
     io:format("WARNING! ~s: id=~w tpdo process died: ~p\n", 
 	      [Ctx#co_ctx.name,T#tpdo.pid, Reason]),
     case restart_tpdo(T, Ctx) of
-	{error, not_found} ->
+	{error, Error} ->
 	    io:format("WARNING! ~s: not possible to restart "
-		      "tpdo process for offset ~p\n", 
-		      [Ctx#co_ctx.name,T#tpdo.offset]),
+		      "tpdo process for offset ~p, reason = ~p\n", 
+		      [Ctx#co_ctx.name,T#tpdo.offset,Error]),
 	    Ctx;
 	NewT ->
 	    ?dbg(node, "~s: handle_tpdo_processes: new tpdo process ~p started", 
@@ -2197,35 +2229,18 @@ lookup_nmt_entry(NodeId, Ctx) ->
 	    E
     end.
 
-broadcast_state(State, #co_ctx {state = State}) ->
+broadcast_state(State, #co_ctx {state = State, name = Name}) ->
     %% No change
+    ?dbg(node, "~s: broadcast_state: no change state = ~p", [Name, State]),
     ok;
-broadcast_state(State, Ctx) ->
-    ?dbg(node, "~s: broadcast_state: new state = ~p", [Ctx#co_ctx.name, State]),
+broadcast_state(State, Ctx=#co_ctx { name = Name}) ->
+    ?dbg(node, "~s: broadcast_state: new state = ~p", [Name, State]),
 
     %% To all tpdo processes
-    lists:foreach(
-      fun(T) ->
-	      case T#tpdo.pid of
-		  Pid -> 
-		      ?dbg(node, "~s: broadcast_state: to TPDO with pid = ~p", 
-			   [Ctx#co_ctx.name, Pid]),
-		      gen_server:cast(Pid, {state, State}) 
-	      end
-      end,
-      Ctx#co_ctx.tpdo_list),
+    send_to_tpdos({state, State}, Ctx),
     
     %% To all applications ??
-    lists:foreach(
-      fun(A) ->
-	      case A#app.pid of
-		  Pid -> 
-		      ?dbg(node, "~s: broadcast_state: to app with pid = ~p", 
-			   [Ctx#co_ctx.name, Pid]),
-		      gen_server:cast(Pid, {state, State}) 
-	      end
-      end,
-      Ctx#co_ctx.app_list).
+    send_to_apps({state, State}, Ctx).
 
 send_to_apps(Msg, _Ctx=#co_ctx {name = Name, app_list = AList}) ->
     lists:foreach(
@@ -2239,6 +2254,17 @@ send_to_apps(Msg, _Ctx=#co_ctx {name = Name, app_list = AList}) ->
       end,
       AList).
 
+send_to_tpdos(Msg, _Ctx=#co_ctx {name = Name, tpdo_list = TList}) ->
+    lists:foreach(
+      fun(T) ->
+	      case T#tpdo.pid of
+		  Pid -> 
+		      ?dbg(node, "~s: handle_call: sending ~w to tpdo "
+			   "with pid = ~p", [Name, Msg, Pid]),
+		      gen_server:cast(Pid, Msg) 
+	      end
+      end,
+      TList).
     
 %%
 %% Dictionary entry has been updated
@@ -2251,7 +2277,7 @@ handle_notify(I, Ctx) ->
     NewCtx.
 
 handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg(node, "~s: handle_notify: Index=~7.16.0#",[Ctx#co_ctx.name, I]),
+    ?dbg(node, "~s: handle_notify: Index=~7.16.0#",[_Name, I]),
     case I of
 	?IX_COB_ID_SYNC_MESSAGE ->
 	    update_sync(Ctx);
@@ -2427,14 +2453,14 @@ update_sync(Ctx) ->
     
 
 update_tpdo(P=#pdo_parameter {offset = Offset, cob_id = CId, valid = Valid}, 
-	    Ctx=#co_ctx { tpdo_list = TList }) ->
-    ?dbg(node, "~s: update_tpdo: pdo param for ~p", [Ctx#co_ctx.name, Offset]),
+	    Ctx=#co_ctx { tpdo_list = TList, tpdo = TpdoCtx, name = _Name }) ->
+    ?dbg(node, "~s: update_tpdo: pdo param for ~p", [_Name, Offset]),
     case lists:keytake(CId, #tpdo.cob_id, TList) of
 	false ->
 	    if Valid ->
-		    {ok,Pid} = co_tpdo:start(Ctx#co_ctx.tpdo, P),
+		    {ok,Pid} = co_tpdo:start(TpdoCtx#tpdo_ctx {debug = get(dbg)}, P),
 		    ?dbg(node, "~s: update_tpdo: starting tpdo process ~p for ~p", 
-			 [Ctx#co_ctx.name, Pid, Offset]),
+			 [_Name, Pid, Offset]),
 		    co_tpdo:debug(Pid, get(dbg)),
 		    gen_server:cast(Pid, {state, Ctx#co_ctx.state}),
 		    Mon = erlang:monitor(process, Pid),
@@ -2456,18 +2482,27 @@ update_tpdo(P=#pdo_parameter {offset = Offset, cob_id = CId, valid = Valid},
 	    end
     end.
 
-restart_tpdo(T=#tpdo {offset = Offset}, Ctx) ->
+restart_tpdo(T=#tpdo {offset = Offset, rc = RC}, 
+	     Ctx=#co_ctx {tpdo = TpdoCtx}) ->
     case load_pdo_parameter(?IX_TPDO_PARAM_FIRST + Offset, Offset, Ctx) of
 	undefined -> 
 	    ?dbg(node, "~s: restart_tpdo: pdo param for ~p not found", 
 		 [Ctx#co_ctx.name, Offset]),
 	    {error, not_found};
 	Param ->
-	    {ok,Pid} = co_tpdo:start(Ctx#co_ctx.tpdo, Param),
-	    co_tpdo:debug(Pid, get(dbg)),
-	    gen_server:cast(Pid, {state, Ctx#co_ctx.state}),
-	    Mon = erlang:monitor(process, Pid),
-	    T#tpdo {pid = Pid, mon = Mon}
+	    case RC > ?RESTART_LIMIT of
+		true ->
+		    ?dbg(node, "~s: restart_tpdo: restart counter exceeded", 
+			 [Ctx#co_ctx.name]),
+		    {error, restart_not_allowed};
+		false ->
+		    {ok,Pid} = 
+			co_tpdo:start(TpdoCtx#tpdo_ctx {debug = get(dbg)}, Param),
+		    co_tpdo:debug(Pid, get(dbg)),
+		    gen_server:cast(Pid, {state, Ctx#co_ctx.state}),
+		    Mon = erlang:monitor(process, Pid),
+		    T#tpdo {pid = Pid, mon = Mon, rc = RC+1}
+	    end
     end.
 
 
@@ -2866,7 +2901,7 @@ pdo_mapping(IX, _TpdoCtx=#tpdo_ctx {dict = Dict, res_table = ResTable,
 pdo_mapping(IX, ResTable, Dict, TpdoCache) ->
     ?dbg(node, "pdo_mapping: ~7.16.0#", [IX]),
     case co_dict:value(Dict, IX, 0) of
-	{ok,N} when N >= 0, N =< 64 ->
+	{ok,N} when N >= 0, N =< 64 -> %% Standard tpdo/rpdo
 	    MType = case IX of
 			_TPDO when IX >= ?IX_TPDO_MAPPING_FIRST, 
 				   IX =< ?IX_TPDO_MAPPING_LAST ->
@@ -2875,26 +2910,31 @@ pdo_mapping(IX, ResTable, Dict, TpdoCache) ->
 				   IX =< ?IX_RPDO_MAPPING_LAST ->
 			    rpdo
 		    end,
-	    pdo_mapping(MType,IX,1,N,ResTable,Dict, TpdoCache);
-	{ok,254} -> %% SAM-MPDO
-	    {mpdo,[]};
-	{ok,255} -> %% DAM-MPDO
-	    pdo_mapping(mpdo,IX,1,1,ResTable,Dict, TpdoCache);
+	    ?dbg(node, "pdo_mapping: Standard pdo of size ~p found", [N]),
+	    pdo_mapping(MType,IX,1,N,ResTable,Dict,TpdoCache);
+	{ok,?SAM_MPDO} -> %% SAM-MPDO
+	    ?dbg(node, "pdo_mapping: sam_mpdo identified look for value", []),
+	    mpdo_mapping(sam_mpdo,IX,ResTable,Dict,TpdoCache);
+	{ok,?DAM_MPDO} -> %% DAM-MPDO
+	    ?dbg(node, "pdo_mapping: dam_mpdo found", []),
+	    pdo_mapping(dam_mpdo,IX,1,1,ResTable,Dict,TpdoCache);
 	Error ->
 	    Error
     end.
 
-    
+
 pdo_mapping(MType,IX,SI,Sn,ResTable,Dict,TpdoCache) ->
     pdo_mapping(MType,IX,SI,Sn,[],[],ResTable,Dict,TpdoCache).
 
 pdo_mapping(MType,_IX,SI,Sn,Ts,Is,_ResTable,_Dict,_TpdoCache) when SI > Sn ->
+    ?dbg(node, "pdo_mapping: ~p all entries mapped, result ~p", 
+	 [MType, {Ts,Is}]),
     {MType, {reverse(Ts),reverse(Is)}};
-pdo_mapping(MType,IX,SI,Sn,Ts,Is,ResTable,Dict,TpdoCache) ->
+pdo_mapping(MType,IX,SI,Sn,Ts,Is,ResTable,Dict,TpdoCache) -> 
+    ?dbg(node, "pdo_mapping: type = ~p, index = ~7.16.0#:~w", [MType,IX,SI]),
     case co_dict:value(Dict, IX, SI) of
 	{ok,Map} ->
-	    ?dbg(node, "pdo_mapping: index = ~7.16.0#:~w, map = ~11.16.0#", 
-		 [IX,SI,Map]),
+	    ?dbg(node, "pdo_mapping: map = ~11.16.0#", [Map]),
 	    Index = {_I,_S} = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
 	    ?dbg(node, "pdo_mapping: entry[~w] = {~7.16.0#:~w}", 
 		 [SI,_I,_S]),
@@ -2917,6 +2957,49 @@ pdo_mapping(MType,IX,SI,Sn,Ts,Is,ResTable,Dict,TpdoCache) ->
 	    Error
     end.
 
+mpdo_mapping(sam_mpdo,Ix,ResTable,Dict,TpdoCache) when is_integer(Ix) ->
+    ?dbg(node, "mpdo_mapping: index = ~7.16.0#", [Ix]),
+    case co_dict:value(Dict, Ix, 1) of
+	{ok,Map} ->
+	   Index = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
+	   mpdo_mapping(sam_mpdo,Index,ResTable,Dict,TpdoCache);
+	Error ->
+	    ?dbg(node, "mpdo_mapping: ~7.16.0# = Error ~w", [Ix,Error]),
+	    Error
+    end;
+mpdo_mapping(sam_mpdo,{IxInScanList,SiInScanList},ResTable,Dict,TpdoCache) 
+  when IxInScanList >= ?IX_OBJECT_SCANNER_FIRST andalso
+       IxInScanList =< ?IX_OBJECT_SCANNER_LAST  ->
+    %% MPDO Producer mapping
+    %% The entry in PDO Map has been read, now read the entry in MPDO Scan List
+    ?dbg(node, "mpdo_mapping: sam_mpdo, scan index = ~7.16.0#:~w", 
+	 [IxInScanList,SiInScanList]),
+    case co_dict:value(Dict, IxInScanList, SiInScanList) of
+	{ok, Map} ->
+	    ?dbg(node, "mpdo_mapping: map = ~11.16.0#", [Map]),
+	    Index = {?TMPDO_MAP_INDEX(Map),?TMPDO_MAP_SUBIND(Map)},
+	    BlockSize = ?TMPDO_MAP_SIZE(Map),
+	    mpdo_mapping(sam_mpdo,Index,BlockSize,ResTable,Dict,TpdoCache);
+	Error ->
+	    Error %%??
+    end.
+       
+mpdo_mapping(sam_mpdo,Index = {_Ix,_Si},BlockSize,ResTable,Dict,TpdoCache) ->
+    %% MPDO Producer mapping
+    %% The entry in PDO Map has been read, now read the entry in MPDO Scan List
+    ?dbg(node, "mpdo_mapping: sam_mpdo, local index = ~7.16.0#:~w", [_Ix,_Si]),
+    case entry(sam_mpdo, Index, ResTable, Dict, TpdoCache) of
+	{ok, E} when is_record(E,dict_entry) ->
+	    {sam_mpdo, {[{E#dict_entry.type, ?MPDO_DATA_SIZE}], [Index]}};
+	{ok, Type} ->
+	    {sam_mpdo, {[{Type, ?MPDO_DATA_SIZE}], [Index]}};
+	Error ->
+	    ?dbg(node, "mpdo_mapping: ~7.16.0#:~w = Error ~w", 
+		 [_Ix,_Si,Error]),
+	    Error
+    end.
+
+
 entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
     case co_node:reserver_with_module(ResTable, Ix) of
 	[] ->
@@ -2928,19 +3011,6 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
 
 	    %% Handle differently when TPDO and RPDO
 	    case MType of
-		tpdo ->
-		    %% Store default value in cache ??
-		    ets:insert(TpdoCache, {{Ix, Si}, [0]}),
-		    try Mod:tpdo_callback(Pid, {Ix, Si}, {co_node, tpdo_set}) of
-			Res -> Res %% Handle error??
-		    catch error:Reason ->
-			    io:format("WARNING!" 
-				      "~p: ~p: entry: tpdo_callback call failed " 
-				      "for process ~p module ~p, index ~7.16.0#"
-				      ":~w, reason ~p\n", 
-				      [self(), ?MODULE, Pid, Mod, Ix, Si, Reason]),
-			    {error,  ?abort_internal_error}
-		    end;
 		rpdo ->
 		    try Mod:index_specification(Pid, {Ix, Si}) of
 			{spec, Spec} ->
@@ -2953,6 +3023,19 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
 				      [self(), ?MODULE, Pid, Mod, Ix, Si, Reason]),
 			    {error,  ?abort_internal_error}
 			    
+		    end;
+		T when T == tpdo orelse T == sam_mpdo orelse T == dam_mpdo ->
+		    %% Store default value in cache ??
+		    ets:insert(TpdoCache, {{Ix, Si}, [0]}),
+		    try Mod:tpdo_callback(Pid, {Ix, Si}, {co_node, tpdo_set}) of
+			Res -> Res %% Handle error??
+		    catch error:Reason ->
+			    io:format("WARNING!" 
+				      "~p: ~p: entry: tpdo_callback call failed " 
+				      "for process ~p module ~p, index ~7.16.0#"
+				      ":~w, reason ~p\n", 
+				      [self(), ?MODULE, Pid, Mod, Ix, Si, Reason]),
+			    {error,  ?abort_internal_error}
 		    end
 	    end;
 	{dead, _Mod} ->
@@ -2964,7 +3047,7 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
     end.
 
 tpdo_value({Ix, Si}, #tpdo_ctx {res_table = ResTable, dict = Dict, 
-				   tpdo_cache = TpdoCache}) ->
+				tpdo_cache = TpdoCache}) ->
 	     tpdo_value({Ix, Si}, ResTable, Dict, TpdoCache).
 tpdo_value({Ix, Si} = I, ResTable, Dict, TpdoCache) ->
     case co_node:reserver_with_module(ResTable, Ix) of

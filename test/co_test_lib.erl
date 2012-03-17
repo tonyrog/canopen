@@ -24,7 +24,7 @@ start_node(C, Serial) when is_list(C) ->
     start_node(Serial, Dict);
 start_node(Serial, Dict) ->
     can_router:start(),
-    can_udp:start(1, [{ttl, 0}]),
+    can_udp:start(co_test, 1, [{ttl, 0}]),
 
     {ok, PPid} = co_proc:start_link([{unlinked, true}]),
     ct:pal("Started co_proc ~p",[PPid]),
@@ -40,7 +40,7 @@ start_node(Serial, Dict) ->
 
 start_node(Serial, Dict, Port) ->
     can_router:start(),
-    can_udp:start(Port, [{ttl, 0}]),
+    can_udp:start(co_test, Port, [{ttl, 0}]),
 
     {ok, PPid} = co_proc:start_link([{unlinked, true}]),
     ct:pal("Started co_proc ~p",[PPid]),
@@ -54,9 +54,14 @@ start_node(Serial, Dict, Port) ->
     ct:pal("Started co_node ~p, pid = ~p",[integer_to_list(Serial,16), Pid]),
     {ok, Pid}.
 
-stop_node(_Config) ->
-    co_node:stop(serial()),
-    co_proc:stop().
+stop_node(Config) when is_list(Config) ->
+    stop_node(serial());
+stop_node(Serial) ->
+    co_node:stop(Serial),
+    co_proc:stop(),
+    can_udp:stop(co_test),
+    can_router:stop().
+
 
 load_dict(C) ->
     load_dict(C, serial()).

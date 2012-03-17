@@ -23,7 +23,7 @@
 
 %% API
 -export([start/2, stop/1]).
--export([rtr/1, sync/1, transmit/1]).
+-export([rtr/1, sync/1, transmit/1, transmit/2]).
 -export([update_param/2]).
 -export([update_map/1]).
 
@@ -44,6 +44,7 @@
 -record(s,
 	{
 	  state = ?Initialisation, %% State, see canopen.hrl
+	  type,                %% pdo | dam_mpdo | sam_mpdo
 	  emit = false,        %% true when scheduled to send
 	  valid = true,        %% normally true
 	  rtr_allowed = true,  %% RTR is allowed
@@ -95,6 +96,9 @@ rtr(Pid) ->
 transmit(Pid) ->
     gen_server:cast(Pid, transmit).
 
+transmit(Pid, Destination) ->
+    gen_server:cast(Pid, {transmit, Destination}).
+
 update_param(Pid, Param) ->
     gen_server:call(Pid, {update_param, Param}).
 
@@ -124,6 +128,7 @@ loop_data(Pid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Ctx, Param, FromPid]) ->
+    put(dbg, Ctx#tpdo_ctx.debug),
     ?dbg(tpdo, "init: param = ~p", [Param]),
     Valid = Param#pdo_parameter.valid,
     COBID = Param#pdo_parameter.cob_id,
@@ -144,6 +149,7 @@ init([Ctx, Param, FromPid]) ->
 	       Trans > ?TRANS_SYNC_MAX -> 0;
 	       true -> Trans
 	    end,
+
     S = #s { state = ?Initialisation, 
 	     emit = false,
 	     valid = Valid, %% normally true!
@@ -194,21 +200,24 @@ handle_call({update_param,Param}, _From, S) ->
 	    true ->
 		 (COBID band ?COBID_ENTRY_ID_MASK)
 	 end,
-    {Ts,Is} =
+    {Type, {Ts,Is}} =
 	if S#s.state == ?Operational ->
 		if Valid, COBID =/= S#s.cob_id ->
 			tpdo_mapping(Param#pdo_parameter.offset, S#s.ctx);
 		   Valid, Param#pdo_parameter.offset =/= S#s.offset ->
 			tpdo_mapping(Param#pdo_parameter.offset, S#s.ctx);
 		   not Valid ->
-			{[],[]};
+			{tpdo, {[],[]}};
 		   true ->
-			{S#s.type_list, S#s.index_list}
+			{S#s.type, {S#s.type_list, S#s.index_list}}
 		end;
 	   true ->
-		{[],[]}
+		{undefined, {[],[]}}
 	end,
     Trans = Param#pdo_parameter.transmission_type,
+
+    %% Verify that Trans and Type is valid together ???
+
     Count0 = S#s.count,
     Count1 = if not Valid -> 0;
 		Trans > ?TRANS_SYNC_MAX -> 0;
@@ -230,6 +239,7 @@ handle_call({update_param,Param}, _From, S) ->
 	      true -> S#s.emit
 	   end,
     S1 = S#s { 
+	   type              = Type,
 	   emit              = Emit,
 	   valid             = Valid,
 	   rtr_allowed       = Param#pdo_parameter.rtr_allowed,
@@ -248,13 +258,13 @@ handle_call({update_param,Param}, _From, S) ->
     {reply, ok, S1};
 handle_call(update_map, _From, S) ->
     ?dbg(tpdo, "handle_call: update_map", []),
-    {Ts,Is} =
+    {Type, {Ts,Is}} =
 	if S#s.valid andalso S#s.state == ?Operational ->
 		tpdo_mapping(S#s.offset, S#s.ctx);
 	   true ->
-		{[],[]}
+		{undefined, {[],[]}}
 	end,
-    S1 = S#s { index_list = Is, type_list=Ts },
+    S1 = S#s { type = Type, index_list = Is, type_list=Ts },
     {reply, ok, S1};
 handle_call({debug, TrueOrFalse}, _From, LD) ->
     put(dbg, TrueOrFalse),
@@ -281,17 +291,26 @@ handle_call(_Request, _From, S) ->
 handle_cast({state, State}, S=#s {offset = I, ctx = Ctx}) 
   when State == ?Operational ->
     ?dbg(tpdo, "handle_cast: state ~p", [State]),
-    {Ts,Is} = tpdo_mapping(I, Ctx),
-    {noreply, S#s {state = State, type_list = Ts, index_list = Is}};
+    {Type, {Ts,Is}} = tpdo_mapping(I, Ctx),
+    {noreply, S#s {state = State, type = Type, type_list = Ts, index_list = Is}};
 handle_cast({state, State}, S) ->
     {noreply, S#s {state = State}};
+handle_cast({nodeid_change, nodeid, OldNid, NewNid},  
+	    S=#s {ctx = Ctx=#tpdo_ctx {nodeid = OldNid}}) ->
+    ?dbg(tpdo, "handle_cast: new nodeid ~5.16.0#", [NewNid]),
+    NewCtx = Ctx#tpdo_ctx {nodeid = NewNid},
+    {noreply, S#s {ctx = NewCtx}};
 handle_cast(sync, S) ->
     {noreply, do_sync(S)};
 handle_cast(rtr, S) ->
     {noreply, do_rtr(S)};
 handle_cast(transmit, S) ->
     {noreply, do_transmit(S)};
+handle_cast({transmit, Destination}, S=#s {type = Type}) 
+  when Type == dam_mpdo ->
+    {noreply, do_transmit(S, Destination)};
 handle_cast(_Msg, S) ->
+    ?dbg(tpdo, "handle_cast: Unknown Msg ~p received, Session = ~p", [_Msg, S]),
     {noreply, S}.
 
 %%--------------------------------------------------------------------
@@ -344,14 +363,13 @@ code_change(_OldVsn, State, _Extra) ->
 tpdo_mapping(Offset, Ctx) ->
     ?dbg(tpdo, "tpdo_mapping: offset=~8.16.0#", [Offset]),
     case co_node:tpdo_mapping(Offset, Ctx) of
-	{tpdo, Mapping} -> 
-	    ?dbg(tpdo, "tpdo_mapping: mapping = ~p", [Mapping]),
-	    Mapping;
-	%% {mpdo,Mapping} -> %% FIXME
+	{Type, Mapping} -> 
+	    ?dbg(tpdo, "tpdo_mapping: ~p mapping = ~p", [Type, Mapping]),
+	    {Type, Mapping};
 	_Error ->
 	    ?dbg(tpdo, "tpdo_mapping: mapping error= ~p", [_Error]),
 	    %% Should we terminate ??
-	    {[],[]}
+	    {undefined, {[],[]}} 
     end.
 
 do_transmit(S=#s {state = ?Operational})->
@@ -364,6 +382,14 @@ do_transmit(S=#s {state = ?Operational})->
 	    S  %% ignore, produce error
     end;
 do_transmit(S) ->
+    S.
+
+do_transmit(S=#s {state = ?Operational, type = dam_mpdo}, Destination)->
+    ?dbg(tpdo, "do_transmit: dam_mpdo to ~p", [Destination]),
+    do_send(S,Destination, true);
+do_transmit(S, _Destination) ->
+    ?dbg(tpdo, "do_transmit: dam_mpdo to ~p, wrong type/state in session ~p", 
+	[_Destination, S]),
     S.
 
 do_rtr(S=#s {state = ?Operational}) ->
@@ -403,26 +429,106 @@ do_sync(S=#s {state = ?Operational}) ->
 do_sync(S) ->
     S.
 
-do_send(S=#s {state = ?Operational, index_list = IL, type_list = TL, ctx = Ctx}, 
+do_send(S=#s {state = ?Operational, type = tpdo, ctx = Ctx, 
+	      index_list = IL, type_list = TL}, 
 	true) ->
-    ?dbg(tpdo, "do_send:", []),
+    ?dbg(tpdo, "do_send: tpdo", []),
     if S#s.itmr =:= false ->
 	    ?dbg(tpdo, "do_send: indexes = ~w", [IL]),
-	    ValueList = tpdo_values(IL, Ctx, []),
-	    ?dbg(tpdo, "do_send: values = ~w, types = ~w", 
-		 [ValueList, TL]),
-	    Data = co_codec:encode_pdo(ValueList,TL),
-	    ?dbg(tpdo, "do_send: data = ~p", [Data]),
-	    Frame = #can_frame { id = S#s.id,
-				 len = byte_size(Data),
-				 data = Data },
-	    can:send_from(S#s.from, Frame),
-	    ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
-	    S#s { emit=false, itmr=ITmr };
+	    case tpdo_values(IL, Ctx, []) of
+		{error, Reason} ->
+		    io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
+			      [self(), Reason]),
+		    S;
+		ValueList ->
+		    ?dbg(tpdo, "do_send: values = ~w, types = ~w", 
+			 [ValueList, TL]),
+		    Data = co_codec:encode_pdo(ValueList,TL),
+		    ?dbg(tpdo, "do_send: data = ~p", [Data]),
+		    Frame = #can_frame { id = S#s.id,
+					 len = byte_size(Data),
+					 data = Data },
+		    can:send_from(S#s.from, Frame),
+		    ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
+		    S#s { emit=false, itmr=ITmr }
+	    end;
        true ->
 	    S#s { emit=true }  %% inhibit is running, delay transmission
     end;
+do_send(S=#s {state = ?Operational, type = sam_mpdo,
+	      ctx = Ctx=#tpdo_ctx {nodeid = Nid}, 
+	      index_list = [Index = {Ix, Si}], 
+	      type_list = [T = {_Type, ?MPDO_DATA_SIZE}]}, 
+	true) when Nid =/= undefined ->
+    ?dbg(tpdo, "do_send: sam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
+    if S#s.itmr =:= false ->
+	    case co_node:tpdo_value(Index, Ctx) of
+		{ok, Value} ->
+		    Data = co_codec:encode_pdo([0, Nid, Ix, Si, Value], 
+					       [{?UNSIGNED8, 1},
+						{?UNSIGNED8, 7},
+						{?UNSIGNED16, 16},
+						{?UNSIGNED8, 8}, T]),
+		    ?dbg(tpdo, "do_send: data = ~p", [Data]),
+		    Frame = #can_frame { id = S#s.id,
+					 len = byte_size(Data),
+					 data = Data },
+		    can:send_from(S#s.from, Frame),
+		    ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
+		    S#s { emit=false, itmr=ITmr };
+		{error, Reason} = E->
+		    io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
+			      [self(), Reason]),
+		    E
+	    end;
+       true ->
+	    S#s { emit=true }  %% inhibit is running, delay transmission
+    end;
+do_send(S,true) ->
+    ?dbg(tpdo, "do_send: invalid combination, session = ~p", [S]),
+    S;
 do_send(S,_) ->
+    S.
+
+do_send(S=#s {state = ?Operational, type = dam_mpdo, ctx = Ctx, 
+	      index_list = [Index = {Ix, Si}], 
+	      type_list = [{Type, Size}]}, 
+	Destination, true) 
+  when Size =< ?MPDO_DATA_SIZE->
+    ?dbg(tpdo, "do_send: dam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
+    if S#s.itmr =:= false ->
+	    case co_node:tpdo_value(Index, Ctx) of
+		{ok, Value} ->
+		    Dest = case Destination of
+			       broadcast -> 0;
+			       NodeId -> NodeId
+			   end,
+		    Data = co_codec:encode_pdo([1, Dest, Ix, Si, Value], 
+					       [{?UNSIGNED8, 1},
+						{?UNSIGNED8, 7},
+						{?UNSIGNED16, 16},
+						{?UNSIGNED8, 8}, 
+						{Type, ?MPDO_DATA_SIZE}]),
+		    ?dbg(tpdo, "do_send: data = ~p", [Data]),
+		    Frame = #can_frame { id = S#s.id,
+					 len = byte_size(Data),
+					 data = Data },
+		    can:send_from(S#s.from, Frame),
+		    ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
+		    S#s { emit=false, itmr=ITmr };
+		{error, Reason} = E->
+		    io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
+			      [self(), Reason]),
+		    E
+	    end;
+       true ->
+	    S#s { emit=true }  %% inhibit is running, delay transmission
+    end;
+do_send(S,_Dest,true) ->
+    ?dbg(tpdo, "do_send: invalid combination, session = ~p, destination = ~p", 
+	 [S, _Dest]),
+    S;
+do_send(S,_, false) ->
     S.
 
 
@@ -432,9 +538,7 @@ tpdo_values([Index | Rest], Ctx, ValueList) ->
     case co_node:tpdo_value(Index, Ctx) of
 	{ok, Value} ->
 	    tpdo_values(Rest, Ctx, [Value | ValueList]);
-	{error, Reason} = E->
-	    io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
-		      [self(), Reason]),
+	{error, _Reason} = E->
 	    E
     end.
 
