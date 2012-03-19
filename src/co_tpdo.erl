@@ -362,7 +362,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 tpdo_mapping(Offset, Ctx) ->
     ?dbg(tpdo, "tpdo_mapping: offset=~8.16.0#", [Offset]),
-    case co_node:tpdo_mapping(Offset, Ctx) of
+    case co_api:tpdo_mapping(Offset, Ctx) of
 	{Type, Mapping} -> 
 	    ?dbg(tpdo, "tpdo_mapping: ~p mapping = ~p", [Type, Mapping]),
 	    {Type, Mapping};
@@ -462,7 +462,7 @@ do_send(S=#s {state = ?Operational, type = sam_mpdo,
 	true) when Nid =/= undefined ->
     ?dbg(tpdo, "do_send: sam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
     if S#s.itmr =:= false ->
-	    case co_node:tpdo_value(Index, Ctx) of
+	    case co_api:tpdo_value(Index, Ctx) of
 		{ok, Value} ->
 		    Data = co_codec:encode_pdo([0, Nid, Ix, Si, Value], 
 					       [{?UNSIGNED8, 1},
@@ -497,7 +497,7 @@ do_send(S=#s {state = ?Operational, type = dam_mpdo, ctx = Ctx,
   when Size =< ?MPDO_DATA_SIZE->
     ?dbg(tpdo, "do_send: dam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
     if S#s.itmr =:= false ->
-	    case co_node:tpdo_value(Index, Ctx) of
+	    case co_api:tpdo_value(Index, Ctx) of
 		{ok, Value} ->
 		    Dest = case Destination of
 			       broadcast -> 0;
@@ -535,7 +535,7 @@ do_send(S,_, false) ->
 tpdo_values([], _Ctx, ValueList) ->
     lists:reverse(ValueList);
 tpdo_values([Index | Rest], Ctx, ValueList) ->
-    case co_node:tpdo_value(Index, Ctx) of
+    case co_api:tpdo_value(Index, Ctx) of
 	{ok, Value} ->
 	    tpdo_values(Rest, Ctx, [Value | ValueList]);
 	{error, _Reason} = E->

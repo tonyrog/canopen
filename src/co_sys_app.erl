@@ -192,9 +192,9 @@ loop_data(Pid) ->
 %% @end
 %%--------------------------------------------------------------------
 init(CoSerial) ->
-    {ok, _Dict} = co_node:attach(CoSerial),
-    co_node:reserve(CoSerial, ?IX_STORE_PARAMETERS, ?MODULE),
-    co_node:reserve(CoSerial, ?IX_RESTORE_DEFAULT_PARAMETERS, ?MODULE),
+    {ok, _Dict} = co_api:attach(CoSerial),
+    co_api:reserve(CoSerial, ?IX_STORE_PARAMETERS, ?MODULE),
+    co_api:reserve(CoSerial, ?IX_RESTORE_DEFAULT_PARAMETERS, ?MODULE),
     {ok, #loop_data {state=running, co_node = CoSerial}}.
 
 
@@ -279,7 +279,7 @@ handle_call(_Request, _From, LoopData) ->
 
     
 handle_store(LoopData=#loop_data {co_node = CoNode}, ?EVAS) ->
-    case co_node:save_dict(CoNode) of
+    case co_api:save_dict(CoNode) of
 	ok ->
 	    {reply, ok, LoopData};
 	{error, _Reason} ->
@@ -291,7 +291,7 @@ handle_store(LoopData, _NotOk) ->
     {reply, {error, ?abort_local_control_error}, LoopData}.
 
 handle_restore(LoopData=#loop_data {co_node = CoNode}, ?DOAL) ->
-    case co_node:load_dict(CoNode) of
+    case co_api:load_dict(CoNode) of
 	ok ->
 	    {reply, ok, LoopData};
 	{error, _Reason} ->
@@ -304,11 +304,11 @@ handle_restore(LoopData, _NotOk) ->
 
 
 handle_stop(LoopData=#loop_data {co_node = CoNode}) ->
-    case co_node:alive(LoopData#loop_data.co_node) of
+    case co_api:alive(LoopData#loop_data.co_node) of
 	true ->
-	    co_node:unreserve(CoNode, ?IX_STORE_PARAMETERS),
-	    co_node:unreserve(CoNode, ?IX_RESTORE_DEFAULT_PARAMETERS),
-	    co_node:detach(CoNode);
+	    co_api:unreserve(CoNode, ?IX_STORE_PARAMETERS),
+	    co_api:unreserve(CoNode, ?IX_RESTORE_DEFAULT_PARAMETERS),
+	    co_api:detach(CoNode);
 	false -> 
 	    do_nothing %% Not possible to detach and unsubscribe
     end,

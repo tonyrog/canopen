@@ -175,8 +175,8 @@ loop_data() ->
 init({CoSerial, {Index, RFileName, WFileName}, Starter}) ->
     ct:pal(?NAME, "Starting with index = ~.16B, readfile = ~p, writefile = ~p\n",
 	   [Index, RFileName, WFileName]),
-    {ok, _DictRef} = co_node:attach(CoSerial),
-    ok = co_node:reserve(CoSerial, Index, ?MODULE),
+    {ok, _DictRef} = co_api:attach(CoSerial),
+    ok = co_api:reserve(CoSerial, Index, ?MODULE),
     {ok, #loop_data {starter = Starter, co_node = CoSerial, index = Index,
 		     readfilename = RFileName, writefilename = WFileName}}.
 
@@ -286,11 +286,11 @@ handle_call(loop_data, _From, LoopData) ->
     {reply, ok, LoopData};
 handle_call(stop, _From, LoopData) ->
     ?dbg(?NAME, "handle_call: stop\n",[]),
-    case co_node:alive(LoopData#loop_data.co_node) of
+    case co_api:alive(LoopData#loop_data.co_node) of
 	true ->
-	    co_node:unreserve(LoopData#loop_data.co_node, LoopData#loop_data.index),
+	    co_api:unreserve(LoopData#loop_data.co_node, LoopData#loop_data.index),
 	    ?dbg(?NAME, "stop: unsubscribed.\n",[]),
-	    co_node:detach(LoopData#loop_data.co_node);
+	    co_api:detach(LoopData#loop_data.co_node);
 	false -> 
 	    do_nothing %% Not possible to detach and unsubscribe
     end,

@@ -202,13 +202,13 @@ s_writing({Mref, Reply} = _M, LD)  ->
 	{Mref, ok} ->
 	    %% Atomic reply
 	    erlang:demonitor(Mref, [flush]),
-%%	    co_node:object_event(LD#loop_data.node_pid, 
+%%	    co_api:object_event(LD#loop_data.node_pid, 
 %%				 {LD#loop_data.index, LD#loop_data.subind}),
 	    {stop, normal, LD};
 	{Mref, {ok, Ref}} when is_reference(Ref)->
 	    %% Streamed reply
 	    erlang:demonitor(Mref, [flush]),
-%%	    co_node:object_event(LD#loop_data.node_pid, 
+%%	    co_api:object_event(LD#loop_data.node_pid, 
 %%				 {LD#loop_data.index, LD#loop_data.subind}),
 	    {stop, normal, LD};
 	_Other ->

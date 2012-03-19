@@ -291,7 +291,7 @@ write_begin(S) ->
     Ctx= S#co_session.ctx,
     Index = S#co_session.index,
     SubInd = S#co_session.subind,
-    case co_node:reserver_with_module(Ctx#sdo_ctx.res_table, Index) of
+    case co_api:reserver_with_module(Ctx#sdo_ctx.res_table, Index) of
 	[] ->
 	    ?dbg(srv, "write_begin: No reserver for index ~7.16.0#\n", [Index]),
 	    central_write_begin(Ctx, Index, SubInd);
@@ -351,7 +351,7 @@ read_begin(S) ->
     Ctx= S#co_session.ctx,
     Index = S#co_session.index,
     SubInd = S#co_session.subind,
-    case co_node:reserver_with_module(Ctx#sdo_ctx.res_table, Index) of
+    case co_api:reserver_with_module(Ctx#sdo_ctx.res_table, Index) of
 	[] ->
 	    ?dbg(srv, "read_begin: No reserver for index ~7.16.0#\n", [Index]),
 	    central_read_begin(Ctx, Index, SubInd);
@@ -431,7 +431,7 @@ start_segment_download(S) ->
 		{ok, _Buf1} ->
 		    R = ?mk_scs_initiate_download_response(IX,SI),
 		    send(S, R),
-		    co_node:object_event(S#co_session.node_pid, 
+		    co_api:object_event(S#co_session.node_pid, 
 					 {S#co_session.index, S#co_session.subind}),
 		    {stop, normal, S};
 		{error,Reason} ->
@@ -501,7 +501,7 @@ s_segmented_download(M, S) when is_record(M, can_frame) ->
 		    R = ?mk_scs_download_segment_response(T),
 		    send(S1,R),
 		    if Eod ->
-			    co_node:object_event(S1#co_session.node_pid, 
+			    co_api:object_event(S1#co_session.node_pid, 
 						 {S1#co_session.index,
 						  S1#co_session.subind}),
 			    {stop, normal, S1};
@@ -600,7 +600,7 @@ s_writing_segment_end({Mref, Reply} = M, S)  ->
 		    ?dbg(srv, "s_writing_segment_end: not expedited\n", []),
 		    do_nothing
 	    end,
-	    co_node:object_event(S#co_session.node_pid, 
+	    co_api:object_event(S#co_session.node_pid, 
 				 {S#co_session.index, S#co_session.subind}),
 	    {stop, normal, S};
 	not_ok ->
@@ -1255,7 +1255,7 @@ s_block_download_end(M, S) when is_record(M, can_frame) ->
 			{ok, _Buf} -> 
 			    R = ?mk_scs_block_download_end_response(),
 			    send(S, R),
-			    co_node:object_event(S#co_session.node_pid, 
+			    co_api:object_event(S#co_session.node_pid, 
 						 {S#co_session.index,
 						  S#co_session.subind}),
 			    {stop, normal, S};

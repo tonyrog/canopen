@@ -18,10 +18,6 @@
 -include("co_app.hrl").
 -include("co_debug.hrl").
 
-%% API
--export([start_link/2, stop/1]).
--export([attach/1, detach/1]).
-
 %% gen_server callbacks
 -export([init/1, 
 	 handle_call/3, 
@@ -30,35 +26,11 @@
 	 terminate/2,
 	 code_change/3]).
 
-%% Admin interface
--export([load_dict/1, load_dict/2]).
--export([save_dict/1, save_dict/2]).
--export([get_option/2, set_option/3]).
--export([alive/1]).
-
 %% Application interface
--export([subscribe/2, unsubscribe/2]).
--export([reserve/3, unreserve/2]).
--export([my_subscriptions/1, my_subscriptions/2]).
--export([my_reservations/1, my_reservations/2]).
--export([all_subscribers/1, all_subscribers/2]).
--export([all_reservers/1, reserver/2]).
--export([object_event/2, pdo_event/2, dam_mpdo_event/3]).
--export([notify/3, notify/4, notify/5]). %% To send MPOs
-
-%% CANopen application internal
--export([add_entry/2, get_entry/2]).
--export([get_object/2]).
--export([set/3, value/2]).
--export([store/6, fetch/6]).
+-export([notify/4]). %% To send MPOs
 -export([subscribers/2]).
 -export([reserver_with_module/2]).
--export([tpdo_mapping/2, rpdo_mapping/2, tpdo_set/3, tpdo_value/2]).
-
-%% Test interface
--export([dump/1, dump/2, loop_data/1]).
--export([state/2]).
--export([direct_set/3]).
+-export([tpdo_mapping/2, rpdo_mapping/2, tpdo_value/4]).
 
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
 
@@ -86,703 +58,6 @@
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Description: Starts the CANOpen node.
-%%
-%% Options: 
-%%          {use_serial_as_xnodeid, boolean()} 
-%%          {nodeid, integer()}       - 1-126
-%%          {time_stamp,  timeout()}  - ( 60000 )  1m <br/>
-%%          {sdo_timeout, timeout()}  - ( 1000 ) <br/>
-%%          {blk_timeout, timeout()}  - ( 500 ) <br/>
-%%          {pst, integer()}          - ( 16 ) <br/>
-%%          {max_blksize, integer()}  - ( 74 = 518 bytes) <br/>
-%%          {use_crc, boolean()}      - use crc for block (true) <br/>
-%%          {readbufsize, integer()}  - size of buf when reading from app <br/>
-%%          {load_ratio, float()}     - ratio when time to fill read_buf <br/> 
-%%          {atomic_limit, integer()} - limit to size of atomic variable <br/>
-%%          {load_last_saved, boolean()} - load default dictionary file <br/>
-%%          {dict_file, string()}     - non default dictionary file to load,
-%%                                      overrides load_last_saved <br/>
-%%          {debug, boolean()}        - Enable/Disable trace output<br/>
-%%          {unlinked, boolean()}     - Start process linked (default) or not <br/>
-%%         
-%% @end
-%%--------------------------------------------------------------------
-start_link(S, Opts) ->
-    %% Trace output enable/disable
-    put(dbg, proplists:get_value(debug,Opts,false)), 
-
-    F =	case proplists:get_value(unlinked,Opts,false) of
-	    true -> start;
-	    false -> start_link
-	end,
-
-    ?dbg(node, "start_link: Serial = ~p, Opts = ~p", [S, Opts]),
-    Serial = serial(S),
-    
-    case verify_options(Opts) of
-	ok ->
-	    Name = name(Opts, Serial),
-	    ?dbg(node, "Starting co_node with Name = ~p, Serial = ~.16#", 
-		 [Name, Serial]),
-	    gen_server:F({local, Name}, ?MODULE, {Serial,Name,Opts}, []);
-	E ->
-	    E
-    end.
-
-verify_options([]) ->
-    ok;
-verify_options([{Opt, Value} | Rest]) ->
-    case verify_option(Opt, Value) of
-	ok ->
-	    verify_options(Rest);
-	E ->
-	    E
-    end.
-%%
-%% Get serial number
-%%
-
-serial(Serial) when is_integer(Serial) ->
-    Serial band 16#FFFFFFFF;
-serial(_Serial) ->
-    erlang:error(badarg).
-    
-name(Opts, Serial) ->
-    case proplists:lookup(name, Opts) of
-	{name,Name} when is_atom(Name) ->
-	    Name;
-	none ->
-	    list_to_atom(co_lib:serial_to_string(Serial))
-    end.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Stops the CANOpen node.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec stop(Identity::term()) -> ok | {error, Reason::atom()}.
-				  
-stop(Identity) ->
-    gen_server:call(identity_to_pid(Identity), stop).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Checks if the co_node is alive.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec alive(Identity::term()) -> Reply::boolean().
-				  
-alive(Identity) ->
-    is_process_alive(identity_to_pid(Identity)).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Loads the last saved dict.
-%%
-%% @end
-%%-------------------------------------------------------------------
--spec load_dict(Identity::term()) -> 
-		       ok | {error, Error::atom()}.
-
-load_dict(Identity) ->
-    gen_server:call(identity_to_pid(Identity), load_dict, 10000).
-    
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Loads a new Object Dictionary from File.
-%%
-%% @end
-%%-------------------------------------------------------------------
--spec load_dict(Identity::term(), File::string()) -> 
-		       ok | {error, Error::atom()}.
-
-load_dict(Identity, File) ->
-    gen_server:call(identity_to_pid(Identity), {load_dict, File}, 10000).
-    
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Saves the Object Dictionary to a default file.
-%%
-%% @end
-%%-------------------------------------------------------------------
--spec save_dict(Identity::term()) -> 
-		       ok | {error, Error::atom()}.
-
-save_dict(Identity) ->
-    gen_server:call(identity_to_pid(Identity), save_dict, 10000).
-    
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Saves the Object Dictionary to a file.
-%%
-%% @end
-%%-------------------------------------------------------------------
--spec save_dict(Identity::term(), File::string()) -> 
-		       ok | {error, Error::atom()}.
-
-save_dict(Identity, File) ->
-    gen_server:call(identity_to_pid(Identity), {save_dict, File}, 10000).
-    
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Gets value of option variable. (For testing)
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec get_option(Identity::term(), Option::atom()) -> 
-			{option, Value::term()} | 
-			{error, unkown_option}.
-
-get_option(Identity, Option) ->
-    gen_server:call(identity_to_pid(Identity), {option, Option}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Sets value of option variable. (For testing)
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec set_option(Identity::term(), Option::atom(), NewValue::term()) -> 
-			ok | {error, Reason::string()}.
-
-set_option(Identity, Option, NewValue) ->
-    ?dbg(node, "set_option: Option = ~p, NewValue = ~p",[Option, NewValue]),
-    case verify_option(Option, NewValue) of
-	ok ->
-	    gen_server:call(identity_to_pid(Identity), {option, Option, NewValue});	    
-	{error, _Reason} = Error ->
-	    ?dbg(node, "set_option: option rejected, reason = ~p",[_Reason]),
-	    Error
-    end.
-
-verify_option(Option, NewValue) 
-  when Option == vendor;
-       Option == max_blksize;
-       Option == readbufsize;
-       Option == time_stamp; 
-       Option == sdo_timeout;
-       Option == blk_timeout;
-       Option == atomic_limit ->
-    if is_integer(NewValue) andalso NewValue > 0 ->
-	    ok;
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to a positive integer value."}
-    end;
-verify_option(Option, NewValue) 
-  when Option == pst ->
-    if is_integer(NewValue) andalso NewValue >= 0 ->
-	    ok;
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to a positive integer value or zero."}
-    end;
-verify_option(Option, NewValue) 
-  when Option == nodeid ->
-    if is_integer(NewValue) andalso NewValue >= 0 andalso NewValue < 127->
-	    ok;
-       NewValue =:= undefined ->
-	    ok;
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to an integer between 0 and 126"
-	         " or undefined."}
-    end;
-verify_option(Option, NewValue) 
-  when Option == xnodeid ->
-    if is_integer(NewValue) andalso NewValue > 2#1111111 %% Min 8 bits ??
-       andalso NewValue < 2#1000000000000000000000000 -> %% Max 24 bits
-	    ok;
-       NewValue =:= undefined ->
-	    ok;
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to an integer value between 8 and 24 bits"
-	         " or undefined."}
-    end;
-verify_option(Option, NewValue) 
-  when Option == use_serial_as_xnodeid;
-       Option == use_crc;
-       Option == load_last_saved;
-       Option == debug;
-       Option == unlinked ->
-    if is_boolean(NewValue) ->
-	    ok;
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to true or false."}
-    end;
-verify_option(Option, NewValue) 
-  when Option == load_ratio ->
-    if is_float (NewValue) andalso NewValue > 0 andalso NewValue =< 1 ->
-	    ok;
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to a float value between 0 and 1."}
-    end;
-verify_option(Option, NewValue) 
-  when Option == name;
-       Option == dict_file ->
-    if is_list(NewValue) orelse is_atom(NewValue)->
-	    ok;
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to a string or an atom."}
-    end;
-verify_option(Option, _NewValue) ->
-    {error, "Option " ++ atom_to_list(Option) ++ " unknown."}.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Attches the calling process to the CANnode idenified by Identity.
-%% In return a dictionary reference is given so that the application
-%% can store its object in it if it wants, using the co_dict API.
-%% @end
-%%--------------------------------------------------------------------
--spec attach(Identity::term()) -> 
-		    {ok, DictRef::term()} | 
-		    {error, Error::atom()}.
-
-attach(Identity) ->
-    gen_server:call(identity_to_pid(Identity), {attach, self()}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Detaches the calling process from the CANnode idenified by Identity.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec detach(Identity::term()) -> ok | {error, Error::atom()}.
-
-detach(Identity) ->
-    gen_server:call(identity_to_pid(Identity), {detach, self()}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Adds a subscription to changes of the Dictionary Object in position Index.<br/>
-%% Index can also be a range [Index1 - Index2].
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec subscribe(Identity::term(), Index::integer() | 
-					  list(Index::integer())) -> 
-		       ok | {error, Error::atom()}.
-
-subscribe(Identity, Ix) ->
-    gen_server:call(identity_to_pid(Identity), {subscribe, Ix, self()}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Removes a subscription to changes of the Dictionary Object in position Index.<br/>
-%% Index can also be a range [Index1 - Index2].
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec unsubscribe(Identity::term(), Index::integer() | 
-					    list(Index::integer())) -> 
-		       ok | {error, Error::atom()}.
-unsubscribe(Identity, Ix) ->
-    gen_server:call(identity_to_pid(Identity), {unsubscribe, Ix, self()}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Returns the Indexes for which the application idenified by Pid 
-%% has subscriptions.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec my_subscriptions(Identity::term(), Pid::pid()) -> 
-			      list(Index::integer()) | 
-			      {error, Error::atom()}.
-my_subscriptions(Identity, Pid) ->
-    gen_server:call(identity_to_pid(Identity), {subscriptions, Pid}).
-
-%%--------------------------------------------------------------------
-%% @spec my_subscriptions(Identity) -> [Index] | {error, Error}
-%%
-%% @doc
-%% Returns the Indexes for which the calling process has subscriptions.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec my_subscriptions(Identity::term()) -> 
-			      list(Index::integer()) | 
-			      {error, Error::atom()}.
-my_subscriptions(Identity) ->
-    gen_server:call(identity_to_pid(Identity), {subscriptions, self()}).
-
-%%--------------------------------------------------------------------
-%% @spec all_subscribers(Identity) -> [Pid] | {error, Error}
-%%
-%% @doc
-%% Returns the Pids of all applications that subscribes to any Index.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec all_subscribers(Identity::term()) -> 
-			     list(Pid::pid()) | 
-			     {error, Error::atom()}.
-all_subscribers(Identity) ->
-    gen_server:call(identity_to_pid(Identity), {subscribers}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Returns the Pids of all applications that subscribes to Index.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec all_subscribers(Identity::term(), Ix::integer()) ->
-			     list(Pid::pid()) | 
-			     {error, Error::atom()}.
-
-all_subscribers(Identity, Ix) ->
-    gen_server:call(identity_to_pid(Identity), {subscribers, Ix}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Adds a reservation to an index.
-%% Module:index_specification will be called if needed.
-%% Index can also be a range {Index1, Index2}.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec reserve(Identity::term(), Index::integer(), Module::atom()) -> 
-		     ok | {error, Error::atom()}.
-
-reserve(Identity, Ix, Module) ->
-    gen_server:call(identity_to_pid(Identity), {reserve, Ix, Module, self()}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Removes a reservation to changes of the Dictionary Object in position Index.
-%% Index can also be a range {Index1, Index2}.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec unreserve(Identity::term(), Index::integer()) -> 
-		       ok | {error, Error::atom()}.
-unreserve(Identity, Ix) ->
-    gen_server:call(identity_to_pid(Identity), {unreserve, Ix, self()}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Returns the Indexes for which Pid has reservations.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec my_reservations(Identity::term(), Pid::pid()) -> 
-			     list(Index::integer()) | 
-			     {error, Error::atom()}.
-
-my_reservations(Identity, Pid) ->
-    gen_server:call(identity_to_pid(Identity), {reservations, Pid}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Returns the Indexes for which the calling process has reservations.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec my_reservations(Identity::term()) ->
-			     list(Index::integer()) | 
-			     {error, Error::atom()}.
-
-my_reservations(Identity) ->
-    gen_server:call(identity_to_pid(Identity), {reservations, self()}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Returns the Pids that has reserved any index.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec all_reservers(Identity::term()) ->
-			   list(Pid::pid()) | {error, Error::atom()}.
-
-all_reservers(Identity) ->
-    gen_server:call(identity_to_pid(Identity), {reservers}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Returns the Pid that has reserved index if any.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec reserver(Identity::term(), Ix::integer()) ->
-		      list(Pid::pid()) | {error, Error::atom()}.
-
-reserver(Identity, Ix) ->
-    gen_server:call(identity_to_pid(Identity), {reserver, Ix}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Tells the co_node that an object has been updated so that any
-%% subscribers can be informed.
-%% @end
-%%--------------------------------------------------------------------
--spec object_event(CoNodePid::pid(), Index::{Ix::integer(), Si::integer()}) ->
-			  ok | {error, Error::atom()}.
-
-object_event(CoNodePid, Index) ->
-    gen_server:cast(CoNodePid, {object_event, Index}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Tells the co_node that a PDO should be transmitted.
-%% @end
-%%--------------------------------------------------------------------
--spec pdo_event(CoNode::pid() | integer(), CobId::integer()) ->
-		       ok | {error, Error::atom()}.
-
-pdo_event(Identity, CobId) ->
-    gen_server:cast(identity_to_pid(Identity), {pdo_event, CobId}).
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Tells the co_node that an DAM-MPDO should be transmitted.
-%% @end
-%%--------------------------------------------------------------------
--spec dam_mpdo_event(CoNode::pid() | integer(), CobId::integer(), 
-		    DestinationNode::integer() | broadcast) ->
-		       ok | {error, Error::atom()}.
-
-dam_mpdo_event(Identity, CobId, Destination) 
-  when Destination == broadcast orelse
-       (is_integer(Destination) andalso Destination) =< 127 ->
-    gen_server:cast(identity_to_pid(Identity), {dam_mpdo_event, CobId, Destination});
-dam_mpdo_event(_Identity, _CobId, _Destination) ->
-    ?dbg(node, "dam_mpdo_event: Invalid destination = ~p", [_Destination]),
-    {error, invalid_destination}.
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Adds Entry to the Object dictionary.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec add_entry(Identity::term(), Entry::record()) -> 
-		       ok | {error, Error::atom()}.
-
-add_entry(Identity, Ent) ->
-    gen_server:call(identity_to_pid(Identity), {add_entry, Ent}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Gets the Entry at Index in Object dictionary.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec get_entry(Identity::term(), {Index::integer(), SubIndex::integer()}) -> 
-		       ok | {error, Error::atom()}.
-
-get_entry(Identity, Index) ->
-    gen_server:call(identity_to_pid(Identity), {get_entry,Index}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Gets the Object at Index in Object dictionary.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec get_object(Identity::term(), Index::integer()) -> 
-		       ok | {error, Error::atom()}.
-
-get_object(Identity, Ix) ->
-    gen_server:call(identity_to_pid(Identity), {get_object,Ix}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Sets {Ix, Si} to Value.
-%% @end
-%%--------------------------------------------------------------------
--spec set(Identity::term(), 
-	  Index::{Ix::integer(), Si::integer()} |integer(), 
-	  Value::term()) -> 
-		 ok | {error, Error::atom()}.
-
-set(Identity, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    gen_server:call(identity_to_pid(Identity), {set,I,Value});   
-set(Identity, Ix, Value) when is_integer(Ix) ->
-    set(Identity, {Ix, 0}, Value).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Cache {Ix, Si} Value truncated to 64 bits.
-%% @end
-%%--------------------------------------------------------------------
--spec tpdo_set(Identity::term(), 
-	       Index::{Ix::integer(), Si::integer()} | integer(), 
-	       Value::term()) -> 
-		      ok | {error, Error::atom()}.
-
-tpdo_set(Identity, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Value = ~p",
-	 [Identity, Ix, Si, Value]), 
-    gen_server:call(identity_to_pid(Identity), {tpdo_set,I,Value});   
-tpdo_set(Identity, Ix, Value) when is_integer(Ix) ->
-    tpdo_set(Identity, {Ix, 0}, Value).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Set raw value (used to update internal read only tables etc)
-%% @end
-%%--------------------------------------------------------------------
--spec direct_set(Identity::term(), 
-		 Index::{Ix::integer(), Si::integer()} | integer(), 
-		 Value::term()) -> 
-		 ok | {error, Error::atom()}.
-
-direct_set(Identity, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    gen_server:call(identity_to_pid(Identity), {direct_set,I,Value});
-direct_set(Identity, Ix, Value) when is_integer(Ix) ->
-    direct_set(Identity, {Ix, 0}, Value).
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Gets Value for Index.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec value(Identity::term(), 
-	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
-		   Value::term() | {error, Error::atom()}.
-
-value(Identity, {Ix, Si} = I) when ?is_index(Ix), ?is_subind(Si)  ->
-    gen_server:call(identity_to_pid(Identity), {value,I});
-value(Identity, Ix) when is_integer(Ix) ->
-    value(Identity, {Ix, 0}).
-
-%% 
-%% Note on COBID for SDO service
-%%
-%% The manager may have a IX_SDO_SERVER list (1200 - 127F)
-%% Then look there:
-%% If not then check the COBID.
-%% if COBID has the form of:
-%%    0000-xxxxxxx, assume 7bit-NodeID
-%% if COBID has the form of:
-%%    0010000-xxxxxxxxxxxxxxxxxxxxxxxxx, assume 25bit-NodeID
-%% If COBID is either a NodeID  (7-bit or 29-bit25-bit)
-%% 
-%%
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts a store session to store Value at Index:Subind on remote node.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec store(Identity::term() | atom(), Cobid::integer(), 
-	    Index::integer(), SubInd::integer(), 
-	    TransferMode:: block | segment,
-	    Term::{data, binary()} | {app, Pid::pid(), Module::atom()}) ->
-		   ok | {error, Error::atom()}.
-
-store(Identity, COBID, IX, SI, TransferMode, Term) 
-  when ?is_index(IX), ?is_subind(SI) ->
-    ?dbg(node, "store: Identity = ~p, CobId = ~.16#, Ix = ~4.16.0B, Si = ~p, " ++
-	     "Mode = ~p, Term = ~p", 
-	 [Identity, COBID, IX, SI, TransferMode, Term]),
-    Pid = identity_to_pid(Identity),
-    gen_server:call(Pid, {store,TransferMode,COBID,IX,SI,Term}).
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Starts a fetch session to fetch Value at Index:Subind on remote node.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec fetch(Identity::term() | atom(), Cobid::integer(), 
-	    Index::integer(), SubInd::integer(),
- 	    TransferMode:: block | segment,
-	    Term::data | {app, Pid::pid(), Module::atom()}) ->
-		   ok | {ok, Data::binary()} | {error, Error::atom()}.
-
-
-fetch(Identity, COBID, IX, SI, TransferMode, Term)
-  when ?is_index(IX), ?is_subind(SI) ->
-    gen_server:call(identity_to_pid(Identity), {fetch,TransferMode,COBID,IX,SI,Term}).
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Dumps data to standard output.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec dump(Identity::term()) -> ok | {error, Error::atom()}.
-
-dump(Identity) ->
-    dump(Identity, all).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Dumps data to standard output.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec dump(Identity::term(), Qualifier::all | no_dict) -> 
-		  ok | {error, Error::atom()}.
-
-dump(Identity, Qualifier) 
-  when Qualifier == all;
-       Qualifier == no_dict ->
-    gen_server:call(identity_to_pid(Identity), {dump, Qualifier}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Dumps loop data to standard output.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec loop_data(Identity::term()) -> ok | {error, Error::atom()}.
-
-loop_data(Identity) ->
-    gen_server:call(identity_to_pid(Identity), loop_data).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Sets the co_nodes state.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec state(Identity::term(), State::operational | preoperational | stopped) -> 
-		    NodeId::integer() | {error, Error::atom()}.
-
-state(Identity, operational) ->
-    gen_server:call(identity_to_pid(Identity), {state, ?Operational});
-state(Identity, preoperational) ->
-    gen_server:call(identity_to_pid(Identity), {state, ?PreOperational});
-state(Identity, stopped) ->
-    gen_server:call(identity_to_pid(Identity), {state, ?Stopped}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Send notification (from CobId). <br/>
-%% SubInd is set to 0.<br/>
-%% Executing in calling process context.<br/>
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec notify(CobId::integer(), Ix::integer(), Value::term()) -> 
-		    ok | {error, Error::atom()}.
-
-notify(CobId,Index,Value) ->
-    notify(CobId,Index,0,Value).
-
-%%--------------------------------------------------------------------
-%% @doc
 %% Send notification (from CobId). <br/>
 %% Executing in calling process context.<br/>
 %%
@@ -799,21 +74,6 @@ notify(CobId,Index,Subind,Value) ->
 	 [Frame, CobId, FrameID]),
     can:send(Frame).
 
-%%--------------------------------------------------------------------
-%% @doc
-%% Send notification (from NodeId). <br/>
-%% Executing in calling process context.<br/>
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec notify({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
-	     Func::atom(), Ix::integer(), Si::integer(), Value::term()) -> 
-		    ok | {error, Error::atom()}.
-
-notify({xnodeid, XNid}, Func, Index, Subind, Value) ->
-    notify(?XCOB_ID(co_lib:encode_func(Func), XNid),Index,Subind,Value);
-notify({nodeid, Nid}, Func, Index, Subind, Value) ->
-    notify(?COB_ID(co_lib:encode_func(Func), Nid),Index,Subind,Value).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -1055,8 +315,8 @@ handle_call({value,{Ix, Si}}, _From, Ctx) ->
     {reply, Result, Ctx};
 
 handle_call({store,Mode,NodeId,IX,SI,Term}, From, Ctx) ->
-    CobId = complete_nodeid(NodeId),
-    case lookup_sdo_server(CobId,Ctx) of
+    Nid = complete_nodeid(NodeId),
+    case lookup_sdo_server(Nid,Ctx) of
 	ID={Tx,Rx} ->
 	    ?dbg(node, "~s: store: ID = ~p", [Ctx#co_ctx.name,ID]),
 	    case co_sdo_cli_fsm:store(Ctx#co_ctx.sdo,Mode,From,Tx,Rx,IX,SI,Term) of
@@ -1074,12 +334,14 @@ handle_call({store,Mode,NodeId,IX,SI,Term}, From, Ctx) ->
 		    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
 	    end;
 	undefined ->
+	    ?dbg(node, "~s: store: No sdo server found for cob_id ~8.16.0B.", 
+		 [Ctx#co_ctx.name,Nid]),
 	    {reply, {error, badarg}, Ctx}
     end;
 
 handle_call({fetch,Mode,NodeId,IX,SI, Term}, From, Ctx) ->
-    CobId = complete_nodeid(NodeId),
-    case lookup_sdo_server(CobId,Ctx) of
+    Nid = complete_nodeid(NodeId),
+    case lookup_sdo_server(Nid,Ctx) of
 	ID={Tx,Rx} ->
 	    ?dbg(node, "~s: fetch: ID = ~p", [Ctx#co_ctx.name,ID]),
 	    case co_sdo_cli_fsm:fetch(Ctx#co_ctx.sdo,Mode,From,Tx,Rx,IX,SI,Term) of
@@ -1098,6 +360,8 @@ handle_call({fetch,Mode,NodeId,IX,SI, Term}, From, Ctx) ->
 		    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
 	    end;
 	undefined ->
+	    ?dbg(node, "~s: fetch: No sdo server found for cob_id ~8.16.0B.", 
+		 [Ctx#co_ctx.name,Nid]),
 	    {reply, {error, badarg}, Ctx}
     end;
 
@@ -1234,8 +498,8 @@ handle_call({dump, Qualifier}, _From, Ctx) ->
     io:format("   NAME: ~p\n", [Ctx#co_ctx.name]),
     print_nodeid(" NODEID:", Ctx#co_ctx.nodeid),
     print_nodeid("XNODEID:", Ctx#co_ctx.xnodeid),
-    io:format(" VENDOR: ~8.16.0B\n", [Ctx#co_ctx.vendor]),
-    io:format(" SERIAL: ~8.16.0B\n", [Ctx#co_ctx.serial]),
+    io:format(" VENDOR: ~10.16.0#\n", [Ctx#co_ctx.vendor]),
+    io:format(" SERIAL: ~10.16.0#\n", [Ctx#co_ctx.serial]),
     io:format("  STATE: ~s\n", [co_format:state(Ctx#co_ctx.state)]),
 
     io:format("---- NMT TABLE ----\n"),
@@ -1243,9 +507,9 @@ handle_call({dump, Qualifier}, _From, Ctx) ->
       fun(E,_) ->
 	      io:format("  ID: ~w\n", 
 			[E#nmt_entry.id]),
-	      io:format("    VENDOR: ~8.16.0B\n", 
+	      io:format("    VENDOR: ~10.16.0#\n", 
 			[E#nmt_entry.vendor]),
-	      io:format("    SERIAL: ~8.16.0B\n", 
+	      io:format("    SERIAL: ~10.16.0#\n", 
 			[E#nmt_entry.serial]),
 	      io:format("     STATE: ~s\n", 
 			[co_format:state(E#nmt_entry.state)])
@@ -1253,12 +517,12 @@ handle_call({dump, Qualifier}, _From, Ctx) ->
     io:format("---- NODE MAP TABLE ----\n"),
     ets:foldl(
       fun({Sn,NodeId},_) ->
-	      io:format("~8.16.0B => ~w\n", [Sn, NodeId])
+	      io:format("~10.16.0# => ~w\n", [Sn, NodeId])
       end, ok, Ctx#co_ctx.node_map),
     io:format("---- COB TABLE ----\n"),
     ets:foldl(
       fun({CobId, X},_) ->
-	      io:format("~8.16.0B => ~p\n", [CobId, X])
+	      io:format("~10.16.0# => ~p\n", [CobId, X])
       end, ok, Ctx#co_ctx.cob_table),
     io:format("---- SUB TABLE ----\n"),
     ets:foldl(
@@ -1542,14 +806,6 @@ code_change(_OldVsn, Ctx, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Support functions
 %%--------------------------------------------------------------------
-
-%%
-%% Convert an identity to a pid
-%%
-identity_to_pid(Pid) when is_pid(Pid) ->
-    Pid;
-identity_to_pid(Term) ->
-    co_proc:lookup(Term).
 
 
 %% 
@@ -2719,41 +1975,33 @@ reserver_pid(Tab, Ix) when ?is_index(Ix) ->
 	[{Ix, _Mod, Pid}] -> [Pid]
     end.
 
-inform_reserver(Ix, _Ctx=#co_ctx {name = Name, res_table = RTable}) ->
+inform_reserver(Ix, _Ctx=#co_ctx {name = _Name, res_table = RTable}) ->
     Self = self(),
     case reserver_pid(RTable, Ix) of
 	[Self] -> do_nothing;
 	[] -> do_nothing;
 	[Pid] when is_pid(Pid) -> 
 	    ?dbg(node, "~s: inform_subscribers: "
-		 "Sending object event to ~p", [Name, Pid]),
+		 "Sending object event to ~p", [_Name, Pid]),
 	    gen_server:cast(Pid, {object_event, Ix})
     end.
 
 
-lookup_sdo_server(COBID, Ctx) ->
-    case lookup_cobid(COBID, Ctx) of
-	{sdo_rx, SDOTx} -> 
-	    {SDOTx,COBID};
-	undefined ->
-	    if ?is_nodeid_extended(COBID) ->
-		    NodeID = COBID band ?COBID_ENTRY_ID_MASK,
-		    Tx = ?XCOB_ID(?SDO_TX,NodeID),
-		    Rx = ?XCOB_ID(?SDO_RX,NodeID),
-		    %%ets:insert(Ctx#co_ctx.cob_table, {Rx,{sdo_rx,Tx}}),
-		    %%ets:insert(Ctx#co_ctx.cob_table, {Tx,{sdo_tx,Rx}}),
-		    {Tx,Rx};
-	       ?is_nodeid(COBID) ->
-		    NodeID = COBID band 16#7F,
-		    Tx = ?COB_ID(?SDO_TX,NodeID),
-		    Rx = ?COB_ID(?SDO_RX,NodeID),
-		    %%ets:insert(Ctx#co_ctx.cob_table, {Rx,{sdo_rx,Tx}}),
-		    %%ets:insert(Ctx#co_ctx.cob_table, {Tx,{sdo_tx,Rx}}),
-		    {Tx,Rx};
-	       true ->
-		    undefined
-	    end;
-	_ -> undefined
+lookup_sdo_server(Nid, Ctx=#co_ctx {name = _Name, cob_table = CobTable}) ->
+    if ?is_nodeid_extended(Nid) ->
+	    NodeID = Nid band ?COBID_ENTRY_ID_MASK,
+	    Tx = ?XCOB_ID(?SDO_TX,NodeID),
+	    Rx = ?XCOB_ID(?SDO_RX,NodeID),
+	    {Tx,Rx};
+       ?is_nodeid(Nid) ->
+	    NodeID = Nid band 16#7F,
+	    Tx = ?COB_ID(?SDO_TX,NodeID),
+	    Rx = ?COB_ID(?SDO_RX,NodeID),
+	    {Tx,Rx};
+       true ->
+	    ?dbg(node, "~s: lookup_sdo_server: Nid  ~12.16.0# "
+		 "neither extended or short ???", [_Name, Nid]),
+	    undefined
     end.
 
 lookup_cobid(COBID, Ctx) ->
@@ -3001,7 +2249,7 @@ mpdo_mapping(sam_mpdo,Index = {_Ix,_Si},BlockSize,ResTable,Dict,TpdoCache) ->
 
 
 entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
-    case co_node:reserver_with_module(ResTable, Ix) of
+    case reserver_with_module(ResTable, Ix) of
 	[] ->
 	    ?dbg(node, "entry: No reserver for index ~7.16.0#", [Ix]),
 	    co_dict:lookup_entry(Dict, Ix);
@@ -3027,7 +2275,7 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
 		T when T == tpdo orelse T == sam_mpdo orelse T == dam_mpdo ->
 		    %% Store default value in cache ??
 		    ets:insert(TpdoCache, {{Ix, Si}, [0]}),
-		    try Mod:tpdo_callback(Pid, {Ix, Si}, {co_node, tpdo_set}) of
+		    try Mod:tpdo_callback(Pid, {Ix, Si}, {co_api, tpdo_set}) of
 			Res -> Res %% Handle error??
 		    catch error:Reason ->
 			    io:format("WARNING!" 
@@ -3046,11 +2294,8 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
 	    {error, ?abort_internal_error}
     end.
 
-tpdo_value({Ix, Si}, #tpdo_ctx {res_table = ResTable, dict = Dict, 
-				tpdo_cache = TpdoCache}) ->
-	     tpdo_value({Ix, Si}, ResTable, Dict, TpdoCache).
 tpdo_value({Ix, Si} = I, ResTable, Dict, TpdoCache) ->
-    case co_node:reserver_with_module(ResTable, Ix) of
+    case reserver_with_module(ResTable, Ix) of
 	[] ->
 	    ?dbg(node, "tpdo_value: No reserver for index ~7.16.0#", [Ix]),
 	    co_dict:value(Dict, Ix, Si);
@@ -3089,7 +2334,7 @@ cache_value(Cache, I) ->
 	    
     
 rpdo_value({Ix,Si},Value,Type,Ctx) ->
-    case co_node:reserver_with_module(Ctx#co_ctx.res_table, Ix) of
+    case reserver_with_module(Ctx#co_ctx.res_table, Ix) of
 	[] ->
 	    ?dbg(node, "rpdo_value: No reserver for index ~7.16.0#", [Ix]),
 	    try co_dict:set(Ctx#co_ctx.dict, Ix, Si, Value) of
@@ -3193,9 +2438,9 @@ update_error_list([Code|Cs], SI, Ctx) ->
 print_nodeid(Label, undefined) ->
     io:format(Label ++ " not defined\n",[]);
 print_nodeid(" NODEID:", NodeId) ->
-    io:format(" NODEID:" ++ " ~2.16.0B\n", [NodeId]);
+    io:format(" NODEID:" ++ " ~4.16.0#\n", [NodeId]);
 print_nodeid("XNODEID:", NodeId) ->
-    io:format("XNODEID:" ++ " ~6.16.0B\n", [NodeId]).
+    io:format("XNODEID:" ++ " ~8.16.0#\n", [NodeId]).
 
 				       
 

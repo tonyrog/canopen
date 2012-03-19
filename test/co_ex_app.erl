@@ -148,7 +148,7 @@ abort(Pid, Ref) ->
 %%--------------------------------------------------------------------
 init([CoSerial]) ->
     Dict = ets:new(my_dict, [public, ordered_set]),
-    {ok, _DictRef} = co_node:attach(CoSerial),
+    {ok, _DictRef} = co_api:attach(CoSerial),
     load_dict(CoSerial, Dict),
     {ok, #loop_data {state=init, co_node = CoSerial, dict=Dict}}.
 
@@ -157,11 +157,11 @@ load_dict(CoSerial, Dict) ->
 			  ets:insert(Dict, Entry),
 			  case Index of
 			      16#6000 ->			      
-				  co_node:subscribe(CoSerial, Index);
+				  co_api:subscribe(CoSerial, Index);
 			      16#2003 ->			      
-				  co_node:subscribe(CoSerial, Index);
+				  co_api:subscribe(CoSerial, Index);
 			      _Other ->
-				  co_node:reserve(CoSerial, Index, ?MODULE)
+				  co_api:reserve(CoSerial, Index, ?MODULE)
 			  end
 		  end, ?DICT).
 
@@ -303,10 +303,10 @@ handle_call(stop, _From, LoopData) ->
 	_Pid ->
 	    lists:foreach(
 	      fun({{Index, _SubInd}, _Type, _Transfer, _Value}) ->
-		      co_node:unsubscribe(LoopData#loop_data.co_node, Index)
+		      co_api:unsubscribe(LoopData#loop_data.co_node, Index)
 	      end, ?DICT),
 	    ?dbg("~p: stop: unsubscribed.\n",[?MODULE]),
-	    co_node:detach(LoopData#loop_data.co_node)
+	    co_api:detach(LoopData#loop_data.co_node)
     end,
     ?dbg("~p: handle_call: stop detached.\n",[?MODULE]),
     {stop, normal, ok, LoopData};
@@ -365,7 +365,7 @@ handle_cast({write, Ref, Data}, LoopData) ->
     {noreply, LoopData#loop_data {store = Store}};
 handle_cast({object_event, Ix}, LoopData) ->
     ?dbg("~p: handle_cast: My object ~w has changed. ", [?MODULE, Ix]),
-    {ok, Val} = co_node:value(LoopData#loop_data.co_node, Ix),
+    {ok, Val} = co_api:value(LoopData#loop_data.co_node, Ix),
     ?dbg("New value is ~p\n", [Val]),
     {noreply, LoopData};
 handle_cast(_Msg, LoopData) ->

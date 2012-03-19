@@ -205,7 +205,7 @@ write_size(Pid, NewSize) when is_integer(NewSize) ->
 init({CoNode, Dict, Starter}) ->
     DictTable = ets:new(dict_table(self()), [public, named_table, ordered_set]),
     NameTable = ets:new(name_table(self()), [public, named_table, ordered_set]),
-    {ok, _DictRef} = co_node:attach(CoNode),
+    {ok, _DictRef} = co_api:attach(CoNode),
     load_dict(CoNode, Dict, DictTable, NameTable),
     {ok, #loop_data {state=init, co_node = CoNode, dict=DictTable, 
 		     name_table=NameTable, starter = Starter}}.
@@ -225,11 +225,11 @@ load_dict(CoNode, Dict, DictTable, NameTable) ->
 			  ets:insert(NameTable, {Name, Index}),
 			  case Name of
 			      notify ->			      
-				  co_node:subscribe(CoNode, Index);
+				  co_api:subscribe(CoNode, Index);
 			      mpdo ->			      
-				  co_node:subscribe(CoNode, Index);
+				  co_api:subscribe(CoNode, Index);
 			      _Other ->
-				  co_node:reserve(CoNode, Index, ?MODULE)
+				  co_api:reserve(CoNode, Index, ?MODULE)
 			  end
 		  end, Dict).
 
@@ -358,21 +358,21 @@ handle_call({debug, TrueOrFalse}, _From, LD) ->
 handle_call({write_size, NewSize}, _From, LD) ->
     {reply, ok, LD#loop_data {write_size = NewSize}};
 handle_call(stop, _From, LD=#loop_data {co_node = CoNode}) ->
-    case co_node:alive(CoNode) of
+    case co_api:alive(CoNode) of
 	true ->
 	    Name2Index = ets:tab2list(LD#loop_data.name_table),
 	    lists:foreach(
 	      fun({{Index, _SubInd}, _Type, _Transfer, _Value}) ->
 		      case lists:keyfind(Index, 2, Name2Index) of
 			  {notify, Ix} ->
-			      co_node:unsubscribe(CoNode, Ix);
+			      co_api:unsubscribe(CoNode, Ix);
 			  {mpdo, Ix} ->
-			      co_node:unsubscribe(CoNode, Ix);
+			      co_api:unsubscribe(CoNode, Ix);
 			  {_Any, Ix} ->
-			      co_node:unreserve(CoNode, Ix)
+			      co_api:unreserve(CoNode, Ix)
 		      end
 	      end, ets:tab2list(LD#loop_data.dict)),
-	    co_node:detach(CoNode);
+	    co_api:detach(CoNode);
 	false -> 
 	    do_nothing %% Not possible to detach and unsubscribe
     end,
@@ -434,7 +434,7 @@ handle_cast({object_event, Ix}, LD) ->
     [{notify, I}] = ets:lookup(LD#loop_data.name_table, notify),
     case Ix of
 	I ->
-	    {ok, Val} = co_node:value(LD#loop_data.co_node, Ix),
+	    {ok, Val} = co_api:value(LD#loop_data.co_node, Ix),
 	    ?dbg("New value is ~p", [Val]),
 	    LD#loop_data.starter ! {object_event, Ix},
 	    ?dbg("Sent object event to ~p", [LD#loop_data.starter]);

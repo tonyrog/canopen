@@ -88,8 +88,6 @@ init_per_suite(Config) ->
     co_test_lib:start_node(Config),
     co_test_lib:start_node(Config, ?RPDO_NODE),
 
-    co_node:dump(serial(), no_dict),
-
     Config.
 
 %%--------------------------------------------------------------------
@@ -143,10 +141,8 @@ init_per_testcase(_TestCase, Config) ->
     timer:sleep(100),
 
     %% Redo mapping, i.e. calls to tpdo_callback
-    ok = co_node:state(serial(), preoperational),
-    co_node:dump(serial(), no_dict),
-    ok = co_node:state(serial(), operational),
-    co_node:dump(serial(), no_dict),
+    ok = co_api:state(serial(), preoperational),
+    ok = co_api:state(serial(), operational),
     ct:pal("Changed state to operational", []),    
     timer:sleep(100),
 
@@ -262,18 +258,18 @@ send_tpdo0(_Config) ->
     lists:foreach(
       fun({{Ix, Si} = SourceIndex, SourceValue}) -> 
 	      ct:pal("Setting ~.16B:~w to ~p",[Ix, Si, SourceValue]),
-	      co_node:set(serial(), SourceIndex, SourceValue)
+	      co_api:set(serial(), SourceIndex, SourceValue)
       end, SourceList),
 
     %% Send tpdo with new value
-    co_node:pdo_event(serial(), CobId),
+    co_api:pdo_event(serial(), CobId),
 
     %% Wait for new values to be sent to co_node
     timer:sleep(1000),
 
     lists:foreach(
       fun({{IxT, SiT} = TargetIndex, TargetValue}) -> 
-	      {ok, TargetValue} = co_node:value(?RPDO_NODE, TargetIndex),
+	      {ok, TargetValue} = co_api:value(?RPDO_NODE, TargetIndex),
 	      ct:pal("Value for ~.16B:~w is ~p",[IxT, SiT, TargetValue])
       end, TargetList),
     
@@ -333,9 +329,9 @@ send_multi(Config) ->
     set(Config, SourceList),
 
     %% Send tpdo with new value 3 times
-    co_node:pdo_event(serial(), CobId),
-    co_node:pdo_event(serial(), CobId),
-    co_node:pdo_event(serial(), CobId),
+    co_api:pdo_event(serial(), CobId),
+    co_api:pdo_event(serial(), CobId),
+    co_api:pdo_event(serial(), CobId),
 
     %% Receive values 3 times
     rec(TargetList),
@@ -376,7 +372,7 @@ send_tpdo(Config, Tpdo) ->
     set(Config, SourceList),
 
     %% Send tpdo with new value
-    co_node:pdo_event(serial(), CobId),
+    co_api:pdo_event(serial(), CobId),
 
     rec(TargetList),
 

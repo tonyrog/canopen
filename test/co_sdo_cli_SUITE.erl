@@ -12,7 +12,7 @@
 -compile(export_all).
 
 -include_lib("common_test/include/ct.hrl").
-
+-include("canopen.hrl").
 
 
 %%--------------------------------------------------------------------
@@ -100,8 +100,7 @@ all() ->
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
     co_test_lib:start_node(Config),
-    {ok, _Mgr} = co_mgr:start([{unlinked, true}]),
-    ok = co_node:set_option({name, co_mgr}, debug, true),
+    {ok, _Mgr} = co_mgr:start([{unlinked, true}, {debug, true}]),
     ct:pal("Started co_mgr"),
     Config.
 
@@ -162,7 +161,7 @@ init_per_testcase(Case, Config) when Case == store_atomic_segment;
     ct:pal("Testcase: ~p", [Case]),
     {ok, Pid} = co_test_app:start(serial(), app_dict()),
     ok = co_test_app:debug(Pid, true),
-    {ok, Cli} = co_test_app:start({name, co_mgr}, app_dict_cli()),
+    {ok, Cli} = co_test_app:start(?MGR_NODE, app_dict_cli()),
     ok = co_test_app:debug(Cli, true),
     [{app, Cli} | Config];
 init_per_testcase(_TestCase, Config) ->
@@ -472,17 +471,17 @@ store(Config, {{Index, _T, _M, SrvValue}, CliValue}, BlockOrSegment) ->
 fetch(Config, {{Index, _T, _M, SrvValue}, CliValue}, BlockOrSegment) ->
     %% Verify old value
     {Index, _Type, _Transfer, CliValue} = 
-	lists:keyfind(Index, 1, co_test_app:dict({name, co_mgr})),
+	lists:keyfind(Index, 1, co_test_app:dict(?MGR_NODE)),
 
     %% Change to new
     ok = fetch_cmd(Config, Index, BlockOrSegment),
     {Index, _Type, _Transfer, SrvValue} = 
-	lists:keyfind(Index, 1, co_test_app:dict({name, co_mgr})),
+	lists:keyfind(Index, 1, co_test_app:dict(?MGR_NODE)),
 
     ok.
 
 xnodeid() ->
-    {xnodeid, NodeId} = co_node:get_option(serial(), xnodeid),
+    {xnodeid, NodeId} = co_api:get_option(serial(), xnodeid),
     NodeId.
 
 store_cmd(Config, {Ix, Si}, BlockOrSegment) -> 

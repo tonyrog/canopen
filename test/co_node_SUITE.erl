@@ -247,10 +247,10 @@ set_options_nok(_Config) ->
 %%--------------------------------------------------------------------
 unknown_option(_Config) ->
     {error, "Unknown option unknown_option"} = 
-	co_node:get_option(serial(), unknown_option),
+	co_api:get_option(serial(), unknown_option),
     
     {error, "Option unknown_option unknown."} = 
-	co_node:set_option(serial(), unknown_option, any),
+	co_api:set_option(serial(), unknown_option, any),
 
     ok.
 
@@ -267,25 +267,25 @@ nodeid_changes(_Config) ->
 
     %% Both nodeids can't be undefined
     {error, "Not possible to remove last nodeid"} = 
-	co_node:set_option(serial(), nodeid, undefined),
+	co_api:set_option(serial(), nodeid, undefined),
 
     set_option({xnodeid, co_lib:serial_to_xnodeid(serial())}),
     set_option({nodeid, undefined}),
 
     %% Both nodeids can't be undefined
     {error, "Not possible to remove last nodeid"} = 
-	co_node:set_option(serial(), xnodeid, undefined),
+	co_api:set_option(serial(), xnodeid, undefined),
     {error, "Not possible to remove last nodeid"} = 
-	co_node:set_option(serial(), use_serial_as_xnodeid, false),
+	co_api:set_option(serial(), use_serial_as_xnodeid, false),
 
     set_option({nodeid, 7}),
 
     set_option({use_serial_as_xnodeid, false}),
-    {xnodeid, undefined} = co_node:get_option(serial(), xnodeid),
+    {xnodeid, undefined} = co_api:get_option(serial(), xnodeid),
 
     set_option({use_serial_as_xnodeid, true}),
     XNodeId = co_lib:serial_to_xnodeid(serial()),
-    {xnodeid, XNodeId} = co_node:get_option(serial(), xnodeid),
+    {xnodeid, XNodeId} = co_api:get_option(serial(), xnodeid),
 
     ok.
     
@@ -298,16 +298,16 @@ nodeid_changes(_Config) ->
 %%--------------------------------------------------------------------
 restore_dict(_Config) ->
     {Index, NewValue, _Type} = ct:get_config(dict_index),
-    {ok, OldValue} = co_node:value(serial(), Index),
-    ok = co_node:save_dict(serial()),
+    {ok, OldValue} = co_api:value(serial(), Index),
+    ok = co_api:save_dict(serial()),
 
     %% Change a value and see that it is changed
-    ok = co_node:set(serial(), Index, NewValue),
-    {ok, NewValue} = co_node:value(serial(), Index),
+    ok = co_api:set(serial(), Index, NewValue),
+    {ok, NewValue} = co_api:value(serial(), Index),
 
     %% Restore the dictionary and see that the value is restored
-    ok = co_node:load_dict(serial()),
-    {ok, OldValue} = co_node:value(serial(), Index),
+    ok = co_api:load_dict(serial()),
+    {ok, OldValue} = co_api:value(serial(), Index),
 
     ok.
 
@@ -320,7 +320,7 @@ restore_dict(_Config) ->
 %%--------------------------------------------------------------------
 save_and_load(Config) ->
     {Index, NewValue, _Type} = ct:get_config(dict_index),
-    {ok, OldValue} = co_node:value(serial(), Index),
+    {ok, OldValue} = co_api:value(serial(), Index),
 
     [] = 
 	os:cmd(co_test_lib:set_cmd(Config, 
@@ -328,8 +328,8 @@ save_and_load(Config) ->
 				   ?EVAS, unsigned32, segment, 9000)),
 
     %% Change a value and see that it is changed
-    ok = co_node:set(serial(), Index, NewValue),
-    {ok, NewValue} = co_node:value(serial(), Index),
+    ok = co_api:set(serial(), Index, NewValue),
+    {ok, NewValue} = co_api:value(serial(), Index),
 
     %% Restore the dictionary and see that the value is restored
     [] = 
@@ -337,7 +337,7 @@ save_and_load(Config) ->
 				   {?IX_RESTORE_DEFAULT_PARAMETERS, ?SI_RESTORE_ALL}, 
 				   ?DOAL, unsigned32, segment, 9000)),
     
-    {ok, OldValue} = co_node:value(serial(), Index),
+    {ok, OldValue} = co_api:value(serial(), Index),
 
     ok.
 
@@ -403,7 +403,7 @@ app_dict() -> co_test_lib:app_dict().
      
 set_option_ok({Option, NewValue}) ->
     %% Fetch old value
-    {Option, OldValue} = co_node:get_option(serial(), Option),
+    {Option, OldValue} = co_api:get_option(serial(), Option),
     
     %% Change
     set_option({Option, NewValue}),
@@ -415,17 +415,17 @@ set_option_ok({Option, NewValue}) ->
 
 set_option({Option, NewValue}) ->
     %% Set new value and check
-    ok = co_node:set_option(serial(), Option, NewValue),
-    {Option, NewValue} = co_node:get_option(serial(), Option).
+    ok = co_api:set_option(serial(), Option, NewValue),
+    {Option, NewValue} = co_api:get_option(serial(), Option).
 
 set_option_nok({Option, NewValue, ErrMsg}) ->
     %% Fetch old value
-    {Option, OldValue} = co_node:get_option(serial(), Option),
+    {Option, OldValue} = co_api:get_option(serial(), Option),
     
     %% Try setting new value
-    {error, ErrMsg} = co_node:set_option(serial(), Option, NewValue),
+    {error, ErrMsg} = co_api:set_option(serial(), Option, NewValue),
     
     %% Check old wasn't changed
-    {Option, OldValue} = co_node:get_option(serial(), Option),
+    {Option, OldValue} = co_api:get_option(serial(), Option),
 
     ok.

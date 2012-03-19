@@ -6,6 +6,7 @@
 # Behaviours compiled first
 #
 MODULES = \
+	co_api \
 	co_app \
 	co_stream_app \
 	co_tpdo_app \

@@ -303,11 +303,13 @@ handle_call(stop, _From, Ctx) ->
 %% @doc
 %% Handling cast messages
 %%
-%% @spec handle_cast(Msg, Ctx) -> {noreply, Ctx} |
-%%                                  {noreply, Ctx, Timeout} |
-%%                                  {stop, Reason, Ctx}
 %% @end
 %%--------------------------------------------------------------------
+-spec handle_cast(Msg::term(), Ctx::record()) -> 
+			 {noreply, Ctx::record()} |
+			 {noreply, Ctx::record(), Timeout::timeout()} |
+			 {stop, Reason::term(), Ctx::record()}.
+
 handle_cast(_Msg, Ctx) ->
     {noreply, Ctx}.
 

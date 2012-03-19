@@ -58,34 +58,61 @@
 %%%===================================================================
 
 %%--------------------------------------------------------------------
-%% @spec store(Ctx,Block,From,Src,Dst,IX,SI,Bin) -> 
-%%           {ok, Pid} | ignore | {error, Error}
 %% @doc
 %% Creates a gen_fsm process which calls Module:init/1 to
-%% initialize. To ensure a synchronized start-up procedure, this
-%% function does not return until Module:init/1 has returned.
+%% initialize.
 %%
 %% @end
 %%--------------------------------------------------------------------
-store(Ctx,Block,From,Src,Dst,IX,SI,Term) when is_record(Ctx, sdo_ctx) ->
-    ?dbg(cli, "store: block = ~p, From = ~p, Ix = ~p, Si = ~p, Term = ~p",
-	 [Block, From, IX, SI, Term]),
+-spec store(Ctx::record(),
+	    Block:: segment | block,
+	    From::pid(), 
+	    Src::integer(),
+	    Dst::integer(),
+	    IX::integer(),
+	    SI::integer(),
+	    Source:: {app, Pid::pid(), Mod::atom()} | 
+		     {data, Bin::binary}) -> 
+		   {ok, Pid::pid()} | 
+		   ignore | 
+		   {error, Error::term()}.
+
+store(Ctx,Block,From,Src,Dst,IX,SI,Source) when is_record(Ctx, sdo_ctx) ->
+    ?dbg(cli, "store: block = ~p, From = ~p, Ix = ~p, Si = ~p, Source = ~p",
+	 [Block, From, IX, SI, Source]),
     gen_fsm:start(?MODULE, 
-		  [store,Block,Ctx,From,self(),Src,Dst,IX,SI,Term], []).
+		  [store,Block,Ctx,From,self(),Src,Dst,IX,SI,Source], []).
 
 %%--------------------------------------------------------------------
-%% @spec fetch(Ctx,Block,From,Src,Dst,IX,SI,Term) -> 
-%%           {ok, Pid} | ignore | {error, Error}
 %% @doc
 %% Creates a gen_fsm process which calls Module:init/1 to
-%% initialize. To ensure a synchronized start-up procedure, this
-%% function does not return until Module:init/1 has returned.
+%% initialize. 
 %%
 %% @end
 %%--------------------------------------------------------------------
-fetch(Ctx,Block,From,Src,Dst,IX,SI,Term) ->
+-spec fetch(Ctx::record(),
+	    Block:: segment | block,
+	    From::pid(), 
+	    Src::integer(),
+	    Dst::integer(),
+	    IX::integer(),
+	    SI::integer(),
+	    Destination:: {app, Pid::pid(), Mod::atom()} | 
+			  data) -> 
+		   {ok, Pid::pid()} | 
+		   ignore | 
+		   {error, Error::term()}.
+
+fetch(Ctx,Block,From,Src,Dst,IX,SI,data) ->
+    ?dbg(cli, "fetch: block = ~p, From = ~p, Ix = ~p, Si = ~p, Destination = data",
+	 [Block, From, IX, SI]),
     gen_fsm:start(?MODULE, 
-		  [fetch,Block,Ctx,From,self(),Src,Dst,IX,SI,Term], []).
+		  [fetch,Block,Ctx,From,self(),Src,Dst,IX,SI,{data, From}], []);
+fetch(Ctx,Block,From,Src,Dst,IX,SI,Destination) ->
+    ?dbg(cli, "fetch: block = ~p, From = ~p, Ix = ~p, Si = ~p, Destination = ~p",
+	 [Block, From, IX, SI, Destination]),
+    gen_fsm:start(?MODULE, 
+		  [fetch,Block,Ctx,From,self(),Src,Dst,IX,SI,Destination], []).
 
 %%%===================================================================
 %%% gen_fsm callbacks
@@ -171,8 +198,8 @@ fetch(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, {app, Pid, Modul
 	{error,Reason} ->
 	    abort(S, Reason)
     end;
-fetch(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, data) ->
-    case co_data_buf:init(write, self(), {(<<>>), {IX, SI}}, 
+fetch(S=#co_session {ctx = Ctx, index = IX, subind = SI}, Mode, {data, Client}) ->
+    case co_data_buf:init(write, self(), {(<<>>), {IX, SI}, Client}, 
 			  Ctx#sdo_ctx.atomic_limit) of
 	{ok, Buf} ->
 	    case Mode of 
@@ -498,7 +525,7 @@ s_segmented_upload_response(M, S) when is_record(M, can_frame) ->
 		    case co_data_buf:write(S#co_session.buf, Data1, true, segment) of
 			{ok, _Buf1} ->
 			    gen_server:reply(S#co_session.node_from, {ok, Data1}),
-			    co_node:object_event(S#co_session.node_pid, 
+			    co_api:object_event(S#co_session.node_pid, 
 						 {S#co_session.index,
 						  S#co_session.subind}),
 			    {stop, normal, S};
@@ -562,7 +589,7 @@ s_segmented_upload(M, S) when is_record(M, can_frame) ->
 		{ok, Buf1} ->
 		    if Eod ->
 			    gen_server:reply(S#co_session.node_from, ok),
-			    co_node:object_event(S#co_session.node_pid, 
+			    co_api:object_event(S#co_session.node_pid, 
 						 {S#co_session.index,
 						  S#co_session.subind}),
 			    {stop, normal, S};
@@ -650,13 +677,13 @@ s_writing_segment({Mref, Reply} = M, S)  ->
 	    %% Atomic reply
 	    erlang:demonitor(Mref, [flush]),
 	    gen_server:reply(S#co_session.node_from, ok),
-	    co_node:object_event(S#co_session.node_pid, 
+	    co_api:object_event(S#co_session.node_pid, 
 				 {S#co_session.index,S#co_session.subind}),
 	    {stop, normal, S};
 	{Mref, {ok, Ref}} when is_reference(Ref)->
 	    %% Streamed reply
 	    erlang:demonitor(Mref, [flush]),
-	    co_node:object_event(S#co_session.node_pid, 
+	    co_api:object_event(S#co_session.node_pid, 
 				 {S#co_session.index,S#co_session.subind}),
 	    gen_server:reply(S#co_session.node_from, ok),
 	    {stop, normal, S};
@@ -1087,7 +1114,7 @@ s_block_upload_end(M, S) when is_record(M, can_frame) ->
 			    R = ?mk_scs_block_download_end_response(),
 			    send(S, R),
 			    gen_server:reply(S#co_session.node_from, ok),
-			    co_node:object_event(S#co_session.node_pid, 
+			    co_api:object_event(S#co_session.node_pid, 
 						 {S#co_session.index,S#co_session.subind}),
 			    {stop, normal, S};
 			{error,Reason} ->
@@ -1282,7 +1309,7 @@ check_writing_block_end({Mref, Reply}, StateName, S) ->
 		    R = ?mk_scs_block_download_end_response(),
 		    send(S, R),
 		    gen_server:reply(S#co_session.node_from, ok),
-		    co_node:object_event(S#co_session.node_pid, 
+		    co_api:object_event(S#co_session.node_pid, 
 					 {S#co_session.index,S#co_session.subind}),
 		    {stop, normal, S};
 		State ->

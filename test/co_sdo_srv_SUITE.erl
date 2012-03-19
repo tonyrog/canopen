@@ -152,8 +152,8 @@ init_per_testcase(_TestCase = timeout, Config) ->
     ok = co_test_app:debug(Pid, true),
 
     %% Change the timeout for the co_node
-    {sdo_timeout, OldTOut} = co_node:get_option(serial(), sdo_timeout),
-    ok = co_node:set_option(serial(), sdo_timeout, 500),
+    {sdo_timeout, OldTOut} = co_api:get_option(serial(), sdo_timeout),
+    ok = co_api:set_option(serial(), sdo_timeout, 500),
     [{timeout, OldTOut} | Config];
 
 init_per_testcase(_TestCase, Config) ->
@@ -197,7 +197,7 @@ end_per_testcase(timeout, Config) ->
 
     %% Restore the timeout for the co_node
     OldTOut = ?config(timeout, Config),
-    co_node:set_option(serial(), sdo_timeout, OldTOut),
+    co_api:set_option(serial(), sdo_timeout, OldTOut),
     ok;
 
 end_per_testcase(_TestCase, _Config) ->

@@ -257,8 +257,8 @@ loop_data(Pid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([CoSerial]) ->
-    {ok, _Dict} = co_node:attach(CoSerial),
-    co_node:reserve(CoSerial, ?IX_OS_COMMAND, ?MODULE),
+    {ok, _Dict} = co_api:attach(CoSerial),
+    co_api:reserve(CoSerial, ?IX_OS_COMMAND, ?MODULE),
     {ok, #loop_data {state=init, co_node = CoSerial}}.
 
 %%--------------------------------------------------------------------
@@ -446,10 +446,10 @@ handle_read(Bytes, LoopData=#loop_data {ref = Ref, read_buf = Data}) ->
     
 
 handle_stop(LoopData) ->
-    case co_node:alive(LoopData#loop_data.co_node) of
+    case co_api:alive(LoopData#loop_data.co_node) of
 	true ->
-	    co_node:unreserve(LoopData#loop_data.co_node, ?IX_OS_COMMAND),
-	    co_node:detach(LoopData#loop_data.co_node);
+	    co_api:unreserve(LoopData#loop_data.co_node, ?IX_OS_COMMAND),
+	    co_api:detach(LoopData#loop_data.co_node);
 	false -> 
 	    do_nothing %% Not possible to detach and unsubscribe
     end,

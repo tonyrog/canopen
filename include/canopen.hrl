@@ -9,6 +9,9 @@
 -ifndef(__CAN_OPEN_HRL__).
 -define(__CAN_OPEN_HRL__, true).
 
+%% Serial number of CANOpen manager
+-define(MGR_NODE, 16#00).
+
 %% Basic data types (DEFTYPE)
 -define(BOOLEAN,         16#0001).
 -define(INTEGER8,        16#0002).

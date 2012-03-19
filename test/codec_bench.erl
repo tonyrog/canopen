@@ -35,7 +35,7 @@ a2(0) -> ok;
 a2(N) -> ?T2(co_codec), a2(N-1).
 
 d2(_D,0) -> ok;
-d2(D,N) -> co_node:tpdo_pack(0, D), d2(D,N-1).
+d2(D,N) -> co_api:tpdo_pack(0, D), d2(D,N-1).
 
 dict() ->
     {ok,D} = co_dict:from_file("bench.dict"),

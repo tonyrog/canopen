@@ -153,7 +153,7 @@ loop_data() ->
 %%--------------------------------------------------------------------
 init([CoSerial, IndexList, Starter]) ->
     DictTable = ets:new(tpdo_dict, [public, named_table, ordered_set]),
-    {ok, _DictRef} = co_node:attach(CoSerial),
+    {ok, _DictRef} = co_api:attach(CoSerial),
     load_dict(CoSerial, DictTable, IndexList),
     {ok, #loop_data {co_node = CoSerial, tpdo_dict = DictTable, starter = Starter}}.
 
@@ -163,7 +163,7 @@ load_dict(CoSerial, DictTable, IndexList) ->
     lists:foreach(fun({{Index, _SubInd}, _Type, _Value} = Entry) ->
 			  ets:insert(DictTable, Entry),
 			  ?dbg("Inserting entry = ~p", [Entry]),
-			  co_node:reserve(CoSerial, Index, ?MODULE)
+			  co_api:reserve(CoSerial, Index, ?MODULE)
 		  end, IndexList).
 
 %%--------------------------------------------------------------------
@@ -198,14 +198,14 @@ handle_call(loop_data, _From, LD) ->
     {reply, ok, LD};
 handle_call(stop, _From, LD=#loop_data {co_node = CoNode}) ->
     ?dbg("handle_call: stop",[]),
-    case co_node:alive(CoNode) of
+    case co_api:alive(CoNode) of
 	true ->
 	    lists:foreach(
 	      fun({{Index, _SubInd}, _Type, _Value}) ->
-		      co_node:unreserve(CoNode, Index)
+		      co_api:unreserve(CoNode, Index)
 	      end, ets:tab2list(LD#loop_data.tpdo_dict)),
 	    ?dbg("stop: unsubscribed.",[]),
-	    co_node:detach(CoNode);
+	    co_api:detach(CoNode);
 	false -> 
 	    do_nothing %% Not possible to detach and unsubscribe
     end,

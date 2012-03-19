@@ -28,7 +28,8 @@ start_node(Serial, Dict) ->
 
     {ok, PPid} = co_proc:start_link([{unlinked, true}]),
     ct:pal("Started co_proc ~p",[PPid]),
-    {ok, Pid} = co_node:start_link(Serial, 
+
+    {ok, Pid} = co_api:start_link(Serial, 
 				   [{use_serial_as_xnodeid, true},
 				    {dict_file, Dict},
 				    {max_blksize, 7},
@@ -44,7 +45,13 @@ start_node(Serial, Dict, Port) ->
 
     {ok, PPid} = co_proc:start_link([{unlinked, true}]),
     ct:pal("Started co_proc ~p",[PPid]),
-    {ok, Pid} = co_node:start_link(Serial, 
+
+    case co_api:alive(Serial) of
+	true -> co_api:stop(Serial); %% Clean up failed ??
+	false -> do_nothing
+    end,
+
+    {ok, Pid} = co_api:start_link(Serial, 
 				   [{use_serial_as_xnodeid, true},
 				    {dict_file, Dict},
 				    {max_blksize, 7},
@@ -57,7 +64,7 @@ start_node(Serial, Dict, Port) ->
 stop_node(Config) when is_list(Config) ->
     stop_node(serial());
 stop_node(Serial) ->
-    co_node:stop(Serial),
+    co_api:stop(Serial),
     co_proc:stop(),
     can_udp:stop(co_test),
     can_router:stop().
@@ -68,7 +75,7 @@ load_dict(C) ->
 
 load_dict(C, Serial) ->
     DataDir = ?config(data_dir, C),
-    co_node:load_dict(Serial, filename:join(DataDir, ?DICT)).
+    co_api:load_dict(Serial, filename:join(DataDir, ?DICT)).
 
 serial() ->
     case os:getenv("SERIAL") of

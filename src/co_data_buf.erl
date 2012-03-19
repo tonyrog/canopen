@@ -208,6 +208,16 @@ init_i(write, Dict, #dict_entry{index = I, type = Type}, BSize, LLevel) ->
 		       buf_size = BSize,
 		       load_level = LLevel,
 		       mode = {dict, Dict}}};
+init_i(write, Pid, {Data, I, Client}, BSize, LLevel) when is_binary(Data) ->
+    {ok, #co_data_buf {access = write,
+		       i = I,
+		       pid = Pid,
+		       data = Data,
+		       size = size(Data),
+		       eof = true,
+		       buf_size = BSize,
+		       load_level = LLevel,
+		       mode = {data, Client}}};
 init_i(Access, Pid, {Data, I}, BSize, LLevel) when is_binary(Data) ->
     {ok, #co_data_buf {access = Access,
 		       i = I,
@@ -544,14 +554,14 @@ write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, type = Type, data = OldData
 	    {error, ?abort_value_range_error}
     end;
 		
-write(Buf=#co_data_buf {mode = data = _Mode, data = OldData, 
+write(Buf=#co_data_buf {mode = {data, Client} = _Mode, data = OldData, 
 		     i = {_Index, _SubInd}, tmp = TmpData}, 
       Data, true, segment) -> 
     ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p", [_Mode, Data, true]),
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
-    ?dbg(data_buf, "write:store ?? I = ~.16B:~.8B, Data = ~p", 
-	 [_Index, _SubInd, DataToSend]),
-    %% ??
+    ?dbg(data_buf, "write: reply to ~p I = ~.16B:~.8B, Data = ~p", 
+	 [Client, _Index, _SubInd, DataToSend]),
+    gen_server:reply(Client, {ok, DataToSend}),
     {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
 
 %%%% Not End of Data
