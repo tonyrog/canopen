@@ -129,9 +129,9 @@ end_per_suite(Config) ->
 init_per_testcase(Case, Config) when Case == os_command;
 				     Case == os_command_slow;
 				     Case == os_command_seq ->
-    {ok, Pid} = co_os_app:start_link(serial()),
+    {ok, Pid} = co_os_app:start(serial()),
     ok = co_os_app:debug(Pid, true),
-    Config;
+    Config ++ [{os_app_pid, Pid}];
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
     Config.
@@ -152,14 +152,12 @@ init_per_testcase(_TestCase, Config) ->
 			      ok |
 			      {save_config,Config1::list(tuple())}.
 
-end_per_testcase(Case, _Config) when Case == start_stop_app;
+end_per_testcase(Case, Config) when Case == start_stop_app;
 				     Case == os_command;
 				     Case == os_command_slow;
 				     Case == os_command_seq ->
-    case whereis(co_os_app) of
-	undefined  -> do_nothing;
-	_Pid ->  co_os_app:stop(serial())
-    end,
+    Pid = ?config(os_app_pid, Config),
+    co_os_app:stop(Pid),
     ok;
 end_per_testcase(_TestCase, _Config) ->
     ok.

@@ -19,6 +19,8 @@
 -export([object_by_name/2]).
 -export([object_by_id/2]).
 -export([object_by_index/2]).
+-export([entry_by_index/3]).
+-export([enum_by_id/2]).
 -export([encode_type/1]).
 -export([encode_struct/1]).
 -export([encode_access/1]).
@@ -27,6 +29,7 @@
 -export([decode_type/1]).
 -export([decode_struct/1]).
 -export([decode_access/1]).
+-export([find_entry/2]).
 
 -include("canopen.hrl").
 
@@ -293,13 +296,20 @@ load_definition(File,Path) ->
 load_dmod(Module, DCtx) when is_atom(Module) ->
     File = atom_to_list(Module) ++ ".def",
     case file:path_consult(DCtx#dctx.path, File) of
-	{error, enoent} ->
-	    io:format("load_mod: file ~p not found\n", [File]),
-	    {{error,enoent}, DCtx};
-	Err = {error,_} ->
-	    {Err, DCtx};
 	{ok, Forms,_} ->
-	    dmod(Forms, undefined, DCtx)
+	    dmod(Forms, undefined, DCtx);
+	{error, enoent} ->
+	    %% Check the priv dir
+	    PrivFile = filename:join(code:priv_dir(canopen), File),
+	    case file:consult(PrivFile) of
+		{ok, Forms} ->
+		    dmod(Forms, undefined, DCtx);
+		_Else ->
+		    io:format("load_mod: file ~p not found\n", [PrivFile]),
+		    {{error,enoent}, DCtx}
+	    end;
+	Err = {error,_} ->
+	    {Err, DCtx}
     end.
 
 %% {module, abc}  - define module

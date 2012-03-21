@@ -65,8 +65,8 @@
 %% @end
 %%--------------------------------------------------------------------
 -spec store(Ctx::record(),
-	    Block:: segment | block,
-	    From::pid(), 
+	    Mode:: segment | block,
+	    Client::pid(), 
 	    Src::integer(),
 	    Dst::integer(),
 	    IX::integer(),
@@ -77,11 +77,11 @@
 		   ignore | 
 		   {error, Error::term()}.
 
-store(Ctx,Block,From,Src,Dst,IX,SI,Source) when is_record(Ctx, sdo_ctx) ->
-    ?dbg(cli, "store: block = ~p, From = ~p, Ix = ~p, Si = ~p, Source = ~p",
-	 [Block, From, IX, SI, Source]),
+store(Ctx,Mode,Client,Src,Dst,IX,SI,Source) when is_record(Ctx, sdo_ctx) ->
+    ?dbg(cli, "store: mode = ~p, from = ~p, ix = ~p, si = ~p, source = ~p",
+	 [Mode, Client, IX, SI, Source]),
     gen_fsm:start(?MODULE, 
-		  [store,Block,Ctx,From,self(),Src,Dst,IX,SI,Source], []).
+		  [store,Mode,Ctx,Client,self(),Src,Dst,IX,SI,Source], []).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -91,8 +91,8 @@ store(Ctx,Block,From,Src,Dst,IX,SI,Source) when is_record(Ctx, sdo_ctx) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec fetch(Ctx::record(),
-	    Block:: segment | block,
-	    From::pid(), 
+	    Mode:: segment | block,
+	    Client::pid(), 
 	    Src::integer(),
 	    Dst::integer(),
 	    IX::integer(),
@@ -103,16 +103,16 @@ store(Ctx,Block,From,Src,Dst,IX,SI,Source) when is_record(Ctx, sdo_ctx) ->
 		   ignore | 
 		   {error, Error::term()}.
 
-fetch(Ctx,Block,From,Src,Dst,IX,SI,data) ->
-    ?dbg(cli, "fetch: block = ~p, From = ~p, Ix = ~p, Si = ~p, Destination = data",
-	 [Block, From, IX, SI]),
+fetch(Ctx,Mode,Client,Src,Dst,IX,SI,data) ->
+    ?dbg(cli, "fetch: mode = ~p, from = ~w, ix = ~p, si = ~p, destination = data",
+	 [Mode, Client, IX, SI]),
     gen_fsm:start(?MODULE, 
-		  [fetch,Block,Ctx,From,self(),Src,Dst,IX,SI,{data, From}], []);
-fetch(Ctx,Block,From,Src,Dst,IX,SI,Destination) ->
-    ?dbg(cli, "fetch: block = ~p, From = ~p, Ix = ~p, Si = ~p, Destination = ~p",
-	 [Block, From, IX, SI, Destination]),
+		  [fetch,Mode,Ctx,Client,self(),Src,Dst,IX,SI,{data, Client}], []);
+fetch(Ctx,Mode,Client,Src,Dst,IX,SI,Destination) ->
+    ?dbg(cli, "fetch: mode = ~p, from = ~w, ix = ~p, si = ~p, destination = ~w",
+	 [Mode, Client, IX, SI, Destination]),
     gen_fsm:start(?MODULE, 
-		  [fetch,Block,Ctx,From,self(),Src,Dst,IX,SI,Destination], []).
+		  [fetch,Mode,Ctx,Client,self(),Src,Dst,IX,SI,Destination], []).
 
 %%%===================================================================
 %%% gen_fsm callbacks
@@ -128,12 +128,12 @@ fetch(Ctx,Block,From,Src,Dst,IX,SI,Destination) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-init([Action,Mode,Ctx,From,NodePid,Src,Dst,IX,SI,Term]) ->
+init([Action,Mode,Ctx,Client,NodePid,Src,Dst,IX,SI,Term]) ->
     put(dbg, Ctx#sdo_ctx.debug),
     ?dbg(cli,"init: ~p ~p src=~.16#, dst=~.16#", [Action, Mode, Src, Dst]),
-    ?dbg(cli,"init: From = ~p, Index = ~4.16.0B:~p, Term = ~p",
-    	 [From, IX, SI, Term]),
-    S = new_session(Ctx,From,NodePid,Src,Dst,IX,SI),
+    ?dbg(cli,"init: from = ~w, index = ~4.16.0B:~p, term = ~w",
+    	 [Client, IX, SI, Term]),
+    S = new_session(Ctx,Client,NodePid,Src,Dst,IX,SI),
     apply(?MODULE, Action, [S, Mode, Term]).
 
 %% @private
@@ -379,12 +379,12 @@ s_segmented_download_end(M, S) when is_record(M, can_frame) ->
 	?ma_scs_initiate_download_response(IX,SI) when 
 	      IX =:= S#co_session.index,
 	      SI =:= S#co_session.subind ->
-	    gen_server:reply(S#co_session.node_from, ok),
+	    gen_server:reply(S#co_session.client, ok),
 	    {stop,normal,S};
 	?ma_scs_download_segment_response(T) when T =/= S#co_session.t ->
 	    abort(S, ?abort_toggle_not_alternated);
 	?ma_scs_download_segment_response(_T) ->
-	    gen_server:reply(S#co_session.node_from, ok),
+	    gen_server:reply(S#co_session.client, ok),
 	    {stop,normal,S};
 	_ ->
 	    l_abort(M, S, s_segmented_download)
@@ -524,7 +524,7 @@ s_segmented_upload_response(M, S) when is_record(M, can_frame) ->
 		    NBytes = if SizeInd =:= 1 -> 4-N; true -> 4 end,
 		    case co_data_buf:write(S#co_session.buf, Data1, true, segment) of
 			{ok, _Buf1} ->
-			    gen_server:reply(S#co_session.node_from, {ok, Data1}),
+			    gen_server:reply(S#co_session.client, {ok, Data1}),
 			    co_api:object_event(S#co_session.node_pid, 
 						 {S#co_session.index,
 						  S#co_session.subind}),
@@ -536,7 +536,8 @@ s_segmented_upload_response(M, S) when is_record(M, can_frame) ->
 			{error, Reason} ->
 			    abort(S, Reason)
 		    end;
-	       true ->
+	       true -> 
+		    %% Not expedited
 		    ?dbg(cli, "s_segmented_upload_response: Size = ~p\n", [N]),
 		    case co_data_buf:update(S#co_session.buf, {ok, N}) of
 			{ok, Buf1} ->
@@ -588,7 +589,7 @@ s_segmented_upload(M, S) when is_record(M, can_frame) ->
 	    case co_data_buf:write(S#co_session.buf, DataToWrite, Eod, segment) of
 		{ok, Buf1} ->
 		    if Eod ->
-			    gen_server:reply(S#co_session.node_from, ok),
+			    gen_server:reply(S#co_session.client, ok),
 			    co_api:object_event(S#co_session.node_pid, 
 						 {S#co_session.index,
 						  S#co_session.subind}),
@@ -676,7 +677,7 @@ s_writing_segment({Mref, Reply} = M, S)  ->
 	{Mref, ok} ->
 	    %% Atomic reply
 	    erlang:demonitor(Mref, [flush]),
-	    gen_server:reply(S#co_session.node_from, ok),
+	    gen_server:reply(S#co_session.client, ok),
 	    co_api:object_event(S#co_session.node_pid, 
 				 {S#co_session.index,S#co_session.subind}),
 	    {stop, normal, S};
@@ -685,7 +686,7 @@ s_writing_segment({Mref, Reply} = M, S)  ->
 	    erlang:demonitor(Mref, [flush]),
 	    co_api:object_event(S#co_session.node_pid, 
 				 {S#co_session.index,S#co_session.subind}),
-	    gen_server:reply(S#co_session.node_from, ok),
+	    gen_server:reply(S#co_session.client, ok),
 	    {stop, normal, S};
 	_Other ->
 	    l_abort(M, S, s_writing)
@@ -884,7 +885,7 @@ s_block_download_response_last(timeout, S) ->
 s_block_download_end_response(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
 	?ma_scs_block_download_end_response() ->
-	    gen_server:reply(S#co_session.node_from, ok),
+	    gen_server:reply(S#co_session.client, ok),
 	    {stop, normal, S};
 	_ ->
 	    l_abort(M, S, s_block_download_end_response)
@@ -1113,7 +1114,7 @@ s_block_upload_end(M, S) when is_record(M, can_frame) ->
 			{ok, _Buf} -> 
 			    R = ?mk_scs_block_download_end_response(),
 			    send(S, R),
-			    gen_server:reply(S#co_session.node_from, ok),
+			    gen_server:reply(S#co_session.client, ok),
 			    co_api:object_event(S#co_session.node_pid, 
 						 {S#co_session.index,S#co_session.subind}),
 			    {stop, normal, S};
@@ -1308,7 +1309,7 @@ check_writing_block_end({Mref, Reply}, StateName, S) ->
 		    ?dbg(cli, "handle_info: last reply, terminating\n",[]),
 		    R = ?mk_scs_block_download_end_response(),
 		    send(S, R),
-		    gen_server:reply(S#co_session.node_from, ok),
+		    gen_server:reply(S#co_session.client, ok),
 		    co_api:object_event(S#co_session.node_pid, 
 					 {S#co_session.index,S#co_session.subind}),
 		    {stop, normal, S};
@@ -1352,7 +1353,7 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-new_session(Ctx,From,NodePid,Src,Dst,IX,SI) ->
+new_session(Ctx,Client,NodePid,Src,Dst,IX,SI) ->
     #co_session {
 	     src       = Src,
 	     dst       = Dst,
@@ -1364,7 +1365,7 @@ new_session(Ctx,From,NodePid,Src,Dst,IX,SI) ->
 	     blkseq    = 0,
 	     blkbytes  = 0,
 	     node_pid  = NodePid,
-	     node_from = From,
+	     client    = Client,
 	     ctx       = Ctx
 	    }.
 
@@ -1388,13 +1389,20 @@ l_abort(M, S, StateName) ->
 	      SI =:= S#co_session.subind ->
 	    Reason = co_sdo:decode_abort_code(Code),
 	    %% remote party has aborted
-	    gen_server:reply(S#co_session.node_from, {error,Reason}),
+	    ?dbg(cli, "l_abort: Other side has aborted in state ~p, \n"
+		 "reason ~p, sending error to ~w",
+		 [StateName, Reason, S#co_session.client]),
+	    gen_server:reply(S#co_session.client, {error,Reason}),
 	    {stop, normal, S};
-	?ma_scs_abort_transfer(_IX,_SI,_Code) ->
+	?ma_scs_abort_transfer(_IX,_SI, _Code) ->
 	    %% probably a delayed abort for an old session ignore
+	    ?dbg(cli, "l_abort: Old abort in state ~p, reason ~p",
+		 [StateName, co_sdo:decode_abort_code(_Code)]),
 	    {next_state, StateName, S, timeout(S)};
 	_ ->
 	    %% we did not expect this command abort
+	    ?dbg(cli, "l_abort: Unexpected frame ~p in state ~p",
+		 [M#can_frame.data, StateName]),
 	    abort(S, ?abort_command_specifier)
     end.
 	    
@@ -1404,7 +1412,7 @@ abort(S=#co_session {buf = Buf}, Reason) ->
     co_data_buf:abort(Buf, Code),
     R = ?mk_ccs_abort_transfer(S#co_session.index, S#co_session.subind, Code),
     send(S, R),
-    gen_server:reply(S#co_session.node_from, {error,Reason}),
+    gen_server:reply(S#co_session.client, {error,Reason}),
     {stop, normal, S}.
     
 

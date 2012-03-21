@@ -781,11 +781,11 @@ notify(CobId,Index,Value) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec notify(CobId::integer(), Ix::integer(), Si::integer(), Value::term()) -> 
+-spec notify(CobId::integer(), Ix::integer(), Si::integer(), Data::binary()) -> 
 		    ok | {error, Error::atom()}.
 
-notify(CobId,Index,Subind,Value) ->
-    co_node:notify(CobId,Index,Subind,Value).
+notify(CobId,Index,Subind,Data) ->
+    co_node:notify(CobId,Index,Subind,Data).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -795,13 +795,13 @@ notify(CobId,Index,Subind,Value) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec notify({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
-	     Func::atom(), Ix::integer(), Si::integer(), Value::term()) -> 
+	     Func::atom(), Ix::integer(), Si::integer(), Data::binary()) -> 
 		    ok | {error, Error::atom()}.
 
-notify({xnodeid, XNid}, Func, Index, Subind, Value) ->
-    notify(?XCOB_ID(co_lib:encode_func(Func), XNid),Index,Subind,Value);
-notify({nodeid, Nid}, Func, Index, Subind, Value) ->
-    notify(?COB_ID(co_lib:encode_func(Func), Nid),Index,Subind,Value).
+notify({xnodeid, XNid}, Func, Index, Subind, Data) ->
+    notify(?XCOB_ID(co_lib:encode_func(Func), XNid),Index,Subind,Data);
+notify({nodeid, Nid}, Func, Index, Subind, Data) ->
+    notify(?COB_ID(co_lib:encode_func(Func), Nid),Index,Subind,Data).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -842,7 +842,7 @@ tpdo_mapping(Offset, Ctx) ->
 tpdo_value(Index = {Ix, Si}, #tpdo_ctx {res_table = ResTable, dict = Dict, 
 					tpdo_cache = TpdoCache}) 
   when is_integer(Ix) andalso is_integer(Si) ->
-	     co_node:tpdo_value(Index, ResTable, Dict, TpdoCache).
+    co_node:tpdo_value(Index, ResTable, Dict, TpdoCache).
 
 %%--------------------------------------------------------------------
 %% @doc

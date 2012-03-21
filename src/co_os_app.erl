@@ -21,7 +21,7 @@
 -behaviour(co_stream_app).
 
 %% API
--export([start_link/1, stop/1]).
+-export([start/1, start_link/1, stop/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -50,6 +50,7 @@
 	  command = ""     ::string(),   %% Subindex 1
 	  status = 0       ::integer(),  %% Subindex 2
 	  reply =""        ::string(),   %% Subindex 3
+	  exec_pid         ::pid(),      %% Pid of process executing command
 	  co_node          ::atom(),     %% Name of co_node
 	  ref              ::reference(),%% Reference for communication with session
 	  read_buf = <<>>  ::binary()    %% Tmp buffer when uploading reply
@@ -77,12 +78,27 @@ start_link(CoSerial) ->
 -spec stop(CoSerial::integer()) -> ok | 
 		{error, Error::atom()}.
 
+stop(Pid) when is_pid(Pid)->
+    gen_server:call(Pid, stop);
 stop(CoSerial) ->
     case whereis(name(CoSerial)) of
 	undefined -> do_nothing;
 	Pid -> gen_server:call(Pid, stop)
     end.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Starts the server.
+%% @end
+%%--------------------------------------------------------------------
+-spec start(CoSerial::integer()) -> 
+		   {ok, Pid::pid()} | 
+		   ignore | 
+		   {error, Error::atom()}.
+
+start(CoSerial) ->
+    gen_server:start({local,  name(CoSerial)}, ?MODULE, [CoSerial],[]).
+	
 %%--------------------------------------------------------------------
 %%% CAllbacks for co_app and co_stream_app behavious
 %%--------------------------------------------------------------------
@@ -257,6 +273,7 @@ loop_data(Pid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([CoSerial]) ->
+    process_flag(trap_exit, true),
     {ok, _Dict} = co_api:attach(CoSerial),
     co_api:reserve(CoSerial, ?IX_OS_COMMAND, ?MODULE),
     {ok, #loop_data {state=init, co_node = CoSerial}}.
@@ -395,10 +412,12 @@ handle_write_i(NewC, false, LoopData=#loop_data {ref = Ref}) ->
 
 handle_command(LoopData=#loop_data {command = Command}) when is_list(Command) ->
     ?dbg(?NAME," handle_command: command = ~p.\n",[Command]),
-    proc_lib:spawn_link(?MODULE, execute_command, [Command, self()]),
+    Pid = proc_lib:spawn_link(?MODULE, execute_command, [Command, self()]),
+    ?dbg(?NAME," handle_command: spawned = ~p.\n",[Pid]),
     {reply, ok, LoopData#loop_data {state = executing,
-					    status = 255, 
-					    reply = ""}};
+				    status = 255, 
+				    reply = "",
+				    exec_pid = Pid}};
 handle_command(LoopData=#loop_data {command = Command}) ->
     ?dbg(?NAME," handle_command: convert iolist = ~p.\n",[Command]),
     try iolist_size(Command) of
@@ -413,7 +432,9 @@ handle_command(LoopData=#loop_data {command = Command}) ->
 %% @private
 execute_command(Command, Starter) ->
     Res = execute_command(Command),
-    Starter ! Res.
+    ?dbg(?NAME," execute_command: result = ~p.\n",[Res]),
+    Starter ! Res,
+    exit(normal).
 
 execute_command(Command) ->
     try os:cmd(Command) of
@@ -529,6 +550,20 @@ handle_info({Status, Reply} = _Info, LoopData) ->
 handle_info({notify, _RemoteCobId, _Index, _SubInd, _Value}, LoopData) ->
     ?dbg(?NAME," handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w \n", 
 	      [_RemoteCobId, _Index, _SubInd, _Value]),
+    {noreply, LoopData};
+handle_info({'EXIT', Pid, normal}, LoopData=#loop_data {exec_pid = Pid}) ->
+    %% Execution process terminated normally
+    {noreply, LoopData};
+handle_info({'EXIT', Pid, _Reason}, LoopData=#loop_data {exec_pid = Pid}) ->
+    ?dbg(?NAME, "handle_info: unexpected EXIT for process ~p received, reason ~p", 
+	 [Pid, _Reason]),
+     {noreply, LoopData#loop_data {state = executed,
+				   status = 3, 
+				   reply = "Internal Error"}};
+handle_info({'EXIT', _Pid, _Reason}, LoopData) ->
+    %% Other process terminated
+   ?dbg(?NAME, "handle_info: unexpected EXIT for process ~p received, reason ~p", 
+	 [_Pid, _Reason]),
     {noreply, LoopData};
 handle_info(_Info, LoopData) ->
     ?dbg(?NAME," handle_info: Unknown Info ~p\n", [_Info]),

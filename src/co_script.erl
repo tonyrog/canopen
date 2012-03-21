@@ -1,9 +1,8 @@
 %%%------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @author Malotte W Lönne <malotte@malotte.net>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%% CANopen script file.
+%%% CANopen script interpretor.
 %%%
 %%% File    : co_script.erl <br/>
 %%% Created: 23 Feb 2010 by Tony Rogvall (as pds_conf)
@@ -14,9 +13,20 @@
 
 -import(lists, [reverse/1]).
 
+%% While testing ??
+-compile(export_all).
+
 -export([run/0, run/1, script/1]).
 -export([file/1]).
 -export([string/1]).
+
+-ifdef(debug).
+-define(dbg(Format, Args),
+	io:format("~p: " ++ Format ++ "\n", [?MODULE] ++ Args)).
+-else.
+-define(dbg(Format, Args), ok).
+
+-endif.
 
 run() ->
     usage().
@@ -27,7 +37,7 @@ run([]) ->
     usage().
 
 usage() ->
-    io:format("usage: COscript <file>\n", []),
+    io:format("usage: co_script <file>\n", []),
     ok.
 
 script(File) ->
@@ -37,14 +47,17 @@ script(File) ->
     end.
 
 file(File) ->
-    Filename =
+    FileName =
 	case filename:dirname(File) of
 	    "." when hd(File) =/= $. ->
-		filename:join(code:priv_dir(pds), File);
+		filename:join(code:priv_dir(canopen), File);
 	    _ -> 
 		File
 	end,
-    case file:read_file(Filename) of
+
+    ?dbg("Filename = ~p", [FileName]),
+
+    case file:read_file(FileName) of
 	{ok,Bin} ->
 	    string(File, binary_to_list(Bin));
 	Error ->
@@ -64,6 +77,7 @@ string(File, Cs) ->
 	    case exprs_list(File, Ts) of
 		{ok,ExprsList} ->
 		    co_mgr:start([]), %% just in case
+		    ?dbg("Expressions = ~p", [ExprsList]),
 		    eval_list(File, ExprsList);
 		Error ->
 		    Error
@@ -101,8 +115,10 @@ eval_list(File, ExprsList) ->
     eval_list(File, ExprsList, erl_eval:new_bindings()).
 
 eval_list(File, [Exprs|ExprsList], Bindings) ->
+    ?dbg("Eval: ~p", [Exprs]),
     try erl_eval:exprs(Exprs, Bindings, {value, fun eval_func0/2}) of
-	{value,Value,Bindings1} ->
+	{value,Value,Bindings1} = _R ->
+	    ?dbg("Result =  ~p", [_R]),
 	    case File of
 		"*stdin*" ->
 		    io:format("~p\n", [Value]),
@@ -133,19 +149,27 @@ eval_func0(Name, Args) ->
     
 
 eval_func(require, [Mod]) ->
-    co_mgr:require(Mod);
+    co_mgr:client_require(Mod);
 eval_func(setnid, [Nid]) ->
-    co_mgr:setnid(Nid);
-eval_func(set, [Nid,Index,SubInd,Value,Type]) ->
-    co_mgr:store(Nid,Index,SubInd,segment,{value, Value, Type});
-eval_func(get, [Nid,Index,SubInd,Type]) ->
-    co_mgr:fetch(Nid,Index,SubInd,segment,{value, Type});
+    co_mgr:client_set_nid(Nid);
+eval_func(store, [Nid,Index,SubInd,Value]) ->
+    co_mgr:client_store(Nid,Index,SubInd, Value);
+eval_func(store, [Index,SubInd,Value]) ->
+    co_mgr:client_store(Index,SubInd,Value);
+eval_func(store, [Index,Value]) ->
+    co_mgr:client_store(Index,Value);
+eval_func(fetch, [Nid,Index,SubInd]) ->
+    co_mgr:client_fetch(Nid,Index,SubInd);
+eval_func(fetch, [Index,SubInd]) ->
+    co_mgr:client_fetch(Index,SubInd);
+eval_func(fetch, [Index]) ->
+     co_mgr:client_fetch(Index);
 eval_func(noify, [Nid,Index,SubInd,Value]) ->
-    co_mgr:notify(Nid,Index,SubInd,Value);
+    co_mgr:client_notify(Nid,Index,SubInd,Value);
 eval_func(notify, [Index,SubInd,Value]) ->
-    co_mgr:notify(Index,SubInd,Value);
+    co_mgr:client_notify(Index,SubInd,Value);
 eval_func(notify, [Index,Value]) ->
-    co_mgr:notify(Index,Value).
+    co_mgr:client_notify(Index,Value).
 
 
 

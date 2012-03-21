@@ -139,9 +139,9 @@ init_i(read, Pid,
 				     mode = M,
 				     timeout = Tout})
     catch
-	error:Reason ->
+	error:_Reason ->
 	    ?dbg(data_buf, "init: encode of = ~p, ~p failed, Reason = ~p", 
-		 [Value,  Type, Reason]),
+		 [Value,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 
@@ -164,9 +164,9 @@ init_i(read, Pid,
 				     mode = M,
 				     timeout = Tout})
     catch
-	error:Reason ->
+	error:_Reason ->
 	    ?dbg(data_buf, "init: encode of = ~p, ~p failed, Reason = ~p", 
-		 [Value,  Type, Reason]),
+		 [Value,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 
@@ -194,9 +194,9 @@ init_i(read, Dict, #dict_entry{index = I, type = Type, value = Value}, BSize, LL
 			       load_level = LLevel,
 			       mode = {dict, Dict}}}
     catch
-	error:Reason ->
+	error:_Reason ->
 	    ?dbg(data_buf, "init: encode of = ~p, ~p failed, Reason = ~p", 
-		 [Value,  Type, Reason]),
+		 [Value,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 
@@ -262,9 +262,9 @@ open_i(read, Buf=#co_data_buf {pid = Pid, i = I, type = Type, mode = {atomic, Mo
 					  size = size(Data),
 					  eof = true}}
 	    catch
-		error:Reason ->
+		error:_Reason ->
 		    ?dbg(data_buf, "open: encode of = ~p, ~p failed, Reason = ~p", 
-			 [Value,  Type, Reason]),
+			 [Value,  Type, _Reason]),
 		    {error, ?abort_value_range_error}
 	    end;
 	Other ->
@@ -399,9 +399,9 @@ write(Buf=#co_data_buf {mode = atomic, pid = Pid, type = Type, data = OldData,
 	    app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true} , 
 		     Pid, {set, I, Value})
     catch
-	error:Reason ->
+	error:_Reason ->
 	    ?dbg(data_buf, "write: decode of = ~p, ~p failed, Reason = ~p", 
-		 [DataToSend,  Type, Reason]),
+		 [DataToSend,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 		
@@ -419,9 +419,9 @@ write(Buf=#co_data_buf {mode = atomic = _Mode, pid = Pid, type = Type, data = Da
 	    app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}, 
 		     Pid, {set, I, Value})
    catch
-	error:Reason ->
+	error:_Reason ->
 	    ?dbg(data_buf, "write: decode of = ~p, ~p failed, Reason = ~p", 
-		 [DataToSend,  Type, Reason]),
+		 [DataToSend,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 
@@ -458,9 +458,9 @@ write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type,
 		    Other
 	    end
    catch
-	error:Reason ->
+	error:_Reason ->
 	    ?dbg(data_buf, "write: decode of = ~p, ~p failed, Reason = ~p", 
-		 [DataToSend,  Type, Reason]),
+		 [DataToSend,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 
@@ -527,9 +527,9 @@ write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, type = Type, data = OldData
 	    co_dict:direct_set(Dict, Index, SubInd, Value),
 	    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}}
    catch
-	error:Reason ->
+	error:_Reason ->
 	    ?dbg(data_buf, "write: decode of = ~p, ~p failed, Reason = ~p", 
-		 [DataToSend,  Type, Reason]),
+		 [DataToSend,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 		
@@ -548,9 +548,9 @@ write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, type = Type, data = OldData
 	    co_dict:direct_set(Dict, Index, SubInd, Value),
 	    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}}
    catch
-	error:Reason ->
+	error:_Reason ->
 	    ?dbg(data_buf, "write: decode of = ~p, ~p failed, Reason = ~p", 
-		 [DataToSend,  Type, Reason]),
+		 [DataToSend,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 		
@@ -559,7 +559,7 @@ write(Buf=#co_data_buf {mode = {data, Client} = _Mode, data = OldData,
       Data, true, segment) -> 
     ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p", [_Mode, Data, true]),
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
-    ?dbg(data_buf, "write: reply to ~p I = ~.16B:~.8B, Data = ~p", 
+    ?dbg(data_buf, "write: reply to ~w I = ~.16B:~.8B, Data = ~p", 
 	 [Client, _Index, _SubInd, DataToSend]),
     gen_server:reply(Client, {ok, DataToSend}),
     {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
@@ -675,9 +675,9 @@ update(Buf=#co_data_buf {access = read, type = Type}, {ok, Value}) ->
 				  size = size(Data),
 				  eof = true}}
    catch
-	error:Reason ->
+	error:_Reason ->
 	    ?dbg(data_buf, "update: decode of = ~p, ~p failed, Reason = ~p", 
-		 [Value,  Type, Reason]),
+		 [Value,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 		
@@ -722,7 +722,7 @@ update(_Buf, Other) ->
 -spec abort(Buf::#co_data_buf{}, Reason::integer()) ->
 		   ok.
 
-abort(undefined, _Reason) -> 
+abort(undefined, _Reason) ->
     ok;
 abort(_Buf=#co_data_buf {mode = {dict, _Dict}}, _Reason) -> 
     ok;

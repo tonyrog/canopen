@@ -63,13 +63,13 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec notify(CobId::integer(), Ix::integer(), Si::integer(), Value::term()) -> 
+-spec notify(CobId::integer(), Ix::integer(), Si::integer(), Data::binary()) -> 
 		    ok | {error, Error::atom()}.
 
-notify(CobId,Index,Subind,Value) ->
+notify(CobId,Index,Subind,Data) ->
     FrameID = ?COBID_TO_CANID(CobId),
     Frame = #can_frame { id=FrameID, len=0, 
-			 data=(<<16#80,Index:16/little,Subind:8,Value:32/little>>) },
+			 data=(<<16#80,Index:16/little,Subind:8,Data:32/little>>) },
     ?dbg(node, "notify: Sending frame ~p from CobId = ~.16#, CanId = ~.16#)",
 	 [Frame, CobId, FrameID]),
     can:send(Frame).
@@ -1125,7 +1125,7 @@ handle_can(Frame, Ctx) ->
 			{1, Nid} when Nid == Ctx#co_ctx.nodeid ->
 			    %% DAM-MPDO, destination is this node
 			    handle_dam_mpdo(Ctx, COBID, Ix, Si, Data);
-			{1, OtherNid} ->
+			{1, _OtherNid} ->
 			    %% DAM-MPDO, destination is some other node
 			    Ctx;
 			{0, 0} ->
@@ -1339,13 +1339,13 @@ handle_dam_mpdo(Ctx, CobId, Ix, Si, Data) ->
     %% How handle CobId ??
     try co_dict:set(Ctx#co_ctx.dict, Ix, Si, Data) of
 	ok -> ok;
-	Error -> 
+	_Error -> 
 	    ?dbg(node, "~s: handle_dam_mpdo: Failed updating index ~7.16.0#, "
-		 "error = ~p", [Ctx#co_ctx.name, Ix, Error])
+		 "error = ~p", [Ctx#co_ctx.name, Ix, _Error])
     catch
-	error:Reason -> 
+	error:_Reason -> 
 	    ?dbg(node, "~s: handle_dam_mpdo: Crashed updating index ~7.16.0#, "
-		 "reason = ~p", [Ctx#co_ctx.name, Ix, Reason])
+		 "reason = ~p", [Ctx#co_ctx.name, Ix, _Reason])
     end,
     case lists:usort(subscribers(Ctx#co_ctx.sub_table, Ix) ++
 			 reserver_pid(Ctx#co_ctx.res_table, Ix)) of
@@ -1485,12 +1485,12 @@ lookup_nmt_entry(NodeId, Ctx) ->
 	    E
     end.
 
-broadcast_state(State, #co_ctx {state = State, name = Name}) ->
+broadcast_state(State, #co_ctx {state = State, name = _Name}) ->
     %% No change
-    ?dbg(node, "~s: broadcast_state: no change state = ~p", [Name, State]),
+    ?dbg(node, "~s: broadcast_state: no change state = ~p", [_Name, State]),
     ok;
-broadcast_state(State, Ctx=#co_ctx { name = Name}) ->
-    ?dbg(node, "~s: broadcast_state: new state = ~p", [Name, State]),
+broadcast_state(State, Ctx=#co_ctx { name = _Name}) ->
+    ?dbg(node, "~s: broadcast_state: new state = ~p", [_Name, State]),
 
     %% To all tpdo processes
     send_to_tpdos({state, State}, Ctx),
@@ -1498,25 +1498,25 @@ broadcast_state(State, Ctx=#co_ctx { name = Name}) ->
     %% To all applications ??
     send_to_apps({state, State}, Ctx).
 
-send_to_apps(Msg, _Ctx=#co_ctx {name = Name, app_list = AList}) ->
+send_to_apps(Msg, _Ctx=#co_ctx {name = _Name, app_list = AList}) ->
     lists:foreach(
       fun(A) ->
 	      case A#app.pid of
 		  Pid -> 
 		      ?dbg(node, "~s: handle_call: sending ~w to app "
-			   "with pid = ~p", [Name, Msg, Pid]),
+			   "with pid = ~p", [_Name, Msg, Pid]),
 		      gen_server:cast(Pid, Msg) 
 	      end
       end,
       AList).
 
-send_to_tpdos(Msg, _Ctx=#co_ctx {name = Name, tpdo_list = TList}) ->
+send_to_tpdos(Msg, _Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
     lists:foreach(
       fun(T) ->
 	      case T#tpdo.pid of
 		  Pid -> 
 		      ?dbg(node, "~s: handle_call: sending ~w to tpdo "
-			   "with pid = ~p", [Name, Msg, Pid]),
+			   "with pid = ~p", [_Name, Msg, Pid]),
 		      gen_server:cast(Pid, Msg) 
 	      end
       end,
@@ -1865,14 +1865,14 @@ subscriptions(Tab, Pid) when is_pid(Pid) ->
 subscribers(Tab) ->
     lists:usort([Pid || {Pid, _Ixs} <- ets:tab2list(Tab)]).
 
-inform_subscribers(I, _Ctx=#co_ctx {name = Name, sub_table = STable}) ->
+inform_subscribers(I, _Ctx=#co_ctx {name = _Name, sub_table = STable}) ->
     lists:foreach(
       fun(Pid) ->
 	      case self() of
 		  Pid -> do_nothing;
 		  _OtherPid ->
 		      ?dbg(node, "~s: inform_subscribers: "
-			   "Sending object event to ~p", [Name, Pid]),
+			   "Sending object event to ~p", [_Name, Pid]),
 		      gen_server:cast(Pid, {object_event, I}) 
 	      end
       end,
@@ -1987,7 +1987,7 @@ inform_reserver(Ix, _Ctx=#co_ctx {name = _Name, res_table = RTable}) ->
     end.
 
 
-lookup_sdo_server(Nid, Ctx=#co_ctx {name = _Name, cob_table = CobTable}) ->
+lookup_sdo_server(Nid, _Ctx=#co_ctx {name = _Name}) ->
     if ?is_nodeid_extended(Nid) ->
 	    NodeID = Nid band ?COBID_ENTRY_ID_MASK,
 	    Tx = ?XCOB_ID(?SDO_TX,NodeID),
@@ -2079,13 +2079,13 @@ set_tpdo_value(I,Value,Ctx)  when is_list(Value) andalso length(Value) > 16 ->
     set_tpdo_value(I,lists:sublist(Value,16),Ctx);
 %% Other conversions ???
 set_tpdo_value({_Ix, _Si} = I, Value, 
-	       Ctx=#co_ctx {tpdo_cache = Cache, name = Name}) ->
+	       Ctx=#co_ctx {tpdo_cache = Cache, name = _Name}) ->
     ?dbg(node, "~s: set_tpdo_value: Ix = ~.16#:~w, Value = ~p",
-	 [Name, _Ix, _Si, Value]), 
+	 [_Name, _Ix, _Si, Value]), 
     case ets:lookup(Cache, I) of
 	[] ->
 	    io:format("WARNING!" 
-		      "~s: set_tpdo_value: unknown tpdo element\n", [Name]),
+		      "~s: set_tpdo_value: unknown tpdo element\n", [_Name]),
 	    {{error,unknown_tpdo_element}, Ctx};
 	[{I, OldValues}] ->
 	    NewValues = case OldValues of
@@ -2093,14 +2093,14 @@ set_tpdo_value({_Ix, _Si} = I, Value,
 			    _List -> OldValues ++ [Value]
 			end,
 	    ?dbg(node, "~s: set_tpdo_value: old = ~p, new = ~p",
-		 [Name, OldValues, NewValues]), 
+		 [_Name, OldValues, NewValues]), 
 	    try ets:insert(Cache,{I,NewValues}) of
 		true -> {ok, Ctx}
 	    catch
 		error:Reason -> 
 		    io:format("WARNING!" 
 			      "~s: set_tpdo_value: insert of ~p failed, reason = ~w\n", 
-			      [Name, NewValues, Reason]),
+			      [_Name, NewValues, Reason]),
 		    {{error,Reason}, Ctx}
 	    end
     end.

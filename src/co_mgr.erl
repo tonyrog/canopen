@@ -15,29 +15,52 @@
 -include("sdo.hrl").
 -include("co_debug.hrl").
 
-%% api
+%% regular api
 -export([start/0, start/1, stop/0]).
--export([fetch/5]).
+-export([fetch/5,fetch/4]).
+-export([store/5,store/4]).
 -export([load/1]).
--export([store/5]).
--export([require/1]).
--export([setnid/1]).
+
+%% api when using definition files
+-export([client_require/1]).
+-export([client_set_nid/1]).
+-export([client_set_mode/1]).
+-export([client_set_tout/1]).
+-export([client_store/4, client_store/3, client_store/2]).
+-export([client_fetch/3, client_fetch/2, client_fetch/1]).
+-export([client_notify/4, client_notify/3, client_notify/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
+%% spawned function
+-export([execute_request/6]).
+
 %% Test functions
 -export([debug/1]).
--export([loop_data/0]).
+-export([loop_data/0, loop_data/1]).
 
 
 -define(CO_MGR, co_mgr).
-
--record(mgr_ctx,
+-record(node,
 	{
-	  def_nid,
-	  ctx
+	  nid,             %% CAN node id
+	  serial=0,        %% serial 
+	  product=unknown, %% product code
+	  state=up         %% up/down/sleep
+	}).
+
+
+-record(mgr,
+	{
+	  def_nid,         %% default node for short operations
+	  def_trans_mode = segment, %% default transfer mode
+	  def_timeout = 2000, %% default timeout
+	  nodes = [],      %% nodes detected
+	  pids = [],       %% list of outstanding operations
+	  ctx,             %% current context
+	  ctx_list =[]     %% [{mod,<ctx>}] 
 	}).
 
 %%====================================================================
@@ -72,7 +95,12 @@ start(Options) ->
 	    false -> start_link
 	end,
 
-    case co_proc:lookup(?MGR_NODE) of
+    case co_proc:alive() of
+	true -> do_nothing;
+	false -> co_proc:start_link(Options)
+    end,
+
+    case co_proc:lookup(?CO_MGR) of
 	MPid when is_pid(MPid) ->
 	    ok;
 	{error, not_found} ->
@@ -94,16 +122,6 @@ stop() ->
 	undefined ->
 	    {error, no_manager_running}
     end.
-
-
-require(Mod) ->
-    gen_server:call(?CO_MGR, {require, Mod}).
-
-%% Set the default nodeid - for short interface
-setnid(Nid) ->
-    gen_server:call(?CO_MGR, {setnid, Nid}).
-
-    
     
 %%--------------------------------------------------------------------
 %% @doc
@@ -149,6 +167,8 @@ fetch(NodeId, Ix, Si, TransferMode, {app, Pid, Mod} = Term)
 	undefined -> {error, non_existing_application};
 	_Info -> co_api:fetch(?MGR_NODE, NodeId, Ix, Si, TransferMode, Term)
     end;
+fetch(NodeId, Ix, Si, TransferMode, {value, Type}) when is_atom(Type) ->
+    fetch(NodeId, Ix, Si, TransferMode, {value, co_lib:encode_type(Type)}); 
 fetch(NodeId, Ix, Si, TransferMode, {value, Type}) 
   when is_integer(NodeId), 
        is_integer(Ix), 
@@ -164,6 +184,22 @@ fetch(NodeId, Ix, Si, TransferMode, {value, Type})
     end;
 fetch(NodeId, Ix, Si, TransferMode, data = Term) ->
     co_api:fetch(?MGR_NODE, NodeId, Ix, Si, TransferMode, Term).
+
+-spec fetch(NodeId::integer(), {Ix::integer(), Si::integer()},
+	    TransferMode:: block | segment,
+	    Destination:: {app, Pid::pid(), Mod::atom()} | 
+			  {value, Type::integer()} |
+			  data) ->
+		   ok | 
+		   {ok, Value::term()} | 
+		   {ok, Data::binary()} |
+		   {error, Reason::atom()}.
+		   
+fetch(NodeId, {Ix, Si}, TransferMode, Term) 
+  when is_integer(NodeId), 
+       is_integer(Ix), 
+       is_integer(Si) ->
+fetch(NodeId, Ix, Si, TransferMode, Term).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -199,6 +235,8 @@ store(NodeId, Ix, Si, TransferMode, {app, Pid, Mod} = Term)
 	undefined -> {error, non_existing_application};
 	_Info -> co_api:store(?MGR_NODE, NodeId, Ix, Si, TransferMode, Term)
     end;
+store(NodeId, Ix, Si, TransferMode, {value, Value, Type}) when is_atom(Type) ->
+ store(NodeId, Ix, Si, TransferMode, {value, Value, co_lib:encode_type(Type)});
 store(NodeId, Ix, Si, TransferMode, {value, Value, Type}) 
   when is_integer(NodeId), 
        is_integer(Ix), 
@@ -213,15 +251,29 @@ store(NodeId, Ix, Si, TransferMode, {data, Bin} = Term)
        is_binary(Bin) ->
     co_api:store(?MGR_NODE, NodeId, Ix, Si, TransferMode, Term).
 
+-spec store(NodeId::integer(), {Ix::integer(), Si::integer()},
+	    TransferMode:: block | segment,
+	    Source:: {app, Pid::pid(), Mod::atom()} | 
+		      {value, Value::term(), Type::integer()} |
+		      {data, Bin::binary}) ->
+		   ok | 
+		   {error, Reason::atom()}.
+
+store(NodeId, {Ix, Si}, TransferMode,  Term) 
+  when is_integer(NodeId), 
+       is_integer(Ix), 
+       is_integer(Si) ->
+store(NodeId, Ix, Si, TransferMode,  Term).
 
 %% For testing
 %% @private
 debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
     gen_server:call(?CO_MGR, {debug, TrueOrFalse}).
 
+loop_data(Qual) when Qual == no_ctx ->
+    gen_server:call(?CO_MGR, {loop_data, Qual}).
 loop_data() ->
-    gen_server:call(?CO_MGR, loop_data).
-
+    gen_server:call(?CO_MGR, {loop_data, all}).
 
 %%====================================================================
 %% gen_server callbacks
@@ -241,6 +293,8 @@ init(Opts) ->
     %% Trace output enable/disable
     put(dbg, proplists:get_value(debug,Opts,false)), 
 
+    co_proc:reg(?CO_MGR),
+
     case co_proc:lookup(?MGR_NODE) of
 	NPid when is_pid(NPid) ->
 	    ok;
@@ -250,8 +304,62 @@ init(Opts) ->
 						 [{nodeid, 0}] ++ Opts)
     end,
 
-    {ok, #mgr_ctx {def_nid = undefined, ctx = undefined}}.
+    process_flag(trap_exit, true),
+    
+    {ok, #mgr {def_nid = 0, ctx = undefined}}.
 
+
+%% API used by co_script
+
+client_require(Mod) 
+  when is_atom(Mod) ->
+    gen_server:call(?CO_MGR, {require, Mod}).
+
+%% Set the default nodeid - for short interface
+client_set_nid(Nid) 
+  when is_integer(Nid) andalso Nid < 2#1000000000000000000000000 -> %% Max 24 bit
+    gen_server:call(?CO_MGR, {set_nid, Nid}).
+
+%% Set the default transfer mode
+client_set_mode(Mode) 
+  when Mode == block;
+       Mode == segment ->
+    gen_server:call(?CO_MGR, {set_mode, Mode}).
+
+%% Set the default timeout
+client_set_tout(TimeOut) 
+  when is_integer(TimeOut) orelse TimeOut == infinity ->
+    gen_server:call(?CO_MGR, {set_tout, TimeOut}).
+
+%% Store value
+client_store(Nid, Index, SubInd, Value) ->
+    gen_server:call(?CO_MGR, {store, Nid, Index, SubInd, Value}).
+
+client_store(Index, SubInd, Value) ->
+    gen_server:call(?CO_MGR, {store, Index, SubInd, Value}).
+
+client_store(Index, Value) ->
+    gen_server:call(?CO_MGR, {store, Index, 0, Value}).
+
+%% Fetch value
+client_fetch(Nid, Index, SubInd) ->
+    gen_server:call(?CO_MGR, {fetch, Nid, Index, SubInd}).
+
+client_fetch(Index, SubInd)  ->
+    gen_server:call(?CO_MGR, {fetch, Index, SubInd}).
+
+client_fetch(Index)  ->
+    gen_server:call(?CO_MGR, {fetch, Index, 0}).
+
+%% Send notification
+client_notify(Nid, Index, Subind, Value) ->
+    gen_server:cast(?CO_MGR, {notify, Nid, Index, Subind, Value}).
+
+client_notify(Index, Subind, Value) ->
+    gen_server:cast(?CO_MGR, {notify, Index, Subind, Value}).
+  
+client_notify(Index, Value) ->
+    gen_server:cast(?CO_MGR, {notify, Index, 0, Value}).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -260,26 +368,60 @@ init(Opts) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec handle_call(Request::stop,
-		  From::pid(), Ctx::record()) ->
-			 {reply, Reply::term(), Ctx::record()} |
-			 {reply, Reply::term(), Ctx::record(), Timeout::timeout()} |
-			 {noreply, Ctx::record()} |
-			 {noreply, Ctx::record(), Timeout::timeout()} |
-			 {stop, Reason::term(), Reply::term(), Ctx::record()} |
-			 {stop, Reason::term(), Ctx::record()}.
+-spec handle_call(Request::stop |
+			   {setnid, Nid::integer()} |
+			   {setmode, Mode:: block | segment} |
+			   {settout, TOut::timeout()} |
+			   {debug, TrueOrFalse::boolean()} |
+			   {loop_data, Qual:: all | no_ctx},
+		  From::pid(), Mgr::record()) ->
+			 {reply, Reply::term(), Mgr::record()} |
+			 {reply, Reply::term(), Mgr::record(), Timeout::timeout()} |
+			 {noreply, Mgr::record()} |
+			 {noreply, Mgr::record(), Timeout::timeout()} |
+			 {stop, Reason::term(), Reply::term(), Mgr::record()} |
+			 {stop, Reason::term(), Mgr::record()}.
 
-handle_call({debug, TrueOrFalse}, _From, Ctx) ->
+handle_call({set_nid,Nid}, _From, Mgr) ->
+    {reply, ok, Mgr#mgr { def_nid = Nid }};
+handle_call({set_mode,Mode}, _From, Mgr) ->
+    {reply, ok, Mgr#mgr { def_trans_mode = Mode }};
+handle_call({set_tout,Tout}, _From, Mgr) ->
+    {reply, ok, Mgr#mgr { def_timeout = Tout }};
+handle_call({require,Mod}, _From, Mgr) ->
+    {Reply,_DCtx,Mgr1} = load_ctx(Mod, Mgr),
+    {reply, Reply, Mgr1};
+handle_call({store,Nid,Index,SubInd,Value}, From, Mgr) ->
+    do_store(Nid,Index,SubInd,Value, From, Mgr);
+handle_call({store,Index,SubInd,Value}, From, Mgr=#mgr {def_nid = DefNid}) 
+  when DefNid =/= 0 ->
+    do_store(DefNid, Index, SubInd, Value, From, Mgr);
+handle_call({fetch,Nid,Index,SubInd}, From, Mgr) ->
+    do_fetch(Nid,Index,SubInd, From, Mgr);
+handle_call({fetch,Index,SubInd}, From, Mgr=#mgr {def_nid = DefNid})
+  when DefNid =/= 0 ->
+    do_fetch(DefNid, Index, SubInd, From, Mgr);
+handle_call({debug, TrueOrFalse}, _From, Mgr) ->
     put(dbg, TrueOrFalse),
-    {reply, ok, Ctx};
-handle_call(loop_data, _From, Ctx) ->
-    io:format("Loop data = ~p\n", [Ctx]),
-    {reply, ok, Ctx};
-handle_call(stop, _From, Ctx) ->
-    {stop, normal, ok, Ctx};
-handle_call(_Request, _From, Ctx) ->
+    {reply, ok, Mgr};
+handle_call({loop_data, all}, _From, Mgr) ->
+    io:format("Loop data = ~p\n", [Mgr]),
+    {reply, ok, Mgr};
+handle_call({loop_data, no_ctx}, _From, Mgr) ->
+    io:format("Loop data:\n"
+	      "Default nid = ~.16.0#\n"
+	      "Default transfer mode = ~p\n"
+	      "Default timeout = ~p\n"
+	      "Nodes ~p\n"
+	      "Pids ~p\n",
+	      [Mgr#mgr.def_nid, Mgr#mgr.def_trans_mode, Mgr#mgr.def_timeout,
+	       Mgr#mgr.nodes, Mgr#mgr.pids]),
+    {reply, ok, Mgr};
+handle_call(stop, _From, Mgr) ->
+    {stop, normal, ok, Mgr};
+handle_call(_Request, _From, Mgr) ->
     ?dbg(mgr, "handle_call: Unknown request ~p", [ _Request]),
-    {reply, {error,bad_call}, Ctx}.
+    {reply, {error,bad_call}, Mgr}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -288,14 +430,19 @@ handle_call(_Request, _From, Ctx) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec handle_cast(Msg::term(), Ctx::record()) -> 
-			 {noreply, Ctx::record()} |
-			 {noreply, Ctx::record(), Timeout::timeout()} |
-			 {stop, Reason::term(), Ctx::record()}.
+-spec handle_cast(Msg::term(), Mgr::record()) -> 
+			 {noreply, Mgr::record()} |
+			 {noreply, Mgr::record(), Timeout::timeout()} |
+			 {stop, Reason::term(), Mgr::record()}.
 
-handle_cast(_Msg, Ctx) ->
+handle_cast({notify, Nid, Index, SubInd, Value}, Mgr) ->
+    do_notify(Nid, Index, SubInd, Value, Mgr);
+handle_cast({notify, Index, SubInd, Value}, Mgr=#mgr {def_nid = DefNid})
+  when DefNid =/= 0 ->
+    do_notify(DefNid, Index, SubInd, Value, Mgr);
+handle_cast(_Msg, Mgr) ->
     ?dbg(mgr, "handle_cast: Unknown msg ~p", [_Msg]),
-    {noreply, Ctx}.
+    {noreply, Mgr}.
 
 
 %%--------------------------------------------------------------------
@@ -305,14 +452,27 @@ handle_cast(_Msg, Ctx) ->
 %% Handles 'DOWN' messages for monitored processes.
 %% @end
 %%--------------------------------------------------------------------
--spec handle_info(Info::term(), Ctx::record()) -> 
-			 {noreply, Ctx::record()} |
-			 {noreply, Ctx::record(), Timeout::timeout()} |
-			 {stop, Reason::term(), Ctx::record()}.
+-spec handle_info(Info::term(), Mgr::record()) -> 
+			 {noreply, Mgr::record()} |
+			 {noreply, Mgr::record(), Timeout::timeout()} |
+			 {stop, Reason::term(), Mgr::record()}.
 
-handle_info(_Info, Ctx) ->
+handle_info({'EXIT', Pid, Reason}, Mgr=#mgr {pids = PList}) ->
+    ?dbg(?NAME, "handle_info: EXIT for process ~p received, reason ~p", 
+	 [Pid, Reason]),
+    case lists:member(Pid, PList) of
+	true -> 
+	    case Reason of
+		normal -> do_nothing;
+		_Other -> io:format("WARNING, request failed, reason ~p\n", [Reason])
+	    end,
+	    {noreply, Mgr#mgr {pids = PList -- [Pid]}};
+	false ->
+	    {noreply, Mgr}
+    end;
+handle_info(_Info, Mgr) ->
     ?dbg(mgr, "handle_info: Unknown info ~p", [_Info]),
-    {noreply, Ctx}.
+    {noreply, Mgr}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -322,10 +482,11 @@ handle_info(_Info, Ctx) ->
 %% necessary cleaning up. When it returns, the gen_server terminates
 %% with Reason. The return value is ignored.
 %%
-%% @spec terminate(Reason, Ctx) -> void()
+%% @spec terminate(Reason, Mgr) -> void()
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, _Ctx) ->
+terminate(_Reason, _Mgr) ->
+   ?dbg(mgr, "terminate: reason ~p", [_Reason]),
     case co_proc:lookup(?MGR_NODE) of
 	Pid when is_pid(Pid) ->
 	    ?dbg(mgr, "terminate: Stoping co_node 0", []),
@@ -333,6 +494,7 @@ terminate(_Reason, _Ctx) ->
 	{error, not_found} ->
 	    do_nothing
     end,
+    co_proc:reg(?CO_MGR),
     ok.
 
 %%--------------------------------------------------------------------
@@ -340,10 +502,305 @@ terminate(_Reason, _Ctx) ->
 %% @doc
 %% Convert process ctx when code is changed
 %%
-%% @spec code_change(OldVsn, Ctx, Extra) -> {ok, NewCtx}
+%% @spec code_change(OldVsn, Mgr, Extra) -> {ok, NewMgr}
 %% @end
 %%--------------------------------------------------------------------
-code_change(_OldVsn, Ctx, _Extra) ->
+code_change(_OldVsn, Mgr, _Extra) ->
     ?dbg(mgr, "code_change: Old version ~p", [_OldVsn]),
-    {ok, Ctx}.
+    {ok, Mgr}.
 
+
+%%--------------------------------------------------------------------
+%%% Internal functions
+%%--------------------------------------------------------------------
+load_ctx(Mod, Mgr) ->
+    case lists:keysearch(Mod, 1, Mgr#mgr.ctx_list) of
+	false ->
+	    try co_lib:load_definition(Mod) of
+		{ok, DCtx} ->
+		    ?dbg(mgr, "load_ctx: Loaded ~p", [Mod]),
+		    List = [{Mod,DCtx}|Mgr#mgr.ctx_list],
+		    {ok, DCtx, Mgr#mgr { ctx=DCtx, ctx_list = List }};
+		{Error, _} ->
+		    ?dbg(mgr, "load_ctx: failed loading ~p", [Mod]),
+		    {Error, [], Mgr}
+	    catch
+		error:Reason ->
+		    {{error,Reason}, [], Mgr}
+	    end;
+	{value,{Mod,DCtx}} ->
+	    ?dbg(mgr, "load_ctx: ~p already loaded", [Mod]),
+	    {ok, DCtx, Mgr#mgr { ctx = DCtx }}
+    end.
+    
+do_store(Nid,Index,SubInd,Value,Client, 
+       Mgr=#mgr {pids = PList, def_trans_mode = TransMode, def_timeout = TimeOut}) ->
+    Ctx = context(Nid, Mgr),
+    case translate_index(Ctx,Index,SubInd,Value) of
+	{ok,{Ti,Tsi, {V, Type} } = _T} ->
+	    ?dbg(mgr, "do_store: translated  ~p", [_T]),
+	    Pid = 
+		spawn_request(store, 
+			      [Nid, Ti, Tsi, TransMode, {value, V, type(Type)}],
+			      TimeOut,
+			      Client,
+			      {store, Nid, Index, SubInd, Value, Type, Ctx},
+			      get(dbg)),
+	    {noreply, Mgr#mgr { pids = [Pid | PList] }};
+	Error ->
+	    ?dbg(mgr,"do_store: translation failed, error: ~p\n", [Error]),
+	    {reply, Error, Mgr}
+    end.
+  
+
+do_fetch(Nid,Index,SubInd, Client, 
+       Mgr=#mgr {pids = PList, def_trans_mode = TransMode, def_timeout = TimeOut}) ->
+    Ctx = context(Nid, Mgr),
+    case translate_index(Ctx,Index,SubInd,no_value) of
+	{ok,{Ti,Tsi,Type} = _T} ->
+	    ?dbg(mgr, "do_fetch: translated  ~p", [_T]),
+	    Pid = 
+		spawn_request(fetch, 
+			      [Nid, Ti, Tsi, TransMode, {value, type(Type)}],
+			      TimeOut,
+			      Client,
+			      {fetch, Nid, Index, SubInd, Type, Ctx},
+			      get(dbg)),
+	    {noreply,  Mgr#mgr { pids = [Pid | PList] }};
+	Error ->
+	    ?dbg(mgr,"do_store: translation failed, error: ~p\n", [Error]),
+	    {reply, Error, Mgr}
+    end.
+
+spawn_request(F, Args, TimeOut, Client, Request, Dbg) ->
+    Pid = proc_lib:spawn_link(?MODULE, execute_request, 
+			      [F, Args, TimeOut, Client, Request, Dbg]),
+    ?dbg(mgr, "spawn_request: spawned  ~p", [Pid]),
+    Pid.
+
+
+execute_request(F, Args, TimeOut, Client, Request, Dbg) ->
+    put(dbg, Dbg),
+    apply(?MODULE,F,Args),
+    receive
+	{_Ref, Reply} ->
+	    ?dbg(mgr,"execute_request: reply received ~p, sending to ~p", 
+		 [Reply, Client]),
+	    handle_reply(Reply, Client, Request);
+	Other ->
+	    ?dbg(mgr,"execute_request: Other received ~p, sending to ~p", 
+		 [Other, Client]),
+	    handle_reply(Other, Client, Request)
+    after TimeOut ->
+	    ?dbg(mgr,"execute_request: timeout", []),
+	    gen_server:reply(Client, {error, timeout})
+    end.
+
+handle_reply({ok, Data}, Client, {fetch, _Nid, _Index, _SubInd, Type, Ctx}) ->
+    ?dbg(mgr,"handle_reply: Formatting ~p, type ~p", [Data, Type]),
+    {Value, _Rest} = co_codec:decode(Data, type(Type)),
+    Reply = format_value(Value, Type, Ctx),
+    gen_server:reply(Client, Reply);
+handle_reply({error, ECode}, Client, _Request) ->
+    gen_server:reply(Client, {error, co_sdo:decode_abort_code(ECode)});
+handle_reply(Other, Client, _Request) -> %% ok ???
+    gen_server:reply(Client, Other).
+
+do_notify(Nid,Index,SubInd,Value, Mgr) ->
+    Ctx = context(Nid, Mgr),
+    case translate_index(Ctx,Index,SubInd,Value) of
+	{ok,{Ti,Tsi,{Tv, Type}} = _T} ->
+	    ?dbg(mgr, "do_notify: translated  ~p", [_T]),
+	    try co_codec:encode(Tv, Type) of
+		Data ->
+		    ?dbg(mgr,"do_notify: ~w ~p ~p ~p\n", [Nid,Ti,Tsi,Data]),
+		    co_api:notify(Nid,Ti,Tsi,Data)
+	    catch error:Reason ->
+		    ?dbg(mgr,"do_notify: encode failed ~w ~p ~p ~p, reason ~p\n", 
+			      [Nid, Index, SubInd, Value, Reason])
+	    end;
+	_Error ->
+	    ?dbg(mgr,"do_notify: translation failed, error: ~p\n", [_Error]),
+	    error
+    end,
+    {noreply, Mgr}.
+    
+
+%% try translate symbolic index and Value
+translate_index(_Ctx,Index,SubInd,Value) 
+  when ?is_index(Index), ?is_subind(SubInd),is_integer(Value) ->
+    {ok,{Index,SubInd,Value}};
+translate_index(Ctx,Index,SubInd,Value) 
+  when  ?is_index(Index), ?is_subind(SubInd) ->
+    Res = co_lib:entry_by_index(Index,SubInd,Ctx),
+    translate_index2(Res, Index, Value, Ctx);
+translate_index(Ctx,Index,SubInd,Value) 
+  when ?is_subind(SubInd), is_atom(Index) ->
+    Res = co_lib:object_by_id(Index, Ctx),
+    translate_index1(Ctx, Res, Index, SubInd, Value);
+translate_index(Ctx,Index,SubInd,Value) 
+  when ?is_subind(SubInd), is_list(Index) ->
+    Res = co_lib:object_by_name(Index, Ctx),
+    translate_index1(Ctx, Res, Index, SubInd, Value);
+translate_index(_Ctx,_Index,_Subind,_Value) ->
+    {error,argument}.
+
+translate_index1(_Ctx, error,_Index,_SubInd,_Value) ->
+    {error, argument};
+translate_index1(Ctx, {ok,Obj},_Index,SubInd,Value) ->
+    Ti = Obj#objdef.index,
+    Res = co_lib:find_entry(SubInd, Obj), 
+    translate_index2(Ctx, Res, Ti, Value).
+
+translate_index2(_Ctx, error, _Index, _Value) ->
+    {error,argument};
+translate_index2(_Ctx, {ok, E}, Index, no_value) ->
+    %% For fetch 
+    {ok,{Index,E#entdef.index,E#entdef.type}};
+translate_index2(Ctx, {ok, E}, Index, Value) ->
+    case translate_value(E#entdef.type, Value, Ctx) of
+	{ok,IValue} ->
+	    {ok,{Index,E#entdef.index,{IValue,E#entdef.type}}};
+	error ->
+	    {error,argument}
+    end.
+
+   
+
+translate_value({enum,Base,_Id},Value,Ctx) when is_integer(Value) ->    
+    translate_value(Base, Value, Ctx);
+translate_value({enum,Base,Id},Value,Ctx) when is_atom(Value) ->
+    case co_lib:enum_by_id(Id, Ctx) of
+	error -> error;
+	{ok,Enums} ->
+	    case lists:keysearch(Value, 1, Enums) of
+		false -> error;
+		{value,{_,IValue}} ->
+		    translate_value(Base, IValue, Ctx)
+	    end
+    end;
+translate_value({bitfield,Base,_Id},Value,Ctx) when is_integer(Value) ->    
+    translate_value(Base, Value, Ctx);
+translate_value({bitfield,Base,Id},Value,Ctx) when is_atom(Value) ->
+    case co_lib:enum_by_id(Id, Ctx) of
+	error -> error;
+	{ok,Enums} ->
+	    case lists:keysearch(Value, 1, Enums) of
+		false -> error;
+		{value,{_,IValue}} ->
+		    translate_value(Base, IValue, Ctx)
+	    end
+    end;
+translate_value({bitfield,Base,Id},Value,Ctx) when is_list(Value) ->
+    case co_lib:enum_by_id(Id, Ctx) of
+	error -> error;
+	{ok,Enums} ->
+	    IValue = 
+		lists:foldl(
+		  fun(V, Bits) ->
+			  case lists:keysearch(V, 1, Enums) of
+			      false -> 0;
+			      {value,{_,Val}} -> Bits bor Val
+			  end
+		  end, 0, Value),
+	    translate_value(Base, IValue, Ctx)
+    end;
+translate_value(boolean, true, _)  -> {ok, 1};
+translate_value(boolean, false, _) -> {ok, 0};
+translate_value(Type, Value, _Ctx) when is_atom(Type), is_integer(Value) ->
+    %% FIXME
+    {ok, Value};
+translate_value(_, _, _) ->
+    error.
+
+
+%% translate Node ID to dctx
+context(Nid, Mgr) ->
+    case lists:keysearch(Nid, #node.nid, Mgr#mgr.nodes) of
+	false ->
+	    Mgr#mgr.ctx;  %% use current context
+	{value,N} ->
+	    Mod = N#node.product,
+	    case lists:keysearch(Mod, #node.nid, Mgr#mgr.ctx_list) of
+		false ->
+		    Mgr#mgr.ctx;  %% use current context
+		{value,{_,MCtx}} ->
+		    MCtx
+	    end
+    end.
+
+
+format_value(Value, Type, DCtx) ->
+    case Type of
+	boolean    -> ite(Value==0, "false", "true");
+	unsigned8  -> unsigned(Value,16#ff);
+	unsigned16 -> unsigned(Value,16#ffff);
+	unsigned24 -> unsigned(Value,16#ffffff);
+	unsigned32 -> unsigned(Value,16#ffffffff);
+
+	integer8  -> signed(Value, 16#7f);
+	integer16 -> signed(Value, 16#7fff);
+	integer24 -> signed(Value, 16#7fffff);
+	integer32 -> signed(Value, 16#7fffffff);
+
+	{enum,Type1,EId} ->
+	    case co_lib:enum_by_id(EId, DCtx) of
+		{ok,Enums} ->
+		    case lists:keysearch(Value, 2, Enums) of
+			false ->
+			    format_value(Value, Type1, DCtx);
+			{value,{Key,_}} ->
+			    atom_to_list(Key)
+		    end;
+		error ->
+		    format_value(Value, Type1, DCtx)
+	    end;
+	{bitfield,Type1,EId} ->
+	    case co_lib:enum_by_id(EId, DCtx) of
+		{ok,Enums} ->
+		    Fields = bitfield(Value, Enums),
+		    io_lib:format("~p", [Fields]);
+		error ->
+		    format_value(Value, Type1, DCtx)
+	    end;
+	_ ->
+	    %%integer_to_list(Value) ??
+	    Value
+    end.
+
+ite(true,Then,_Else) -> Then;
+ite(false,_Then,Else) -> Else.
+
+bitfield(Value,Enums) ->
+    bitfield(Value,Enums,[]).
+
+bitfield(0,_,Acc) ->
+    Acc;
+bitfield(Value,[{Key,Val}|Enums],Acc) ->
+    if (Val band Value) == Val ->
+	    bitfield(Value band (bnot Val), Enums, [Key|Acc]);
+       true ->
+	    bitfield(Value, Enums, Acc)
+    end;
+bitfield(_, [], Acc) ->
+    Acc.
+
+
+unsigned(V, Mask) ->
+    %%integer_to_list(V band Mask). ??
+    (V band Mask).
+
+signed(V, UMask) ->
+    if V band (bnot UMask) == 0 ->
+	    (V band UMask);
+       true ->
+	    %%[$-|integer_to_list(((bnot V) band UMask)+1)] ??
+	    [$-|(((bnot V) band UMask)+1)]
+    end.
+
+type({enum, Base, _Id}) ->
+    Base;
+type({bitfield, Base, _Id}) ->
+    Base;
+type(Type) ->
+    Type.

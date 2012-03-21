@@ -9,7 +9,7 @@
 -ifndef(CO_DEBUG_HRL).
 -define(CO_DEBUG_HRL, true).
 
-%%-ifdef(debug).
+-ifdef(debug).
 -define(dbg(Tag, Format, Args),
 	case get(dbg) of
 	    true ->
@@ -20,7 +20,7 @@
 -else.
 -define(dbg(Tag, Format, Args), ok).
 
-%%-endif.
+-endif.
 
 
 -endif.

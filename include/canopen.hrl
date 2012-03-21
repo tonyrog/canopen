@@ -433,7 +433,7 @@
 	  last     ::uint1(),      %% Flag indicating if last segment is received
 	  first    :: boolean(),   %% True for first block
 	  node_pid :: pid(),       %% Pid of the node
-	  node_from :: term(),     %% Delayed gen_server:reply caller
+	  client   :: term(),     %% Delayed gen_server:reply caller
 	  ctx      :: record(sdo_ctx),  %% general parameters
 	  buf      :: term(),      %% Data buffer
 	  mref     :: term(),      %% Ref to application
