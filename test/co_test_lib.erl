@@ -23,32 +23,20 @@ start_node(C, Serial) when is_list(C) ->
     Dict = filename:join(DataDir, ?DICT),
     start_node(Serial, Dict);
 start_node(Serial, Dict) ->
+    start_node(Serial, Dict, 1, 0).
+
+start_node(Serial, Dict, Port, Ttl) ->
     can_router:start(),
-    can_udp:start(co_test, 1, [{ttl, 0}]),
+    can_udp:start(co_test, Port, [{ttl, Ttl}]),
 
     {ok, PPid} = co_proc:start_link([{unlinked, true}]),
     ct:pal("Started co_proc ~p",[PPid]),
 
-    {ok, Pid} = co_api:start_link(Serial, 
-				   [{use_serial_as_xnodeid, true},
-				    {dict_file, Dict},
-				    {max_blksize, 7},
-				    {vendor,16#2A1},
-				    {unlinked, true},
-				    {debug, true}]),
-    ct:pal("Started co_node ~p, pid = ~p",[integer_to_list(Serial,16), Pid]),
-    {ok, Pid}.
-
-start_node(Serial, Dict, Port) ->
-    can_router:start(),
-    can_udp:start(co_test, Port, [{ttl, 0}]),
-
-    {ok, PPid} = co_proc:start_link([{unlinked, true}]),
-    ct:pal("Started co_proc ~p",[PPid]),
-
-    case co_api:alive(Serial) of
+    try co_api:alive(Serial) of
 	true -> co_api:stop(Serial); %% Clean up failed ??
 	false -> do_nothing
+    catch error:_Reason ->
+	    do_nothing
     end,
 
     {ok, Pid} = co_api:start_link(Serial, 
@@ -60,6 +48,7 @@ start_node(Serial, Dict, Port) ->
 				    {debug, true}]),
     ct:pal("Started co_node ~p, pid = ~p",[integer_to_list(Serial,16), Pid]),
     {ok, Pid}.
+
 
 stop_node(Config) when is_list(Config) ->
     stop_node(serial());

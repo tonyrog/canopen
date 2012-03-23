@@ -722,19 +722,12 @@ update(_Buf, Other) ->
 -spec abort(Buf::#co_data_buf{}, Reason::integer()) ->
 		   ok.
 
-abort(undefined, _Reason) ->
-    ok;
-abort(_Buf=#co_data_buf {mode = {dict, _Dict}}, _Reason) -> 
-    ok;
-abort(_Buf=#co_data_buf {mode = atomic}, _Reason) -> 
-    ok;
-abort(_Buf=#co_data_buf {mode = {atomic, _Module}}, _Reason) -> 
-    ok;
 abort(_Buf=#co_data_buf {mode = streamed, pid = Pid, ref = Ref}, Reason) -> 
     gen_server:cast(Pid, {abort, Ref, Reason});
 abort(_Buf=#co_data_buf {mode = {streamed, Module}, pid = Pid, ref = Ref}, Reason) -> 
-    Module:abort(Pid, Ref, Reason).
-
+    Module:abort(Pid, Ref, Reason);
+abort(_Buf, _Reason) -> 
+    ok.
 %%--------------------------------------------------------------------
 %% @doc
 %% Check if all data is received from application.

@@ -14,6 +14,7 @@
 
 -export([serial_to_string/1, string_to_serial/1]).
 -export([serial_to_xnodeid/1]).
+-export([cobid_to_nodeid/1]).
 -export([load_definition/1]).
 -export([load_dmod/2]).
 -export([object_by_name/2]).
@@ -47,6 +48,14 @@ string_to_serial(String) when is_list(String) ->
 serial_to_xnodeid(Serial) ->
     (Serial bsr 8).
 
+cobid_to_nodeid(CobId) ->
+    if ?is_cobid_extended((CobId)) ->
+	    ?XNODE_ID(CobId);
+       ?is_not_cobid_extended((CobId)) ->
+	    ?NODE_ID(CobId);
+       true ->
+	    undefined
+    end.
 
 %% Encode/Decode category
 encode_category(optional) -> ?CATEGORY_OPTIONAL;
@@ -299,8 +308,8 @@ load_dmod(Module, DCtx) when is_atom(Module) ->
 	{ok, Forms,_} ->
 	    dmod(Forms, undefined, DCtx);
 	{error, enoent} ->
-	    %% Check the priv dir
-	    PrivFile = filename:join(code:priv_dir(canopen), File),
+	    %% Check the priv/def dir
+	    PrivFile = filename:join(code:priv_dir(canopen) ++ "/def", File),
 	    case file:consult(PrivFile) of
 		{ok, Forms} ->
 		    dmod(Forms, undefined, DCtx);

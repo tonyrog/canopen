@@ -92,7 +92,7 @@ store(Ctx,Mode,Client,Src,Dst,IX,SI,Source) when is_record(Ctx, sdo_ctx) ->
 %%--------------------------------------------------------------------
 -spec fetch(Ctx::record(),
 	    Mode:: segment | block,
-	    Client::pid(), 
+	    Client::term(), %% gen_server-From 
 	    Src::integer(),
 	    Dst::integer(),
 	    IX::integer(),
@@ -1393,6 +1393,8 @@ l_abort(M, S, StateName) ->
 		 "reason ~p, sending error to ~w",
 		 [StateName, Reason, S#co_session.client]),
 	    gen_server:reply(S#co_session.client, {error,Reason}),
+	    {Pid, _Ref} = S#co_session.client,
+	    io:format("Msgs ~p\n", [process_info(Pid, messages)]),
 	    {stop, normal, S};
 	?ma_scs_abort_transfer(_IX,_SI, _Code) ->
 	    %% probably a delayed abort for an old session ignore

@@ -25,7 +25,6 @@
 -export([client_require/1]).
 -export([client_set_nid/1]).
 -export([client_set_mode/1]).
--export([client_set_tout/1]).
 -export([client_store/4, client_store/3, client_store/2]).
 -export([client_fetch/3, client_fetch/2, client_fetch/1]).
 -export([client_notify/4, client_notify/3, client_notify/2]).
@@ -35,7 +34,7 @@
 	 terminate/2, code_change/3]).
 
 %% spawned function
--export([execute_request/6]).
+-export([execute_request/5]).
 
 %% Test functions
 -export([debug/1]).
@@ -56,7 +55,6 @@
 	{
 	  def_nid,         %% default node for short operations
 	  def_trans_mode = segment, %% default transfer mode
-	  def_timeout = 2000, %% default timeout
 	  nodes = [],      %% nodes detected
 	  pids = [],       %% list of outstanding operations
 	  ctx,             %% current context
@@ -265,6 +263,53 @@ store(NodeId, {Ix, Si}, TransferMode,  Term)
        is_integer(Si) ->
 store(NodeId, Ix, Si, TransferMode,  Term).
 
+%% API used by co_script
+
+client_require(Mod) 
+  when is_atom(Mod) ->
+    gen_server:call(?CO_MGR, {require, Mod}).
+
+%% Set the default nodeid - for short interface
+client_set_nid(Nid) 
+  when is_integer(Nid) andalso Nid < 2#1000000000000000000000000 -> %% Max 24 bit
+    gen_server:call(?CO_MGR, {set_nid, Nid}).
+
+%% Set the default transfer mode
+client_set_mode(Mode) 
+  when Mode == block;
+       Mode == segment ->
+    gen_server:call(?CO_MGR, {set_mode, Mode}).
+
+%% Store value
+client_store(Nid, Index, SubInd, Value) ->
+    gen_server:call(?CO_MGR, {store, Nid, Index, SubInd, Value}).
+
+client_store(Index, SubInd, Value) ->
+    gen_server:call(?CO_MGR, {store, Index, SubInd, Value}).
+
+client_store(Index, Value) ->
+    gen_server:call(?CO_MGR, {store, Index, 0, Value}).
+
+%% Fetch value
+client_fetch(Nid, Index, SubInd) ->
+    gen_server:call(?CO_MGR, {fetch, Nid, Index, SubInd}).
+
+client_fetch(Index, SubInd)  ->
+    gen_server:call(?CO_MGR, {fetch, Index, SubInd}).
+
+client_fetch(Index)  ->
+    gen_server:call(?CO_MGR, {fetch, Index, 0}).
+
+%% Send notification
+client_notify(Nid, Index, Subind, Value) ->
+    gen_server:cast(?CO_MGR, {notify, Nid, Index, Subind, Value}).
+
+client_notify(Index, Subind, Value) ->
+    gen_server:cast(?CO_MGR, {notify, Index, Subind, Value}).
+  
+client_notify(Index, Value) ->
+    gen_server:cast(?CO_MGR, {notify, Index, 0, Value}).
+
 %% For testing
 %% @private
 debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
@@ -309,58 +354,6 @@ init(Opts) ->
     {ok, #mgr {def_nid = 0, ctx = undefined}}.
 
 
-%% API used by co_script
-
-client_require(Mod) 
-  when is_atom(Mod) ->
-    gen_server:call(?CO_MGR, {require, Mod}).
-
-%% Set the default nodeid - for short interface
-client_set_nid(Nid) 
-  when is_integer(Nid) andalso Nid < 2#1000000000000000000000000 -> %% Max 24 bit
-    gen_server:call(?CO_MGR, {set_nid, Nid}).
-
-%% Set the default transfer mode
-client_set_mode(Mode) 
-  when Mode == block;
-       Mode == segment ->
-    gen_server:call(?CO_MGR, {set_mode, Mode}).
-
-%% Set the default timeout
-client_set_tout(TimeOut) 
-  when is_integer(TimeOut) orelse TimeOut == infinity ->
-    gen_server:call(?CO_MGR, {set_tout, TimeOut}).
-
-%% Store value
-client_store(Nid, Index, SubInd, Value) ->
-    gen_server:call(?CO_MGR, {store, Nid, Index, SubInd, Value}).
-
-client_store(Index, SubInd, Value) ->
-    gen_server:call(?CO_MGR, {store, Index, SubInd, Value}).
-
-client_store(Index, Value) ->
-    gen_server:call(?CO_MGR, {store, Index, 0, Value}).
-
-%% Fetch value
-client_fetch(Nid, Index, SubInd) ->
-    gen_server:call(?CO_MGR, {fetch, Nid, Index, SubInd}).
-
-client_fetch(Index, SubInd)  ->
-    gen_server:call(?CO_MGR, {fetch, Index, SubInd}).
-
-client_fetch(Index)  ->
-    gen_server:call(?CO_MGR, {fetch, Index, 0}).
-
-%% Send notification
-client_notify(Nid, Index, Subind, Value) ->
-    gen_server:cast(?CO_MGR, {notify, Nid, Index, Subind, Value}).
-
-client_notify(Index, Subind, Value) ->
-    gen_server:cast(?CO_MGR, {notify, Index, Subind, Value}).
-  
-client_notify(Index, Value) ->
-    gen_server:cast(?CO_MGR, {notify, Index, 0, Value}).
-
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -371,7 +364,6 @@ client_notify(Index, Value) ->
 -spec handle_call(Request::stop |
 			   {setnid, Nid::integer()} |
 			   {setmode, Mode:: block | segment} |
-			   {settout, TOut::timeout()} |
 			   {debug, TrueOrFalse::boolean()} |
 			   {loop_data, Qual:: all | no_ctx},
 		  From::pid(), Mgr::record()) ->
@@ -386,8 +378,6 @@ handle_call({set_nid,Nid}, _From, Mgr) ->
     {reply, ok, Mgr#mgr { def_nid = Nid }};
 handle_call({set_mode,Mode}, _From, Mgr) ->
     {reply, ok, Mgr#mgr { def_trans_mode = Mode }};
-handle_call({set_tout,Tout}, _From, Mgr) ->
-    {reply, ok, Mgr#mgr { def_timeout = Tout }};
 handle_call({require,Mod}, _From, Mgr) ->
     {Reply,_DCtx,Mgr1} = load_ctx(Mod, Mgr),
     {reply, Reply, Mgr1};
@@ -411,11 +401,11 @@ handle_call({loop_data, no_ctx}, _From, Mgr) ->
     io:format("Loop data:\n"
 	      "Default nid = ~.16.0#\n"
 	      "Default transfer mode = ~p\n"
-	      "Default timeout = ~p\n"
 	      "Nodes ~p\n"
-	      "Pids ~p\n",
-	      [Mgr#mgr.def_nid, Mgr#mgr.def_trans_mode, Mgr#mgr.def_timeout,
-	       Mgr#mgr.nodes, Mgr#mgr.pids]),
+	      "Pids ~p\n"
+	      "Ctxs ~p\n",
+	      [Mgr#mgr.def_nid, Mgr#mgr.def_trans_mode,  Mgr#mgr.nodes, Mgr#mgr.pids, 
+	       [Mod || {Mod, _} <-  Mgr#mgr.ctx_list]]),
     {reply, ok, Mgr};
 handle_call(stop, _From, Mgr) ->
     {stop, normal, ok, Mgr};
@@ -489,7 +479,7 @@ terminate(_Reason, _Mgr) ->
    ?dbg(mgr, "terminate: reason ~p", [_Reason]),
     case co_proc:lookup(?MGR_NODE) of
 	Pid when is_pid(Pid) ->
-	    ?dbg(mgr, "terminate: Stoping co_node 0", []),
+	    ?dbg(mgr, "terminate: Stopping co_node 0", []),
 	    co_api:stop(?MGR_NODE);
 	{error, not_found} ->
 	    do_nothing
@@ -534,17 +524,16 @@ load_ctx(Mod, Mgr) ->
     end.
     
 do_store(Nid,Index,SubInd,Value,Client, 
-       Mgr=#mgr {pids = PList, def_trans_mode = TransMode, def_timeout = TimeOut}) ->
+       Mgr=#mgr {pids = PList, def_trans_mode = TransMode}) ->
     Ctx = context(Nid, Mgr),
     case translate_index(Ctx,Index,SubInd,Value) of
-	{ok,{Ti,Tsi, {V, Type} } = _T} ->
+	{ok,{Ti,Tsi, Tv } = _T} ->
 	    ?dbg(mgr, "do_store: translated  ~p", [_T]),
 	    Pid = 
 		spawn_request(store, 
-			      [Nid, Ti, Tsi, TransMode, {value, V, type(Type)}],
-			      TimeOut,
+			      [Nid, Ti, Tsi, TransMode, Tv],
 			      Client,
-			      {store, Nid, Index, SubInd, Value, Type, Ctx},
+			      {store, Nid, Index, SubInd, Value, Tv, Ctx},
 			      get(dbg)),
 	    {noreply, Mgr#mgr { pids = [Pid | PList] }};
 	Error ->
@@ -554,17 +543,16 @@ do_store(Nid,Index,SubInd,Value,Client,
   
 
 do_fetch(Nid,Index,SubInd, Client, 
-       Mgr=#mgr {pids = PList, def_trans_mode = TransMode, def_timeout = TimeOut}) ->
+       Mgr=#mgr {pids = PList, def_trans_mode = TransMode}) ->
     Ctx = context(Nid, Mgr),
     case translate_index(Ctx,Index,SubInd,no_value) of
-	{ok,{Ti,Tsi,Type} = _T} ->
+	{ok,{Ti,Tsi,Tv} = _T} ->
 	    ?dbg(mgr, "do_fetch: translated  ~p", [_T]),
 	    Pid = 
 		spawn_request(fetch, 
-			      [Nid, Ti, Tsi, TransMode, {value, type(Type)}],
-			      TimeOut,
+			      [Nid, Ti, Tsi, TransMode, Tv],
 			      Client,
-			      {fetch, Nid, Index, SubInd, Type, Ctx},
+			      {fetch, Nid, Index, SubInd, Tv, Ctx},
 			      get(dbg)),
 	    {noreply,  Mgr#mgr { pids = [Pid | PList] }};
 	Error ->
@@ -572,38 +560,27 @@ do_fetch(Nid,Index,SubInd, Client,
 	    {reply, Error, Mgr}
     end.
 
-spawn_request(F, Args, TimeOut, Client, Request, Dbg) ->
+spawn_request(F, Args, Client, Request, Dbg) ->
     Pid = proc_lib:spawn_link(?MODULE, execute_request, 
-			      [F, Args, TimeOut, Client, Request, Dbg]),
+			      [F, Args, Client, Request, Dbg]),
     ?dbg(mgr, "spawn_request: spawned  ~p", [Pid]),
     Pid.
 
-
-execute_request(F, Args, TimeOut, Client, Request, Dbg) ->
+execute_request(F, Args, Client, Request, Dbg) ->
     put(dbg, Dbg),
-    apply(?MODULE,F,Args),
-    receive
-	{_Ref, Reply} ->
-	    ?dbg(mgr,"execute_request: reply received ~p, sending to ~p", 
-		 [Reply, Client]),
-	    handle_reply(Reply, Client, Request);
-	Other ->
-	    ?dbg(mgr,"execute_request: Other received ~p, sending to ~p", 
-		 [Other, Client]),
-	    handle_reply(Other, Client, Request)
-    after TimeOut ->
-	    ?dbg(mgr,"execute_request: timeout", []),
-	    gen_server:reply(Client, {error, timeout})
-    end.
+    ?dbg(mgr, "execute_request: F = ~p Args = ~w)", [F, Args]),
+    Reply = apply(?MODULE,F,Args),
+    ?dbg(mgr, "execute_request: reply  ~p", [Reply]),
+    handle_reply(Reply, Client, Request).
 
-handle_reply({ok, Data}, Client, {fetch, _Nid, _Index, _SubInd, Type, Ctx}) ->
-    ?dbg(mgr,"handle_reply: Formatting ~p, type ~p", [Data, Type]),
-    {Value, _Rest} = co_codec:decode(Data, type(Type)),
+handle_reply({ok, Value}, Client, {fetch, _Nid, _Index, _SubInd, Type, Ctx}) ->
+    ?dbg(mgr,"handle_reply: Formatting ~p, type ~p", [Value, Type]),
     Reply = format_value(Value, Type, Ctx),
     gen_server:reply(Client, Reply);
 handle_reply({error, ECode}, Client, _Request) ->
     gen_server:reply(Client, {error, co_sdo:decode_abort_code(ECode)});
 handle_reply(Other, Client, _Request) -> %% ok ???
+    ?dbg(mgr,"handle_reply: Other ~p", [Other]),
     gen_server:reply(Client, Other).
 
 do_notify(Nid,Index,SubInd,Value, Mgr) ->
@@ -611,13 +588,13 @@ do_notify(Nid,Index,SubInd,Value, Mgr) ->
     case translate_index(Ctx,Index,SubInd,Value) of
 	{ok,{Ti,Tsi,{Tv, Type}} = _T} ->
 	    ?dbg(mgr, "do_notify: translated  ~p", [_T]),
-	    try co_codec:encode(Tv, Type) of
+	    try co_codec:encode(Tv, {Type, 32}) of
 		Data ->
 		    ?dbg(mgr,"do_notify: ~w ~p ~p ~p\n", [Nid,Ti,Tsi,Data]),
 		    co_api:notify(Nid,Ti,Tsi,Data)
-	    catch error:Reason ->
+	    catch error:_Reason ->
 		    ?dbg(mgr,"do_notify: encode failed ~w ~p ~p ~p, reason ~p\n", 
-			      [Nid, Index, SubInd, Value, Reason])
+			      [Nid, Index, SubInd, Value, _Reason])
 	    end;
 	_Error ->
 	    ?dbg(mgr,"do_notify: translation failed, error: ~p\n", [_Error]),
@@ -627,13 +604,15 @@ do_notify(Nid,Index,SubInd,Value, Mgr) ->
     
 
 %% try translate symbolic index and Value
+translate_index(undefined,_Index,_SubInd,_Value) ->
+    {error, no_context};
 translate_index(_Ctx,Index,SubInd,Value) 
   when ?is_index(Index), ?is_subind(SubInd),is_integer(Value) ->
-    {ok,{Index,SubInd,Value}};
+    {ok,{Index,SubInd,{Value, integer}}};
 translate_index(Ctx,Index,SubInd,Value) 
   when  ?is_index(Index), ?is_subind(SubInd) ->
     Res = co_lib:entry_by_index(Index,SubInd,Ctx),
-    translate_index2(Res, Index, Value, Ctx);
+    translate_index2(Ctx, Res, Index, SubInd, Value);
 translate_index(Ctx,Index,SubInd,Value) 
   when ?is_subind(SubInd), is_atom(Index) ->
     Res = co_lib:object_by_id(Index, Ctx),
@@ -650,17 +629,20 @@ translate_index1(_Ctx, error,_Index,_SubInd,_Value) ->
 translate_index1(Ctx, {ok,Obj},_Index,SubInd,Value) ->
     Ti = Obj#objdef.index,
     Res = co_lib:find_entry(SubInd, Obj), 
-    translate_index2(Ctx, Res, Ti, Value).
+    translate_index2(Ctx, Res, Ti, SubInd, Value).
 
-translate_index2(_Ctx, error, _Index, _Value) ->
-    {error,argument};
-translate_index2(_Ctx, {ok, E}, Index, no_value) ->
+translate_index2(_Ctx, error, Index, SubInd, no_value) ->
     %% For fetch 
-    {ok,{Index,E#entdef.index,E#entdef.type}};
-translate_index2(Ctx, {ok, E}, Index, Value) ->
+    {ok, {Index, SubInd, data}};
+translate_index2(_Ctx, error, _Index, _SubInd, _Value) ->
+    {error,argument};
+translate_index2(_Ctx, {ok, E}, Index, SubInd, no_value) ->
+    %% For fetch 
+    {ok,{Index,SubInd,{value, co_lib:encode_type(E#entdef.type)}}};
+translate_index2(Ctx, {ok, E}, Index, SubInd, Value) ->
     case translate_value(E#entdef.type, Value, Ctx) of
 	{ok,IValue} ->
-	    {ok,{Index,E#entdef.index,{IValue,E#entdef.type}}};
+	    {ok,{Index,SubInd,{value, IValue,co_lib:encode_type(E#entdef.type)}}};
 	error ->
 	    {error,argument}
     end.
@@ -797,10 +779,3 @@ signed(V, UMask) ->
 	    %%[$-|integer_to_list(((bnot V) band UMask)+1)] ??
 	    [$-|(((bnot V) band UMask)+1)]
     end.
-
-type({enum, Base, _Id}) ->
-    Base;
-type({bitfield, Base, _Id}) ->
-    Base;
-type(Type) ->
-    Type.

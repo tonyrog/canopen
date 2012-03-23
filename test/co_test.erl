@@ -5,15 +5,30 @@
 
 -module(co_test).
 
--export([run/1, run/2, halt/1]).
+-export([run/1, run/3, run_mgr/0, run_mgr/2, halt/1, halt_mgr/0]).
 
 run(Serial) ->
     Dict = filename:join(code:priv_dir(canopen), "default.dict"),
     co_test_lib:start_node(Serial, Dict).
 
-run(Serial, Port) ->
+run(Serial, Port, Ttl) ->
     Dict = filename:join(code:priv_dir(canopen), "default.dict"),
-    co_test_lib:start_node(Serial, Dict, Port).
+    co_test_lib:start_node(Serial, Dict, Port, Ttl).
 
 halt(Serial) ->
     co_test_lib:stop_node(Serial).
+
+run_mgr() ->
+    run_mgr(1, 0).
+
+run_mgr(Port, Ttl) ->
+    can_router:start(),
+    can_udp:start(co_test, Port, [{ttl, Ttl}]),
+    co_proc:start_link([{unlinked, true}]),
+    co_mgr:start([{unlinked, true}, {debug, true}]).
+
+halt_mgr() ->
+    co_mgr:stop(),
+    co_proc:stop(),
+    can_udp:stop(co_test),
+    can_router:stop().

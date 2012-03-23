@@ -69,7 +69,7 @@
 notify(CobId,Index,Subind,Data) ->
     FrameID = ?COBID_TO_CANID(CobId),
     Frame = #can_frame { id=FrameID, len=0, 
-			 data=(<<16#80,Index:16/little,Subind:8,Data:32/little>>) },
+			 data=(<<16#80,Index:16/little,Subind:8,Data:4/binary>>) },
     ?dbg(node, "notify: Sending frame ~p from CobId = ~.16#, CanId = ~.16#)",
 	 [Frame, CobId, FrameID]),
     can:send(Frame).
@@ -1134,7 +1134,7 @@ handle_can(Frame, Ctx) ->
 				 "Frame = ~w", [Ctx#co_ctx.name, Frame]),
 			    Ctx;
 			{0, SourceNid} ->
-			    ?dbg(node, "~s: handle_can: SAM-MPDO from ~2.16.0B"
+			    ?dbg(node, "~s: handle_can: SAM-MPDO from ~.16.0B "
 				 "not handled yet. Frame = ~w", 
 				 [Ctx#co_ctx.name, SourceNid, Frame]),
 			    %% handle_sam_mpdo()

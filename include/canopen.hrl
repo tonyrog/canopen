@@ -248,6 +248,20 @@
 -define(XFUNCTION_CODE(COB_ID), (((COB_ID) bsr 25) band 16#F)).
 -define(XNODE_ID(COB_ID),      ((COB_ID) band ?XNODE_ID_MASK)).
 
+-define(is_cobid_extended(COBID),
+	((COBID) band ?COBID_ENTRY_EXTENDED) =/= 0).
+-define(is_not_cobid_extended(COBID),
+	((COBID) band ?COBID_ENTRY_EXTENDED) =:= 0).
+
+%% Is NodeID an extended node id 
+-define(is_nodeid_extended(NodeID),
+	(?is_cobid_extended((NodeID)) andalso
+	((NodeID) band 16#2E000000 =:= ?COBID_ENTRY_EXTENDED))).
+
+%% Is NodeID a plain node Id
+-define(is_nodeid(NodeID),
+	((NodeID)>0), ((NodeID)=<127)).
+
 -define(NMT_ID, ?COB_ID(?NMT, 0)).
 -define(SYNC_ID, ?COB_ID(?SYNC, 0)).
 -define(TIME_STAMP_ID, ?COB_ID(?TIME_STAMP, 0)).
@@ -712,20 +726,6 @@
 -define(COBID_ENTRY_RTR_DISALLOWED, 16#40000000).
 -define(COBID_ENTRY_EXTENDED,       16#20000000).
 -define(COBID_ENTRY_ID_MASK,        16#1FFFFFFF).
-
--define(is_cobid_extended(COBID),
-	((COBID) band ?COBID_ENTRY_EXTENDED) =/= 0).
--define(is_not_cobid_extended(COBID),
-	((COBID) band ?COBID_ENTRY_EXTENDED) =:= 0).
-
-%% Is NodeID an extended node id 
--define(is_nodeid_extended(NodeID),
-	(?is_cobid_extended((NodeID)) andalso
-	((NodeID) band 16#2E000000 =:= ?COBID_ENTRY_EXTENDED))).
-
-%% Is NodeID a plain node Id
--define(is_nodeid(NodeID),
-	((NodeID)>0), ((NodeID)=<127)).
 
 %%
 %% Symbolic cobid handling
