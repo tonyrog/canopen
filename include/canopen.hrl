@@ -468,6 +468,7 @@
 %% SDO session descriptor
 -record(sdo,
 	{
+	  dest_node,
 	  id,  %% {src,dst}
 	  pid, %% fsm pid
 	  mon  %% fsm monitor

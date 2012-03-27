@@ -8,6 +8,7 @@ MODULES = \
 	co_node_SUITE \
 	co_os_SUITE \
 	co_proc_SUITE \
+	co_script_SUITE \
 	co_sdo_cli_SUITE \
 	co_sdo_srv_SUITE \
 	co_tpdo_SUITE \

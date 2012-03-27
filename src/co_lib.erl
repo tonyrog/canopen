@@ -146,6 +146,15 @@ encode_type(identity)        -> ?IDENTITY;
 encode_type({enum,Base,_Name}) -> encode_type(Base);
 encode_type({bitfield,Base,_Name}) -> encode_type(Base).
 
+simple_type(undefined) ->
+    false; %% ??
+simple_type(T) ->
+    ?dbg(lib,"simple_type: testing ~p", [T]),
+    case encode_type(T) of
+	Simple when Simple < 16#0020 -> true;
+	_Complex -> false
+    end.
+
 decode_type(?BOOLEAN) -> boolean;
 decode_type(?INTEGER8) -> integer8;
 decode_type(?INTEGER16) -> integer16;
@@ -357,25 +366,36 @@ def_mod([{objdef,Index,Options}|Forms],
 	                 S > 0, S < 16#ffff ->
 		lists:seq(I,J,S)
 	end,
-    ?dbg(lib,"def_mod: new indexes ~w", [NewIxs]),
     Obj0 = decode_obj(Options, #objdef { index=hd(NewIxs)}),
-    ?dbg(lib,"def_mod: decoded object ~p", [Obj0]),
     Obj1  = verify_obj(Obj0,DMod),
-    %%?dbg(lib,"def_mod: verified object ~p", [Obj1]),
+    ?dbg(lib,"def_mod: obj ~p verified", [Obj1]),
     verify_uniqe_id(Obj1, DefCtx),
-    %%?dbg(lib,"def_mod: verified unique id ~p", [Obj1]),
-    Id = Obj1#objdef.id,
+
+    %% If no entries and 'simple' type add default entry for subindex 0
+    %% If 'complex' type it structure needs to be checked at runtime
+    Obj2 = case {Obj1#objdef.entries, simple_type(Obj1#objdef.type)} of
+	       {[], true} ->
+		   ?dbg(lib,"def_mod: adding def entry with type ~p", 
+			[Obj1#objdef.type]),
+		   DefEntry = #entdef {index = 0,
+				       type = Obj1#objdef.type,
+				       range = Obj1#objdef.range,
+				       access = Obj1#objdef.access},
+		   Obj1#objdef {entries = [DefEntry]};
+	       _Other ->
+		   Obj1
+	   end,
+
+    Id = Obj2#objdef.id,
+    ?dbg(lib,"def_mod: obj id ~p verified", [Id]),
     NewIxsDict =
 	lists:foldl(
 	  fun(Ix, Dict) ->
 		  store_one(Ix, Id, Dict)
 	  end, IxsDict, NewIxs),
-
-    ?dbg(lib,"def_mod: new object ~p, new indexes ~p", [Obj1, NewIxsDict]),
-    def_mod(Forms, DMod#def_mod {objects = [Obj1 | Objects], ixs = NewIxsDict}, DefCtx);
+    def_mod(Forms, DMod#def_mod {objects = [Obj2 | Objects], ixs = NewIxsDict}, DefCtx);
 def_mod([], DMod, DefCtx) ->
     NewDefCtx = add_module(DefCtx, DMod),
-    ?dbg(lib,"def_mod: returning ~p", [NewDefCtx]),
     {ok, NewDefCtx}.
 
 
@@ -430,7 +450,9 @@ decode_obj_opt(_Kv={Key,Value}, Obj) ->
 	type  -> 
 	    Obj#objdef { type=Value };
 	access ->
-	    Obj#objdef { access=Value }
+	    Obj#objdef { access=Value };
+	range ->
+	    Obj#objdef { range=Value }
     end.
 
 
@@ -810,20 +832,25 @@ in_range(A, [_ | Rs]) -> in_range(A, Rs);
 in_range(_A, _) -> false.
 
 %% return #objdef | error
-object(Key, DefCtx) 
-  when is_record(DefCtx, def_ctx) ->
+object(Key, DefCtx=#def_ctx {modules = Modules}) 
+  when ?is_index(Key) ->
+    ?dbg(lib,"object: searching for index ~p in whole context", [Key]),
+    case find_in_mods(Key, #def_mod.ixs, Modules) of
+	{error, _Error} = E -> E;
+	{ok, Id} -> object(Id, DefCtx#def_ctx.modules)
+    end;
+object(Key, _DefCtx=#def_ctx {modules = Modules})  ->
     ?dbg(lib,"object: searching for ~p in whole context", [Key]),
-    object(Key, DefCtx#def_ctx.modules);
+    object(Key, Modules);
 object(_Key, []) ->
     {error, not_found};
-object(Key, [{ModName, DefMod} | DefMods]) 
+object(Key, [{ModName, DefMod=#def_mod {objects = Objects}} | DefMods]) 
   when is_record(DefMod, def_mod)->
     ?dbg(lib,"object: searching for ~p in ~p", [Key, ModName]),
-    case object(Key, DefMod#def_mod.objects) of
+    case object(Key, Objects) of
 	false ->
 	    object(Key, DefMods);
 	Obj when is_record(Obj, objdef) ->
-	    ?dbg(lib,"object: found ~p in ~p", [Key, Obj]),
 	    Obj;
 	{error, _Error} = E -> 
 	    E
@@ -917,5 +944,6 @@ find_in_mods(Key, Pos, [{_ModName, DMod}|DMods]) ->
 	Found -> Found
     end;
 find_in_mods(_Key, _Pos, []) ->
+    ?dbg(lib,"find_in_mods: ~p not found", [_Key]),
     {error, not_found}.
 

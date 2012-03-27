@@ -1,0 +1,12 @@
+%%
+%% Script setting up nothing ;-)
+%%
+
+require(canopen).
+
+setnid(16#30004).
+
+fetch(cobid_time_stamp).
+fetch(cobid_time_stamp,0).
+fetch(cobid_time_stamp,7).
+

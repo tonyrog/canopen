@@ -1,17 +1,20 @@
 %%%-------------------------------------------------------------------
-%%% @author Marina Westman Lönne <malotte@malotte.net>
-%%% @copyright (C) 2012, Marina Westman Lönne
+%%% @author Marina Westman LÃ¶nne <malotte@malotte.net>
+%%% @copyright (C) 2011, Marina Westman LÃ¶nne
 %%% @doc
-%%%   Test suite for CANopen process dictionary.
-%%% Created : 9 Feb 2012 by Marina Westman Lönne 
+%%%
+%%% Created : 27 March by Marina Westman LÃ¶nne 
 %%% @end
 %%%-------------------------------------------------------------------
--module(co_proc_SUITE).
+-module(co_script_SUITE).
 
 %% Note: This directive should only be used in test suites.
 -compile(export_all).
 
 -include_lib("common_test/include/ct.hrl").
+-include("canopen.hrl").
+
+-define(SCRIPT1, 'test1.script').
 
 %%--------------------------------------------------------------------
 %% COMMON TEST CALLBACK FUNCTIONS
@@ -34,7 +37,9 @@
 %% @end
 %%--------------------------------------------------------------------
 suite() ->
-    [{timetrap,{minutes,10}}].
+    [{timetrap,{minutes,10}},
+     {require, serial},
+     {require, dict}].
 
 
 %%--------------------------------------------------------------------
@@ -54,13 +59,10 @@ suite() ->
 %% @end
 %%--------------------------------------------------------------------
 all() -> 
-    [start_of_co_proc,
-     reg_unreg,
-     i,
-     clear,
-     monitor].
+    [require,
+     fetch_store,
+     script].
 %%     break].
-
 
 
 %%--------------------------------------------------------------------
@@ -80,6 +82,10 @@ all() ->
 %% @end
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
+    put(dbg,true), %% Enable trace
+    co_test_lib:start_node(Config),
+    {ok, _Mgr} = co_mgr:start([{linked, false}, {debug, true}]),
+    ct:pal("Started co_mgr"),
     Config.
 
 %%--------------------------------------------------------------------
@@ -92,9 +98,10 @@ init_per_suite(Config) ->
 %% @spec end_per_suite(Config) -> _
 %% @end
 %%--------------------------------------------------------------------
-end_per_suite(_Config) ->
+end_per_suite(Config) ->
+    co_mgr:stop(),
+    co_test_lib:stop_node(Config),
     ok.
-
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -116,7 +123,6 @@ end_per_suite(_Config) ->
 %%--------------------------------------------------------------------
 init_per_testcase(_TestCase, Config) ->
     ct:pal("Testcase: ~p", [_TestCase]),
-    {ok, _Pid} = co_proc:start_link([{linked, false}]),
     Config.
 
 
@@ -134,83 +140,63 @@ init_per_testcase(_TestCase, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_testcase(_TestCase, _Config) ->
-    co_proc:stop(),
     ok.
-
 %%--------------------------------------------------------------------
 %% TEST CASES
 %%--------------------------------------------------------------------
-
 %%--------------------------------------------------------------------
-%% @spec start_of_co_proc(Config) -> ok 
+%% @spec require(Config) -> ok 
 %% @doc 
-%% Dummy testcase verifying that the co_proc is up and running.
-%% The real start is done in init_per_testcase.
+%% Requires the manager to load a definition file
 %% @end
 %%--------------------------------------------------------------------
-start_of_co_proc(_Config) -> 
-    ct:pal("Proc up and running"),
-    timer:sleep(100),
+require(_Config) ->
+    ok = co_mgr:client_require(canopen),
     ok.
 
 %%--------------------------------------------------------------------
-%% @spec reg(Config) -> ok 
+%% @spec fetch_store(Config) -> ok 
 %% @doc 
-%% Verifies reg and unreg functions.
+%% Fetches cobid_time_stamp, changes it and restores it.
 %% @end
 %%--------------------------------------------------------------------
-reg_unreg(_Config) ->
-    ok = co_proc:reg(one),
-    [one] = co_proc:regs(),
-    ok = co_proc:unreg(one),
-    {error,not_found} = co_proc:regs(),
+fetch_store(_Config) ->
+    %% Fetch
+    CTS = co_mgr:client_fetch(co_lib:serial_to_xnodeid(serial()),
+			      cobid_time_stamp, 0),
+
+    %% Change
+    NewCTS = CTS + 1,
+    ok = co_mgr:client_store(co_lib:serial_to_xnodeid(serial()),
+			     cobid_time_stamp, 0, NewCTS),
+
+    %% Verify change
+    NewCTS = co_mgr:client_fetch(co_lib:serial_to_xnodeid(serial()),
+				 cobid_time_stamp, 0),
+
+    %% Restore
+    ok = co_mgr:client_store(co_lib:serial_to_xnodeid(serial()),
+			     cobid_time_stamp, 0, CTS),
+
+    %% Verify restore
+    CTS = co_mgr:client_fetch(co_lib:serial_to_xnodeid(serial()),
+			      cobid_time_stamp, 0),
+
     ok.
 
 %%--------------------------------------------------------------------
-%% @spec reg(Config) -> ok 
+%% @spec script(Config) -> ok 
 %% @doc 
-%% Verifies i function.
+%% Runs a script 
 %% @end
 %%--------------------------------------------------------------------
-i(_Config) ->
-    [] = co_proc:i(),
-    Pid = self(),
-    ok = co_proc:reg(one),
-    [{Pid, _Mon, [one]}] = co_proc:i(),
+script(Config) ->
+    DataDir = ?config(data_dir, Config),
+
+    %% Using file instead of run/script to avoid halt of node
+    ok = co_script:file([filename:join(DataDir, ?SCRIPT1)]),
     ok.
 
-%%--------------------------------------------------------------------
-%% @spec reg(Config) -> ok 
-%% @doc 
-%% Verifies clear function.
-%% @end
-%%--------------------------------------------------------------------
-clear(_Config) ->
-    ok = co_proc:reg(one),
-    ok = co_proc:reg(two),
-    [one, two] = co_proc:regs(),
-    ok = co_proc:clear(),
-    {error,not_found} = co_proc:regs(),
-    ok.
-
-%%--------------------------------------------------------------------
-%% @spec reg(Config) -> ok 
-%% @doc 
-%% Verifies monitoring of registered processes.
-%% @end
-%%--------------------------------------------------------------------
-monitor(_Config) ->
-    Pid = spawn(
-	    fun() -> 
-		    co_proc:reg(spawn),
-		    [spawn] = co_proc:regs(),
-		    exit
-	    end),
-    timer:sleep(100),
-    {error,dead} = co_proc:regs(Pid),
-    [{Pid, {dead, _R}, []}] = co_proc:i(),
-    ok.
-    
 %%--------------------------------------------------------------------
 %% @spec break(Config) -> ok 
 %% @doc 
@@ -219,13 +205,13 @@ monitor(_Config) ->
 %% @end
 %%--------------------------------------------------------------------
 break(Config) ->
-    ets:new(config, [set, public, named_table]),
-    ets:insert(config, Config),
+    ets:new(conf, [set, public, named_table]),
+    ets:insert(conf, Config),
     test_server:break("Break for test development\n" ++
-		     "Get Config by ets:tab2list(config)"),
+		     "Get Config by ets:tab2list(conf)"),
     ok.
-
 
 %%--------------------------------------------------------------------
 %% Help functions
 %%--------------------------------------------------------------------
+serial() -> co_test_lib:serial().

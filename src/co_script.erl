@@ -33,6 +33,8 @@ run() ->
 
 run([File]) when is_atom(File) ->
     script(atom_to_list(File));
+run([File]) when is_list(File) ->
+    script(File);
 run([]) ->
     usage().
 

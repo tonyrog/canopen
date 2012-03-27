@@ -78,7 +78,7 @@
 		   {error, Error::term()}.
 
 store(Ctx,Mode,Client,Src,Dst,IX,SI,Source) when is_record(Ctx, sdo_ctx) ->
-    ?dbg(cli, "store: mode = ~p, from = ~p, ix = ~p, si = ~p, source = ~p",
+    ?dbg(cli, "store: mode = ~p, from = ~p, ix = ~.16.0#, si = ~p, source = ~p",
 	 [Mode, Client, IX, SI, Source]),
     gen_fsm:start(?MODULE, 
 		  [store,Mode,Ctx,Client,self(),Src,Dst,IX,SI,Source], []).
@@ -104,12 +104,12 @@ store(Ctx,Mode,Client,Src,Dst,IX,SI,Source) when is_record(Ctx, sdo_ctx) ->
 		   {error, Error::term()}.
 
 fetch(Ctx,Mode,Client,Src,Dst,IX,SI,data) ->
-    ?dbg(cli, "fetch: mode = ~p, from = ~w, ix = ~p, si = ~p, destination = data",
+    ?dbg(cli, "fetch: mode = ~p, from = ~w, ix = ~.16.0#, si = ~p, destination = data",
 	 [Mode, Client, IX, SI]),
     gen_fsm:start(?MODULE, 
 		  [fetch,Mode,Ctx,Client,self(),Src,Dst,IX,SI,{data, Client}], []);
 fetch(Ctx,Mode,Client,Src,Dst,IX,SI,Destination) ->
-    ?dbg(cli, "fetch: mode = ~p, from = ~w, ix = ~p, si = ~p, destination = ~w",
+    ?dbg(cli, "fetch: mode = ~p, from = ~w, ix = ~.16.0#, si = ~p, destination = ~w",
 	 [Mode, Client, IX, SI, Destination]),
     gen_fsm:start(?MODULE, 
 		  [fetch,Mode,Ctx,Client,self(),Src,Dst,IX,SI,Destination], []).

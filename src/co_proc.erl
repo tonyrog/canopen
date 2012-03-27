@@ -53,9 +53,9 @@
 
 start_link(Opts) ->
     io:format("co_proc: start_link: Opts = ~p\n", [Opts]),
-    F =	case proplists:get_value(unlinked,Opts,false) of
-	    true -> start;
-	    false -> start_link
+    F =	case proplists:get_value(linked,Opts,true) of
+	    true -> start_link;
+	    false -> start
 	end,
     
     case whereis(?MODULE) of

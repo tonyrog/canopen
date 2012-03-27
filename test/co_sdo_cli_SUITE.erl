@@ -100,7 +100,7 @@ all() ->
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
     co_test_lib:start_node(Config),
-    {ok, _Mgr} = co_mgr:start([{unlinked, true}, {debug, true}]),
+    {ok, _Mgr} = co_mgr:start([{linked, false}, {debug, true}]),
     ct:pal("Started co_mgr"),
     Config.
 

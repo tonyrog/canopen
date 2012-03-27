@@ -76,7 +76,7 @@
 %%          {dict_file, string()}     - non default dictionary file to load,
 %%                                      overrides load_last_saved <br/>
 %%          {debug, boolean()}        - Enable/Disable trace output<br/>
-%%          {unlinked, boolean()}     - Start process linked (default) or not <br/>
+%%          {linked, boolean()}       - Start process linked (default) or not <br/>
 %%         
 %% @end
 %%--------------------------------------------------------------------
@@ -95,7 +95,7 @@
           {load_last_saved, boolean()} | 
           {dict_file, string()} | 
           {debug, boolean()} | 
-          {unlinked, boolean()}.
+          {linked, boolean()}.
 	
 -spec start_link(Serial::integer(), list(Option::option())) ->
 			{ok, Pid::pid()} |
@@ -103,20 +103,19 @@
 start_link(S, Opts) ->
     %% Trace output enable/disable
     put(dbg, proplists:get_value(debug,Opts,false)), 
+    ?dbg(node, "start_link: Serial = ~p, Opts = ~p", [S, Opts]),
 
-    F =	case proplists:get_value(unlinked,Opts,false) of
-	    true -> start;
-	    false -> start_link
+    F =	case proplists:get_value(linked,Opts,true) of
+	    true -> start_link;
+	    false -> start
 	end,
 
-    ?dbg(node, "start_link: Serial = ~p, Opts = ~p", [S, Opts]),
     Serial = serial(S),
-    
     case verify_options(Opts) of
 	ok ->
 	    Name = name(Opts, Serial),
-	    ?dbg(node, "Starting co_node with Name = ~p, Serial = ~.16#", 
-		 [Name, Serial]),
+	    ?dbg(node, "Starting co_node with function ~p, Name = ~p, Serial = ~.16#", 
+		 [F, Name, Serial]),
 	    gen_server:F({local, Name}, ?CO_NODE, {Serial,Name,Opts}, []);
 	E ->
 	    E
@@ -198,7 +197,7 @@ verify_option(Option, NewValue)
        Option == use_crc;
        Option == load_last_saved;
        Option == debug;
-       Option == unlinked ->
+       Option == linked ->
     if is_boolean(NewValue) ->
 	    ok;
        true ->

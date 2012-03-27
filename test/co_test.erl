@@ -24,8 +24,8 @@ run_mgr() ->
 run_mgr(Port, Ttl) ->
     can_router:start(),
     can_udp:start(co_test, Port, [{ttl, Ttl}]),
-    co_proc:start_link([{unlinked, true}]),
-    co_mgr:start([{unlinked, true}, {debug, true}]).
+    co_proc:start_link([{linked, false}]),
+    co_mgr:start([{linked, false}, {debug, true}]).
 
 halt_mgr() ->
     co_mgr:stop(),

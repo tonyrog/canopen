@@ -87,10 +87,12 @@ start() ->
 -spec start(Options::list()) ->  {ok, Pid::pid()} | {error, Reason::atom()}.
 
 start(Options) ->
-    %% Check if co_mgr already running
-    F =	case proplists:get_value(unlinked,Options,false) of
-	    true -> start;
-	    false -> start_link
+    put(dbg, proplists:get_value(debug,Options,false)), 
+    ?dbg(mgr, "start: Opts = ~p", [Options]),
+
+    F =	case proplists:get_value(linked,Options,true) of
+	    true -> start_link;
+	    false -> start
 	end,
 
     case co_proc:alive() of
@@ -102,6 +104,7 @@ start(Options) ->
 	MPid when is_pid(MPid) ->
 	    ok;
 	{error, not_found} ->
+	    ?dbg(mgr, "Starting co_mgr with function = ~p", [F]),
 	    {ok, _NewMPid} = gen_server:F({local, ?CO_MGR}, ?MODULE, Options, [])
     end.
 
@@ -267,6 +270,7 @@ store(NodeId, Ix, Si, TransferMode,  Term).
 
 client_require(Mod) 
   when is_atom(Mod) ->
+    ?dbg(mgr, "client_require: module ~p", [Mod]),
     gen_server:call(?CO_MGR, {require, Mod}).
 
 %% Set the default nodeid - for short interface
@@ -642,6 +646,10 @@ translate_index2(_Ctx, {error, _Error} = _E, Index, SubInd, no_value) ->
 translate_index2(_Ctx, {error, _Error} = _E, _Index, _SubInd, _Value) ->
     ?dbg(mgr,"translate_index2: not found ~p\n", [_E]),
     {error,argument};
+translate_index2(Ctx, E=#entdef {index = S}, Index, SubInd, Value) 
+  when ?is_subind(SubInd) andalso not is_integer(S) ->
+    %% Found entry with index as range use original sub_index
+    translate_index2(Ctx, E#entdef {index = SubInd}, Index, SubInd, Value);
 translate_index2(_Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, no_value) ->
     %% For fetch 
     {ok,{Index,SubInd,{value, co_lib:encode_type(Type)}}};

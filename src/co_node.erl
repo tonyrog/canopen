@@ -314,54 +314,38 @@ handle_call({value,{Ix, Si}}, _From, Ctx) ->
     Result = co_dict:value(Ctx#co_ctx.dict, Ix, Si),
     {reply, Result, Ctx};
 
-handle_call({store,Mode,NodeId,IX,SI,Term}, From, Ctx) ->
+handle_call({Action,Mode,NodeId,IX,SI,Term}, From, 
+	    Ctx=#co_ctx {name = _Name, sdo_list = Sessions, sdo = SdoCtx}) 
+  when Action == store;
+       Action == fetch ->
     Nid = complete_nodeid(NodeId),
     case lookup_sdo_server(Nid,Ctx) of
 	ID={Tx,Rx} ->
-	    ?dbg(node, "~s: store: ID = ~p", [Ctx#co_ctx.name,ID]),
-	    case co_sdo_cli_fsm:store(Ctx#co_ctx.sdo,Mode,From,Tx,Rx,IX,SI,Term) of
-		{error, Reason} ->
-		    ?dbg(node,"~s: unable to start co_sdo_cli_fsm: ~p", 
-			 [Ctx#co_ctx.name, Reason]),
-		    {reply, Reason, Ctx};
-		{ok, Pid} ->
-		    Mon = erlang:monitor(process, Pid),
-		    sys:trace(Pid, true),
-		    S = #sdo { id=ID, pid=Pid, mon=Mon },
-		    ?dbg(node, "~s: store: added session id=~p", 
-			 [Ctx#co_ctx.name, ID]),
-		    Sessions = Ctx#co_ctx.sdo_list,
-		    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
+	    ?dbg(node, "~s: ~p: ID = ~p", [_Name,Action,ID]),
+	    case lists:keyfind(Nid, #sdo.dest_node, Sessions) of
+		false ->
+		    %% OK to start new session
+		    case co_sdo_cli_fsm:Action(SdoCtx,Mode,From,Tx,Rx,IX,SI,Term) of
+			{error, Reason} ->
+			    ?dbg(node,"~s: ~p: unable to start co_sdo_cli_fsm: ~p", 
+				 [_Name, Action, Reason]),
+			    {reply, Reason, Ctx};
+			{ok, Pid} ->
+			    Mon = erlang:monitor(process, Pid),
+			    sys:trace(Pid, true),
+			    S = #sdo { dest_node = Nid, id=ID, pid=Pid, mon=Mon },
+			    ?dbg(node, "~s: ~p: added session id=~p", 
+				 [_Name, Action, ID]),
+			    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
+		    end;
+		_Found ->
+		    ?dbg(node, "~s: ~p: Session already in progress to ~.16.0#", 
+			 [_Name, Action, Nid]),
+		    {reply, {error, session_already_in_progress}, Ctx}
 	    end;
 	undefined ->
-	    ?dbg(node, "~s: store: No sdo server found for cob_id ~8.16.0B.", 
-		 [Ctx#co_ctx.name,Nid]),
-	    {reply, {error, badarg}, Ctx}
-    end;
-
-handle_call({fetch,Mode,NodeId,IX,SI, Term}, From, Ctx) ->
-    Nid = complete_nodeid(NodeId),
-    case lookup_sdo_server(Nid,Ctx) of
-	ID={Tx,Rx} ->
-	    ?dbg(node, "~s: fetch: ID = ~p", [Ctx#co_ctx.name,ID]),
-	    case co_sdo_cli_fsm:fetch(Ctx#co_ctx.sdo,Mode,From,Tx,Rx,IX,SI,Term) of
-		{error, Reason} ->
-		    io:format("WARNING!" 
-			      "~s: unable to start co_sdo_cli_fsm: ~p\n", 
-			      [Ctx#co_ctx.name,Reason]),
-		    {reply, Reason, Ctx};
-		{ok, Pid} ->
-		    Mon = erlang:monitor(process, Pid),
-		    sys:trace(Pid, true),
-		    S = #sdo { id=ID, pid=Pid, mon=Mon },
-		    ?dbg(node, "~s: fetch: added session id=~p", 
-			 [Ctx#co_ctx.name, ID]),
-		    Sessions = Ctx#co_ctx.sdo_list,
-		    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
-	    end;
-	undefined ->
-	    ?dbg(node, "~s: fetch: No sdo server found for cob_id ~8.16.0B.", 
-		 [Ctx#co_ctx.name,Nid]),
+	    ?dbg(node, "~s: ~p: No sdo server found for node ~.16.0#.", 
+		 [_Name, Action, Nid]),
 	    {reply, {error, badarg}, Ctx}
     end;
 

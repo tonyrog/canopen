@@ -29,7 +29,7 @@ start_node(Serial, Dict, Port, Ttl) ->
     can_router:start(),
     can_udp:start(co_test, Port, [{ttl, Ttl}]),
 
-    {ok, PPid} = co_proc:start_link([{unlinked, true}]),
+    {ok, PPid} = co_proc:start_link([{linked, false}]),
     ct:pal("Started co_proc ~p",[PPid]),
 
     try co_api:alive(Serial) of
@@ -44,7 +44,7 @@ start_node(Serial, Dict, Port, Ttl) ->
 				    {dict_file, Dict},
 				    {max_blksize, 7},
 				    {vendor,16#2A1},
-				    {unlinked, true},
+				    {linked, false},
 				    {debug, true}]),
     ct:pal("Started co_node ~p, pid = ~p",[integer_to_list(Serial,16), Pid]),
     {ok, Pid}.
