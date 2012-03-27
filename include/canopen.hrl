@@ -190,10 +190,13 @@
 	  name,        %% Object name (string)
 	  id,          %% Object id (atom)
 	  description, %% Object documentation
-	  struct,     %% variable,array,record ...
-	  type,       %% unsigned8, ....
-	  category,   %% optional,mandatory,conditional
-	  entry,      %% default entry for var & array
+	  struct,      %% variable,array,record ...
+	  type,        %% unsigned8, ....
+	  access,      %% ro=Read only, wo=Write only, rw=Read Write,
+	               %% c=Constant
+	  category,    %% optional,mandatory,conditional
+	  range,       %% allowed value range for this object
+	  entry,       %% default entry for array
 	  entries=[]
 	 }).
 
@@ -679,6 +682,7 @@
 -define(IX_OS_COMMAND_MODE,            16#1024).
 -define(IX_OS_DEBUGGER,                16#1025).  %% Type=0024
 -define(IX_OS_PROMPT,                  16#1026).  %% Type=ARRAY UNSIGNED8
+
 -define(SI_STDIN,   1).  %% UNSIGNED8
 -define(SI_STDOUT,  2).  %% UNSIGNED8
 -define(SI_STDERR,  3).  %% UNSIGNED8

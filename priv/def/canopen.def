@@ -11,94 +11,6 @@
 
 {require, type}.
 
-{objdef, 16#0022, 
- [{id, sdo_parameter},
-  {name, "SDO Parameter"},
-  {struct,defstruct},
-  {category,mandatory},
-  {entry,0,[{name,"number of entries"},
-	    {type,unsigned8},
-	    {category,mandatory},
-	    {access,ro},
-	    {default,3}]},
-  {entry,1,[{name,"COB-ID client -> server"},
-	    {type,unsigned32},
-	    {category,mandatory},
-	    {access,rw}]},
-  {entry,2,[{name,"COB-ID client <- server"},
-	    {type,unsigned32},
-	    {category,mandatory},
-	    {access,rw}]},
-  {entry,3,[{name,"node ID"},
-	    {type,unsigned8},
-	    {category,mandatory},
-	    {access,rw}]}
- ]}.
-
-%%
-%% Communication parameter (16#20)
-%% mapped => #pdo_parameter
-%%
-{objdef,16#0020,
- [{id, pdo_parameter},
-  {name,"PDO Parameter"},
-  {struct,defstruct},
-  {category,mandatory},
-  {entry,0,[{name,"Number of entries"},
-  	    {type,unsigned8},
-	    {category,mandatory},
-	    {access,ro},
-	    {default,5}]},
-  {entry,1,[{id, cob_id},
-	    {name,"cob-id"},
-	    {type,unsigned32},
-	    {category,mandatory},
-	    {access,rw}]},
-  {entry,2,[{id, transmission_type},
-	    {name,"transmission type"},
-	    {type,unsigned8},
-	    {category,mandatory},
-	    {access,rw}]},
-  {entry,3,[{id, inhibit_time},
-	    {name,"inhibit time"},
-	    {type,unsigned16},
-	    {category,mandatory},
-	    {access,rw}]},
-  {entry,4,[{id, reserved},
-	    {name,"reserved"},
-	    {type,unsigned8},
-	    {category,mandatory},
-	    {access,rw}]},
-  {entry,5,[{id, event_timer},
-	    {name,"event timer"},
-	    {type,unsigned16},
-	    {category,mandatory},
-	    {access,rw}]}
- ]}.
-
-%%
-%% PDO mapping (16#21)
-%% mapped => #pdo_mapping
-%%
-{objdef,16#0021,
- [{id, pdo_mapping},
-  {name,"PDO Mapping"},
-  {struct,array},
-  {category,mandatory},
-  {entry,0,[{id, size},
-	    {name,"number of mapped"},
-	    {type,unsigned8},
-	    {category,mandatory},
-	    {access,rw},
-	    {range,{16#00,16#40}},
-	    {default,0}]},
-  {entry,{16#00,16#40},
-   [{name,"object ~w"},
-    {type,unsigned32},
-    {category,optional},
-    {access,rw}]}
- ]}.
-
 {objdef,16#1000,
  [{id, device_type},
   {name,"Device type"},
@@ -129,7 +41,7 @@
  [{id, cobid_sync_message},
   {name,"COB-ID SYNC-message"},
   {struct,var},
-  {type,unsigned32},
+  {type,unsigned32}, 
   {category,optional},
   {access,rw}]}.
 
@@ -263,8 +175,9 @@
   {name,"Identity Object"},
   {struct, var},
   {type, identity},
-  {category,mandatory},
-  {access, co}]}.
+  {category, mandatory},
+  {access, co} %%??
+  ]}.
 
 %% 11FF reserved
 %% {objdef,16#1029,"Error Behaviour",record,

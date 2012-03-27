@@ -504,7 +504,7 @@ code_change(_OldVsn, Mgr, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 load_ctx(Mod, Mgr) ->
-    case lists:keysearch(Mod, 1, Mgr#mgr.ctx_list) of
+    case lists:keyfind(Mod, 1, Mgr#mgr.ctx_list) of
 	false ->
 	    try co_lib:load_definition(Mod) of
 		{ok, DCtx} ->
@@ -518,7 +518,7 @@ load_ctx(Mod, Mgr) ->
 		error:Reason ->
 		    {{error,Reason}, [], Mgr}
 	    end;
-	{value,{Mod,DCtx}} ->
+	{Mod, DCtx} ->
 	    ?dbg(mgr, "load_ctx: ~p already loaded", [Mod]),
 	    {ok, DCtx, Mgr#mgr { ctx = DCtx }}
     end.
@@ -545,6 +545,7 @@ do_store(Nid,Index,SubInd,Value,Client,
 do_fetch(Nid,Index,SubInd, Client, 
        Mgr=#mgr {pids = PList, def_trans_mode = TransMode}) ->
     Ctx = context(Nid, Mgr),
+    ?dbg(mgr, "do_fetch: translate  ~p:~p", [Index, SubInd]),
     case translate_index(Ctx,Index,SubInd,no_value) of
 	{ok,{Ti,Tsi,Tv} = _T} ->
 	    ?dbg(mgr, "do_fetch: translated  ~p", [_T]),
@@ -556,7 +557,7 @@ do_fetch(Nid,Index,SubInd, Client,
 			      get(dbg)),
 	    {noreply,  Mgr#mgr { pids = [Pid | PList] }};
 	Error ->
-	    ?dbg(mgr,"do_store: translation failed, error: ~p\n", [Error]),
+	    ?dbg(mgr,"do_fetch: translation failed, error: ~p\n", [Error]),
 	    {reply, Error, Mgr}
     end.
 
@@ -611,38 +612,43 @@ translate_index(_Ctx,Index,SubInd,Value)
     {ok,{Index,SubInd,{Value, integer}}};
 translate_index(Ctx,Index,SubInd,Value) 
   when  ?is_index(Index), ?is_subind(SubInd) ->
-    Res = co_lib:entry_by_index(Index,SubInd,Ctx),
+    Res = co_lib:entry(Index, SubInd, Ctx),
     translate_index2(Ctx, Res, Index, SubInd, Value);
 translate_index(Ctx,Index,SubInd,Value) 
-  when ?is_subind(SubInd), is_atom(Index) ->
-    Res = co_lib:object_by_id(Index, Ctx),
-    translate_index1(Ctx, Res, Index, SubInd, Value);
-translate_index(Ctx,Index,SubInd,Value) 
-  when ?is_subind(SubInd), is_list(Index) ->
-    Res = co_lib:object_by_name(Index, Ctx),
+  when is_atom(Index);
+       is_list(Index)->
+    Res = co_lib:object(Index, Ctx),
+    ?dbg(mgr,"translate_index: found ~p\n", [Res]),
     translate_index1(Ctx, Res, Index, SubInd, Value);
 translate_index(_Ctx,_Index,_Subind,_Value) ->
     {error,argument}.
 
-translate_index1(_Ctx, error,_Index,_SubInd,_Value) ->
+translate_index1(_Ctx, {error, _Error} = _E ,_Index,_SubInd,_Value) ->
+    ?dbg(mgr,"translate_index1: not found ~p\n", [_E]),
     {error, argument};
-translate_index1(Ctx, {ok,Obj},_Index,SubInd,Value) ->
+translate_index1(Ctx, Obj,_Index,SubInd,Value) 
+  when ?is_subind(SubInd);
+       is_list(SubInd);
+       is_atom(SubInd) ->
     Ti = Obj#objdef.index,
-    Res = co_lib:find_entry(SubInd, Obj), 
+    Res = co_lib:entry(SubInd, Obj, Ctx), 
+    ?dbg(mgr,"translate_index1: found ~p\n", [Res]),
     translate_index2(Ctx, Res, Ti, SubInd, Value).
 
-translate_index2(_Ctx, error, Index, SubInd, no_value) ->
+translate_index2(_Ctx, {error, _Error} = _E, Index, SubInd, no_value) ->
+    ?dbg(mgr,"translate_index2: not found ~p\n", [_E]),
     %% For fetch 
     {ok, {Index, SubInd, data}};
-translate_index2(_Ctx, error, _Index, _SubInd, _Value) ->
+translate_index2(_Ctx, {error, _Error} = _E, _Index, _SubInd, _Value) ->
+    ?dbg(mgr,"translate_index2: not found ~p\n", [_E]),
     {error,argument};
-translate_index2(_Ctx, {ok, E}, Index, SubInd, no_value) ->
+translate_index2(_Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, no_value) ->
     %% For fetch 
-    {ok,{Index,SubInd,{value, co_lib:encode_type(E#entdef.type)}}};
-translate_index2(Ctx, {ok, E}, Index, SubInd, Value) ->
-    case translate_value(E#entdef.type, Value, Ctx) of
+    {ok,{Index,SubInd,{value, co_lib:encode_type(Type)}}};
+translate_index2(Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, Value) ->
+    case translate_value(Type, Value, Ctx) of
 	{ok,IValue} ->
-	    {ok,{Index,SubInd,{value, IValue,co_lib:encode_type(E#entdef.type)}}};
+	    {ok,{Index,SubInd,{value, IValue,co_lib:encode_type(Type)}}};
 	error ->
 	    {error,argument}
     end.

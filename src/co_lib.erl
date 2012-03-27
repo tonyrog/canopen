@@ -16,11 +16,9 @@
 -export([serial_to_xnodeid/1]).
 -export([cobid_to_nodeid/1]).
 -export([load_definition/1]).
--export([load_dmod/2]).
--export([object_by_name/2]).
--export([object_by_id/2]).
--export([object_by_index/2]).
--export([entry_by_index/3]).
+-export([load_def_mod/2]).
+-export([object/2]).
+-export([entry/2,entry/3]).
 -export([enum_by_id/2]).
 -export([encode_type/1]).
 -export([encode_struct/1]).
@@ -30,9 +28,9 @@
 -export([decode_type/1]).
 -export([decode_struct/1]).
 -export([decode_access/1]).
--export([find_entry/2]).
 
 -include("canopen.hrl").
+-include("co_debug.hrl").
 
 %% Convert 4 bytes serial number to a string xx:xx:xx:xx
 serial_to_string(<<Serial:32>>) ->
@@ -260,102 +258,96 @@ encode_func(_) -> erlang:error(badarg).
 %% Load all description objects in a def file
 %%
 %%
--record(dmod,
+
+-record(def_mod,
 	{
 	  require = [],  %% modules required [atom()]
+	  name,    %% module name
 	  enums,   %% dictionary of enums
-	  struct,  %% dictionary  Index -> ID  (DEFSTRUCT)
-	  type,    %% dictionary  Index -> ID  (DEFTYPE)
-	  pdo,     %% dictionary  Index -> ID  (PDODEF)
-	  var,     %% dictionay   Index -> ID  (VAR/REC/ARRAY)
-	  id,      %% dictionary  Index -> ID
-	  name,    %% dictionary string => ID
-	  objects  %% dictionary  ID -> OBJDEF
-	}).
+	  ixs,     %% dictionary Index -> ID
+	  objects  %% list of objdefs
+	  }).
 
--record(dctx,
+-record(def_ctx,
 	{
 	  module,       %% module loading
-	  modules = [], %% loaded modules [{atom(),#dmod}]
+	  modules = [], %% loaded modules [{atom(),#def_mod}]
 	  loading = [], %% loading stack [atom()] 
 	  path=[]       %% search path for require
 	}).
 
-
-new_dmod() ->
-    #dmod 
-	{ require = [],
-	  enums   = dict:new(),
-	  struct  = dict:new(),
-	  type    = dict:new(),
-	  pdo     = dict:new(),
-	  var     = dict:new(),
-	  id      = dict:new(),
-	  name    = dict:new(),
-	  objects = dict:new() }.
+new_def_mod(Module) ->
+    #def_mod { require = [],
+	       enums   = dict:new(),
+	       ixs     = dict:new(),
+	       name    = Module,
+	       objects = [] }.
 
 
 load_definition(File) ->
     load_definition(filename:basename(File),[filename:dirname(File)]).
 
-
 load_definition(File,Path) ->
-    load_dmod(list_to_atom(File), #dctx { path=Path }).
+    load_def_mod(list_to_atom(File), #def_ctx { path=Path }).
 
-load_dmod(Module, DCtx) when is_atom(Module) ->
+load_def_mod(Module, DefCtx) when is_atom(Module) ->
     File = atom_to_list(Module) ++ ".def",
-    case file:path_consult(DCtx#dctx.path, File) of
+    case file:path_consult(DefCtx#def_ctx.path, File) of
 	{ok, Forms,_} ->
-	    dmod(Forms, undefined, DCtx);
+	    def_mod(Forms, undefined, DefCtx);
 	{error, enoent} ->
 	    %% Check the priv/def dir
 	    PrivFile = filename:join(code:priv_dir(canopen) ++ "/def", File),
 	    case file:consult(PrivFile) of
 		{ok, Forms} ->
-		    dmod(Forms, undefined, DCtx);
-		_Else ->
-		    io:format("load_mod: file ~p not found\n", [PrivFile]),
-		    {{error,enoent}, DCtx}
+		    def_mod(Forms, undefined, DefCtx);
+		{error,Error} = E ->
+		    io:format("load_mod: loading ~p failed, reason ~p\n", 
+			      [PrivFile, Error]),
+		    {E, DefCtx}
 	    end;
 	Err = {error,_} ->
-	    {Err, DCtx}
+	    {Err, DefCtx}
     end.
 
 %% {module, abc}  - define module
-dmod([{module, Module}|Os], DMod, DCtx) when is_atom(Module) ->
-    case lists:keysearch(Module, 1, DCtx#dctx.modules) of
+def_mod([{module, Module}|Forms], DMod, DefCtx) when is_atom(Module) ->
+    case lists:keyfind(Module, 1, DefCtx#def_ctx.modules) of
 	false ->
-	    DMod1 = new_dmod(),
-	    DCtx1 = add_module(DCtx, DMod),
-	    dmod(Os, DMod1, DCtx1#dctx { module = Module });
-	{value, _} ->
-	    erlang:error({module_already_defined, Module})
+	    DMod1 = new_def_mod(Module),
+	    DefCtx1 = add_module(DefCtx, DMod),	    
+	    def_mod(Forms, DMod1, DefCtx1#def_ctx { module = Module });
+	_DefMod ->
+	    erlang:error({module_already_defined, Module}) 
     end;
 %% {require, def} - load a module
-dmod([{require, Module}|Os], DMod, DCtx) when is_atom(Module) ->
-    case lists:keysearch(Module, 1, DCtx#dctx.modules) of
+def_mod([{require, Module}|Forms], DMod, DefCtx) when is_atom(Module) ->
+    case lists:keyfind(Module, 1, DefCtx#def_ctx.modules) of
 	false ->
-	    case lists:member(Module, DCtx#dctx.loading) of
+	    case lists:member(Module, DefCtx#def_ctx.loading) of
 		true ->
 		    erlang:error({circular_definition, Module});
 		false ->
-		    DCtx1 =  DCtx#dctx { loading=[Module|DCtx#dctx.loading]},
-		    {_, DCtx2} = load_dmod(Module, DCtx1),
-		    Require = [Module|DMod#dmod.require],
-		    dmod(Os, DMod#dmod { require=Require},
-			 DCtx2#dctx { module = DCtx#dctx.module,
-				      loading = DCtx#dctx.loading })
+		    DefCtx1 =  DefCtx#def_ctx { loading=[Module|DefCtx#def_ctx.loading]},
+		    {_, DefCtx2} = load_def_mod(Module, DefCtx1),
+		    Require = [Module|DMod#def_mod.require],
+		    def_mod(Forms, DMod#def_mod { require=Require},
+			 DefCtx2#def_ctx { module = DefCtx#def_ctx.module,
+					 loading = DefCtx#def_ctx.loading })
 	    end;
-	{value, {_, _DMod1}} ->
-	    dmod(Os, DMod, DCtx)
+	_DefMod ->
+	    %% Already loaded, continue
+	    def_mod(Forms, DMod, DefCtx)
     end;
 %% {enum, atom(), [{atom(),value()}]}
-dmod([{enum,Id,Enums}|Os], DMod, DCtx) ->
-    Dict = dict:store(Id, Enums, DMod#dmod.enums),
-    dmod(Os, DMod#dmod { enums = Dict}, DCtx);
-dmod([{objdef,Index,Options}|Os], DMod, DCtx) ->
+def_mod([{enum,Id,Enums}|Forms], DMod=#def_mod {enums = EnumDict}, DefCtx) ->
+    NewDict = dict:store(Id, Enums, EnumDict),
+    def_mod(Forms, DMod#def_mod {enums = NewDict}, DefCtx);
+def_mod([{objdef,Index,Options}|Forms], 
+	DMod=#def_mod {objects = Objects, ixs = IxsDict}, 
+	DefCtx) ->
     %% io:format("objdef ixs=~p\n", [Index]),
-    Ixs = 
+    NewIxs = 
 	case Index of
 	    I when I > 0, I =< 16#ffff ->
 		[I];
@@ -365,57 +357,35 @@ dmod([{objdef,Index,Options}|Os], DMod, DCtx) ->
 	                 S > 0, S < 16#ffff ->
 		lists:seq(I,J,S)
 	end,
-    Obj0 = decode_obj(Options, #objdef { index=hd(Ixs)}),
-    Obj  = verify_obj(Obj0,DMod),
-    verify_uniqe_id(Obj,DCtx),
-    Id       = Obj#objdef.id,
-    Dobjects = store_one(Id,  Obj, DMod#dmod.objects),
-    Dname    = store_one(Obj#objdef.name, Id, DMod#dmod.name),
-    DMod1 =
+    ?dbg(lib,"def_mod: new indexes ~w", [NewIxs]),
+    Obj0 = decode_obj(Options, #objdef { index=hd(NewIxs)}),
+    ?dbg(lib,"def_mod: decoded object ~p", [Obj0]),
+    Obj1  = verify_obj(Obj0,DMod),
+    %%?dbg(lib,"def_mod: verified object ~p", [Obj1]),
+    verify_uniqe_id(Obj1, DefCtx),
+    %%?dbg(lib,"def_mod: verified unique id ~p", [Obj1]),
+    Id = Obj1#objdef.id,
+    NewIxsDict =
 	lists:foldl(
-	  fun(Ix, DMod0) ->
-		  Did  = store_one(Ix, Id, DMod0#dmod.id),
-		  case Obj#objdef.struct of
-		      defstruct ->
-			  D = dict:store(Ix, Id, DMod0#dmod.struct),
-			  DMod0#dmod { struct=D, id=Did };
-		      deftype ->
-			  D = dict:store(Ix, Id, DMod0#dmod.type),
-			  DMod0#dmod { type=D, id=Did };
-		      defpdo ->
-			  D = dict:store(Ix, Id, DMod0#dmod.pdo),
-			  DMod0#dmod { pdo=D, id=Did };
-		      _ ->
-			  D = dict:store(Ix, Id, DMod0#dmod.var),
-			  DMod0#dmod { var=D, id=Did }
-		  end
-	  end, DMod#dmod { objects=Dobjects, name=Dname }, Ixs),
-    dmod(Os, DMod1, DCtx);
-dmod([], DMod, DCtx) ->
-    {ok, add_module(DCtx, DMod)}.
+	  fun(Ix, Dict) ->
+		  store_one(Ix, Id, Dict)
+	  end, IxsDict, NewIxs),
+
+    ?dbg(lib,"def_mod: new object ~p, new indexes ~p", [Obj1, NewIxsDict]),
+    def_mod(Forms, DMod#def_mod {objects = [Obj1 | Objects], ixs = NewIxsDict}, DefCtx);
+def_mod([], DMod, DefCtx) ->
+    NewDefCtx = add_module(DefCtx, DMod),
+    ?dbg(lib,"def_mod: returning ~p", [NewDefCtx]),
+    {ok, NewDefCtx}.
 
 
 %% Insert a module into the module list
-add_module(DCtx, undefined) ->
-    DCtx;
-add_module(DCtx, DMod) ->
-    DCtx#dctx { module = undefined,
-		modules=[{DCtx#dctx.module,DMod}|DCtx#dctx.modules]}.
+add_module(DefCtx, undefined) ->
+    DefCtx;
+add_module(DefCtx=#def_ctx {module = Module, modules = Modules}, DMod) ->
+    DefCtx#def_ctx { module = undefined,
+		     modules=[{Module, DMod}|Modules]}.
 
-%%
-%% Check that id is uniq
-%%
-verify_uniqe_id(Obj, DCtx) ->
-    if Obj#objdef.id == undefined ->
-	    erlang:error(id_required, Obj#objdef.index);
-       true ->
-	    case object_by_id(Obj#objdef.id, DCtx) of
-		error -> true;
-		{ok,Obj2} ->
-		    erlang:error({id_not_uniq,Obj#objdef.id,Obj2#objdef.index})
-	    end
-    end.
-    
 store_one(Key, Value, Dict) ->
     case dict:find(Key, Dict) of
 	error ->
@@ -424,144 +394,6 @@ store_one(Key, Value, Dict) ->
 	    Dict
     end.
 
-%% return {ok,#objdef} | error
-object_by_id(Id, DCtx) when is_atom(Id) ->
-    find_in_mods(Id, #dmod.objects, DCtx#dctx.modules).
-
-enum_by_id(Id, DCtx) when is_atom(Id) ->
-    find_in_mods(Id, #dmod.enums, DCtx#dctx.modules).    
-
-%% return {ok,#objdef} | error
-object_by_name(Name, DCtx) when is_list(Name)  ->
-    case find_in_mods(Name, #dmod.name, DCtx#dctx.modules) of
-	error -> error;
-	{ok,Id} -> object_by_id(Id, DCtx)
-    end.
-
-%% return {ok,#objdef} | error
-object_by_index(Index, DCtx) ->
-    case find_in_mods(Index, #dmod.id, DCtx#dctx.modules) of
-	error -> error;
-	{ok,Id} ->
-	    case object_by_id(Id, DCtx) of
-		error -> error;
-		{ok,Obj} when Obj#objdef.index =/= Index ->
-		    %% patch "template object"
-		    {ok, Obj#objdef { index=Index }}; 
-		Found -> Found
-	    end
-    end.
-
-type_by_index(Index, DCtx) ->
-    case find_in_mods(Index, #dmod.type, DCtx#dctx.modules) of
-	error -> error;
-	{ok,Id} -> object_by_id(Id,DCtx)
-    end.
-
-struct_by_index(Index, DCtx) ->
-    case find_in_mods(Index, #dmod.struct, DCtx#dctx.modules) of    
-	error -> error;
-	{ok,Id} -> object_by_id(Id,DCtx)
-    end.
-
-pdo_by_index(Index, DCtx) ->
-    case find_in_mods(Index, #dmod.pdo, DCtx#dctx.modules) of    
-	error -> error;
-	{ok,Id} -> object_by_id(Id,DCtx)
-    end.
-
-var_by_index(Index, DCtx) ->
-    case find_in_mods(Index, #dmod.var, DCtx#dctx.modules) of
-	error -> error;
-	{ok,Id} -> object_by_id(Id,DCtx)
-    end.
-
-
-find_in_mods(Key, Pos, [{_,DMod}|DMods]) ->
-    case dict:find(Key, element(Pos, DMod)) of
-	error -> find_in_mods(Key, Pos, DMods);
-	Found -> Found
-    end;
-find_in_mods(_Key, _Pos, []) ->
-    error.
-
-	    
-entry_by_index(Index, SubInd, Def) ->
-    case object_by_index(Index, Def) of
-	error -> error;
-	{ok,Obj} ->
-	    case find_entry(SubInd, Obj) of
-		error -> error;
-		Found -> Found
-	    end
-    end.
-
-find_entry(SubInd, Obj) ->
-    if SubInd == 0, Obj#objdef.struct == var;
-       SubInd == 0, Obj#objdef.struct == defpdo ->
-	    if Obj#objdef.entry == undefined ->
-		    case find_ent(SubInd, Obj#objdef.entries) of
-			error -> error;
-			{ok,Ent} -> {ok,Ent#entdef { index=SubInd}}
-		    end;
-	       true ->
-		    {ok, (Obj#objdef.entry)#entdef { index=SubInd }}
-	    end;
-       %% special handling of SubIndex=0, SubIndex=255
-       true ->
-	    case find_ent(SubInd, Obj#objdef.entries) of
-		error -> error;
-		{ok,Ent} -> {ok,Ent#entdef { index=SubInd}}
-	    end
-    end.
-
-find_ent(SubIndex, [Ent|Entries]) ->
-    case match_index(SubIndex, Ent#entdef.index) of
-	true -> {ok,Ent};
-	false -> find_ent(SubIndex, Entries)
-    end;
-find_ent(_Index, []) ->
-    error.
-
-%% Check if index match object index
-match_index(Index, Index) -> 
-    true;
-match_index(Index, {From,To}) when Index >= From, Index =< To -> 
-    true;
-match_index(Index, {From,To,Step}) when Index >= From, Index =< To, (Index-From) rem Step == 0 ->
-    true;
-match_index(_, _) -> false.
-
-%% Convert index to offset idx
-object_idx(Index, Index) -> 
-    1;
-object_idx(Index, {From,To}) when Index >= From, Index =< To ->
-    (Index - From)+1;
-object_idx(Index, {From,To,Step}) when Index >= From, Index =< To, (Index-From) rem Step == 0 ->
-    (Index - From)+1.
-
-translate(String, [{From,To} | More]) ->
-    translate(translate(String, From, To), More);
-translate(String, []) ->
-    String.
-
-%% translate From=>To
-translate([], _From, _To) ->
-    [];
-translate(String, From, To) ->
-    case match(String, From) of
-	{true, String1} ->
-	    To ++ translate(String1, From, To);
-	false ->
-	    [hd(String) | translate(tl(String), From, To)]
-    end.
-
-match(String, []) ->
-    {true,String};
-match([H|T1], [H|T2]) ->
-    match(T1,T2);
-match(_, _) ->
-    false.
 
 decode_obj([Opt|Options], Obj) ->
     %%io:format("decode_option: ~p\n", [Opt]),
@@ -582,8 +414,8 @@ decode_obj_opt({entry,Index,Options}, Obj) ->
     E = decode_ent(Options, #entdef { index=IndexRange }),
     Es = Obj#objdef.entries,
     Obj#objdef { entries=[E|Es]};
-decode_obj_opt(Kv={Key,Value}, Obj) ->
-    %%io:format("decode object option: ~p\n", [Kv]),
+decode_obj_opt(_Kv={Key,Value}, Obj) ->
+    %%io:format("decode object option: ~p\n", [_Kv]),
     case Key of
 	name ->
 	    Obj#objdef { name=Value };
@@ -595,25 +427,10 @@ decode_obj_opt(Kv={Key,Value}, Obj) ->
 	    Obj#objdef { struct=Value };
 	category ->
 	    Obj#objdef { category=Value };
-	%% Add the following fields to a field with index=default
 	type  -> 
-	    Ent = decode_ent_opt(Kv, Obj#objdef.entry),
-	    Obj#objdef { entry=Ent };
+	    Obj#objdef { type=Value };
 	access ->
-	    Ent = decode_ent_opt(Kv, Obj#objdef.entry),
-	    Obj#objdef { entry=Ent };
-	pdo_mapping ->
-	    Ent = decode_ent_opt(Kv, Obj#objdef.entry),
-	    Obj#objdef { entry=Ent };
-	range ->
-	    Ent = decode_ent_opt(Kv, Obj#objdef.entry),
-	    Obj#objdef { entry=Ent };
-	default ->
-	    Ent = decode_ent_opt(Kv, Obj#objdef.entry),
-	    Obj#objdef { entry=Ent };
-	substitute ->
-	    Ent = decode_ent_opt(Kv, Obj#objdef.entry),
-	    Obj#objdef { entry=Ent }
+	    Obj#objdef { access=Value }
     end.
 
 
@@ -634,7 +451,7 @@ decode_ent_opt(_Kv={Key,Value}, Ent) ->
 	name ->
 	    Ent#entdef { name=Value };
 	id ->
-	    Ent#entdef { name=id };
+	    Ent#entdef { id=Value };
 	description ->
 	    Ent#entdef { description=Value };
 	type -> 
@@ -653,6 +470,18 @@ decode_ent_opt(_Kv={Key,Value}, Ent) ->
 	    Ent#entdef { substitute=Value }
     end.
 
+%%
+%% Check that id is uniq
+%%
+verify_uniqe_id(_Obj=#objdef {id = undefined, index = Index}, _DefCtx) ->
+    erlang:error({id_required, Index});
+verify_uniqe_id(_Obj=#objdef {id = Id}, DefCtx) ->
+    case object(Id, DefCtx) of
+	{error, _} -> true;
+	Obj2 ->
+	    erlang:error({id_not_uniq,Id,Obj2#objdef.index})
+    end.
+    
 %%
 %% Verify object
 %%
@@ -723,7 +552,7 @@ verify_obj_struct(Obj,_Def) ->
 	undefined -> %% default
 	    Obj#objdef { struct=var };
 	defstruct ->
-	    Range = [{16#0020,16#0023}, %% built-in (canopen.def)
+	    Range = [{16#0020,16#0025}, %% built-in (canopen.def)
 		     {16#0040,16#0050}, 
 		     {16#0080,16#009F},
 		     {16#00C0,16#00DF},
@@ -742,7 +571,8 @@ verify_obj_struct(Obj,_Def) ->
 	deftype ->
 	    Range = [{16#0001,16#0016},  %% built in (canopen.def)
 		     {16#0018,16#001B},  %% built in (canopen.def)
-		     16#0017, {16#001C,16#001F}, %% reserved
+		     16#0017,            %% reserved
+		     {16#001C,16#001F},  %% reserved
 		     {16#0060,16#007F}, 
 		     {16#00A0,16#00BF},
 		     {16#00E0,16#00FF},
@@ -832,7 +662,7 @@ verify_enum_values(_Base, [], _Ks, _Vs) ->
 
 
 verify_enum(Base, Name, Def) when is_atom(Name) ->
-    case dict:find(Name, Def#dmod.enums) of
+    case dict:find(Name, Def#def_mod.enums) of
 	error -> erlang:error({enum_type_not_defined, Name});
 	{ok,Enums} -> verify_enum_values(Base, Enums, [], [])
     end;
@@ -978,4 +808,114 @@ in_range(A, [{B,C}|_]) when A >= B, A =< C -> true;
 in_range(A, [{B,_}|_]) when A < B -> false;
 in_range(A, [_ | Rs]) -> in_range(A, Rs);
 in_range(_A, _) -> false.
+
+%% return #objdef | error
+object(Key, DefCtx) 
+  when is_record(DefCtx, def_ctx) ->
+    ?dbg(lib,"object: searching for ~p in whole context", [Key]),
+    object(Key, DefCtx#def_ctx.modules);
+object(_Key, []) ->
+    {error, not_found};
+object(Key, [{ModName, DefMod} | DefMods]) 
+  when is_record(DefMod, def_mod)->
+    ?dbg(lib,"object: searching for ~p in ~p", [Key, ModName]),
+    case object(Key, DefMod#def_mod.objects) of
+	false ->
+	    object(Key, DefMods);
+	Obj when is_record(Obj, objdef) ->
+	    ?dbg(lib,"object: found ~p in ~p", [Key, Obj]),
+	    Obj;
+	{error, _Error} = E -> 
+	    E
+    end;
+object(Id, ObjList) 
+  when is_atom(Id) andalso is_list(ObjList) ->
+    ?dbg(lib,"object: searching for ~p", [Id]),
+    lists:keyfind(Id, #objdef.id, ObjList);
+object(Name, ObjList)
+  when is_list(Name) andalso is_list(ObjList) ->
+    ?dbg(lib,"object: searching for ~p", [Name]),
+    lists:keyfind(Name, #objdef.name, ObjList);
+object(Index, [Obj| Objects]) 
+  when ?is_index(Index) andalso is_record(Obj, objdef)->
+    ?dbg(lib,"object: searching for ~p", [Index]),
+    %% Index can be a range
+    case match_index(Index, Obj#objdef.index) of
+	true -> Obj;
+	false -> object(Index, Objects)
+    end.
+
+
+entry(Key, _Obj=#objdef {entries = [], type = Type}, DefCtx) 
+  when is_record(DefCtx, def_ctx) ->
+    ?dbg(lib,"entry: searching for ~p when no entries", [Key]),
+    case object(Type, DefCtx) of
+	{error, _Error} = E -> E;
+	TypeObj -> entry(Key, TypeObj)
+    end;
+entry(Key, Obj=#objdef {entries = E}, DefCtx) 
+  when is_record(DefCtx, def_ctx) ->
+    ?dbg(lib,"entry: searching for ~p when entries ~p", [Key,E]),
+    entry(Key, Obj);
+entry(Index, SubInd, DefCtx) 
+  when is_record(DefCtx, def_ctx)->
+    ?dbg(lib,"entry: searching for ~p:~p", [Index, SubInd]),
+    case object(Index, DefCtx) of
+	{error, _Error} = E -> E;
+	Obj ->
+	   entry(SubInd, Obj, DefCtx)
+    end.
+
+entry(_Key, []) ->
+    {error, not_found};
+entry(Name, _Obj=#objdef {entries = Entries}) 
+  when is_list(Name)->
+    ?dbg(lib,"entry: searching for ~p when name", [Name]),
+    lists:keyfind(Name, #entdef.name, Entries);
+entry(Id, _Obj=#objdef {entries = Entries}) 
+  when is_atom(Id)->
+    ?dbg(lib,"entry: searching for ~p when id", [Id]),
+    lists:keyfind(Id, #entdef.id, Entries);
+entry(SubIndex, _Obj=#objdef {entries = Entries}) 
+  when ?is_subind(SubIndex) ->
+    ?dbg(lib,"entry: searching for ~p when index", [SubIndex]),
+    entry(SubIndex, Entries);
+entry(SubIndex, [Ent|Entries]) 
+  when ?is_subind(SubIndex) ->
+    ?dbg(lib,"entry: searching for ~p when index", [SubIndex]),
+    %% Index can be a range
+    case match_index(SubIndex, Ent#entdef.index) of
+	true -> Ent;
+	false -> entry(SubIndex, Entries)
+    end.
+
+
+%% Check if index match object index
+match_index(Index, Index) -> 
+    true;
+match_index(Index, {From,To}) when Index >= From, Index =< To -> 
+    true;
+match_index(Index, {From,To,Step}) when Index >= From, Index =< To, (Index-From) rem Step == 0 ->
+    true;
+match_index(_, _) -> false.
+
+%% Convert index to offset idx
+object_idx(Index, Index) -> 
+    1;
+object_idx(Index, {From,To}) when Index >= From, Index =< To ->
+    (Index - From)+1;
+object_idx(Index, {From,To,Step}) when Index >= From, Index =< To, (Index-From) rem Step == 0 ->
+    (Index - From)+1.
+
+enum_by_id(Id, DefCtx) when is_atom(Id) ->
+    find_in_mods(Id, #def_mod.enums, DefCtx#def_ctx.modules).    
+
+
+find_in_mods(Key, Pos, [{_ModName, DMod}|DMods]) ->
+    case dict:find(Key, element(Pos, DMod)) of
+	error -> find_in_mods(Key, Pos, DMods);
+	Found -> Found
+    end;
+find_in_mods(_Key, _Pos, []) ->
+    {error, not_found}.
 

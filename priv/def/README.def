@@ -23,6 +23,7 @@ option() =
      | {struct,object_type()}	-- required
      | {catecory,catrgory()}
      | {type, type()}		-- required if struct=var | optional
+     | {access, access()}
      | {entry,subindex:8,[entry()]}
      | {entry,{from:8,to:8},[entry()]}
 
@@ -36,7 +37,7 @@ entry() =
 	| {default,number()|string()}
 	| {substitute, number()|string()}
 
-object_type() = var | rec | array | defstruct
+object_type() = var | rec | array | defstruct 
 
 category() = *optional | mandatory | conditional
 
