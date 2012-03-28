@@ -170,7 +170,7 @@
 	  index,      %% {index:16, subindex:8}
 	  access,     %% ACCESS_ C|RO|WO|RW|STO|PTR
 	  type,       %% data type (integer:16)
-	  value       %% data (decoded | maybe keep encoded?)
+	  data        %% data  (encoded)
 	 }).
 
 %%  category_code:2 (check standard)
@@ -477,7 +477,7 @@
 %% TPDO process context
 -record(tpdo_ctx,
 	{
-	  nodeid, %% (Short) CANOpen node id
+	  nodeid,     %% (Short) CANOpen node id (for SAM-MPDOs)
 	  dict,       %% copy of dictionary in co_ctx
 	  tpdo_cache, %% copy of tpdo cache in co_ctx
 	  res_table,  %% copy of reserver table in co_ctx

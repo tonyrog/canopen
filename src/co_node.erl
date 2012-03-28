@@ -30,12 +30,13 @@
 -export([notify/4]). %% To send MPOs
 -export([subscribers/2]).
 -export([reserver_with_module/2]).
--export([tpdo_mapping/2, rpdo_mapping/2, tpdo_value/4]).
+-export([tpdo_mapping/2, rpdo_mapping/2, tpdo_data/4]).
 
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
 
 -define(LAST_SAVED_FILE, "last.dict").
 -define(RESTART_LIMIT, 10). %% Add clear timer ??
+-define(MAX_TPDO_CACHE, 1024). %% ???
 
 -define(COBID_TO_CANID(ID),
 	if ?is_cobid_extended((ID)) ->
@@ -301,20 +302,20 @@ initialization(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
 %% @end
 %%--------------------------------------------------------------------
 
-handle_call({set,{IX,SI},Value}, _From, Ctx) ->
-    {Reply,Ctx1} = set_dict_value(IX,SI,Value,Ctx),
+handle_call({set,{Ix,Si},Value}, _From, Ctx) ->
+    {Reply,Ctx1} = set_dict_value(Ix,Si,Value,Ctx),
     {reply, Reply, Ctx1};
 handle_call({tpdo_set,I,Value}, _From, Ctx) ->
-    {Reply,Ctx1} = set_tpdo_value(I,Value,Ctx),
+    {Reply,Ctx1} = set_tpdo_data(I,Value,Ctx),
     {reply, Reply, Ctx1};
-handle_call({direct_set,{IX,SI},Value}, _From, Ctx) ->
-    {Reply,Ctx1} = direct_set_dict_value(IX,SI,Value,Ctx),
+handle_call({direct_set,{Ix,Si},Value}, _From, Ctx) ->
+    {Reply,Ctx1} = direct_set_dict_value(Ix,Si,Value,Ctx),
     {reply, Reply, Ctx1};
 handle_call({value,{Ix, Si}}, _From, Ctx) ->
     Result = co_dict:value(Ctx#co_ctx.dict, Ix, Si),
     {reply, Result, Ctx};
 
-handle_call({Action,Mode,NodeId,IX,SI,Term}, From, 
+handle_call({Action,Mode,NodeId,Ix,Si,Term}, From, 
 	    Ctx=#co_ctx {name = _Name, sdo_list = Sessions, sdo = SdoCtx}) 
   when Action == store;
        Action == fetch ->
@@ -325,7 +326,7 @@ handle_call({Action,Mode,NodeId,IX,SI,Term}, From,
 	    case lists:keyfind(Nid, #sdo.dest_node, Sessions) of
 		false ->
 		    %% OK to start new session
-		    case co_sdo_cli_fsm:Action(SdoCtx,Mode,From,Tx,Rx,IX,SI,Term) of
+		    case co_sdo_cli_fsm:Action(SdoCtx,Mode,From,Tx,Rx,Ix,Si,Term) of
 			{error, Reason} ->
 			    ?dbg(node,"~s: ~p: unable to start co_sdo_cli_fsm: ~p", 
 				 [_Name, Action, Reason]),
@@ -805,7 +806,7 @@ create_dict() ->
 		       [#dict_entry { index={?IX_ERROR_REGISTER, 0},
 				      access=?ACCESS_RO,
 				      type=?UNSIGNED8,
-				      value=0}]),
+				      data=(<<0>>)}]),
     co_dict:add_object(Dict, #dict_object { index=?IX_PREDEFINED_ERROR_FIELD,
 					    access=?ACCESS_RO,
 					    struct=?OBJECT_ARRAY,
@@ -813,7 +814,7 @@ create_dict() ->
 		       [#dict_entry { index={?IX_PREDEFINED_ERROR_FIELD,0},
 				      access=?ACCESS_RW,
 				      type=?UNSIGNED8,
-				      value=0}]),
+				      data=(<<0>>)}]),
     Dict.
     
 %%
@@ -1033,20 +1034,20 @@ set_dict_entry(E, Ctx) when is_record(E, dict_entry) ->
     ets:insert(Ctx#co_ctx.dict, E),
     handle_notify(I, Ctx).
 
-set_dict_value(IX,SI,Value,Ctx) ->
-    try co_dict:set(Ctx#co_ctx.dict, IX,SI,Value) of
-	ok -> {ok, handle_notify(IX, Ctx)};
+set_dict_value(Ix,Si,Value,Ctx) ->
+    try co_dict:set_value(Ctx#co_ctx.dict, Ix,Si,Value) of
+	ok -> {ok, handle_notify(Ix, Ctx)};
 	Error -> {Error, Ctx}
     catch
 	error:Reason -> {{error,Reason}, Ctx}
     end.
 
 
-direct_set_dict_value(IX,SI,Value,Ctx) ->
+direct_set_dict_value(Ix,Si,Value,Ctx) ->
     ?dbg(node, "~s: direct_set_dict_value: Ix = ~.16#:~w, Value = ~p",
-	 [Ctx#co_ctx.name, IX, SI, Value]), 
-    try co_dict:direct_set(Ctx#co_ctx.dict, IX,SI,Value) of
-	ok -> {ok, handle_notify(IX, Ctx)};
+	 [Ctx#co_ctx.name, Ix, Si, Value]), 
+    try co_dict:direct_set_value(Ctx#co_ctx.dict, Ix,Si,Value) of
+	ok -> {ok, handle_notify(Ix, Ctx)};
 	Error -> {Error, Ctx}
     catch
 	error:Reason -> {{error,Reason}, Ctx}
@@ -1321,7 +1322,7 @@ handle_dam_mpdo(Ctx, CobId, Ix, Si, Data) ->
     ?dbg(node, "~s: handle_dam_mpdo: Index = ~7.16.0#", [Ctx#co_ctx.name,Ix]),
     %% Updating dict. Maybe object_changed instead of notify ??
     %% How handle CobId ??
-    try co_dict:set(Ctx#co_ctx.dict, Ix, Si, Data) of
+    try co_dict:set_data(Ctx#co_ctx.dict, Ix, Si, Data) of
 	ok -> ok;
 	_Error -> 
 	    ?dbg(node, "~s: handle_dam_mpdo: Failed updating index ~7.16.0#, "
@@ -1783,14 +1784,14 @@ load_sdo_parameter(I, Ctx) ->
 load_list(Dict, List) ->
     load_list(Dict, List, []).
 
-load_list(Dict, [{IX,SI}|List], Acc) ->
-    try co_dict:direct_value(Dict,IX,SI) of
+load_list(Dict, [{Ix,Si}|List], Acc) ->
+    try co_dict:direct_value(Dict,Ix,Si) of
 	Value -> load_list(Dict, List, [Value|Acc])
     catch
 	error:_ -> undefined
     end;
-load_list(Dict, [{IX,SI,Default}|List],Acc) ->
-    try co_dict:direct_value(Dict,IX,SI) of
+load_list(Dict, [{Ix,Si,Default}|List],Acc) ->
+    try co_dict:direct_value(Dict,Ix,Si) of
 	Value -> load_list(Dict, List, [Value|Acc])
     catch
 	error:_ ->
@@ -2053,38 +2054,35 @@ update_nmt_value(Key,Value,E) when is_record(E, nmt_entry) ->
 %%
 %%
 %% Callback functions for changes in tpdo elements
-%% Truncate data to 64 bits
 %%
-set_tpdo_value(I,Value,Ctx) when is_binary(Value) andalso byte_size(Value) > 8 ->
-    <<TruncValue:8/binary, _Rest/binary>> = Value,
-    set_tpdo_value(I,TruncValue,Ctx);
-set_tpdo_value(I,Value,Ctx)  when is_list(Value) andalso length(Value) > 16 ->
-    %% ??
-    set_tpdo_value(I,lists:sublist(Value,16),Ctx);
-%% Other conversions ???
-set_tpdo_value({_Ix, _Si} = I, Value, 
+set_tpdo_data({_Ix, _Si} = I, Data, 
 	       Ctx=#co_ctx {tpdo_cache = Cache, name = _Name}) ->
-    ?dbg(node, "~s: set_tpdo_value: Ix = ~.16#:~w, Value = ~p",
-	 [_Name, _Ix, _Si, Value]), 
+    ?dbg(node, "~s: set_tpdo_data: Ix = ~.16#:~w, Data = ~p",
+	 [_Name, _Ix, _Si, Data]), 
     case ets:lookup(Cache, I) of
 	[] ->
 	    io:format("WARNING!" 
-		      "~s: set_tpdo_value: unknown tpdo element\n", [_Name]),
+		      "~s: set_tpdo_data: unknown tpdo element\n", [_Name]),
 	    {{error,unknown_tpdo_element}, Ctx};
-	[{I, OldValues}] ->
-	    NewValues = case OldValues of
-			    [0] -> [Value]; %% remove default
-			    _List -> OldValues ++ [Value]
+	[{I, OldData}] when length(OldData) >= ?MAX_TPDO_CACHE->
+	    io:format("WARNING!" 
+		      "~s: set_tpdo_data: tpdo cache for ~.16#:~w full.\n", 
+		      [_Name,  _Ix, _Si]),
+	    {{error, tpdo_cache_full}, Ctx};
+	[{I, OldData}] ->
+	    NewData = case OldData of
+			    [0] -> [Data]; %% remove default
+			    _List -> OldData ++ [Data]
 			end,
-	    ?dbg(node, "~s: set_tpdo_value: old = ~p, new = ~p",
-		 [_Name, OldValues, NewValues]), 
-	    try ets:insert(Cache,{I,NewValues}) of
+	    ?dbg(node, "~s: set_tpdo_data: old = ~p, new = ~p",
+		 [_Name, OldData, NewData]), 
+	    try ets:insert(Cache,{I,NewData}) of
 		true -> {ok, Ctx}
 	    catch
 		error:Reason -> 
 		    io:format("WARNING!" 
-			      "~s: set_tpdo_value: insert of ~p failed, reason = ~w\n", 
-			      [_Name, NewValues, Reason]),
+			      "~s: set_tpdo_data: insert of ~p failed, reason = ~w\n", 
+			      [_Name, NewData, Reason]),
 		    {{error,Reason}, Ctx}
 	    end
     end.
@@ -2092,115 +2090,109 @@ set_tpdo_value({_Ix, _Si} = I, Value,
 %%
 %% Unpack PDO Data from external TPDO/internal RPDO 
 %%
-rpdo_unpack(I, Data, Ctx) ->
+rpdo_unpack(I, Data, Ctx=#co_ctx {name = _Name}) ->
     case pdo_mapping(I, Ctx#co_ctx.res_table, Ctx#co_ctx.dict, 
 		     Ctx#co_ctx.tpdo_cache) of
-	{rpdo,{Ts,Is}} ->
-	    ?dbg(node, "~s: rpdo_unpack: data = ~w, ts = ~w, is = ~w", 
-		 [Ctx#co_ctx.name, Data, Ts, Is]),
-	    try co_codec:decode_pdo(Data, Ts) of
+	{rpdo,IL} ->
+	    BitLenList = [BitLen || {_Ix, BitLen} <- IL],
+	    ?dbg(node, "~s: rpdo_unpack: data = ~w, il = ~w, bl = ~w", 
+		 [_Name, Data, IL, BitLenList]),
+	    try co_codec:decode_pdo(Data, BitLenList) of
 		{Ds, _} -> 
-		    ?dbg(node, "rpdo_unpack: decoded data ~p", [Ds]),
-		    rpdo_set(Is, Ds, Ts, Ctx)
+		    ?dbg(node, "~s: rpdo_unpack: decoded data ~p", [_Name, Ds]),
+		    rpdo_set(IL, Ds, Ctx)
 	    catch error:_Reason ->
 		    io:format("WARNING!" 
 			      "~s: rpdo_unpack: decode failed = ~p\n", 
-			      [Ctx#co_ctx.name, _Reason]),
+			      [_Name, _Reason]),
 		    Ctx
 	    end;
 	Error ->
 	    io:format("WARNING!" 
-		      "~s: rpdo_unpack: error = ~p\n", [Ctx#co_ctx.name, Error]),
+		      "~s: rpdo_unpack: error = ~p\n", [_Name, Error]),
 	    Ctx
     end.
 
-rpdo_set([{IX,SI}|Is], [Value|Vs], [Type|Ts], Ctx) ->
-    if IX >= ?BOOLEAN, IX =< ?UNSIGNED32 -> %% skip entry
-	    rpdo_set(Is, Vs, Ts, Ctx);
+rpdo_set([{{Ix,Si}, _BitLen}|Is], [Data|Ds], Ctx) ->
+    if Ix >= ?BOOLEAN, Ix =< ?UNSIGNED32 -> %% skip entry
+	    rpdo_set(Is, Ds, Ctx);
        true ->
-	    {_Reply,Ctx1} = rpdo_value({IX,SI},Value,Type,Ctx),
-	    rpdo_set(Is, Vs, Ts, Ctx1)
+	    {_Reply,Ctx1} = rpdo_value({Ix,Si},Data,Ctx),
+	    rpdo_set(Is, Ds, Ctx1)
     end;
-rpdo_set([], [], [], Ctx) ->
+rpdo_set([], [], Ctx) ->
     Ctx.
 
 %%
 %% read PDO mapping  => {MapType,[{Type,Len}],[Index]}
 %%
-pdo_mapping(IX, _TpdoCtx=#tpdo_ctx {dict = Dict, res_table = ResTable, 
+pdo_mapping(Ix, _TpdoCtx=#tpdo_ctx {dict = Dict, res_table = ResTable, 
 				   tpdo_cache = TpdoCache}) ->
-    pdo_mapping(IX, ResTable, Dict, TpdoCache).
-pdo_mapping(IX, ResTable, Dict, TpdoCache) ->
-    ?dbg(node, "pdo_mapping: ~7.16.0#", [IX]),
-    case co_dict:value(Dict, IX, 0) of
+    pdo_mapping(Ix, ResTable, Dict, TpdoCache).
+pdo_mapping(Ix, ResTable, Dict, TpdoCache) ->
+    ?dbg(node, "pdo_mapping: ~7.16.0#", [Ix]),
+    case co_dict:value(Dict, Ix, 0) of
 	{ok,N} when N >= 0, N =< 64 -> %% Standard tpdo/rpdo
-	    MType = case IX of
-			_TPDO when IX >= ?IX_TPDO_MAPPING_FIRST, 
-				   IX =< ?IX_TPDO_MAPPING_LAST ->
+	    MType = case Ix of
+			_TPDO when Ix >= ?IX_TPDO_MAPPING_FIRST, 
+				   Ix =< ?IX_TPDO_MAPPING_LAST ->
 			    tpdo;
-			_RPDO when IX >= ?IX_RPDO_MAPPING_FIRST, 
-				   IX =< ?IX_RPDO_MAPPING_LAST ->
+			_RPDO when Ix >= ?IX_RPDO_MAPPING_FIRST, 
+				   Ix =< ?IX_RPDO_MAPPING_LAST ->
 			    rpdo
 		    end,
 	    ?dbg(node, "pdo_mapping: Standard pdo of size ~p found", [N]),
-	    pdo_mapping(MType,IX,1,N,ResTable,Dict,TpdoCache);
+	    pdo_mapping(MType,Ix,1,N,ResTable,Dict,TpdoCache);
 	{ok,?SAM_MPDO} -> %% SAM-MPDO
 	    ?dbg(node, "pdo_mapping: sam_mpdo identified look for value", []),
-	    mpdo_mapping(sam_mpdo,IX,ResTable,Dict,TpdoCache);
+	    mpdo_mapping(sam_mpdo,Ix,ResTable,Dict,TpdoCache);
 	{ok,?DAM_MPDO} -> %% DAM-MPDO
 	    ?dbg(node, "pdo_mapping: dam_mpdo found", []),
-	    pdo_mapping(dam_mpdo,IX,1,1,ResTable,Dict,TpdoCache);
+	    pdo_mapping(dam_mpdo,Ix,1,1,ResTable,Dict,TpdoCache);
 	Error ->
 	    Error
     end.
 
 
-pdo_mapping(MType,IX,SI,Sn,ResTable,Dict,TpdoCache) ->
-    pdo_mapping(MType,IX,SI,Sn,[],[],ResTable,Dict,TpdoCache).
+pdo_mapping(MType,Ix,Si,Sn,ResTable,Dict,TpdoCache) ->
+    pdo_mapping(MType,Ix,Si,Sn,[],ResTable,Dict,TpdoCache).
 
-pdo_mapping(MType,_IX,SI,Sn,Ts,Is,_ResTable,_Dict,_TpdoCache) when SI > Sn ->
+pdo_mapping(MType,_Ix,Si,Sn,Is,_ResTable,_Dict,_TpdoCache) when Si > Sn ->
     ?dbg(node, "pdo_mapping: ~p all entries mapped, result ~p", 
-	 [MType, {Ts,Is}]),
-    {MType, {reverse(Ts),reverse(Is)}};
-pdo_mapping(MType,IX,SI,Sn,Ts,Is,ResTable,Dict,TpdoCache) -> 
-    ?dbg(node, "pdo_mapping: type = ~p, index = ~7.16.0#:~w", [MType,IX,SI]),
-    case co_dict:value(Dict, IX, SI) of
+	 [MType, Is]),
+    {MType, reverse(Is)};
+pdo_mapping(MType,Ix,Si,Sn,Is,ResTable,Dict,TpdoCache) -> 
+    ?dbg(node, "pdo_mapping: type = ~p, index = ~7.16.0#:~w", [MType,Ix,Si]),
+    case co_dict:value(Dict, Ix, Si) of
 	{ok,Map} ->
 	    ?dbg(node, "pdo_mapping: map = ~11.16.0#", [Map]),
 	    Index = {_I,_S} = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
 	    ?dbg(node, "pdo_mapping: entry[~w] = {~7.16.0#:~w}", 
-		 [SI,_I,_S]),
-	    case entry(MType, Index, ResTable, Dict, TpdoCache) of
-		{ok, E} when is_record(E,dict_entry) ->
-		    pdo_mapping(MType,IX,SI+1,Sn,
-				[{E#dict_entry.type,?PDO_MAP_BITS(Map)}|Ts],
-				[Index|Is], ResTable, Dict, TpdoCache);
-		{ok, Type} ->
-		    pdo_mapping(MType,IX,SI+1,Sn,
-				[{Type,?PDO_MAP_BITS(Map)}|Ts],
-				[Index|Is], ResTable, Dict, TpdoCache);
-		    
-		Error ->
-		    Error
-	    end;
+		 [Si,_I,_S]),
+	    maybe_install_callback(MType, Index, ResTable, Dict, TpdoCache),
+	    pdo_mapping(MType,Ix,Si+1,Sn,
+			[{Index, ?PDO_MAP_BITS(Map)}|Is], 
+			ResTable, Dict, TpdoCache);
 	Error ->
 	    ?dbg(node, "pdo_mapping: ~7.16.0#:~w = Error ~w", 
-		 [IX,SI,Error]),
+		 [Ix,Si,Error]),
 	    Error
     end.
 
-mpdo_mapping(sam_mpdo,Ix,ResTable,Dict,TpdoCache) when is_integer(Ix) ->
+mpdo_mapping(MType,Ix,ResTable,Dict,TpdoCache) 
+  when MType == sam_mpdo andalso is_integer(Ix) ->
     ?dbg(node, "mpdo_mapping: index = ~7.16.0#", [Ix]),
     case co_dict:value(Dict, Ix, 1) of
 	{ok,Map} ->
 	   Index = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
-	   mpdo_mapping(sam_mpdo,Index,ResTable,Dict,TpdoCache);
+	   mpdo_mapping(MType,Index,ResTable,Dict,TpdoCache);
 	Error ->
 	    ?dbg(node, "mpdo_mapping: ~7.16.0# = Error ~w", [Ix,Error]),
 	    Error
     end;
-mpdo_mapping(sam_mpdo,{IxInScanList,SiInScanList},ResTable,Dict,TpdoCache) 
-  when IxInScanList >= ?IX_OBJECT_SCANNER_FIRST andalso
+mpdo_mapping(MType,{IxInScanList,SiInScanList},ResTable,Dict,TpdoCache) 
+  when MType == sam_mpdo andalso
+       IxInScanList >= ?IX_OBJECT_SCANNER_FIRST andalso
        IxInScanList =< ?IX_OBJECT_SCANNER_LAST  ->
     %% MPDO Producer mapping
     %% The entry in PDO Map has been read, now read the entry in MPDO Scan List
@@ -2209,34 +2201,20 @@ mpdo_mapping(sam_mpdo,{IxInScanList,SiInScanList},ResTable,Dict,TpdoCache)
     case co_dict:value(Dict, IxInScanList, SiInScanList) of
 	{ok, Map} ->
 	    ?dbg(node, "mpdo_mapping: map = ~11.16.0#", [Map]),
-	    Index = {?TMPDO_MAP_INDEX(Map),?TMPDO_MAP_SUBIND(Map)},
-	    BlockSize = ?TMPDO_MAP_SIZE(Map),
-	    mpdo_mapping(sam_mpdo,Index,BlockSize,ResTable,Dict,TpdoCache);
+	    Index = {_Ix,_Si} = {?TMPDO_MAP_INDEX(Map),?TMPDO_MAP_SUBIND(Map)},
+	    BlockSize = ?TMPDO_MAP_SIZE(Map), %% TODO ????
+	    ?dbg(node, "mpdo_mapping: sam_mpdo, local index = ~7.16.0#:~w", [_Ix,_Si]),
+	    maybe_install_callback(MType, Index, ResTable, Dict, TpdoCache),
+	    {MType, [{Index, ?MPDO_DATA_SIZE}]};
 	Error ->
 	    Error %%??
     end.
        
-mpdo_mapping(sam_mpdo,Index = {_Ix,_Si},BlockSize,ResTable,Dict,TpdoCache) ->
-    %% MPDO Producer mapping
-    %% The entry in PDO Map has been read, now read the entry in MPDO Scan List
-    ?dbg(node, "mpdo_mapping: sam_mpdo, local index = ~7.16.0#:~w", [_Ix,_Si]),
-    case entry(sam_mpdo, Index, ResTable, Dict, TpdoCache) of
-	{ok, E} when is_record(E,dict_entry) ->
-	    {sam_mpdo, {[{E#dict_entry.type, ?MPDO_DATA_SIZE}], [Index]}};
-	{ok, Type} ->
-	    {sam_mpdo, {[{Type, ?MPDO_DATA_SIZE}], [Index]}};
-	Error ->
-	    ?dbg(node, "mpdo_mapping: ~7.16.0#:~w = Error ~w", 
-		 [_Ix,_Si,Error]),
-	    Error
-    end.
-
-
-entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
+maybe_install_callback(MType, {Ix, Si}, ResTable, _Dict, TpdoCache) ->
     case reserver_with_module(ResTable, Ix) of
 	[] ->
 	    ?dbg(node, "entry: No reserver for index ~7.16.0#", [Ix]),
-	    co_dict:lookup_entry(Dict, Ix);
+	    ok;
 	{Pid, Mod} when is_pid(Pid)->
 	    ?dbg(node, "entry: Process ~p has reserved index ~7.16.0#", 
 		 [Pid, Ix]),
@@ -2244,18 +2222,7 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
 	    %% Handle differently when TPDO and RPDO
 	    case MType of
 		rpdo ->
-		    try Mod:index_specification(Pid, {Ix, Si}) of
-			{spec, Spec} ->
-			    {ok, Spec#index_spec.type}
-		    catch error:Reason -> 
-			    io:format("WARNING!" 
-				      "~p: ~p: entry: index_specification call "
-				      "failed for process ~p module ~p, index "
-				      "~7.16.0#:~w, reason ~p\n", 
-				      [self(), ?MODULE, Pid, Mod, Ix, Si, Reason]),
-			    {error,  ?abort_internal_error}
-			    
-		    end;
+		    ok;
 		T when T == tpdo orelse T == sam_mpdo orelse T == dam_mpdo ->
 		    %% Store default value in cache ??
 		    ets:insert(TpdoCache, {{Ix, Si}, [0]}),
@@ -2263,7 +2230,8 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
 			Res -> Res %% Handle error??
 		    catch error:Reason ->
 			    io:format("WARNING!" 
-				      "~p: ~p: entry: tpdo_callback call failed " 
+				      "~p: ~p: maybe_install_callback: "
+				      "tpdo_callback call failed " 
 				      "for process ~p module ~p, index ~7.16.0#"
 				      ":~w, reason ~p\n", 
 				      [self(), ?MODULE, Pid, Mod, Ix, Si, Reason]),
@@ -2271,18 +2239,20 @@ entry(MType, {Ix, Si}, ResTable, Dict, TpdoCache) ->
 		    end
 	    end;
 	{dead, _Mod} ->
-	    ?dbg(node, "entry: Reserver process for index ~7.16.0# dead.", [Ix]),
+	    ?dbg(node, "maybe_install_callback: "
+		 "Reserver process for index ~7.16.0# dead.", [Ix]),
 	    {error, ?abort_internal_error}; %% ???
 	_Other ->
-	    ?dbg(node, "entry: Other case = ~p", [_Other]),
+	    ?dbg(node, "maybe_install_callback: "
+		 "Other case = ~p", [_Other]),
 	    {error, ?abort_internal_error}
     end.
 
-tpdo_value({Ix, Si} = I, ResTable, Dict, TpdoCache) ->
+tpdo_data({Ix, Si} = I, ResTable, Dict, TpdoCache) ->
     case reserver_with_module(ResTable, Ix) of
 	[] ->
 	    ?dbg(node, "tpdo_value: No reserver for index ~7.16.0#", [Ix]),
-	    co_dict:value(Dict, Ix, Si);
+	    co_dict:data(Dict, Ix, Si);
 	{Pid, _Mod} when is_pid(Pid)->
 	    ?dbg(node, "tpdo_value: Process ~p has reserved index ~7.16.0#", 
 		 [Pid, Ix]),
@@ -2317,11 +2287,11 @@ cache_value(Cache, I) ->
     end.
 	    
     
-rpdo_value({Ix,Si},Value,Type,Ctx) ->
+rpdo_value({Ix,Si},Data,Ctx) ->
     case reserver_with_module(Ctx#co_ctx.res_table, Ix) of
 	[] ->
 	    ?dbg(node, "rpdo_value: No reserver for index ~7.16.0#", [Ix]),
-	    try co_dict:set(Ctx#co_ctx.dict, Ix, Si, Value) of
+	    try co_dict:set_data(Ctx#co_ctx.dict, Ix, Si, Data) of
 		ok -> {ok, handle_notify(Ix, Ctx)};
 		Error -> {Error, Ctx}
 	    catch
@@ -2330,15 +2300,7 @@ rpdo_value({Ix,Si},Value,Type,Ctx) ->
 	{Pid, Mod} when is_pid(Pid)->
 	    ?dbg(node, "rpdo_value: Process ~p has reserved index ~7.16.0#", 
 		 [Pid, Ix]),
-	    Bin = 
-		try co_codec:encode(Value, Type) of
-		    B -> B
-		catch error: _Reason1 ->
-			?dbg(node, "rpdo_value: Encode failed for ~p of type ~w "
-			     "reason ~p",[Value, Type, _Reason1]),
-			Value %% ??
-		end,
-	    case co_set_fsm:start({Pid, Mod}, {Ix, Si}, Bin) of
+	    case co_set_fsm:start({Pid, Mod}, {Ix, Si}, Data) of
 		{ok, _FsmPid} -> 
 		    ?dbg(node,"Started set session ~p", [_FsmPid]),
 		    {ok, handle_notify(Ix, Ctx)};
@@ -2395,28 +2357,28 @@ set_error(Error, Code, Ctx) ->
 	    Ctx#co_ctx { error_list = NewErrorList }
     end.
 
-update_error_list([], SI, Ctx) ->
+update_error_list([], Si, Ctx) ->
     co_dict:update_entry(Ctx#co_ctx.dict,
 			 #dict_entry { index = {?IX_PREDEFINED_ERROR_FIELD,0},
 				       access = ?ACCESS_RW,
 				       type  = ?UNSIGNED8,
-				       value = SI }),
+				       data = co_codec:encode(Si,?UNSIGNED8) }),
     [];
-update_error_list(_Cs, SI, Ctx) when SI >= 254 ->
+update_error_list(_Cs, Si, Ctx) when Si >= 254 ->
     co_dict:update_entry(Ctx#co_ctx.dict,
 			 #dict_entry { index = {?IX_PREDEFINED_ERROR_FIELD,0},
 				       access = ?ACCESS_RW,
 				       type  = ?UNSIGNED8,
-				       value = 254 }),
+				       data = co_codec:encode(254,?UNSIGNED8) }),
     [];
-update_error_list([Code|Cs], SI, Ctx) ->
+update_error_list([Code|Cs], Si, Ctx) ->
     %% FIXME: Code should be 16 bit MSB ?
     co_dict:update_entry(Ctx#co_ctx.dict,
-			 #dict_entry { index = {?IX_PREDEFINED_ERROR_FIELD,SI},
+			 #dict_entry { index = {?IX_PREDEFINED_ERROR_FIELD,Si},
 				       access = ?ACCESS_RO,
 				       type  = ?UNSIGNED32,
-				       value = Code }),
-    [Code | update_error_list(Cs, SI+1, Ctx)].
+				       data = co_codec:encode(Code,?UNSIGNED32) }),
+    [Code | update_error_list(Cs, Si+1, Ctx)].
     
 
 print_nodeid(Label, undefined) ->

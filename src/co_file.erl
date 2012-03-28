@@ -62,7 +62,7 @@ fold_objects(_Fun, Acc, []) ->
 %% @private
 load_objects([{object,Index,Options}|Es],Os) 
   when ?is_index(Index), is_list(Options) ->
-    io:format("~p: Load object: ~8.16.0B\n", [?MODULE, Index]),
+    io:format("~p: Load object: ~.16.0# (~p)\n", [?MODULE, Index, Index]),
     Obj = load_object(Options,#dict_object { index=Index },undefined,[]),
     load_objects(Es, [Obj|Os]);
 %%
@@ -72,8 +72,8 @@ load_objects([{sdo_server,I,ClientID}|Es],Os) ->
     io:format("~p: Load SDO-SERVER: ~w\n", [?MODULE, I]),
     Access = if I==0 -> ?ACCESS_RO; true -> ?ACCESS_RW end,
     Index = ?IX_SDO_SERVER_FIRST+I,
-    SDORx = cobid(sdo_rx, ClientID),
-    SDOTx = cobid(sdo_tx, ClientID),
+    SDORx = co_lib:cobid(sdo_rx, ClientID),
+    SDOTx = co_lib:cobid(sdo_tx, ClientID),
     NodeID = nodeid(ClientID),
     Obj = sdo_record(Index,Access,SDORx,SDOTx,NodeID),
     load_objects(Es, [Obj|Os]);
@@ -124,18 +124,22 @@ load_objects([{tpdo,I,ID,Opts}|Es],Os) ->
 			  struct=?OBJECT_RECORD, access=?ACCESS_RW },
 	   [
 	    #dict_entry { index={Index,0}, type=?UNSIGNED8,
-			  access=?ACCESS_RO, value=5 },
+			  access=?ACCESS_RO, data=(<<5>>) },
 	    #dict_entry { index={Index,1}, type=?UNSIGNED32,
-			  access=?ACCESS_RW, value=COBID },
+			  access=?ACCESS_RW, 
+			  data=co_codec:encode(COBID,?UNSIGNED32) },
 	    #dict_entry { index={Index,2}, type=?UNSIGNED8,
 			  access=?ACCESS_RW, 
-			  value=co_lib:encode_transmission(Trans)},
+			  data=co_codec:encode(co_lib:encode_transmission(Trans),
+					       ?UNSIGNED8) },
 	    #dict_entry { index={Index,3}, type=?UNSIGNED16,
-			  access=?ACCESS_RW, value=InhibitTime},
+			  access=?ACCESS_RW, 
+			  data=co_codec:encode(InhibitTime,?UNSIGNED16) },
 	    #dict_entry { index={Index,4}, type=?UNSIGNED8,
-			  access=?ACCESS_RW, value=0},
+			  access=?ACCESS_RW, data=(<<0>>)},
 	    #dict_entry { index={Index,5}, type=?UNSIGNED16,
-			  access=?ACCESS_RW, value=EventTimer}]},
+			  access=?ACCESS_RW, 
+			  data=co_codec:encode(EventTimer,?UNSIGNED16) }]},
     io:format("~p: TPDO-PARAMETER: ~w\n", [?MODULE, Obj]),
     load_objects(Es, [Obj|Os]);
 %%
@@ -155,11 +159,13 @@ load_objects([{tpdo_map,I,Map, Opts}|Es], Os) ->
 			struct=?OBJECT_RECORD, access=?ACCESS_RW },
 	 [
 	  #dict_entry { index={Index,0}, type=?UNSIGNED8,
-			access=?ACCESS_RW, value=Si0Value }
+			access=?ACCESS_RW, 
+			data=co_codec:encode(Si0Value, ?UNSIGNED8) }
 	  | map(fun({Si,{Mi,Ms,Bl}}) ->
 			#dict_entry { index={Index,Si}, type=?UNSIGNED32,
 				      access=?ACCESS_RW,
-				      value=?PDO_MAP(Mi,Ms,Bl) }
+				      data=co_codec:encode(?PDO_MAP(Mi,Ms,Bl),
+							   ?UNSIGNED32) }
 	       end, lists:zip(seq(1,N), Map))]},
     load_objects(Es, [Obj|Os]);
 %%
@@ -176,18 +182,22 @@ load_objects([{rpdo,I,ID,Opts}|Es],Os) ->
 			  struct=?OBJECT_RECORD, access=?ACCESS_RW },
 	   [
 	    #dict_entry { index={Index,0}, type=?UNSIGNED8,
-			  access=?ACCESS_RO, value=5 },
+			  access=?ACCESS_RO, data=(<<5>>) },
 	    #dict_entry { index={Index,1}, type=?UNSIGNED32,
-			  access=?ACCESS_RW, value=COBID},
+			  access=?ACCESS_RW, 
+			  data=co_codec:encode(COBID, ?UNSIGNED32) },
 	    #dict_entry { index={Index,2}, type=?UNSIGNED8,
 			  access=?ACCESS_RW,
-			  value=co_lib:encode_transmission(Trans)},
+			  data=co_codec:encode(co_lib:encode_transmission(Trans),
+					       ?UNSIGNED8)},
 	    #dict_entry { index={Index,3}, type=?UNSIGNED16,
-			  access=?ACCESS_RW, value=InhibitTime},
+			  access=?ACCESS_RW, 
+			  data=co_codec:encode(InhibitTime,?UNSIGNED16) },
 	    #dict_entry { index={Index,4}, type=?UNSIGNED8,
-			  access=?ACCESS_RW, value=0},
+			  access=?ACCESS_RW, data=(<<0>>)},
 	    #dict_entry { index={Index,5}, type=?UNSIGNED16,
-			  access=?ACCESS_RW, value=EventTimer}]},
+			  access=?ACCESS_RW, 
+			  data=co_codec:encode(EventTimer,?UNSIGNED16) }]},
     load_objects(Es, [Obj|Os]);
 
 %%
@@ -200,11 +210,13 @@ load_objects([{rpdo_map,I,Map}|Es], Os) ->
     Obj = {#dict_object { index = Index, type=?PDO_MAPPING,
 			  struct=?OBJECT_RECORD, access=?ACCESS_RW },
 	   [#dict_entry { index={Index,0}, type=?UNSIGNED8,
-			  access=?ACCESS_RW, value=N }
+			  access=?ACCESS_RW, 
+			  data=co_codec:encode(N,?UNSIGNED8) }
 	    | map(fun({Si,{Mi,Ms,Bl}}) ->
 			  #dict_entry { index={Index,Si}, type=?UNSIGNED32,
 					access=?ACCESS_RW,
-					value=?PDO_MAP(Mi,Ms,Bl) }
+					data=co_codec:encode(?PDO_MAP(Mi,Ms,Bl),
+							     ?UNSIGNED32) }
 		  end, lists:zip(seq(1,N), Map))]},
     load_objects(Es, [Obj|Os]);
 %% 
@@ -218,11 +230,13 @@ load_objects([{mpdo_dispatch,I,Map}|Es], Os) ->
     Obj = {#dict_object { index = Index, type=?UNSIGNED64,
 			  struct=?OBJECT_ARRAY, access=?ACCESS_RW },
 	   [#dict_entry { index={Index,0}, type=?UNSIGNED8,
-			  access=?ACCESS_RW, value=N }
+			  access=?ACCESS_RW, data=co_codec:encode(N,?UNSIGNED8) }
 	    | map(fun({Si,{Bs,Li,Ls,Ri,Rs,Ni}}) ->
 			  #dict_entry { index={Index,Si}, type=?UNSIGNED64,
 					access=?ACCESS_RW,
-					value=?RMPDO_MAP(Bs,Li,Ls,Ri,Rs,Ni) }
+					data=co_codec:encode(
+					       ?RMPDO_MAP(Bs,Li,Ls,Ri,Rs,Ni),
+					       ?UNSIGNED64) }
 		  end, lists:zip(seq(1,N), Map))]},
     load_objects(Es, [Obj|Os]);
 
@@ -233,11 +247,12 @@ load_objects([{mpdo_scanner,I,Map}|Es], Os) ->
     Obj = {#dict_object { index = Index, type=?UNSIGNED32,
 			  struct=?OBJECT_ARRAY, access=?ACCESS_RW },
 	   [#dict_entry { index={Index,0}, type=?UNSIGNED8,
-			  access=?ACCESS_RW, value=N }
+			  access=?ACCESS_RW,  data=co_codec:encode(N,?UNSIGNED8) }
 	    | map(fun({Si,{Bs,Li,Ls}}) ->
 			  #dict_entry { index={Index,Si}, type=?UNSIGNED32,
 					access=?ACCESS_RW,
-					value=?TMPDO_MAP(Bs,Li,Ls) }
+					data=co_codec:encode(?TMPDO_MAP(Bs,Li,Ls),
+							     ?UNSIGNED32) }
 		  end, lists:zip(seq(1,N), Map))]},
     io:format("~p: MPDO-SCANNER: ~w\n", [?MODULE, Obj]),
     load_objects(Es, [Obj|Os]);
@@ -265,7 +280,9 @@ load_object([Opt|Opts],O,V,Es) ->
 	    load_object(Opts,O,V,Es);
 	{entry,SubIndex,SubOpts} when ?is_subind(SubIndex),is_list(SubOpts) ->
 	    Index = O#dict_object.index,
-	    E=load_entry(SubOpts,#dict_entry{index={Index,SubIndex}}),
+	    GuessedType = %% Overridden if found
+		entry_type(SubIndex,O#dict_object.type,O#dict_object.struct),
+	    E=load_entry(SubOpts,#dict_entry{index={Index,SubIndex},type = GuessedType}),
 	    %% Encode the value according to type
 	    load_object(Opts,O,V,[E|Es])
     end;
@@ -273,15 +290,9 @@ load_object([],O,V,[]) when O#dict_object.struct == ?OBJECT_VAR ->
     {O,[#dict_entry{index={O#dict_object.index,0},
 		    type   = O#dict_object.type,
 		    access = O#dict_object.access,
-		    value=V}]};
+		    data=co_codec:encode(V, O#dict_object.type)}]};
 load_object([],O,_V,Es) ->
-    Es1 = lists:map(
-	    fun(E) ->
-		    Type = entry_type(E#dict_entry.type,E#dict_entry.index,
-				      O#dict_object.type,O#dict_object.struct),
-		    E#dict_entry { type=Type }
-	    end, Es),
-    {O,Es1}.
+    {O,Es}.
 
 
 load_entry([Opt|Opts],Entry) ->
@@ -296,7 +307,8 @@ load_entry([Opt|Opts],Entry) ->
 	    T = co_lib:encode_type(Type),
 	    load_entry(Opts,Entry#dict_entry {type=T});
 	{value,V} ->
-	    load_entry(Opts,Entry#dict_entry {value=V})
+	    Data = co_codec:encode(V, Entry#dict_entry.type),
+	    load_entry(Opts,Entry#dict_entry {data=Data})
     end;
 load_entry([],Entry) ->
     Entry.
@@ -307,28 +319,26 @@ sdo_record(Index,Access,COB1,COB2,NodeID) ->
     [#dict_object { index=Index, type=?SDO_PARAMETER,
 		    struct=?OBJECT_RECORD, access=?ACCESS_RW },
      #dict_entry { index={Index,0}, type=?UNSIGNED8, 
-		   access=?ACCESS_RO, value=N },
+		   access=?ACCESS_RO, data=co_codec:encode(N,?UNSIGNED8) },
      %% Client->Server(Rx)
      #dict_entry { index={Index,1}, type=?UNSIGNED32,
-		   access=Access, value=COB1 },
+		   access=Access, data=co_codec:encode(COB1, ?UNSIGNED32) },
      %% Server->Client(Tx)
      #dict_entry { index={Index,2}, type=?UNSIGNED32,
-		   access=Access, value=COB2 } |
+		   access=Access, data=co_codec:encode(COB2, ?UNSIGNED32) } |
      if NodeID == undefined ->
 	     [];
 	true ->
 	     %% Client ID
 	     [#dict_entry { index={Index,3}, type=?UNSIGNED8,
-		   access=?ACCESS_RW, value=NodeID}]
+		   access=?ACCESS_RW, data=co_codec:encode(NodeID,?UNSIGNED8) }]
      end].
 
 
 %% derive entry type, when missing and possible
-entry_type(undefined,{_,0},_,?OBJECT_ARRAY)  -> ?UNSIGNED8;
-entry_type(undefined,{_,0},_,?OBJECT_RECORD) -> ?UNSIGNED8;
-entry_type(undefined,{_,I},Type,?OBJECT_ARRAY) when I>0 -> Type;
-entry_type(undefined,{_,I},Type,?OBJECT_RECORD) when I>0 -> Type;
-entry_type(Type,_,_,_) when Type =/= undefined -> Type.
+entry_type(0,_,?OBJECT_ARRAY)  -> ?UNSIGNED8;
+entry_type(0,_,?OBJECT_RECORD) -> ?UNSIGNED8;
+entry_type(SI,Type,_)  -> Type. %% ?? ?????????????????
 
 %% Construct and check a cobid
 cobid(ID) when is_integer(ID) ->
@@ -343,7 +353,7 @@ cobid(ID) when is_integer(ID) ->
 cobid({extended,ID}) when ID > 0, ID < 16#1FC00000 ->
     ID + ?COBID_ENTRY_EXTENDED;
 cobid({F,N}) -> %% symbolic cobid
-    cobid(F,N);
+    co_lib:cobid(F,N);
 cobid(_) ->    
     erlang:error(badarg).
 
@@ -357,16 +367,3 @@ nodeid({extended,ID}) when ID > 0, ID =< 16#1FFFFFF ->
 nodeid(_) ->
     erlang:error(badarg).
 
-%% 
-%% Combine nodeid with function code
-cobid(F, N) ->
-    Func = co_lib:encode_func(F),
-    NodeID = nodeid(N),
-    if ?is_nodeid_extended(NodeID) ->
-	    NodeID1 = NodeID band ?COBID_ENTRY_ID_MASK,
-	    ?XCOB_ID(Func,NodeID1);
-       ?is_nodeid(NodeID) ->
-	    ?COB_ID(Func,NodeID);
-       true ->
-	    erlang:error(badarg)
-    end.

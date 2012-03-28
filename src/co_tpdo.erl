@@ -59,8 +59,7 @@
 	  count,               %% current sync count
 	  itmr=false,          %% Inhibit timer ref
 	  etmr=false,          %% Event timer ref
-	  index_list=[],       %% Map index list [{Index,SubIndex}]
-	  type_list=[]         %% Map type list [{Type,BitLen}]
+	  index_list=[]        %% Map index list [{{Index,SubIndex}, BitLen}]
 	}).
 
 %%%===================================================================
@@ -184,87 +183,17 @@ init([Ctx, Param, FromPid]) ->
 %%--------------------------------------------------------------------
 handle_call({update_param,Param}, _From, S) ->
     ?dbg(tpdo, "handle_call: update_param", []),
-    Valid = Param#pdo_parameter.valid,
-    ITmr0 = if not Valid; Param#pdo_parameter.inhibit_time =:= 0 ->
-		    stop_timer(S#s.itmr);
-	       true -> S#s.itmr
-	    end,
-    ETmr0 = if not Valid; Param#pdo_parameter.event_timer =:= 0 ->
-		    stop_timer(S#s.etmr);
-	       true -> 
-		    S#s.etmr
-	    end,
-    COBID = Param#pdo_parameter.cob_id,
-    ID = if (COBID band ?COBID_ENTRY_EXTENDED) =/= 0 ->
-		 (COBID band ?COBID_ENTRY_ID_MASK) bor ?CAN_EFF_FLAG;
-	    true ->
-		 (COBID band ?COBID_ENTRY_ID_MASK)
-	 end,
-    {Type, {Ts,Is}} =
-	if S#s.state == ?Operational ->
-		if Valid, COBID =/= S#s.cob_id ->
-			tpdo_mapping(Param#pdo_parameter.offset, S#s.ctx);
-		   Valid, Param#pdo_parameter.offset =/= S#s.offset ->
-			tpdo_mapping(Param#pdo_parameter.offset, S#s.ctx);
-		   not Valid ->
-			{tpdo, {[],[]}};
-		   true ->
-			{S#s.type, {S#s.type_list, S#s.index_list}}
-		end;
-	   true ->
-		{undefined, {[],[]}}
-	end,
-    Trans = Param#pdo_parameter.transmission_type,
-
-    %% Verify that Trans and Type is valid together ???
-
-    Count0 = S#s.count,
-    Count1 = if not Valid -> 0;
-		Trans > ?TRANS_SYNC_MAX -> 0;
-		Count0 < Trans -> Count0;
-		true -> Trans
-	     end,
-    %% May start an event timer 
-    %%  FIXME: what about changed event_timer, less or greater (> 0)
-    %%         We may have to check remaining time to know
-    %%         Right now let event timer trigger and set rate then
-    ETmr1 = if ETmr0 =:= false,
-	       Valid,Param#pdo_parameter.event_timer > 0,Trans >= ?TRANS_RTR ->
-		    start_timer(S#s.event_timer,event);
-	       true ->
-		    ETmr0
-	    end,
-    Emit = if not Valid -> false;
-	      %% more Conditions for setting to false?
-	      true -> S#s.emit
-	   end,
-    S1 = S#s { 
-	   type              = Type,
-	   emit              = Emit,
-	   valid             = Valid,
-	   rtr_allowed       = Param#pdo_parameter.rtr_allowed,
-	   inhibit_time      = Param#pdo_parameter.inhibit_time,
-	   event_timer       = Param#pdo_parameter.event_timer,
-	   offset            = Param#pdo_parameter.offset,
-	   cob_id            = COBID,
-	   id                = ID,
-	   transmission_type = Trans,
-	   count             = Count1,
-	   itmr              = ITmr0,
-	   etmr              = ETmr1,
-	   index_list        = Is,
-	   type_list         = Ts
-	  },
+    S1 = update_param_int(Param, S),
     {reply, ok, S1};
 handle_call(update_map, _From, S) ->
     ?dbg(tpdo, "handle_call: update_map", []),
-    {Type, {Ts,Is}} =
+    {Type, Is} =
 	if S#s.valid andalso S#s.state == ?Operational ->
 		tpdo_mapping(S#s.offset, S#s.ctx);
 	   true ->
-		{undefined, {[],[]}}
+		{undefined, []}
 	end,
-    S1 = S#s { type = Type, index_list = Is, type_list=Ts },
+    S1 = S#s { type = Type, index_list = Is },
     {reply, ok, S1};
 handle_call({debug, TrueOrFalse}, _From, LD) ->
     put(dbg, TrueOrFalse),
@@ -291,13 +220,21 @@ handle_call(_Request, _From, S) ->
 handle_cast({state, State}, S=#s {offset = I, ctx = Ctx}) 
   when State == ?Operational ->
     ?dbg(tpdo, "handle_cast: state ~p", [State]),
-    {Type, {Ts,Is}} = tpdo_mapping(I, Ctx),
-    {noreply, S#s {state = State, type = Type, type_list = Ts, index_list = Is}};
+    {Type, Is} = tpdo_mapping(I, Ctx),
+    {noreply, S#s {state = State, type = Type, index_list = Is}};
 handle_cast({state, State}, S) ->
     {noreply, S#s {state = State}};
 handle_cast({nodeid_change, nodeid, OldNid, NewNid},  
-	    S=#s {ctx = Ctx=#tpdo_ctx {nodeid = OldNid}}) ->
-    ?dbg(tpdo, "handle_cast: new nodeid ~5.16.0#", [NewNid]),
+	    S=#s {ctx = Ctx=#tpdo_ctx {nodeid = OldNid}, type = Type}) ->
+    case {NewNid, Type} of
+	{undefined, sam_mpdo} -> 
+	    io:format("WARNING! ~p: (Short) nodeid undefined"
+		      "not possible to send sam-mpdos", [self()]);
+	{undefined, _OtherType} ->
+	    ?dbg(tpdo, "handle_cast: nodeid set to undefined", []);
+	_Defined ->
+	    ?dbg(tpdo, "handle_cast: new nodeid ~5.16.0#", [NewNid])
+    end,
     NewCtx = Ctx#tpdo_ctx {nodeid = NewNid},
     {noreply, S#s {ctx = NewCtx}};
 handle_cast(sync, S) ->
@@ -359,6 +296,78 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+update_param_int(Param, S) ->
+    Valid = Param#pdo_parameter.valid,
+    ITmr0 = if not Valid; Param#pdo_parameter.inhibit_time =:= 0 ->
+		    stop_timer(S#s.itmr);
+	       true -> S#s.itmr
+	    end,
+    ETmr0 = if not Valid; Param#pdo_parameter.event_timer =:= 0 ->
+		    stop_timer(S#s.etmr);
+	       true -> 
+		    S#s.etmr
+	    end,
+    COBID = Param#pdo_parameter.cob_id,
+    ID = if (COBID band ?COBID_ENTRY_EXTENDED) =/= 0 ->
+		 (COBID band ?COBID_ENTRY_ID_MASK) bor ?CAN_EFF_FLAG;
+	    true ->
+		 (COBID band ?COBID_ENTRY_ID_MASK)
+	 end,
+    {Type, Is} =
+	if S#s.state == ?Operational ->
+		if Valid, COBID =/= S#s.cob_id ->
+			tpdo_mapping(Param#pdo_parameter.offset, S#s.ctx);
+		   Valid, Param#pdo_parameter.offset =/= S#s.offset ->
+			tpdo_mapping(Param#pdo_parameter.offset, S#s.ctx);
+		   not Valid ->
+			{tpdo, []};
+		   true ->
+			{S#s.type, S#s.index_list}
+		end;
+	   true ->
+		{undefined, {[],[]}}
+	end,
+    Trans = Param#pdo_parameter.transmission_type,
+
+    %% Verify that Trans and Type is valid together ???
+
+    Count0 = S#s.count,
+    Count1 = if not Valid -> 0;
+		Trans > ?TRANS_SYNC_MAX -> 0;
+		Count0 < Trans -> Count0;
+		true -> Trans
+	     end,
+    %% May start an event timer 
+    %%  FIXME: what about changed event_timer, less or greater (> 0)
+    %%         We may have to check remaining time to know
+    %%         Right now let event timer trigger and set rate then
+    ETmr1 = if ETmr0 =:= false,
+	       Valid,Param#pdo_parameter.event_timer > 0,Trans >= ?TRANS_RTR ->
+		    start_timer(S#s.event_timer,event);
+	       true ->
+		    ETmr0
+	    end,
+    Emit = if not Valid -> false;
+	      %% more Conditions for setting to false?
+	      true -> S#s.emit
+	   end,
+    S#s { 
+      type              = Type,
+      emit              = Emit,
+      valid             = Valid,
+      rtr_allowed       = Param#pdo_parameter.rtr_allowed,
+      inhibit_time      = Param#pdo_parameter.inhibit_time,
+      event_timer       = Param#pdo_parameter.event_timer,
+      offset            = Param#pdo_parameter.offset,
+      cob_id            = COBID,
+      id                = ID,
+      transmission_type = Trans,
+      count             = Count1,
+      itmr              = ITmr0,
+      etmr              = ETmr1,
+      index_list        = Is
+     }.
+ 
 
 tpdo_mapping(Offset, Ctx) ->
     ?dbg(tpdo, "tpdo_mapping: offset=~8.16.0#", [Offset]),
@@ -429,21 +438,20 @@ do_sync(S=#s {state = ?Operational}) ->
 do_sync(S) ->
     S.
 
-do_send(S=#s {state = ?Operational, type = tpdo, ctx = Ctx, 
-	      index_list = IL, type_list = TL}, 
+do_send(S=#s {state = ?Operational, type = tpdo, ctx = Ctx, index_list = IL}, 
 	true) ->
     ?dbg(tpdo, "do_send: tpdo", []),
     if S#s.itmr =:= false ->
 	    ?dbg(tpdo, "do_send: indexes = ~w", [IL]),
-	    case tpdo_values(IL, Ctx, []) of
+	    case tpdo_data(IL, Ctx, []) of
 		{error, Reason} ->
 		    io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
 			      [self(), Reason]),
 		    S;
-		ValueList ->
-		    ?dbg(tpdo, "do_send: values = ~w, types = ~w", 
-			 [ValueList, TL]),
-		    Data = co_codec:encode_pdo(ValueList,TL),
+		DataList ->
+		    ?dbg(tpdo, "do_send: values = ~w, ", [DataList]),
+		    BitLenList = [BitLen || {_Ix, BitLen} <- IL],
+		    Data = co_codec:encode_pdo(DataList,BitLenList),
 		    ?dbg(tpdo, "do_send: data = ~p", [Data]),
 		    Frame = #can_frame { id = S#s.id,
 					 len = byte_size(Data),
@@ -457,18 +465,17 @@ do_send(S=#s {state = ?Operational, type = tpdo, ctx = Ctx,
     end;
 do_send(S=#s {state = ?Operational, type = sam_mpdo,
 	      ctx = Ctx=#tpdo_ctx {nodeid = Nid}, 
-	      index_list = [Index = {Ix, Si}], 
-	      type_list = [T = {_Type, ?MPDO_DATA_SIZE}]}, 
+	      index_list = [{Index = {Ix, Si}, ?MPDO_DATA_SIZE}]}, 
 	true) when Nid =/= undefined ->
     ?dbg(tpdo, "do_send: sam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
     if S#s.itmr =:= false ->
-	    case co_api:tpdo_value(Index, Ctx) of
-		{ok, Value} ->
-		    Data = co_codec:encode_pdo([0, Nid, Ix, Si, Value], 
+	    case co_api:tpdo_data(Index, Ctx) of
+		{ok, IData} ->
+		    Data = co_codec:encode_pdo([0, Nid, Ix, Si, IData], 
 					       [{?UNSIGNED8, 1},
 						{?UNSIGNED8, 7},
 						{?UNSIGNED16, 16},
-						{?UNSIGNED8, 8}, T]),
+						?MPDO_DATA_SIZE]),
 		    ?dbg(tpdo, "do_send: data = ~p", [Data]),
 		    Frame = #can_frame { id = S#s.id,
 					 len = byte_size(Data),
@@ -491,24 +498,23 @@ do_send(S,_) ->
     S.
 
 do_send(S=#s {state = ?Operational, type = dam_mpdo, ctx = Ctx, 
-	      index_list = [Index = {Ix, Si}], 
-	      type_list = [{Type, Size}]}, 
+	      index_list = [{Index = {Ix, Si}, Size}]}, 
 	Destination, true) 
   when Size =< ?MPDO_DATA_SIZE->
     ?dbg(tpdo, "do_send: dam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
     if S#s.itmr =:= false ->
-	    case co_api:tpdo_value(Index, Ctx) of
-		{ok, Value} ->
+	    case co_api:tpdo_data(Index, Ctx) of
+		{ok, IData} ->
 		    Dest = case Destination of
 			       broadcast -> 0;
 			       NodeId -> NodeId
 			   end,
-		    Data = co_codec:encode_pdo([1, Dest, Ix, Si, Value], 
+		    Data = co_codec:encode_pdo([1, Dest, Ix, Si, IData], 
 					       [{?UNSIGNED8, 1},
 						{?UNSIGNED8, 7},
 						{?UNSIGNED16, 16},
 						{?UNSIGNED8, 8}, 
-						{Type, ?MPDO_DATA_SIZE}]),
+						?MPDO_DATA_SIZE]),
 		    ?dbg(tpdo, "do_send: data = ~p", [Data]),
 		    Frame = #can_frame { id = S#s.id,
 					 len = byte_size(Data),
@@ -532,12 +538,12 @@ do_send(S,_, false) ->
     S.
 
 
-tpdo_values([], _Ctx, ValueList) ->
-    lists:reverse(ValueList);
-tpdo_values([Index | Rest], Ctx, ValueList) ->
-    case co_api:tpdo_value(Index, Ctx) of
-	{ok, Value} ->
-	    tpdo_values(Rest, Ctx, [Value | ValueList]);
+tpdo_data([], _Ctx, DataList) ->
+    lists:reverse(DataList);
+tpdo_data([{Index, _BitLen} | Rest], Ctx, DataList) ->
+    case co_api:tpdo_data(Index, Ctx) of
+	{ok, Data} ->
+	    tpdo_data(Rest, Ctx, [Data | DataList]);
 	{error, _Reason} = E->
 	    E
     end.

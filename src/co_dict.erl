@@ -17,9 +17,11 @@
 	 delete_object/2, delete_entry/2,
 	 update_object/2, update_entry/2,
 	 lookup_object/2, lookup_entry/2,
-	 set/4, direct_set/4, force_set/4,
-	 set_array/3, set_objects/3,
-	 value/3, direct_value/3,
+	 set_value/4, direct_set_value/4,
+	 set_data/4, direct_set_data/4,
+	 set_array_value/3, set_array_data/3,
+	 data/2, data/3, direct_data/2, direct_data/3,
+	 value/2, value/3, direct_value/2, direct_value/3,
 	 to_file/2, to_fd/2
 	]).
 
@@ -66,7 +68,7 @@ deftype(Dict, Type, Size) ->
     ets:insert(Dict, #dict_entry  { index={Type,0},
 				    access=?ACCESS_RO,
 				    type=?UNSIGNED32,
-				    value=Size }).
+				    data=co_codec:encode(Size, ?UNSIGNED32)}).
     
 
 %% add entries in entry table
@@ -82,14 +84,14 @@ defstruct(Dict, Type, Fields) ->
     ets:insert(Dict, #dict_entry  { index={Type,0},
 				    access=?ACCESS_RO,
 				    type=?UNSIGNED8,
-				    value = length(Fields) }),
+				    data = co_codec:encode(length(Fields),?UNSIGNED8) }),
     defstruct_fields(Dict, Type, 1, Fields).
     
 defstruct_fields(Dict, Type, I, [F|Fs]) ->
     ets:insert(Dict, #dict_entry  { index={Type,I},
 				    access=?ACCESS_RO,
 				    type=?UNSIGNED8,
-				    value = F }),
+				    data = co_codec:encode(F,?UNSIGNED8) }),
     defstruct_fields(Dict, Type, I+1, Fs);
 defstruct_fields(_Dict,_Type,_I,[]) ->
     ok.
@@ -202,7 +204,7 @@ to_file(Dict, File) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Writes a dictionary to a file.
+%% Writes a dictionary to a file. Converts binary data to value
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -223,7 +225,10 @@ to_fd(Dict, Ix, Fd) ->
 		   true ->
 			case ets:lookup(Dict, {Ix,0}) of
 			    [] -> [];
-			    [E] -> [{value,E#dict_entry.value}]
+			    [E] -> 
+				{V, _Rest} = co_codec:decode(E#dict_entry.data,
+							     E#dict_entry.type),
+				[{value, V }]
 			end
 		end,
 	    Var = {object,Ix,
@@ -253,10 +258,12 @@ read_entries(Dict, Ix, Sx, Es) ->
 	    lists:reverse(Es);
 	{Ix,Sx1} ->
 	    [D] = ets:lookup(Dict, {Ix,Sx1}),
+	    {V, _Rest} = co_codec:decode(D#dict_entry.data,
+					 D#dict_entry.type),
 	    E = {entry,Sx1,
 		 [{access,co_lib:decode_access(D#dict_entry.access)},
 		  {type,co_lib:decode_type(D#dict_entry.type)},
-		  {value,D#dict_entry.value}]},
+		  {value,V}]},
 	    read_entries(Dict,Ix,Sx1,[E|Es]);
 	_ ->
 	    lists:reverse(Es)
@@ -402,7 +409,7 @@ lookup_entry(Dict, Index={Ix,255}) ->
 	    {ok,#dict_entry { index  = Index,
 			      access = ?ACCESS_RO,
 			      type   = ?UNSIGNED32,
-			      value  = Value }};
+			      data   = co_codec:encode(Value, ?UNSIGNED32)}};
 	[] ->
 	    i_fail(Dict,Ix)
     end;    
@@ -418,17 +425,17 @@ lookup_entry(Dict, Ix) when ?is_index(Ix) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Set value of existing object in dictionary.
+%% Set data of existing object in dictionary.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec set(Dict::term(), Index::integer(), SubInd::integer(), Value::term()) ->
+-spec set_data(Dict::term(), Index::integer(), SubInd::integer(), Data::binary()) ->
 		 ok | 
 		 {error, no_such_object} |
 		 {error, no_such_subindex} |
 		 {error, bad_access}.
 
-set(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
+set_data(Dict, Ix, Si, Data) when ?is_index(Ix), ?is_subind(Si) ->
     Index = {Ix, Si},
     try ets:lookup_element(Dict, Index, #dict_entry.access) of
 	?ACCESS_RO ->
@@ -436,7 +443,7 @@ set(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
 	?ACCESS_C ->
 	    {error,?abort_write_not_allowed};
 	_ ->
-	    direct_set(Dict, Ix, Si, Value)
+	    direct_set_data(Dict, Ix, Si, Data)
     catch
 	error:badarg ->
 	    i_fail(Dict, Index);
@@ -444,88 +451,175 @@ set(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
 	    erlang:error(What)
     end.
 
-%%--------------------------------------------------------------------
+%%%--------------------------------------------------------------------
 %% @doc
-%% Set value of existing object in dictionary.
+%% Set data of existing object in dictionary.
 %% Work as set but without checking access !
 %% @end
 %%--------------------------------------------------------------------
--spec direct_set(Dict::term(), Index::integer(), SubInd::integer(), 
-		 Value::term()) ->
+-spec direct_set_data(Dict::term(), Index::integer(), SubInd::integer(), 
+		 Data::binary()) ->
 		 ok | 
 		 {error, no_such_object} |
 		 {error, no_such_subindex} |
 		 {error, bad_access}.
 
-direct_set(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
+direct_set_data(Dict, Ix, Si, Data) 
+  when ?is_index(Ix), ?is_subind(Si), is_binary(Data) ->
     Index = {Ix, Si},
-    case ets:update_element(Dict, Index, {#dict_entry.value, Value}) of
+    case ets:update_element(Dict, Index, {#dict_entry.data, Data}) of
 	false ->
 	    i_fail(Dict, Index);
 	true ->
 	    ok
     end.
-
 %%--------------------------------------------------------------------
 %% @doc
 %% Set value of existing object in dictionary.
-%% Work as direct_set but creates entry if it does not exist!
+%%
 %% @end
 %%--------------------------------------------------------------------
--spec force_set(Dict::term(), Index::integer(), SubInd::integer(), 
+-spec set_value(Dict::term(), Index::integer(), SubInd::integer(), Value::term()) ->
+		 ok | 
+		 {error, no_such_object} |
+		 {error, no_such_subindex} |
+		 {error, bad_access}.
+
+set_value(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
+    Index = {Ix, Si},
+    try ets:lookup_element(Dict, Index, #dict_entry.access) of
+	?ACCESS_RO ->
+	    {error,?abort_write_not_allowed};
+	?ACCESS_C ->
+	    {error,?abort_write_not_allowed};
+	_ ->
+	    direct_set_value(Dict, Ix, Si, Value)
+    catch
+	error:badarg ->
+	    i_fail(Dict, Index);
+	  error:What ->
+	    erlang:error(What)
+    end.
+
+%%%--------------------------------------------------------------------
+%% @doc
+%% Set value of existing object in dictionary.
+%% Work as set but without checking access !
+%% @end
+%%--------------------------------------------------------------------
+-spec direct_set_value(Dict::term(), Index::integer(), SubInd::integer(), 
 		 Value::term()) ->
 		 ok | 
 		 {error, no_such_object} |
 		 {error, no_such_subindex} |
 		 {error, bad_access}.
 
-force_set(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
+direct_set_value(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
     Index = {Ix, Si},
-    case ets:update_element(Dict, Index, {#dict_entry.value, Value}) of
-	false ->
-	    %% Type and acces ??
-	    add_entry(Dict, #dict_entry {index = Index, value = Value});
-	true ->
-	    ok
-    end.
+    Type = ets:lookup_element(Dict, Index, #dict_entry.type),
+    direct_set_data(Dict, Ix, Si,co_codec:encode(Value, Type)).
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Sets an array of data for subindex 1..254.
+%% @end
+%%--------------------------------------------------------------------
+-spec set_array_data(Dict::term(), Index::integer(), list(Data::binary())) ->
+		       ok | 
+		       {error, no_such_object} |
+		       {error, no_such_subindex} |
+		       {error, bad_access}.
+
+set_array_data(Dict, Ix, DataList) ->
+    set_array_data(Dict, Ix, 1, DataList).
+
+set_array_data(Dict, Ix, Si, []) ->
+    direct_set_data(Dict, Ix, 0, Si);  %% number of elements
+set_array_data(Dict, Ix, Si, [Data|Rest]) when Si < 255 ->
+    direct_set_data(Dict, Ix, Si, Data),
+    set_array_data(Dict, Ix, Si+1, Rest).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Sets an array of values for subindex 1..254.
 %% @end
 %%--------------------------------------------------------------------
--spec set_array(Dict::term(), Index::integer(), list(Value::term())) ->
+-spec set_array_value(Dict::term(), Index::integer(), list(Value::term())) ->
 		       ok | 
 		       {error, no_such_object} |
 		       {error, no_such_subindex} |
 		       {error, bad_access}.
 
-set_array(Dict, Ix, Values) ->
-    set_array(Dict, Ix, 1, Values).
+set_array_value(Dict, Ix, Values) ->
+    set_array_value(Dict, Ix, 1, Values).
 
-set_array(Dict, Ix, Si, []) ->
-    direct_set(Dict, Ix, 0, Si);  %% number of elements
-set_array(Dict, Ix, Si, [Value|Vs]) when Si < 255 ->
-    direct_set(Dict, Ix, Si, Value),
-    set_array(Dict, Ix, Si+1, Vs).
+set_array_value(Dict, Ix, Si, []) ->
+    direct_set_value(Dict, Ix, 0, Si);  %% number of elements
+set_array_value(Dict, Ix, Si, [Value|Vs]) when Si < 255 ->
+    direct_set_value(Dict, Ix, Si, Value),
+    set_array_value(Dict, Ix, Si+1, Vs).
+
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Set objects on consecutive indices.
+%% Get data of existing object in dictionary.
 %% @end
 %%--------------------------------------------------------------------
--spec set_objects(Dict::term(), Index::integer(), list(Obj::record())) ->
-			 ok | 
-			 {error, no_such_object} |
-			 {error, no_such_subindex} |
-			 {error, bad_access}.
+-spec data(Dict::term(), Index::integer(), SubInd::integer()) ->
+		   {ok, Value::term()} | 
+		   {error, Reason::atom()}.
 
-set_objects(Dict, Ix, [Obj|Objs]) ->
-    set_array(Dict, Ix, 1, tuple_to_list(Obj)),
-    set_objects(Dict, Ix+1, Objs);
-set_objects(_Dict, _Ix, []) ->
-    ok.
+data(Dict, Ix, Si) when ?is_index(Ix), ?is_subind(Si) ->
+    data(Dict, {Ix, Si}).
+%%--------------------------------------------------------------------
+%% @doc
+%% Get data of existing object in dictionary.
+%% @end
+%%--------------------------------------------------------------------
+-spec data(Dict::term(), Index::{Ix::integer(), Si::integer()}) ->
+		   {ok, Value::term()} | 
+		   {error, Reason::atom()}.
 
+data(Dict, {Ix, Si} = Index) when ?is_index(Ix), ?is_subind(Si) ->
+    case ets:lookup(Dict, Index) of
+	[E] -> 
+	    case E#dict_entry.access of
+		?ACCESS_WO ->
+		    {error,?abort_read_not_allowed};
+		_ ->
+		    {ok, E#dict_entry.data}
+	    end;
+	_Other ->
+	    i_fail(Dict, Index)
+    end.
+ 
+%%--------------------------------------------------------------------
+%% @doc
+%% Get data of existing object in dictionary.
+%% Works as data but without access check.
+%% @end
+%%--------------------------------------------------------------------
+-spec direct_data(Dict::term(), Index::integer(), SubInd::integer()) ->
+			 Data::binary() | 
+			       {error, Reason::atom()}.
+
+direct_data(Dict,Ix,Si) when ?is_index(Ix), ?is_subind(Si) ->
+    ets:lookup_element(Dict, {Ix,Si}, #dict_entry.data).
+    
+%%--------------------------------------------------------------------
+%% @doc
+%% Get data of existing object in dictionary.
+%% Works as data but without access check.
+%% @end
+%%--------------------------------------------------------------------
+-spec direct_data(Dict::term(), Index::{Ix::integer(), Si::integer()}) ->
+			 Data::binary() | 
+			  {error, Reason::atom()}.
+
+direct_data(Dict,{Ix,Si} = Index) when ?is_index(Ix), ?is_subind(Si) ->
+    ets:lookup_element(Dict, Index, #dict_entry.data).
+    
 %%--------------------------------------------------------------------
 %% @doc
 %% Get value of existing object in dictionary.
@@ -536,17 +630,30 @@ set_objects(_Dict, _Ix, []) ->
 		   {error, Reason::atom()}.
 
 value(Dict, Ix, Si) when ?is_index(Ix), ?is_subind(Si) ->
-    Index = {Ix,Si},
-    try ets:lookup_element(Dict, Index, #dict_entry.access) of
-	?ACCESS_WO ->
-	    {error,?abort_read_not_allowed};
-	_ ->
-	    {ok,ets:lookup_element(Dict, Index, #dict_entry.value)}
-    catch
-	error:badarg ->
-	    i_fail(Dict, Index);
-	  error:What ->
-	    erlang:error(What)
+    value(Dict, {Ix, Si}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Get value of existing object in dictionary.
+%% @end
+%%--------------------------------------------------------------------
+-spec value(Dict::term(), Index::{Ix::integer(), Si::integer()}) ->
+		   {ok, Value::term()} | 
+		   {error, Reason::atom()}.
+
+value(Dict, {Ix, Si} = Index) when ?is_index(Ix), ?is_subind(Si) ->
+    case ets:lookup(Dict, Index) of
+	[E] -> 
+	    case E#dict_entry.access of
+		?ACCESS_WO ->
+		    {error,?abort_read_not_allowed};
+		_ ->
+		    {Value, _Rest} =
+			co_codec:decode(E#dict_entry.data,E#dict_entry.type),
+		    {ok, Value}
+	    end;
+	_Other ->
+	    i_fail(Dict, Index)
     end.
 
 %%--------------------------------------------------------------------
@@ -556,11 +663,31 @@ value(Dict, Ix, Si) when ?is_index(Ix), ?is_subind(Si) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec direct_value(Dict::term(), Index::integer(), SubInd::integer()) ->
-			  {ok, Value::term()} | 
+			  Value::term() | 
 			  {error, Reason::atom()}.
 
 direct_value(Dict,Ix,Si) when ?is_index(Ix), ?is_subind(Si) ->
-    ets:lookup_element(Dict, {Ix,Si}, #dict_entry.value).
+    direct_value(Dict,{Ix,Si}).
+    
+%%--------------------------------------------------------------------
+%% @doc
+%% Get value of existing object in dictionary.
+%% Works as value but without access check.
+%% @end
+%%--------------------------------------------------------------------
+-spec direct_value(Dict::term(), Index::{Ix::integer(), Si::integer()}) ->
+			  Value::term() | 
+			  {error, Reason::atom()}.
+
+direct_value(Dict,{Ix,Si} = Index) when ?is_index(Ix), ?is_subind(Si) ->
+    case ets:lookup(Dict, Index) of
+	[E] -> 
+	    {Value, _Rest} =
+		co_codec:decode(E#dict_entry.data,E#dict_entry.type),
+	    Value;
+	_Other ->
+	    i_fail(Dict, Index)
+    end.
     
 %%
 %% Search for dictionary entry when index I is with in range
@@ -575,7 +702,7 @@ direct_value(Dict,Ix,Si) when ?is_index(Ix), ?is_subind(Si) ->
 find_object(Dict, I, J, S, Vf) 
   when ?is_index(I), ?is_index(J), I =< J, ?is_subind(S) ->
     if S == 0 ->
-	    match_entry_0(Dict,first_object(Dict, I),J,Vf);
+	    match_entry_s(Dict,first_object(Dict, I),J,0,Vf);
        true ->
 	    case ets:next(Dict,{I,S-1}) of
 		{I,S} ->  %% found it
@@ -596,41 +723,25 @@ find_object(Dict, I, J, S, Vf)
 match_entry_s(_Dict, I, J,_S,_Vf) when I > J; I =:= '$end_of_table' ->
     {error,?abort_no_such_object};
 match_entry_s(Dict, I, J, S, Vf) ->
-    try ets:lookup_element(Dict,{I,S},#dict_entry.value) of
-	V when V == Vf ->
-	    {ok,I};
-	V when is_function(Vf) ->
-	    case Vf(V) of
-		true -> {ok,I};
-		false ->
+    case ets:lookup(Dict,{I,S}) of
+	[E] ->
+	    {Value, _Rest} = co_codec:decode(E#dict_entry.data, E#dict_entry.type),
+	    case Value of 
+		Vf ->
+		    {ok,I};
+		V when is_function(Vf) ->
+		    case Vf(V) of
+			true -> {ok,I};
+			false ->
+			    match_entry_s(Dict,next_object(Dict,I,J),J,S,Vf)
+		    end;
+		_ ->
 		    match_entry_s(Dict,next_object(Dict,I,J),J,S,Vf)
 	    end;
-	_ ->
-	    match_entry_s(Dict,next_object(Dict,I,J),J,S,Vf)
-    catch
-	error:badarg ->
+	_Other ->
 	    match_entry_s(Dict,next_object(Dict,I,J),J,S,Vf)
     end.
-%%
-%% Find I where value({I,0}) =:= V
-%%   return {ok,I} if found
-%%          {error,no_such_object}  otherwise
-%%
-match_entry_0(_Dict, I, J, _Vf) when I > J; I == '$end_of_tbale' ->
-    {error, ?abort_no_such_object};    
-match_entry_0(Dict, I, J, Vf) ->
-    case ets:lookup_element(Dict, {I,0}, #dict_entry.value) of
-	V when V == Vf ->
-	    {ok,I};
-	V when is_function(Vf) ->
-	    case Vf(V) of
-		true -> {ok,I};
-		false ->
-		    match_entry_0(Dict,next_object(Dict,I,J),J,Vf)
-	    end;
-	_ ->
-	    match_entry_0(Dict,next_object(Dict,I,J),J,Vf)
-    end.
+
 
 %%
 %% Find first object with index Jx where Jx >= Ix

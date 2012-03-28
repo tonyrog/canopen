@@ -43,7 +43,7 @@
 -export([store/6, fetch/6]).
 -export([subscribers/2]).
 -export([reserver_with_module/2]).
--export([tpdo_mapping/2, rpdo_mapping/2, tpdo_set/3, tpdo_value/2]).
+-export([tpdo_mapping/2, rpdo_mapping/2, tpdo_set/3, tpdo_data/2]).
 
 %% Test interface
 -export([dump/1, dump/2, loop_data/1]).
@@ -608,20 +608,36 @@ set(Identity, Ix, Value) when is_integer(Ix) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Cache {Ix, Si} Value truncated to 64 bits.
+%% Cache {Ix, Si} Data or encoded Value truncated to 64 bits.
 %% @end
 %%--------------------------------------------------------------------
 -spec tpdo_set(Identity::term(), 
 	       Index::{Ix::integer(), Si::integer()} | integer(), 
-	       Value::term()) -> 
+	       Data::binary() | {Value::term(), Type::term()}) -> 
 		      ok | {error, Error::atom()}.
 
-tpdo_set(Identity, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Value = ~p",
-	 [Identity, Ix, Si, Value]), 
-    gen_server:call(identity_to_pid(Identity), {tpdo_set,I,Value});   
-tpdo_set(Identity, Ix, Value) when is_integer(Ix) ->
-    tpdo_set(Identity, {Ix, 0}, Value).
+tpdo_set(Identity, {Ix, Si} = I, Data) 
+  when ?is_index(Ix), ?is_subind(Si), is_binary(Data) ->
+    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Data = ~p",
+	 [Identity, Ix, Si, Data]), 
+    Data64 = co_codec:encode_binary(Data, 64),
+    gen_server:call(identity_to_pid(Identity), {tpdo_set,I,Data64});   
+tpdo_set(Identity, {Ix, Si} = I, {Value, Type}) 
+  when ?is_index(Ix), ?is_subind(Si) ->
+    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Value = ~p, Type = ~p",
+	 [Identity, Ix, Si, Value, Type]), 
+    try co_codec:encode(Value, Type) of
+	Data ->
+	    tpdo_set(Identity, I, Data) 
+    catch
+	error:Reason ->
+	    ?dbg(node, "tpdo_set: encode failed, reason = ~p", [Reason]), 
+	    {error, badarg}
+    end;
+tpdo_set(Identity, Ix, Term) 
+  when is_integer(Ix) ->
+    tpdo_set(Identity, {Ix, 0}, Term).
+
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -834,14 +850,15 @@ tpdo_mapping(Offset, Ctx) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec tpdo_value(Index::{integer(), integer()}, TpdoCtx::record()) ->
-			{ok, Value::term()} |
+-spec tpdo_data(Index::{integer(), integer()}, TpdoCtx::record()) ->
+			{ok, Data::binary()} |
 			{error, Error::atom()}.
 
-tpdo_value(Index = {Ix, Si}, #tpdo_ctx {res_table = ResTable, dict = Dict, 
-					tpdo_cache = TpdoCache}) 
+tpdo_data(Index = {Ix, Si}, #tpdo_ctx {res_table = ResTable, dict = Dict, 
+				       tpdo_cache = TpdoCache}) 
   when is_integer(Ix) andalso is_integer(Si) ->
-    co_node:tpdo_value(Index, ResTable, Dict, TpdoCache).
+    co_node:tpdo_data(Index, ResTable, Dict, TpdoCache).
+
 
 %%--------------------------------------------------------------------
 %% @doc

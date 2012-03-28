@@ -125,7 +125,7 @@ set(_Pid, {Index, SubInd} = I, NewValue) ->
     case ets:lookup(tpdo_dict, I) of
 	[{I, Type, _Value}] ->
 	    ets:insert(tpdo_dict, {I, Type, NewValue}),
-	    gen_server:cast(?MODULE, {set, I, NewValue}),
+	    gen_server:cast(?MODULE, {set, I, NewValue, Type}),
 	    ok;
 	[] ->
 	    {error, ?ABORT_NO_SUCH_OBJECT}
@@ -245,10 +245,10 @@ handle_cast({value, {_Ix, _Si}} = Msg, LD) ->
     ?dbg("handle_cast: value called for ~.16B:~.8B ",[_Ix, _Si]),
 %%    LD#loop_data.starter ! Msg,
     {noreply, LD};
-handle_cast({set, {_Ix, _Si} = I, Value} = Msg, 
+handle_cast({set, {_Ix, _Si} = I, Value, Type} = Msg, 
 	    LD=#loop_data {co_node = CoNode, callback = {M, F}}) ->
     ?dbg("handle_cast: set called for ~.16B:~w with ~p",[_Ix, _Si, Value]),
-    ok = M:F(CoNode, I, Value),
+    ok = M:F(CoNode, I, {Value, Type}),
  %%   LD#loop_data.starter ! Msg,
     {noreply, LD};
 handle_cast(_Msg, LD) ->

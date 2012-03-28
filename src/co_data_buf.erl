@@ -181,24 +181,16 @@ init_i(Access, Pid, #index_spec{index = I, type = Type, transfer = Mode, timeout
 			       load_level = LLevel,
 			       mode = Mode,
 			       timeout = Tout});
-init_i(read, Dict, #dict_entry{index = I, type = Type, value = Value}, BSize, LLevel) ->
-    try co_codec:encode(Value, Type) of
-	Data ->
-	    {ok, #co_data_buf {access = read,
-			       i = I,
-			       type = Type,
-			       data = Data,
-			       size = size(Data),
-			       eof = true,
-			       buf_size = BSize,
-			       load_level = LLevel,
-			       mode = {dict, Dict}}}
-    catch
-	error:_Reason ->
-	    ?dbg(data_buf, "init: encode of = ~p, ~p failed, Reason = ~p", 
-		 [Value,  Type, _Reason]),
-	    {error, ?abort_value_range_error}
-    end;
+init_i(read, Dict, #dict_entry{index = I, type = Type, data = Data}, BSize, LLevel) ->
+    {ok, #co_data_buf {access = read,
+		       i = I,
+		       type = Type,
+		       data = Data,
+		       size = size(Data),
+		       eof = true,
+		       buf_size = BSize,
+		       load_level = LLevel,
+		       mode = {dict, Dict}}};
 
 init_i(write, Dict, #dict_entry{index = I, type = Type}, BSize, LLevel) ->
     {ok, #co_data_buf {access = write,
@@ -515,44 +507,24 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = Dat
 	    Other
     end;
 %% Transfer == dict
-write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, type = Type, data = OldData, 
+write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, data = OldData, 
 		     i = {Index, SubInd}, tmp = TmpData}, 
       Data, true, segment) -> 
     ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p", [_Mode, Data, true]),
-    DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
-    try co_codec:decode(DataToSend, Type) of
-	{Value, _} ->
-	    ?dbg(data_buf, "write:store I = ~.16B:~.8B, Value = ~p", 
-		 [Index, SubInd, Value]),
-	    co_dict:direct_set(Dict, Index, SubInd, Value),
-	    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}}
-   catch
-	error:_Reason ->
-	    ?dbg(data_buf, "write: decode of = ~p, ~p failed, Reason = ~p", 
-		 [DataToSend,  Type, _Reason]),
-	    {error, ?abort_value_range_error}
-    end;
+    DataToSave = <<OldData/binary, TmpData/binary, Data/binary>>,
+    co_dict:direct_set_data(Dict, Index, SubInd, DataToSave),
+    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
 		
-write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, type = Type, data = OldData, 
+write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, data = OldData, 
 		     i = {Index, SubInd}, tmp = TmpData}, 
       N, true, block) -> 
     ?dbg(data_buf, "write: mode = ~w, N = ~p, TmpData = ~w, Eod = ~p", 
 	 [_Mode, N, TmpData, true]),
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
-    DataToSend = <<OldData/binary, DataToAdd/binary>>,
-    try co_codec:decode(DataToSend, Type) of
-	{Value, _} ->
-	    ?dbg(data_buf, "write: store I = ~.16B:~.8B, Value = ~p", 
-		 [Index, SubInd, Value]),
-	    co_dict:direct_set(Dict, Index, SubInd, Value),
-	    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}}
-   catch
-	error:_Reason ->
-	    ?dbg(data_buf, "write: decode of = ~p, ~p failed, Reason = ~p", 
-		 [DataToSend,  Type, _Reason]),
-	    {error, ?abort_value_range_error}
-    end;
+    DataToSave = <<OldData/binary, DataToAdd/binary>>,
+    co_dict:direct_set_data(Dict, Index, SubInd, DataToSave),
+    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
 		
 write(Buf=#co_data_buf {mode = {data, Client} = _Mode, data = OldData, 
 		     i = {_Index, _SubInd}, tmp = TmpData}, 

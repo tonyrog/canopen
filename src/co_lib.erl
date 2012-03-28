@@ -15,6 +15,7 @@
 -export([serial_to_string/1, string_to_serial/1]).
 -export([serial_to_xnodeid/1]).
 -export([cobid_to_nodeid/1]).
+-export([cobid/2]).
 -export([load_definition/1]).
 -export([load_def_mod/2]).
 -export([object/2]).
@@ -53,6 +54,19 @@ cobid_to_nodeid(CobId) ->
 	    ?NODE_ID(CobId);
        true ->
 	    undefined
+    end.
+
+%% 
+%% Combine nodeid with function code
+cobid(F, NodeID) ->
+    Func = co_lib:encode_func(F),
+    if ?is_nodeid_extended(NodeID) ->
+	    NodeID1 = NodeID band ?COBID_ENTRY_ID_MASK,
+	    ?XCOB_ID(Func,NodeID1);
+       ?is_nodeid(NodeID) ->
+	    ?COB_ID(Func,NodeID);
+       true ->
+	    erlang:error(badarg)
     end.
 
 %% Encode/Decode category

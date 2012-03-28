@@ -17,6 +17,8 @@
 -include("canopen.hrl").
 
 -export([encode/2, decode/2,
+	 encode_binary/2, decode_binary/2,
+	 encode_pdo/2, decode_pdo/2,
 	 bitsize/1, bytesize/1]).
 
 -compile(export_all).
@@ -136,14 +138,18 @@ encode_e(Data, ?DOMAIN, S) when is_list(Data) ->
 encode_e(Data, Type, S) when is_atom(Type) ->
     encode_e(Data, co_lib:encode_type(Type), S).
 
-encode_compound_e([D|Ds],[T|Ts]) ->
-    Bits1 = encode_e(D, T),
-    Bits2 = encode_compound_e(Ds, Ts),
+encode_compound_e([D|Ds],[TS = {_T,_S}|TSs]) -> %% {Type, Size}
+    Bits1 = encode_e(D, TS),
+    Bits2 = encode_compound_e(Ds, TSs),
+    concat_bits(Bits1, Bits2);
+encode_compound_e([D|Ds],[S|Ss]) %% Size
+  when is_binary(D), is_integer(S) ->
+    Bits1 = encode_binary(D,S),
+    Bits2 = encode_compound_e(Ds, Ss),
     concat_bits(Bits1, Bits2);
 encode_compound_e([], []) ->
     <<>>.
 
-%% encode a complete PDO frame (possibly too big)
 encode_pdo(Ds, Ts) ->
     Bits = encode_compound_e(Ds,Ts),
     case bit_size(Bits) band 7 of
@@ -275,11 +281,18 @@ decode_e(Data, ?DOMAIN, S) ->
 decode_e(Data, Type, S) when is_atom(Type) ->
     decode_e(Data, co_lib:encode_type(Type), S).
 
-decode_compound_e(Data,[T|Ts]) ->
-    Sz = bitsize_e(T),
+decode_compound_e(Data,[TS = {_T,_S}|TSs]) -> %% {Type, Size}
+    io:format("decode_compound_e: data ~w, ts ~p, tss ~p\n", [Data, TS, TSs]), 
+    Sz = bitsize_e(TS),
     {DataT,DataTs} = split_bits(Data,Sz),
-    {D,<<>>} = decode(DataT,T),
-    {Ds,Data1} = decode_compound_e(DataTs,Ts),
+    {D,<<>>} = decode(DataT,TS),
+    {Ds,Data1} = decode_compound_e(DataTs,TSs),
+    {[D|Ds], Data1};
+decode_compound_e(Data,[S|Ss]) ->%% Size
+    io:format("decode_compound_e: data ~w, s ~p, ss ~p\n", [Data, S, Ss]), 
+    {DataS,DataSs} = split_bits(Data,S),
+    {D,<<>>} = decode_binary(DataS,S),
+    {Ds,Data1} = decode_compound_e(DataSs,Ss),
     {[D|Ds], Data1};
 decode_compound_e(Data, []) ->
     {[], Data}.
@@ -289,6 +302,7 @@ decode_compound_e(Data, []) ->
 %% FIXME: handle error cases, Data to small etc.
 %%
 decode_pdo(Data, Ts) ->
+    io:format("decode_pdo: data ~w, ts ~w\n", [Data, Ts]), 
     Sz = bitsize_e(Ts),
     {Data1,Data2} = split_bits(Data,Sz),
     {Ds,<<>>} = decode_compound_e(Data1,Ts),
@@ -364,13 +378,12 @@ bitsize_e(TypeList) when is_list(TypeList) ->
 bitsize_e(Type) when is_atom(Type) ->
     bitsize_e(co_lib:encode_type(Type)).
 
-bitsize_compound_e([{_T,Size}|Ts]) ->
-    Size + bitsize_compound_e(Ts);
-bitsize_compound_e([T|Ts]) ->
-    case bitsize_e(T) of
-	0 -> 0;
-	Size -> Size + bitsize_compound_e(Ts)
-    end;
+bitsize_compound_e([{_T,S}|TSs]) -> %% {Type, Size}
+    io:format("bitsize_compound_e: s ~p, ts ~p\n", [S, TSs]), 
+    S + bitsize_compound_e(TSs);
+bitsize_compound_e([S|Ss]) -> %% Size
+    io:format("bitsize_compound_e: s ~p, ss ~p\n", [S, Ss]), 
+    S + bitsize_compound_e(Ss);
 bitsize_compound_e([]) ->
     0.
 
