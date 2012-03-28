@@ -1,7 +1,10 @@
 %%
 %% DS-419	Battery Chargers
 %%
+{module, 'DS-419'}.
+
 {objdef,16#6000,[
+  {id,battery_status},
   {name,"Battery status"},
   {struct,var},
   {category,mandatory},

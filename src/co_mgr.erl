@@ -508,6 +508,7 @@ code_change(_OldVsn, Mgr, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 load_ctx(Mod, Mgr) ->
+    ?dbg(mgr, "load_ctx: Loading ~p", [Mod]),
     case lists:keyfind(Mod, 1, Mgr#mgr.ctx_list) of
 	false ->
 	    try co_lib:load_definition(Mod) of

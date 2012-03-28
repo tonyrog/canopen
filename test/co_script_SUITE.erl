@@ -60,8 +60,9 @@ suite() ->
 %%--------------------------------------------------------------------
 all() -> 
     [require,
+     verify_def_files,
      fetch_store,
-     script].
+     basic_script].
 %%     break].
 
 
@@ -155,6 +156,45 @@ require(_Config) ->
     ok.
 
 %%--------------------------------------------------------------------
+%% @spec verify_def_files(Config) -> ok 
+%% @doc 
+%% Requires the manager to load a definition file
+%% @end
+%%--------------------------------------------------------------------
+verify_def_files(_Config) ->
+    DefDir = filename:join(code:priv_dir(canopen), "def/"),
+    ResList = case filelib:is_dir(DefDir) of
+		  true ->
+		      filelib:fold_files(DefDir, "[*.def]", false, 
+					 fun(F, FList) -> 
+						 [{F, verify_def_file(F)} | FList]
+					 end, []);
+	false ->
+	    %% no def_files ??
+		      []
+    end,
+    ct:pal("Res ~p", [ResList]),
+    case lists:all(fun({_File, Res}) ->
+			   case Res of
+			       ok -> true;
+			       _Other ->false
+			   end
+		   end, ResList) of
+	true ->
+	    ok;
+	false ->
+	    ct:fail("Incorrect def files exist")
+    end.
+
+verify_def_file(File) ->
+    %% ct:pal("Verifying ~p",[File]),
+    case filename:basename(File, ".def") of
+	"README" -> ok; %% do_nothing
+	F -> co_mgr:client_require(list_to_atom(F))
+    end.
+	
+
+%%--------------------------------------------------------------------
 %% @spec fetch_store(Config) -> ok 
 %% @doc 
 %% Fetches cobid_time_stamp, changes it and restores it.
@@ -185,12 +225,12 @@ fetch_store(_Config) ->
     ok.
 
 %%--------------------------------------------------------------------
-%% @spec script(Config) -> ok 
+%% @spec basic_script(Config) -> ok 
 %% @doc 
 %% Runs a script 
 %% @end
 %%--------------------------------------------------------------------
-script(Config) ->
+basic_script(Config) ->
     DataDir = ?config(data_dir, Config),
 
     %% Using file instead of run/script to avoid halt of node

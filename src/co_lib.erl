@@ -329,6 +329,8 @@ def_mod([{module, Module}|Forms], DMod, DefCtx) when is_atom(Module) ->
 	_DefMod ->
 	    erlang:error({module_already_defined, Module}) 
     end;
+def_mod([_AnyButModule|Forms], undefined, _DefCtx) ->
+    erlang:error(module_tag_required);
 %% {require, def} - load a module
 def_mod([{require, Module}|Forms], DMod, DefCtx) when is_atom(Module) ->
     case lists:keyfind(Module, 1, DefCtx#def_ctx.modules) of
@@ -537,6 +539,8 @@ verify([], Data, _Def) ->
     Data.
 
 %% Verify object id
+verify_obj_id(_Obj=#objdef {id = undefined, index = Index}, _DefCtx) ->
+    erlang:error({id_required, Index});
 verify_obj_id(Obj,_Def) ->
     if is_atom(Obj#objdef.id),
        Obj#objdef.id =/= undefined -> Obj;
