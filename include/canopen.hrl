@@ -515,6 +515,7 @@
 	  node_map,         %% serial to node id mapping
 	  nmt_table,        %% node states,  #nmt_entry {}
 	  dict,             %% can dictionary
+	  mpdo_dispatch,    %% MPDO dispatch list 
 	  tpdo_cache,       %% caching values used in tpdos
 	  res_table,        %% dictionary reservations
 	  sub_table,        %% dictionary subscriptions
@@ -789,6 +790,13 @@
 	    (((RIndex) band 16#ffff) bsl 16) bor
 	    (((RSubind) band 16#ff) bsl 8) bor 
 	    ((Nid) band 16#ff)).
+
+-define(RMPDO_MAP_SIZE(Map),    (((Map) bsr 56) band 16#ff)).
+-define(RMPDO_MAP_INDEX(Map),   (((Map) bsr 40) band 16#ffff)).
+-define(RMPDO_MAP_SUBIND(Map),  (((Map) bsr 32) band 16#ff)).
+-define(RMPDO_MAP_RINDEX(Map),  (((Map) bsr 16) band 16#ffff)).
+-define(RMPDO_MAP_RSUBIND(Map), (((Map) bsr 8) band 16#ff)).
+-define(RMPDO_MAP_RNID(Map),    ((Map) band 16#ff)).
 
 %% Transmit MPDO map UNSIGNED32 entry (Scan List) 
 %% BlockSize:8  - number of consecutive sub-indices used

@@ -139,11 +139,13 @@ encode_e(Data, Type, S) when is_atom(Type) ->
     encode_e(Data, co_lib:encode_type(Type), S).
 
 encode_compound_e([D|Ds],[TS = {_T,_S}|TSs]) -> %% {Type, Size}
+    io:format("encode_command_e: data ~w, ts ~w\n", [D, TS]), 
     Bits1 = encode_e(D, TS),
     Bits2 = encode_compound_e(Ds, TSs),
     concat_bits(Bits1, Bits2);
 encode_compound_e([D|Ds],[S|Ss]) %% Size
-  when is_binary(D), is_integer(S) ->
+  when is_integer(S) ->
+    io:format("encode_command_e: data ~w, s ~w\n", [D, S]), 
     Bits1 = encode_binary(D,S),
     Bits2 = encode_compound_e(Ds, Ss),
     concat_bits(Bits1, Bits2);
@@ -151,6 +153,7 @@ encode_compound_e([], []) ->
     <<>>.
 
 encode_pdo(Ds, Ts) ->
+    io:format("encode_pdo: data ~w, ts ~w\n", [Ds, Ts]), 
     Bits = encode_compound_e(Ds,Ts),
     case bit_size(Bits) band 7 of
 	0 -> Bits;

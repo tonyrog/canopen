@@ -62,7 +62,9 @@ all() ->
      send_tpdo2,
      send_tpdo3,
      send_tpdo4,
-     send_multi
+     send_multi,
+     send_dam_mpdo,
+     send_sam_mpdo
     ].
 %%     break].
 
@@ -343,6 +345,29 @@ send_multi(Config) ->
   
 %%--------------------------------------------------------------------
 %% @doc 
+%% Verifies sending of dam_mpdo 
+%% @end
+%%--------------------------------------------------------------------
+-spec send_dam_mpdo(Config::list(tuple())) -> ok.
+
+send_dam_mpdo(Config) ->
+    send_dam_mpdo(Config, dam_mpdo, broadcast).
+
+%%--------------------------------------------------------------------
+%% @doc 
+%% Verifies sending of sam_mpdo 
+%% @end
+%%--------------------------------------------------------------------
+-spec send_sam_mpdo(Config::list(tuple())) -> ok.
+
+send_sam_mpdo(Config) ->
+    %% Make sure the sending node has a short nodeid
+    ok = co_api:set_option(serial(), nodeid, (serial() band 16#ff)),
+    timer:sleep(1000),
+    send_tpdo(Config, sam_mpdo).
+
+%%--------------------------------------------------------------------
+%% @doc 
 %% Dummy test case to have a test environment running.
 %% Stores Config in ets table.
 %% @end
@@ -373,6 +398,21 @@ send_tpdo(Config, Tpdo) ->
 
     %% Send tpdo with new value
     co_api:pdo_event(serial(), CobId),
+
+    rec(TargetList),
+
+    ok.
+
+send_dam_mpdo(Config, Tpdo, Destination) ->
+    %% Wait for all processes to be up
+    timer:sleep(100),
+    {CobId, SourceList, TargetList} = ct:get_config(Tpdo),
+
+    %% Set values
+    set(Config, SourceList),
+
+    %% Send tpdo with new value
+    co_api:dam_mpdo_event(serial(), CobId, Destination),
 
     rec(TargetList),
 

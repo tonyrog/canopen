@@ -438,98 +438,34 @@ do_sync(S=#s {state = ?Operational}) ->
 do_sync(S) ->
     S.
 
-do_send(S=#s {state = ?Operational, type = tpdo, ctx = Ctx, index_list = IL}, 
-	true) ->
-    ?dbg(tpdo, "do_send: tpdo", []),
-    if S#s.itmr =:= false ->
-	    ?dbg(tpdo, "do_send: indexes = ~w", [IL]),
-	    case tpdo_data(IL, Ctx, []) of
-		{error, Reason} ->
-		    io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
-			      [self(), Reason]),
-		    S;
-		DataList ->
-		    ?dbg(tpdo, "do_send: values = ~w, ", [DataList]),
-		    BitLenList = [BitLen || {_Ix, BitLen} <- IL],
-		    Data = co_codec:encode_pdo(DataList,BitLenList),
-		    ?dbg(tpdo, "do_send: data = ~p", [Data]),
-		    Frame = #can_frame { id = S#s.id,
-					 len = byte_size(Data),
-					 data = Data },
-		    can:send_from(S#s.from, Frame),
-		    ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
-		    S#s { emit=false, itmr=ITmr }
-	    end;
-       true ->
-	    S#s { emit=true }  %% inhibit is running, delay transmission
-    end;
-do_send(S=#s {state = ?Operational, type = sam_mpdo,
-	      ctx = Ctx=#tpdo_ctx {nodeid = Nid}, 
-	      index_list = [{Index = {Ix, Si}, ?MPDO_DATA_SIZE}]}, 
-	true) when Nid =/= undefined ->
-    ?dbg(tpdo, "do_send: sam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
-    if S#s.itmr =:= false ->
-	    case co_api:tpdo_data(Index, Ctx) of
-		{ok, IData} ->
-		    Data = co_codec:encode_pdo([0, Nid, Ix, Si, IData], 
-					       [{?UNSIGNED8, 1},
-						{?UNSIGNED8, 7},
-						{?UNSIGNED16, 16},
-						?MPDO_DATA_SIZE]),
-		    ?dbg(tpdo, "do_send: data = ~p", [Data]),
-		    Frame = #can_frame { id = S#s.id,
-					 len = byte_size(Data),
-					 data = Data },
-		    can:send_from(S#s.from, Frame),
-		    ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
-		    S#s { emit=false, itmr=ITmr };
-		{error, Reason} = E->
-		    io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
-			      [self(), Reason]),
-		    E
-	    end;
-       true ->
-	    S#s { emit=true }  %% inhibit is running, delay transmission
-    end;
+do_send(S=#s {state = ?Operational, type = tpdo, itmr = false}, true)->
+    send_tpdo(S);
+do_send(S=#s {state = ?Operational, type = sam_mpdo, itmr = false,
+	      ctx = #tpdo_ctx {nodeid = Nid}, 
+	      index_list = [{{{Ix, Si}, BlockSize}, ?MPDO_DATA_SIZE}]}, 
+	true) 
+  when Nid =/= undefined ->
+    ?dbg(tpdo, "do_send: sam_mpdo index = ~7.16.0#:~w, block_size = ~w", 
+	 [Ix, Si, BlockSize]),
+    IndexList = [{Ix, I} || I <- lists:seq(Si, Si + BlockSize)],
+    send_sam_mpdo(S, IndexList);
+do_send(S=#s {state = ?Operational, itmr = Itmr}, true) 
+  when Itmr =/= false ->
+    S#s { emit=true };  %% inhibit is running, delay transmission
 do_send(S,true) ->
     ?dbg(tpdo, "do_send: invalid combination, session = ~p", [S]),
     S;
 do_send(S,_) ->
     S.
 
-do_send(S=#s {state = ?Operational, type = dam_mpdo, ctx = Ctx, 
-	      index_list = [{Index = {Ix, Si}, Size}]}, 
+do_send(S=#s {state = ?Operational, type = dam_mpdo, itmr = false,
+	      index_list = [{_Index, Size}]}, 
 	Destination, true) 
   when Size =< ?MPDO_DATA_SIZE->
-    ?dbg(tpdo, "do_send: dam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
-    if S#s.itmr =:= false ->
-	    case co_api:tpdo_data(Index, Ctx) of
-		{ok, IData} ->
-		    Dest = case Destination of
-			       broadcast -> 0;
-			       NodeId -> NodeId
-			   end,
-		    Data = co_codec:encode_pdo([1, Dest, Ix, Si, IData], 
-					       [{?UNSIGNED8, 1},
-						{?UNSIGNED8, 7},
-						{?UNSIGNED16, 16},
-						{?UNSIGNED8, 8}, 
-						?MPDO_DATA_SIZE]),
-		    ?dbg(tpdo, "do_send: data = ~p", [Data]),
-		    Frame = #can_frame { id = S#s.id,
-					 len = byte_size(Data),
-					 data = Data },
-		    can:send_from(S#s.from, Frame),
-		    ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
-		    S#s { emit=false, itmr=ITmr };
-		{error, Reason} = E->
-		    io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
-			      [self(), Reason]),
-		    E
-	    end;
-       true ->
-	    S#s { emit=true }  %% inhibit is running, delay transmission
-    end;
+    send_dam_mpdo(S, Destination);
+do_send(S=#s {state = ?Operational, itmr = Itmr}, _Dest, true) 
+  when Itmr =/= false ->
+    S#s { emit=true };  %% inhibit is running, delay transmission
 do_send(S,_Dest,true) ->
     ?dbg(tpdo, "do_send: invalid combination, session = ~p, destination = ~p", 
 	 [S, _Dest]),
@@ -537,6 +473,82 @@ do_send(S,_Dest,true) ->
 do_send(S,_, false) ->
     S.
 
+send_tpdo(S=#s {ctx = Ctx, index_list = IL}) ->
+    ?dbg(tpdo, "send_tpdo: indexes = ~w", [IL]),
+    case tpdo_data(IL, Ctx, []) of
+	{error, Reason} ->
+	    io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
+		      [self(), Reason]),
+	    S;
+	DataList ->
+	    ?dbg(tpdo, "send_tpdo: values = ~w, ", [DataList]),
+	    BitLenList = [BitLen || {_Ix, BitLen} <- IL],
+	    Data = co_codec:encode_pdo(DataList,BitLenList),
+	    ?dbg(tpdo, "send_tpdo: data = ~p", [Data]),
+	    Frame = #can_frame { id = S#s.id,
+				 len = byte_size(Data),
+				 data = Data },
+	    can:send_from(S#s.from, Frame),
+	    ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
+	    S#s { emit=false, itmr=ITmr }
+    end.
+    
+send_dam_mpdo(S=#s {ctx = Ctx, index_list = [{Index = {Ix, Si}, _Size}]}, 
+	      Destination) ->
+    ?dbg(tpdo, "send_dam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
+    case co_api:tpdo_data(Index, Ctx) of
+	{ok, IData} ->
+	    ?dbg(tpdo, "send_dam_mpdo, index data = ~p", [IData]),
+	    Dest = case Destination of
+		       broadcast -> 0;
+		       NodeId -> NodeId
+		   end,
+	    Data = co_codec:encode_pdo([1, Dest, Ix, Si, IData], 
+				       [{?UNSIGNED8, 1},
+					{?UNSIGNED8, 7},
+					{?UNSIGNED16, 16},
+					{?UNSIGNED8, 8}, 
+					?MPDO_DATA_SIZE]),
+	    ?dbg(tpdo, "send_dam_mpdo: data = ~p", [Data]),
+	    Frame = #can_frame { id = S#s.id,
+				 len = byte_size(Data),
+				 data = Data },
+	    can:send_from(S#s.from, Frame),
+	    ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
+	    S#s { emit=false, itmr=ITmr };
+	{error, Reason}->
+	    io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
+		      [self(), Reason]),
+	    S
+    end.
+
+send_sam_mpdo(S, []) -> 
+    S;
+send_sam_mpdo(S=#s {state = ?Operational, type = sam_mpdo,
+		    ctx = Ctx=#tpdo_ctx {nodeid = Nid}},
+	      [Index = {Ix, Si} | Ixs]) ->
+    ?dbg(tpdo, "send_sam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
+    S1 = 
+	case co_api:tpdo_data(Index, Ctx) of
+	    {ok, IData} ->
+		Data = co_codec:encode_pdo([0, Nid, Ix, Si, IData], 
+					   [{?UNSIGNED8, 1},
+					    {?UNSIGNED8, 7},
+					    {?UNSIGNED16, 16},
+					    ?MPDO_DATA_SIZE]),
+		?dbg(tpdo, "send_sam_mpdo: data = ~p", [Data]),
+		Frame = #can_frame { id = S#s.id,
+				     len = byte_size(Data),
+				     data = Data },
+		can:send_from(S#s.from, Frame),
+		ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
+		S#s { emit=false, itmr=ITmr };
+	    {error, Reason} ->
+		io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
+			  [self(), Reason]),
+		S
+	end,
+    send_sam_mpdo(S1, Ixs).
 
 tpdo_data([], _Ctx, DataList) ->
     lists:reverse(DataList);

@@ -168,6 +168,7 @@ init({Serial, NodeName, Opts}) ->
     SubTable = create_sub_table(),
     ResTable =  ets:new(co_res_table, [public,ordered_set]),
     TpdoCache = ets:new(co_tpdo_cache, [public,ordered_set]),
+    MpdoDispatch = ets:new(co_mpdo_dispatch, [public,ordered_set]),
     SdoCtx = #sdo_ctx {
       timeout         = proplists:get_value(sdo_timeout,Opts,1000),
       blk_timeout     = proplists:get_value(blk_timeout,Opts,500),
@@ -201,6 +202,7 @@ init({Serial, NodeName, Opts}) ->
       sub_table = SubTable,
       res_table = ResTable,
       dict = Dict,
+      mpdo_dispatch = MpdoDispatch,
       tpdo_cache = TpdoCache,
       tpdo = TpdoCtx,
       cob_table = CobTable,
@@ -507,7 +509,7 @@ handle_call({dump, Qualifier}, _From, Ctx) ->
     io:format("---- COB TABLE ----\n"),
     ets:foldl(
       fun({CobId, X},_) ->
-	      io:format("~10.16.0# => ~p\n", [CobId, X])
+	      io:format("~11.16. # => ~p\n", [CobId, X])
       end, ok, Ctx#co_ctx.cob_table),
     io:format("---- SUB TABLE ----\n"),
     ets:foldl(
@@ -534,6 +536,12 @@ handle_call({dump, Qualifier}, _From, Ctx) ->
       fun({{Ix,Si}, Value},_) ->
 	      io:format("~7.16.0#:~w = ~p\n",[Ix, Si, Value])
       end, ok, Ctx#co_ctx.tpdo_cache),
+    io:format("---- MPDO DISPATCH ----\n"),
+    ets:foldl(
+      fun({{RIx,RSi,RNid}, {LIx,LSi}},_) ->
+	      io:format("~7.16.0#:~w, ~.16.0# = ~7.16.0#:~w\n",
+			[RIx, RSi, RNid, LIx, LSi])
+      end, ok, Ctx#co_ctx.mpdo_dispatch),
     io:format("---------PROCESSES----------\n"),
     lists:foreach(
       fun(Process) ->
@@ -1106,10 +1114,10 @@ handle_can(Frame, Ctx) ->
 		    case {F, Addr} of
 			{1, 0} ->
 			    %% DAM-MPDO, destination is a group
-			    handle_dam_mpdo(Ctx, COBID, Ix, Si, Data);
+			    handle_dam_mpdo(Ctx, COBID, {Ix, Si}, Data);
 			{1, Nid} when Nid == Ctx#co_ctx.nodeid ->
 			    %% DAM-MPDO, destination is this node
-			    handle_dam_mpdo(Ctx, COBID, Ix, Si, Data);
+			    handle_dam_mpdo(Ctx, COBID, {Ix, Si}, Data);
 			{1, _OtherNid} ->
 			    %% DAM-MPDO, destination is some other node
 			    Ctx;
@@ -1122,8 +1130,7 @@ handle_can(Frame, Ctx) ->
 			    ?dbg(node, "~s: handle_can: SAM-MPDO from ~.16.0B "
 				 "not handled yet. Frame = ~w", 
 				 [Ctx#co_ctx.name, SourceNid, Frame]),
-			    %% handle_sam_mpdo()
-			    Ctx
+			    handle_sam_mpdo(Ctx, SourceNid, {Ix, Si}, Data)
 		    end;
 		_Other ->
 		    ?dbg(node, "~s: handle_can: frame not handled: Frame = ~w", 
@@ -1315,22 +1322,38 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
 	    end
     end.
 
+handle_sam_mpdo(Ctx=#co_ctx {mpdo_dispatch = MpdoDispatch, name = _Name}, 
+		SourceNid, {SourceIx, SourceSi}, Data ) ->
+    ?dbg(node, "~s: handle_sam_mpdo: Index = ~7.16.0#:~w, Nid = ~.16.0#, Data = ~w", 
+	 [_Name,SourceIx,SourceSi,SourceNid,Data]),
+    case ets:lookup(MpdoDispatch, {SourceIx, SourceSi, SourceNid}) of
+	[{{SourceIx, SourceSi, SourceNid}, LocalIndex = {LocalIx, LocalSi}}] ->
+	    ?dbg(node, "~s: handle_sam_mpdo: Fopund Index = ~7.16.0#:~w, updating", 
+		 [_Name,LocalIx,LocalSi]),
+	    rpdo_value(LocalIndex,Data,Ctx);
+	[] ->
+	    Ctx;
+	_Other ->
+	    ?dbg(node, "~s: handle_sam_mpdo: Found other ~p ", [_Name, _Other]),
+	    Ctx
+    end.
+
 %%
 %% DAM-MPDO
 %%
-handle_dam_mpdo(Ctx, CobId, Ix, Si, Data) ->
-    ?dbg(node, "~s: handle_dam_mpdo: Index = ~7.16.0#", [Ctx#co_ctx.name,Ix]),
+handle_dam_mpdo(Ctx, CobId, Index = {Ix, Si}, Data) ->
+    ?dbg(node, "~s: handle_dam_mpdo: Index = ~7.16.0#:~w", [Ctx#co_ctx.name,Ix,Si]),
     %% Updating dict. Maybe object_changed instead of notify ??
     %% How handle CobId ??
-    try co_dict:set_data(Ctx#co_ctx.dict, Ix, Si, Data) of
+    try co_dict:set_data(Ctx#co_ctx.dict, Index, Data) of
 	ok -> ok;
 	_Error -> 
-	    ?dbg(node, "~s: handle_dam_mpdo: Failed updating index ~7.16.0#, "
-		 "error = ~p", [Ctx#co_ctx.name, Ix, _Error])
+	    ?dbg(node, "~s: handle_dam_mpdo: Failed updating index ~7.16.0#:~w, "
+		 "error = ~p", [Ctx#co_ctx.name, Ix, Si, _Error])
     catch
 	error:_Reason -> 
-	    ?dbg(node, "~s: handle_dam_mpdo: Crashed updating index ~7.16.0#, "
-		 "reason = ~p", [Ctx#co_ctx.name, Ix, _Reason])
+	    ?dbg(node, "~s: handle_dam_mpdo: Crashed updating index ~7.16.0#:~w, "
+		 "reason = ~p", [Ctx#co_ctx.name, Ix, Si, _Reason])
     end,
     case lists:usort(subscribers(Ctx#co_ctx.sub_table, Ix) ++
 			 reserver_pid(Ctx#co_ctx.res_table, Ix)) of
@@ -1605,10 +1628,59 @@ handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
 		_ ->
 		    Ctx
 	    end;
+	_ when I >= ?IX_OBJECT_DISPATCH_FIRST, I =< ?IX_OBJECT_DISPATCH_LAST ->
+	    ?dbg(node, "~s: handle_notify: update SAM-MPDO-Dispatch for index ~.16.0# ", 
+		 [_Name, I]),
+	    update_mpdo_disp(Ctx, I);
 	_ ->
 	    Ctx
     end.
 
+update_mpdo_disp(Ctx=#co_ctx {dict = Dict, name = _Name}, I) ->
+   try co_dict:direct_value(Dict,{I,0}) of
+	NoOfEntries ->
+	    Ixs = [{I, Si} || Si <- lists:seq(1, NoOfEntries)],
+	   ?dbg(node, "~s: update_mpdo_disp: index list ~w ", [_Name, Ixs]),
+ 	    update_mpdo_disp1(Ctx, Ixs)
+    catch
+	error:_Reason ->
+	    io:format("WARNING!" 
+		      "~s: update_mpdo_disp: reading dict failed, reason = ~w\n", 
+			      [_Name, _Reason]),
+	    Ctx
+    end.
+
+update_mpdo_disp1(Ctx, []) ->
+    Ctx;
+update_mpdo_disp1(Ctx=#co_ctx {dict = Dict, mpdo_dispatch = MpdoDisp, name = _Name}, 
+		 [Index = {_Ix, _Si} | Ixs]) ->
+    ?dbg(node, "~s: update_mpdo_disp: index ~.16.0#:~w ", [_Name, _Ix, _Si]),
+    try co_dict:direct_value(Dict,Index) of
+	Map ->
+	    {SourceIx, SourceSi, SourceNid} = 
+		{?RMPDO_MAP_RINDEX(Map), ?RMPDO_MAP_RSUBIND(Map), ?RMPDO_MAP_RNID(Map)},
+	    {LocalIx, LocalSi} = 
+		{?RMPDO_MAP_INDEX(Map), ?RMPDO_MAP_SUBIND(Map)},
+	    Size = ?RMPDO_MAP_SIZE(Map),
+	    EntryList = 
+		[{{SourceIx, SourceSi + I, SourceNid}, {LocalIx,LocalSi + I}} ||
+		    I <- lists:seq(0, Size - 1)],
+	    ?dbg(node, "~s: update_mpdo_disp: entry list ~w ", [_Name, EntryList]),
+	    insert_mpdo_disp(MpdoDisp,EntryList)
+    catch
+	error:_Reason ->
+	    io:format("WARNING!" 
+		      "~s: update_mpdo_disp: reading dict failed, reason = ~w\n", 
+			      [_Name, _Reason])
+    end,
+    update_mpdo_disp1(Ctx, Ixs).
+    
+insert_mpdo_disp(MpdoDisp,[]) ->
+    ok;
+insert_mpdo_disp(MpdoDisp,[Entry | EntryList]) ->	    
+    ets:insert(MpdoDisp, Entry),
+    insert_mpdo_disp(MpdoDisp, EntryList).
+    
 %% Load time_stamp COBID - maybe start co_time_stamp server
 update_time_stamp(Ctx=#co_ctx {name = _Name}) ->
     try co_dict:direct_value(Ctx#co_ctx.dict,?IX_COB_ID_TIME_STAMP,0) of
@@ -2117,7 +2189,7 @@ rpdo_set([{{Ix,Si}, _BitLen}|Is], [Data|Ds], Ctx) ->
     if Ix >= ?BOOLEAN, Ix =< ?UNSIGNED32 -> %% skip entry
 	    rpdo_set(Is, Ds, Ctx);
        true ->
-	    {_Reply,Ctx1} = rpdo_value({Ix,Si},Data,Ctx),
+	    Ctx1 = rpdo_value({Ix,Si},Data,Ctx),
 	    rpdo_set(Is, Ds, Ctx1)
     end;
 rpdo_set([], [], Ctx) ->
@@ -2205,7 +2277,7 @@ mpdo_mapping(MType,{IxInScanList,SiInScanList},ResTable,Dict,TpdoCache)
 	    BlockSize = ?TMPDO_MAP_SIZE(Map), %% TODO ????
 	    ?dbg(node, "mpdo_mapping: sam_mpdo, local index = ~7.16.0#:~w", [_Ix,_Si]),
 	    maybe_install_callback(MType, Index, ResTable, Dict, TpdoCache),
-	    {MType, [{Index, ?MPDO_DATA_SIZE}]};
+	    {MType, [{{Index, BlockSize}, ?MPDO_DATA_SIZE}]};
 	Error ->
 	    Error %%??
     end.
@@ -2292,10 +2364,15 @@ rpdo_value({Ix,Si},Data,Ctx) ->
 	[] ->
 	    ?dbg(node, "rpdo_value: No reserver for index ~7.16.0#", [Ix]),
 	    try co_dict:set_data(Ctx#co_ctx.dict, Ix, Si, Data) of
-		ok -> {ok, handle_notify(Ix, Ctx)};
-		Error -> {Error, Ctx}
+		ok -> 
+		    handle_notify(Ix, Ctx);
+		_Error -> 
+		    ?dbg(node, "rpdo_value: set_data failed,error ~p", [_Error]),
+		    Ctx
 	    catch
-		error:Reason -> {{error,Reason}, Ctx}
+		error:_Reason -> 
+		    ?dbg(node, "rpdo_value: set_data failed, reason ~p", [_Reason]),
+		    Ctx
 	    end;
 	{Pid, Mod} when is_pid(Pid)->
 	    ?dbg(node, "rpdo_value: Process ~p has reserved index ~7.16.0#", 
@@ -2303,22 +2380,22 @@ rpdo_value({Ix,Si},Data,Ctx) ->
 	    case co_set_fsm:start({Pid, Mod}, {Ix, Si}, Data) of
 		{ok, _FsmPid} -> 
 		    ?dbg(node,"Started set session ~p", [_FsmPid]),
-		    {ok, handle_notify(Ix, Ctx)};
+		    handle_notify(Ix, Ctx);
 		ignore ->
 		    ?dbg(node,"Complete set session executed", []),
-		    {ok, handle_notify(Ix, Ctx)};
-		{error, _Reason} = E-> 	
+		    handle_notify(Ix, Ctx);
+		{error, _Reason} -> 	
 		    %% io:format ??
-		    ?dbg(node,"Failed starting set session ~p", [_Reason]),
-		    {E, Ctx}
+		    ?dbg(node,"Failed starting set session, reason ~p", [_Reason]),
+		    Ctx
 	    end;
 	{dead, _Mod} ->
 	    ?dbg(node, "rpdo_value: Reserver process for index ~7.16.0# dead.", 
 		 [Ix]),
-	    {error, ?abort_internal_error}; %% ???
+	    Ctx;
 	_Other ->
 	    ?dbg(node, "rpdo_value: Other case = ~p", [_Other]),
-	    {error, ?abort_internal_error}
+	    Ctx
     end.
 
 
