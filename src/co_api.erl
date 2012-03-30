@@ -546,14 +546,13 @@ pdo_event(Identity, CobId) ->
 		    DestinationNode::integer() | broadcast) ->
 		       ok | {error, Error::atom()}.
 
-dam_mpdo_event(Identity, CobId, Destination) 
-  when Destination == broadcast orelse
-       (is_integer(Destination) andalso Destination) =< 127 ->
-    gen_server:cast(identity_to_pid(Identity), {dam_mpdo_event, CobId, Destination});
-dam_mpdo_event(_Identity, _CobId, _Destination) ->
-    ?dbg(node, "dam_mpdo_event: Invalid destination = ~p", [_Destination]),
+dam_mpdo_event(Identity, CobId, DestinationNode) 
+  when DestinationNode == broadcast orelse
+       (is_integer(DestinationNode) andalso DestinationNode) =< 127 ->
+    gen_server:cast(identity_to_pid(Identity), {dam_mpdo_event, CobId, DestinationNode});
+dam_mpdo_event(_Identity, _CobId, _DestinationNode) ->
+    ?dbg(node, "dam_mpdo_event: Invalid destination = ~p", [_DestinationNode]),
     {error, invalid_destination}.
-
 
 %%--------------------------------------------------------------------
 %% @doc

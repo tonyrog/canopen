@@ -447,7 +447,7 @@ do_send(S=#s {state = ?Operational, type = sam_mpdo, itmr = false,
   when Nid =/= undefined ->
     ?dbg(tpdo, "do_send: sam_mpdo index = ~7.16.0#:~w, block_size = ~w", 
 	 [Ix, Si, BlockSize]),
-    IndexList = [{Ix, I} || I <- lists:seq(Si, Si + BlockSize)],
+    IndexList = [{Ix, I} || I <- lists:seq(Si, Si + BlockSize - 1)],
     send_sam_mpdo(S, IndexList);
 do_send(S=#s {state = ?Operational, itmr = Itmr}, true) 
   when Itmr =/= false ->
@@ -497,18 +497,14 @@ send_dam_mpdo(S=#s {ctx = Ctx, index_list = [{Index = {Ix, Si}, _Size}]},
 	      Destination) ->
     ?dbg(tpdo, "send_dam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
     case co_api:tpdo_data(Index, Ctx) of
-	{ok, IData} ->
-	    ?dbg(tpdo, "send_dam_mpdo, index data = ~p", [IData]),
+	{ok, DataToSend} ->
+	    ?dbg(tpdo, "send_dam_mpdo, index data = ~p", [DataToSend]),
 	    Dest = case Destination of
 		       broadcast -> 0;
 		       NodeId -> NodeId
 		   end,
-	    Data = co_codec:encode_pdo([1, Dest, Ix, Si, IData], 
-				       [{?UNSIGNED8, 1},
-					{?UNSIGNED8, 7},
-					{?UNSIGNED16, 16},
-					{?UNSIGNED8, 8}, 
-					?MPDO_DATA_SIZE]),
+	    Bin = <<1:1, Dest:7, Ix:16/little, Si:8, DataToSend:4/binary>>,
+	    Data = co_codec:encode_binary(Bin, 64),
 	    ?dbg(tpdo, "send_dam_mpdo: data = ~p", [Data]),
 	    Frame = #can_frame { id = S#s.id,
 				 len = byte_size(Data),
@@ -530,12 +526,9 @@ send_sam_mpdo(S=#s {state = ?Operational, type = sam_mpdo,
     ?dbg(tpdo, "send_sam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
     S1 = 
 	case co_api:tpdo_data(Index, Ctx) of
-	    {ok, IData} ->
-		Data = co_codec:encode_pdo([0, Nid, Ix, Si, IData], 
-					   [{?UNSIGNED8, 1},
-					    {?UNSIGNED8, 7},
-					    {?UNSIGNED16, 16},
-					    ?MPDO_DATA_SIZE]),
+	    {ok, DataToSend} ->
+		Bin = <<0:1, Nid:7, Ix:16/little, Si:8, DataToSend:4/binary>>,
+		Data = co_codec:encode_binary(Bin, 64),
 		?dbg(tpdo, "send_sam_mpdo: data = ~p", [Data]),
 		Frame = #can_frame { id = S#s.id,
 				     len = byte_size(Data),

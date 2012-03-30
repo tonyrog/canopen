@@ -113,7 +113,7 @@
 %% TPDO map
 {tpdo_map, 4, [{16#5003, 0, 32}, {16#3003,0,32}], []}.
 %% RPDO entry
-{rpdo, 4, 16#20001115, []}.
+{rpdo, 4, 16#20001114, []}.
 %% RPDO map
 {rpdo_map, 4, [{16#7034,0,64}]}.
 
@@ -142,4 +142,4 @@
 
 %% MPDO Dispatch List
 %% Last value must same as (short) nodeid based on serial in co_test.cfg
-{mpdo_dispatch, 0, [{2, 16#7034, 0, 16#5003, 0, 16#04}]}. 
+{mpdo_dispatch, 0, [{2, 16#7033, 0, 16#5003, 0, 16#04}]}. 

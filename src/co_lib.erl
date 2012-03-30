@@ -14,6 +14,7 @@
 
 -export([serial_to_string/1, string_to_serial/1]).
 -export([serial_to_xnodeid/1]).
+-export([serial_to_nodeid/1]).
 -export([cobid_to_nodeid/1]).
 -export([cobid/2]).
 -export([load_definition/1]).
@@ -46,6 +47,11 @@ string_to_serial(String) when is_list(String) ->
 %% (remove least significant byte)
 serial_to_xnodeid(Serial) ->
     (Serial bsr 8).
+
+%% Convert Serial to nodeid 
+%% (remove least significant byte and cut to 7)
+serial_to_nodeid(Serial) ->
+    ((Serial bsr 8) band 16#7f).
 
 cobid_to_nodeid(CobId) ->
     if ?is_cobid_extended((CobId)) ->

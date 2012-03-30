@@ -17,7 +17,9 @@
 	 delete_object/2, delete_entry/2,
 	 update_object/2, update_entry/2,
 	 lookup_object/2, lookup_entry/2,
+	 set_value/3, direct_set_value/3,
 	 set_value/4, direct_set_value/4,
+	 set_data/3, direct_set_data/3,
 	 set_data/4, direct_set_data/4,
 	 set_array_value/3, set_array_data/3,
 	 data/2, data/3, direct_data/2, direct_data/3,
@@ -435,7 +437,8 @@ lookup_entry(Dict, Ix) when ?is_index(Ix) ->
 		 {error, no_such_subindex} |
 		 {error, bad_access}.
 
-set_data(Dict, Ix, Si, Data) when ?is_index(Ix), ?is_subind(Si) ->
+set_data(Dict, Ix, Si, Data) 
+  when ?is_index(Ix), ?is_subind(Si), is_binary(Data) ->
     Index = {Ix, Si},
     try ets:lookup_element(Dict, Index, #dict_entry.access) of
 	?ACCESS_RO ->
@@ -450,6 +453,22 @@ set_data(Dict, Ix, Si, Data) when ?is_index(Ix), ?is_subind(Si) ->
 	  error:What ->
 	    erlang:error(What)
     end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Set data of existing object in dictionary.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec set_data(Dict::term(), Index::{Ix::integer(), Si::integer()}, Data::binary()) ->
+		 ok | 
+		 {error, no_such_object} |
+		 {error, no_such_subindex} |
+		 {error, bad_access}.
+
+set_data(Dict, {Ix, Si}, Data) 
+  when ?is_index(Ix), ?is_subind(Si), is_binary(Data) ->
+    set_data(Dict, Ix, Si, Data).
 
 %%%--------------------------------------------------------------------
 %% @doc
@@ -473,19 +492,37 @@ direct_set_data(Dict, Ix, Si, Data)
 	true ->
 	    ok
     end.
+%%%--------------------------------------------------------------------
+%% @doc
+%% Set data of existing object in dictionary.
+%% Work as set but without checking access !
+%% @end
+%%--------------------------------------------------------------------
+-spec direct_set_data(Dict::term(), Index::{Ix::integer(), Si::integer()}, 
+		 Data::binary()) ->
+		 ok | 
+		 {error, no_such_object} |
+		 {error, no_such_subindex} |
+		 {error, bad_access}.
+
+direct_set_data(Dict, {Ix, Si}, Data) 
+  when ?is_index(Ix), ?is_subind(Si), is_binary(Data) ->
+    direct_set_data(Dict, Ix, Si, Data).
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Set value of existing object in dictionary.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec set_value(Dict::term(), Index::integer(), SubInd::integer(), Value::term()) ->
+-spec set_value(Dict::term(), Ix::integer(), Si::integer(), Value::term()) ->
 		 ok | 
 		 {error, no_such_object} |
 		 {error, no_such_subindex} |
 		 {error, bad_access}.
 
-set_value(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
+set_value(Dict, Ix, Si,Value) 
+  when ?is_index(Ix), ?is_subind(Si) ->
     Index = {Ix, Si},
     try ets:lookup_element(Dict, Index, #dict_entry.access) of
 	?ACCESS_RO ->
@@ -501,7 +538,23 @@ set_value(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
 	    erlang:error(What)
     end.
 
-%%%--------------------------------------------------------------------
+%%--------------------------------------------------------------------
+%% @doc
+%% Set value of existing object in dictionary.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec set_value(Dict::term(), Index::{Ix::integer(), Si::integer()}, Value::term()) ->
+		 ok | 
+		 {error, no_such_object} |
+		 {error, no_such_subindex} |
+		 {error, bad_access}.
+
+set_value(Dict, {Ix, Si},Value) 
+  when ?is_index(Ix), ?is_subind(Si) ->
+    set_value(Dict, Ix, Si,Value).
+
+%%--------------------------------------------------------------------
 %% @doc
 %% Set value of existing object in dictionary.
 %% Work as set but without checking access !
@@ -514,11 +567,29 @@ set_value(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
 		 {error, no_such_subindex} |
 		 {error, bad_access}.
 
-direct_set_value(Dict, Ix, Si,Value) when ?is_index(Ix), ?is_subind(Si) ->
+direct_set_value(Dict, Ix, Si,Value) 
+  when ?is_index(Ix), ?is_subind(Si) ->
     Index = {Ix, Si},
     Type = ets:lookup_element(Dict, Index, #dict_entry.type),
     direct_set_data(Dict, Ix, Si,co_codec:encode(Value, Type)).
 
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Set value of existing object in dictionary.
+%% Work as set but without checking access !
+%% @end
+%%--------------------------------------------------------------------
+-spec direct_set_value(Dict::term(), Index::{Ix::integer(), Si::integer()}, 
+		 Value::term()) ->
+		 ok | 
+		 {error, no_such_object} |
+		 {error, no_such_subindex} |
+		 {error, bad_access}.
+
+direct_set_value(Dict, {Ix, Si},Value) 
+  when ?is_index(Ix), ?is_subind(Si) ->
+    direct_set_value(Dict, Ix, Si,Value).
 
 %%--------------------------------------------------------------------
 %% @doc

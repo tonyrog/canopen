@@ -362,7 +362,7 @@ send_dam_mpdo(Config) ->
 
 send_sam_mpdo(Config) ->
     %% Make sure the sending node has a short nodeid
-    ok = co_api:set_option(serial(), nodeid, (serial() band 16#ff)),
+    ok = co_api:set_option(serial(), nodeid, co_lib:serial_to_nodeid(serial())),
     timer:sleep(1000),
     send_tpdo(Config, sam_mpdo).
 

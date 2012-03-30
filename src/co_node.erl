@@ -1067,7 +1067,7 @@ direct_set_dict_value(Ix,Si,Value,Ctx) ->
 %%
 handle_can(Frame, Ctx) when ?is_can_frame_rtr(Frame) ->
     COBID = ?CANID_TO_COBID(Frame#can_frame.id),
-    ?dbg(node, "~s: handle_can: COBID=~8.16.0B", [Ctx#co_ctx.name, COBID]),
+    ?dbg(node, "~s: handle_can: (rtr) COBID=~8.16.0B", [Ctx#co_ctx.name, COBID]),
     case lookup_cobid(COBID, Ctx) of
 	nmt  ->
 	    %% Handle Node guard
@@ -1082,9 +1082,9 @@ handle_can(Frame, Ctx) when ?is_can_frame_rtr(Frame) ->
 		    Ctx
 	    end
     end;
-handle_can(Frame, Ctx) ->
+handle_can(Frame, Ctx=#co_ctx {state = State, name = _Name}) ->
     COBID = ?CANID_TO_COBID(Frame#can_frame.id),
-    ?dbg(node, "~s: handle_can: COBID=~8.16.0B", [Ctx#co_ctx.name, COBID]),
+    ?dbg(node, "~s: handle_can: COBID=~8.16.0B", [_Name, COBID]),
     case lookup_cobid(COBID, Ctx) of
 	nmt        -> handle_nmt(Frame, Ctx);
 	sync       -> handle_sync(Frame, Ctx);
@@ -1094,15 +1094,15 @@ handle_can(Frame, Ctx) ->
 	lss        -> handle_lss(Frame, Ctx);
 	{rpdo,Offset} -> handle_rpdo(Frame, Offset, COBID, Ctx);
 	{sdo_tx,Rx} ->
-	    if Ctx#co_ctx.state=:= ?Operational; 
-	       Ctx#co_ctx.state =:= ?PreOperational ->	    
+	    if State=:= ?Operational; 
+	       State =:= ?PreOperational ->	    
 		    handle_sdo_tx(Frame, COBID, Rx, Ctx);
 	       true ->
 		    Ctx
 	    end;
 	{sdo_rx,Tx} ->
-	    if Ctx#co_ctx.state=:= ?Operational; 
-	       Ctx#co_ctx.state =:= ?PreOperational ->	    
+	    if State=:= ?Operational; 
+	       State =:= ?PreOperational ->	    
 		    handle_sdo_rx(Frame, COBID, Tx, Ctx);
 	       true ->
 		    Ctx
@@ -1110,7 +1110,7 @@ handle_can(Frame, Ctx) ->
 	_NotKnown ->
 	    case Frame#can_frame.data of
 		%% Test if MPDO
-		<<F:1, Addr:7, Ix:16/little, Si:8, Data:32/little>> ->
+		<<F:1, Addr:7, Ix:16/little, Si:8, Data:4/binary>> ->
 		    case {F, Addr} of
 			{1, 0} ->
 			    %% DAM-MPDO, destination is a group
@@ -1120,21 +1120,20 @@ handle_can(Frame, Ctx) ->
 			    handle_dam_mpdo(Ctx, COBID, {Ix, Si}, Data);
 			{1, _OtherNid} ->
 			    %% DAM-MPDO, destination is some other node
+			    ?dbg(node, "~s: handle_can: DAM-MPDO: destination is "
+				 "other node = ~.16.0#", [_Name, _OtherNid]),
 			    Ctx;
 			{0, 0} ->
 			    %% Reserved
 			    ?dbg(node, "~s: handle_can: SAM-MPDO: Addr = 0, reserved "
-				 "Frame = ~w", [Ctx#co_ctx.name, Frame]),
+				 "Frame = ~w", [_Name, Frame]),
 			    Ctx;
 			{0, SourceNid} ->
-			    ?dbg(node, "~s: handle_can: SAM-MPDO from ~.16.0B "
-				 "not handled yet. Frame = ~w", 
-				 [Ctx#co_ctx.name, SourceNid, Frame]),
 			    handle_sam_mpdo(Ctx, SourceNid, {Ix, Si}, Data)
 		    end;
 		_Other ->
 		    ?dbg(node, "~s: handle_can: frame not handled: Frame = ~w", 
-			 [Ctx#co_ctx.name, Frame]),
+			 [_Name, Frame]),
 		    Ctx
 	    end
     end.
@@ -1142,13 +1141,14 @@ handle_can(Frame, Ctx) ->
 %%
 %% NMT 
 %%
-handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
-    ?dbg(node, "~s: handle_nmt: ~p", [Ctx#co_ctx.name, M]),
+handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId, name=_Name}) 
+  when M#can_frame.len >= 2 ->
+    ?dbg(node, "~s: handle_nmt: ~p", [_Name, M]),
     <<NodeId,Cs,_/binary>> = M#can_frame.data,
-    XNid = add_xflag(Ctx#co_ctx.xnodeid),
+    XNid = add_xflag(XNodeId),
     if NodeId == 0; 
        NodeId == XNid; 
-       NodeId == Ctx#co_ctx.nodeid ->
+       NodeId == SNodeId ->
 	    case Cs of
 		?NMT_RESET_NODE ->
 		    reset_application(Ctx);
@@ -1165,7 +1165,7 @@ handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
 		    Ctx#co_ctx { state = ?Stopped };
 		_ ->
 		    ?dbg(node, "~s: handle_nmt: unknown cs=~w", 
-			 [Ctx#co_ctx.name, Cs]),
+			 [_Name, Cs]),
 		    Ctx
 	    end;
        true ->
@@ -1174,9 +1174,9 @@ handle_nmt(M, Ctx) when M#can_frame.len >= 2 ->
     end.
 
 
-handle_node_guard(Frame, Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId}) 
+handle_node_guard(Frame, Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
-    ?dbg(node, "~s: handle_node_guard: request ~w", [Ctx#co_ctx.name,Frame]),
+    ?dbg(node, "~s: handle_node_guard: request ~w", [_Name,Frame]),
     NodeId = ?NODE_ID(Frame#can_frame.id),
     XNid = add_xflag(XNodeId),
     if NodeId == 0; 
@@ -1328,7 +1328,7 @@ handle_sam_mpdo(Ctx=#co_ctx {mpdo_dispatch = MpdoDispatch, name = _Name},
 	 [_Name,SourceIx,SourceSi,SourceNid,Data]),
     case ets:lookup(MpdoDispatch, {SourceIx, SourceSi, SourceNid}) of
 	[{{SourceIx, SourceSi, SourceNid}, LocalIndex = {LocalIx, LocalSi}}] ->
-	    ?dbg(node, "~s: handle_sam_mpdo: Fopund Index = ~7.16.0#:~w, updating", 
+	    ?dbg(node, "~s: handle_sam_mpdo: Found Index = ~7.16.0#:~w, updating", 
 		 [_Name,LocalIx,LocalSi]),
 	    rpdo_value(LocalIndex,Data,Ctx);
 	[] ->
@@ -1343,18 +1343,9 @@ handle_sam_mpdo(Ctx=#co_ctx {mpdo_dispatch = MpdoDispatch, name = _Name},
 %%
 handle_dam_mpdo(Ctx, CobId, Index = {Ix, Si}, Data) ->
     ?dbg(node, "~s: handle_dam_mpdo: Index = ~7.16.0#:~w", [Ctx#co_ctx.name,Ix,Si]),
-    %% Updating dict. Maybe object_changed instead of notify ??
-    %% How handle CobId ??
-    try co_dict:set_data(Ctx#co_ctx.dict, Index, Data) of
-	ok -> ok;
-	_Error -> 
-	    ?dbg(node, "~s: handle_dam_mpdo: Failed updating index ~7.16.0#:~w, "
-		 "error = ~p", [Ctx#co_ctx.name, Ix, Si, _Error])
-    catch
-	error:_Reason -> 
-	    ?dbg(node, "~s: handle_dam_mpdo: Crashed updating index ~7.16.0#:~w, "
-		 "reason = ~p", [Ctx#co_ctx.name, Ix, Si, _Reason])
-    end,
+
+    %% Special handling for seazone ..
+    %% Change ...
     case lists:usort(subscribers(Ctx#co_ctx.sub_table, Ix) ++
 			 reserver_pid(Ctx#co_ctx.res_table, Ix)) of
 	[] ->
@@ -1375,7 +1366,7 @@ handle_dam_mpdo(Ctx, CobId, Index = {Ix, Si}, Data) ->
 		      end
 	      end, PidList)
     end,
-    Ctx.
+    rpdo_value(Index,Data,Ctx).
 
 %%
 %% Handle terminated processes
@@ -2129,13 +2120,21 @@ update_nmt_value(Key,Value,E) when is_record(E, nmt_entry) ->
 %%
 set_tpdo_data({_Ix, _Si} = I, Data, 
 	       Ctx=#co_ctx {tpdo_cache = Cache, name = _Name}) ->
-    ?dbg(node, "~s: set_tpdo_data: Ix = ~.16#:~w, Data = ~p",
+    ?dbg(node, "~s: set_tpdo_data: Ix = ~.16#:~w, Data = ~w",
 	 [_Name, _Ix, _Si, Data]), 
     case ets:lookup(Cache, I) of
 	[] ->
-	    io:format("WARNING!" 
-		      "~s: set_tpdo_data: unknown tpdo element\n", [_Name]),
-	    {{error,unknown_tpdo_element}, Ctx};
+	    %% Previously unknown tpdo element, probably in sam_mpdo
+	    %% with block size > 1
+	    %% Insert ??
+	    ?dbg(node, "~s: set_tpdo_data: inserting first value for "
+		 "previously unknown tpdo element.",
+		 [_Name]), 
+	    ets:insert(Cache, {I, [Data]}),
+	    {ok, Ctx};
+	    %% io:format("WARNING!" 
+	    %% "~s: set_tpdo_data: unknown tpdo element\n", [_Name]),
+	    %% {{error,unknown_tpdo_element}, Ctx};
 	[{I, OldData}] when length(OldData) >= ?MAX_TPDO_CACHE->
 	    io:format("WARNING!" 
 		      "~s: set_tpdo_data: tpdo cache for ~.16#:~w full.\n", 
@@ -2336,16 +2335,23 @@ tpdo_data({Ix, Si} = I, ResTable, Dict, TpdoCache) ->
 	    %% Value cached??
 	    cache_value(TpdoCache, I);
 	_Other ->
-	    ?dbg(node, "tpdo_value: Other case = ~p", [_Other]),
-	    {error, ?abort_internal_error}
+	    %% How handle ???
+	    io:format("WARNING!" 
+		      "~p: tpdo_value: unknown tpdo element\n", [self()]),
+	    ?dbg(node, "tpdo_value: Other case = ~p, returning default value.", 
+		 [_Other]),
+	    {ok, [0]}
     end.
 
 cache_value(Cache, I) ->
     case ets:lookup(Cache, I) of
 	[] ->
+	    %% How handle ???
 	    io:format("WARNING!" 
-		      "~p: tpdo_value: unknown tpdo element\n", [self()]),
-	    {error,?abort_internal_error};
+		      "~p: cache_value: unknown tpdo element\n", [self()]),
+	    ?dbg(node, "cache_value: tpdo element not found, returning default value.", 
+		 []),
+	    {ok, [0]};
 	[{I,[LastValue | []]}]  ->
 	    %% Leave last value in cache
 	    ?dbg(node, "cache_value: Last value = ~p.", [LastValue]),
