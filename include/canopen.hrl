@@ -236,6 +236,22 @@
 
 -define(EMERGENCY,         2#0001).
 
+%%
+-define(COBID_TO_CANID(ID),
+	if ?is_cobid_extended((ID)) ->
+		((ID) band ?COBID_ENTRY_ID_MASK) bor ?CAN_EFF_FLAG;
+	   true ->
+		((ID) band ?CAN_SFF_MASK)
+	end).
+
+-define(CANID_TO_COBID(ID),
+	if ?is_can_id_eff((ID)) ->
+		((ID) band ?CAN_EFF_MASK) bor ?COBID_ENTRY_EXTENDED;
+	   true ->
+		((ID) band ?CAN_SFF_MASK)
+	end).
+	
+
 %% COB 11-bit, 7 bit node id
 -define(NODE_ID_MASK,  16#7f).
 -define(COB_ID(Func,Nid), (((Func) bsl 7) bor ((Nid) band ?NODE_ID_MASK))).
@@ -519,6 +535,7 @@
 	  tpdo_cache,       %% caching values used in tpdos
 	  res_table,        %% dictionary reservations
 	  sub_table,        %% dictionary subscriptions
+	  xnot_table,       %% extended notify subscriptions
 	  cob_table,        %% COB lookup table
 	  tpdo,             %% tpdo context
 	  tpdo_list=[],     %% [#tpdo{}]

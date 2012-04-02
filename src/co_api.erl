@@ -29,6 +29,7 @@
 %% Application interface
 -export([subscribe/2, unsubscribe/2]).
 -export([reserve/3, unreserve/2]).
+-export([extended_notify_subscribe/3, extended_notify_unsubscribe/2]).
 -export([my_subscriptions/1, my_subscriptions/2]).
 -export([my_reservations/1, my_reservations/2]).
 -export([all_subscribers/1, all_subscribers/2]).
@@ -385,6 +386,35 @@ unsubscribe(Identity, Ix) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% Adds a subscription to changes of the Dictionary Object in position Index.<br/>
+%% Index can also be a range [Index1 - Index2].
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec extended_notify_subscribe(Identity::term(), 
+				Index::integer() | 
+				       list(Index::integer()),
+			       {Module::atom(), Function::atom()}) -> 
+		       ok | {error, Error::atom()}.
+
+extended_notify_subscribe(Identity, Ix, {M,F}) ->
+    gen_server:call(identity_to_pid(Identity), {xnot_subscribe, Ix, {self(), {M, F}}}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Removes a subscription to changes of the Dictionary Object in position Index.<br/>
+%% Index can also be a range [Index1 - Index2].
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec extended_notify_unsubscribe(Identity::term(), Index::integer() | 
+					    list(Index::integer())) -> 
+		       ok | {error, Error::atom()}.
+extended_notify_unsubscribe(Identity, Ix) ->
+    gen_server:call(identity_to_pid(Identity), {xnot_unsubscribe, Ix, self()}).
+
+%%--------------------------------------------------------------------
+%% @doc
 %% Returns the Indexes for which the application idenified by Pid 
 %% has subscriptions.
 %%
@@ -629,8 +659,8 @@ tpdo_set(Identity, {Ix, Si} = I, {Value, Type})
 	Data ->
 	    tpdo_set(Identity, I, Data) 
     catch
-	error:Reason ->
-	    ?dbg(node, "tpdo_set: encode failed, reason = ~p", [Reason]), 
+	error:_Reason ->
+	    ?dbg(node, "tpdo_set: encode failed, reason = ~p", [_Reason]), 
 	    {error, badarg}
     end;
 tpdo_set(Identity, Ix, Term) 

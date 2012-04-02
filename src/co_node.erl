@@ -38,21 +38,6 @@
 -define(RESTART_LIMIT, 10). %% Add clear timer ??
 -define(MAX_TPDO_CACHE, 1024). %% ???
 
--define(COBID_TO_CANID(ID),
-	if ?is_cobid_extended((ID)) ->
-		((ID) band ?COBID_ENTRY_ID_MASK) bor ?CAN_EFF_FLAG;
-	   true ->
-		((ID) band ?CAN_SFF_MASK)
-	end).
-
--define(CANID_TO_COBID(ID),
-	if ?is_can_id_eff((ID)) ->
-		((ID) band ?CAN_EFF_MASK) bor ?COBID_ENTRY_EXTENDED;
-	   true ->
-		((ID) band ?CAN_SFF_MASK)
-	end).
-	
-
 %%====================================================================
 %% API
 %%====================================================================
@@ -67,7 +52,8 @@
 -spec notify(CobId::integer(), Ix::integer(), Si::integer(), Data::binary()) -> 
 		    ok | {error, Error::atom()}.
 
-notify(CobId,Index,Subind,Data) ->
+notify(CobId,Index,Subind,Data)
+  when ?is_index(Index), ?is_subind(Subind), is_binary(Data) ->
     FrameID = ?COBID_TO_CANID(CobId),
     Frame = #can_frame { id=FrameID, len=0, 
 			 data=(<<16#80,Index:16/little,Subind:8,Data:4/binary>>) },
@@ -166,6 +152,7 @@ init({Serial, NodeName, Opts}) ->
 
     Dict = create_dict(),
     SubTable = create_sub_table(),
+    XNotTable = ets:new(co_xnot_table, [public,ordered_set]),
     ResTable =  ets:new(co_res_table, [public,ordered_set]),
     TpdoCache = ets:new(co_tpdo_cache, [public,ordered_set]),
     MpdoDispatch = ets:new(co_mpdo_dispatch, [public,ordered_set]),
@@ -201,6 +188,7 @@ init({Serial, NodeName, Opts}) ->
       nmt_table = ets:new(co_nmt_table, [{keypos,#nmt_entry.id}]),
       sub_table = SubTable,
       res_table = ResTable,
+      xnot_table = XNotTable,
       dict = Dict,
       mpdo_dispatch = MpdoDispatch,
       tpdo_cache = TpdoCache,
@@ -419,6 +407,7 @@ handle_call({detach,Pid}, _From, Ctx) when is_pid(Pid) ->
 	    {reply, {error, not_attached}, Ctx};
 	{value, App} ->
 	    remove_subscriptions(Ctx#co_ctx.sub_table, Pid),
+	    remove_subscriptions(Ctx#co_ctx.xnot_table, Pid),
 	    remove_reservations(Ctx#co_ctx.res_table, Pid),
 	    erlang:demonitor(App#app.mon, [flush]),
 	    Ctx1 = Ctx#co_ctx { app_list = Ctx#co_ctx.app_list -- [App]},
@@ -480,6 +469,44 @@ handle_call({reserver,Ix}, _From, Ctx)  ->
 handle_call({reservers}, _From, Ctx)  ->
     Res = reservers(Ctx#co_ctx.res_table),
     {reply, Res, Ctx};
+
+handle_call({xnot_subscribe,{Ix1, Ix2},{Pid, _MF} = Key}, _From, 
+	    Ctx=#co_ctx {name = _Name}) 
+  when is_pid(Pid) ->
+    ?dbg(node, "~s: handle_call: xnot_subscribe index = ~.16.0#-~.16.0# key = ~p",  
+	 [_Name, Ix1, Ix2, Key]),    
+    Res = add_subscription(Ctx#co_ctx.xnot_table, Ix1, Ix2, Key),
+    {reply, Res, Ctx};
+
+handle_call({xnot_subscribe,Ix,{Pid, _MF} = Key}, _From, Ctx=#co_ctx {name = _Name})
+  when is_pid(Pid) ->
+    ?dbg(node, "~s: handle_call: xnot_subscribe index = ~.16.0# key = ~p",  
+	 [_Name, Ix, Key]),    
+    Res = add_subscription(Ctx#co_ctx.xnot_table, Ix, Key),
+    {reply, Res, Ctx};
+
+handle_call({xnot_unsubscribe,{Ix1, Ix2},{Pid, _MF} = Key}, _From, Ctx) 
+  when is_pid(Pid) ->
+    Res = remove_subscription(Ctx#co_ctx.xnot_table, Ix1, Ix2, Key),
+    {reply, Res, Ctx};
+
+handle_call({xnot_unsubscribe,Ix,{Pid, _MF} = Key}, _From, Ctx) 
+  when is_pid(Pid) ->
+    Res = remove_subscription(Ctx#co_ctx.xnot_table, Ix, Key),
+    {reply, Res, Ctx};
+
+handle_call({xnot_subscriptions,Pid}, _From, Ctx) 
+  when is_pid(Pid) ->
+    Subs = subscriptions(Ctx#co_ctx.xnot_table, {Pid, any}),
+    {reply, Subs, Ctx};
+
+handle_call({xnot_subscribers,Ix}, _From, Ctx)  ->
+    Subs = subscribers(Ctx#co_ctx.xnot_table, Ix),
+    {reply, Subs, Ctx};
+
+handle_call({xnot_subscribers}, _From, Ctx)  ->
+    Subs = subscribers(Ctx#co_ctx.xnot_table),
+    {reply, Subs, Ctx};
 
 handle_call({dump, Qualifier}, _From, Ctx) ->
     io:format("   NAME: ~p\n", [Ctx#co_ctx.name]),
@@ -1107,17 +1134,19 @@ handle_can(Frame, Ctx=#co_ctx {state = State, name = _Name}) ->
 	       true ->
 		    Ctx
 	    end;
-	_NotKnown ->
+	_AssumedMpdo ->
 	    case Frame#can_frame.data of
 		%% Test if MPDO
 		<<F:1, Addr:7, Ix:16/little, Si:8, Data:4/binary>> ->
 		    case {F, Addr} of
 			{1, 0} ->
 			    %% DAM-MPDO, destination is a group
-			    handle_dam_mpdo(Ctx, COBID, {Ix, Si}, Data);
+			    handle_dam_mpdo(Ctx, COBID, {Ix, Si}, Data),
+			    extended_notify(Ctx, Ix, Frame);
 			{1, Nid} when Nid == Ctx#co_ctx.nodeid ->
 			    %% DAM-MPDO, destination is this node
-			    handle_dam_mpdo(Ctx, COBID, {Ix, Si}, Data);
+			    handle_dam_mpdo(Ctx, COBID, {Ix, Si}, Data),
+			    extended_notify(Ctx, Ix, Frame);
 			{1, _OtherNid} ->
 			    %% DAM-MPDO, destination is some other node
 			    ?dbg(node, "~s: handle_can: DAM-MPDO: destination is "
@@ -1327,9 +1356,9 @@ handle_sam_mpdo(Ctx=#co_ctx {mpdo_dispatch = MpdoDispatch, name = _Name},
     ?dbg(node, "~s: handle_sam_mpdo: Index = ~7.16.0#:~w, Nid = ~.16.0#, Data = ~w", 
 	 [_Name,SourceIx,SourceSi,SourceNid,Data]),
     case ets:lookup(MpdoDispatch, {SourceIx, SourceSi, SourceNid}) of
-	[{{SourceIx, SourceSi, SourceNid}, LocalIndex = {LocalIx, LocalSi}}] ->
+	[{{SourceIx, SourceSi, SourceNid}, LocalIndex = {_LocalIx, _LocalSi}}] ->
 	    ?dbg(node, "~s: handle_sam_mpdo: Found Index = ~7.16.0#:~w, updating", 
-		 [_Name,LocalIx,LocalSi]),
+		 [_Name,_LocalIx,_LocalSi]),
 	    rpdo_value(LocalIndex,Data,Ctx);
 	[] ->
 	    Ctx;
@@ -1341,32 +1370,33 @@ handle_sam_mpdo(Ctx=#co_ctx {mpdo_dispatch = MpdoDispatch, name = _Name},
 %%
 %% DAM-MPDO
 %%
-handle_dam_mpdo(Ctx, CobId, Index = {Ix, Si}, Data) ->
-    ?dbg(node, "~s: handle_dam_mpdo: Index = ~7.16.0#:~w", [Ctx#co_ctx.name,Ix,Si]),
+handle_dam_mpdo(Ctx, CobId, Index = {_Ix, _Si}, Data) ->
+    ?dbg(node, "~s: handle_dam_mpdo: Index = ~7.16.0#:~w", [Ctx#co_ctx.name,_Ix,_Si]),
+    %% Enough ??
+    rpdo_value(Index,Data,Ctx).
 
-    %% Special handling for seazone ..
-    %% Change ...
-    case lists:usort(subscribers(Ctx#co_ctx.sub_table, Ix) ++
-			 reserver_pid(Ctx#co_ctx.res_table, Ix)) of
+extended_notify(Ctx=#co_ctx {xnot_table = XNotTable, name = _Name}, Ix, Frame) ->
+    case lists:usort(subscribers(XNotTable, Ix)) of
 	[] ->
-	    ?dbg(node, "~s: handle_dam_mpdo: No subscribers for index ~7.16.0#", 
-		 [Ctx#co_ctx.name, Ix]);
+	    ?dbg(node, "~s: extended_notify: No xnot subscribers for index ~7.16.0#", 
+		 [_Name, Ix]);
 	PidList ->
 	    lists:foreach(
-	      fun(Pid) ->
+	      fun({Pid, {M, F}}) ->
 		      case Pid of
 			  dead ->
 			      %% Warning ??
-			      ?dbg(node, "~s: handle_dam_mpdo: Process subscribing "
-				   "to index ~7.16.0# is dead", [Ctx#co_ctx.name, Ix]);
+			      ?dbg(node, "~s: extended_notify: Process subscribing "
+				   "to index ~7.16.0# is dead", [_Name, Ix]);
 			  P when is_pid(P)->
-			      ?dbg(node, "~s: handle_dam_mpdo: Process ~p subscribes "
-				   "to index ~7.16.0#", [Ctx#co_ctx.name, Pid, Ix]),
-			      Pid ! {notify, CobId, Ix, Si, Data}
+			      ?dbg(node, "~s: extended_notify: Process ~p subscribes "
+				   "to index ~7.16.0#", [_Name, Pid, Ix]),
+			      M:F(Pid, Frame)
 		      end
 	      end, PidList)
     end,
-    rpdo_value(Index,Data,Ctx).
+    Ctx.
+    
 
 %%
 %% Handle terminated processes
@@ -1666,7 +1696,7 @@ update_mpdo_disp1(Ctx=#co_ctx {dict = Dict, mpdo_dispatch = MpdoDisp, name = _Na
     end,
     update_mpdo_disp1(Ctx, Ixs).
     
-insert_mpdo_disp(MpdoDisp,[]) ->
+insert_mpdo_disp(_MpdoDisp,[]) ->
     ok;
 insert_mpdo_disp(MpdoDisp,[Entry | EntryList]) ->	    
     ets:insert(MpdoDisp, Entry),
@@ -1865,53 +1895,53 @@ load_list(_Dict, [], Acc) ->
 
 
 
-add_subscription(Tab, Ix, Pid) ->
-    add_subscription(Tab, Ix, Ix, Pid).
+add_subscription(Tab, Ix, Key) ->
+    add_subscription(Tab, Ix, Ix, Key).
 
-add_subscription(Tab, Ix1, Ix2, Pid) when ?is_index(Ix1), ?is_index(Ix2), 
-					  Ix1 =< Ix2, 
-					  (is_pid(Pid) orelse is_atom(Pid)) ->
+add_subscription(Tab, Ix1, Ix2, Key) 
+  when ?is_index(Ix1), ?is_index(Ix2), 
+       Ix1 =< Ix2 ->
     ?dbg(node, "add_subscription: ~7.16.0#:~7.16.0# for ~w", 
-	 [Ix1, Ix2, Pid]),
+	 [Ix1, Ix2, Key]),
     I = co_iset:new(Ix1, Ix2),
-    case ets:lookup(Tab, Pid) of
-	[] -> ets:insert(Tab, {Pid, I});
-	[{_,ISet}] -> ets:insert(Tab, {Pid, co_iset:union(ISet, I)})
+    case ets:lookup(Tab, Key) of
+	[] -> ets:insert(Tab, {Key, I});
+	[{_,ISet}] -> ets:insert(Tab, {Key, co_iset:union(ISet, I)})
     end.
 
     
-remove_subscriptions(Tab, Pid) ->
-    ets:delete(Tab, Pid).
+remove_subscriptions(Tab, Key) ->
+    ets:delete(Tab, Key).
 
-remove_subscription(Tab, Ix, Pid) ->
-    remove_subscription(Tab, Ix, Ix, Pid).
+remove_subscription(Tab, Ix, Key) ->
+    remove_subscription(Tab, Ix, Ix, Key).
 
-remove_subscription(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
+remove_subscription(Tab, Ix1, Ix2, Key) when Ix1 =< Ix2 ->
     ?dbg(node, "remove_subscription: ~7.16.0#:~7.16.0# for ~w", 
-	 [Ix1, Ix2, Pid]),
-    case ets:lookup(Tab, Pid) of
+	 [Ix1, Ix2, Key]),
+    case ets:lookup(Tab, Key) of
 	[] -> ok;
-	[{Pid,ISet}] -> 
+	[{Key,ISet}] -> 
 	    case co_iset:difference(ISet, co_iset:new(Ix1, Ix2)) of
 		[] ->
 		    ?dbg(node, "remove_subscription: last index for ~w", 
-			 [Pid]),
-		    ets:delete(Tab, Pid);
+			 [Key]),
+		    ets:delete(Tab, Key);
 		ISet1 -> 
 		    ?dbg(node, "remove_subscription: new index set ~p for ~w", 
-			 [ISet1,Pid]),
-		    ets:insert(Tab, {Pid,ISet1})
+			 [ISet1,Key]),
+		    ets:insert(Tab, {Key,ISet1})
 	    end
     end.
 
-subscriptions(Tab, Pid) when is_pid(Pid) ->
-    case ets:lookup(Tab, Pid) of
+subscriptions(Tab, Key) when is_pid(Key) ->
+    case ets:lookup(Tab, Key) of
 	[] -> [];
-	[{Pid, Iset, _Opts}] -> Iset
+	[{Key, Iset, _Opts}] -> Iset
     end.
 
 subscribers(Tab) ->
-    lists:usort([Pid || {Pid, _Ixs} <- ets:tab2list(Tab)]).
+    lists:usort([Key || {Key, _Ixs} <- ets:tab2list(Tab)]).
 
 inform_subscribers(I, _Ctx=#co_ctx {name = _Name, sub_table = STable}) ->
     lists:foreach(
