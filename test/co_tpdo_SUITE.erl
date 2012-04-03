@@ -64,6 +64,7 @@ all() ->
      send_tpdo4,
      send_multi,
      send_dam_mpdo,
+     send_dam_mpdo_broadcast,
      send_sam_mpdo
     ].
 %%     break].
@@ -345,13 +346,27 @@ send_multi(Config) ->
   
 %%--------------------------------------------------------------------
 %% @doc 
-%% Verifies sending of dam_mpdo 
+%% Verifies sending of dam_mpdo broadcast.
+%% @end
+%%--------------------------------------------------------------------
+-spec send_dam_mpdo_broadcast(Config::list(tuple())) -> ok.
+
+send_dam_mpdo_broadcast(Config) ->
+    send_dam_mpdo(Config, dam_mpdo, broadcast).
+
+%%--------------------------------------------------------------------
+%% @doc 
+%% Verifies sending of dam_mpdo to one node.
 %% @end
 %%--------------------------------------------------------------------
 -spec send_dam_mpdo(Config::list(tuple())) -> ok.
 
 send_dam_mpdo(Config) ->
-    send_dam_mpdo(Config, dam_mpdo, broadcast).
+    %% Make sure the receiving node has a short nodeid
+    NodeId = co_lib:serial_to_nodeid(?RPDO_NODE),
+    ok = co_api:set_option(?RPDO_NODE, nodeid, NodeId),
+    timer:sleep(1000),
+    send_dam_mpdo(Config, dam_mpdo, NodeId).
 
 %%--------------------------------------------------------------------
 %% @doc 
@@ -397,7 +412,7 @@ send_tpdo(Config, Tpdo) ->
     set(Config, SourceList),
 
     %% Send tpdo with new value
-    co_api:pdo_event(serial(), CobId),
+    ok = co_api:pdo_event(serial(), CobId),
 
     rec(TargetList),
 
@@ -412,7 +427,7 @@ send_dam_mpdo(Config, Tpdo, Destination) ->
     set(Config, SourceList),
 
     %% Send tpdo with new value
-    co_api:dam_mpdo_event(serial(), CobId, Destination),
+    ok = co_api:dam_mpdo_event(serial(), CobId, Destination),
 
     rec(TargetList),
 

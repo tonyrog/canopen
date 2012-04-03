@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% @author Marina Westman Lönne <malotte@malotte.net>
+%%% @author Malotte Westman Lönne <malotte@malotte.net>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
 %%% Intermediate data storage for an SDO session process.<br/>

@@ -3,10 +3,9 @@
 %%% @copyright (C) 2010, Tony Rogvall
 %%% @doc
 %%%    Formatting
-%%% Created : 13 Feb 2009 by Tony Rogvall <tony@rogvall.se> 
+%%% Created : 13 Feb 2009 by Tony Rogvall 
 %%% @end
 %%%-------------------------------------------------------------------
-
 -module(co_format).
 
 -include_lib("can/include/can.hrl").
@@ -55,38 +54,54 @@ format_field(R, I, subind) ->
 format_field(R, I, F) ->
     [atom_to_list(F), "=", io_lib:format("~p", [element(I,R)])].
 
--define(FREC(R,Rn),
-	#Rn{} -> format_record(R,record_info(fields,Rn))).
 
 format_sdo(R) ->
     case R of
-	?FREC(R,sdo_scs_initiate_upload_response);
-	?FREC(R,sdo_scs_initiate_download_response);
-	?FREC(R,sdo_scs_upload_segment_response);
-	?FREC(R,sdo_scs_block_initiate_download_response);
-	?FREC(R,sdo_scs_block_download_end_response);
-	?FREC(R,sdo_scs_block_download_response);
-	?FREC(R,sdo_scs_block_upload_response);
-	?FREC(R,sdo_scs_block_upload_end_request);
-
-	?FREC(R,sdo_ccs_download_segment_request);
-	?FREC(R,sdo_ccs_upload_segment_request);
-	?FREC(R,sdo_ccs_initiate_download_request);
-	?FREC(R,sdo_ccs_initiate_upload_request);
-	?FREC(R,sdo_ccs_block_upload_request);
-	?FREC(R,sdo_ccs_block_upload_end_response);
-	?FREC(R,sdo_ccs_block_upload_start);
-	?FREC(R,sdo_ccs_block_upload_response);
-	?FREC(R,sdo_ccs_block_download_request);
-	?FREC(R,sdo_ccs_block_download_end_request);
-
-	?FREC(R,sdo_block_segment);
-	?FREC(R,sdo_scs_download_segment_response);
-        ?FREC(R,sdo_abort);
+	#sdo_scs_initiate_upload_response{} -> 
+	    format_record(R,record_info(fields,sdo_scs_initiate_upload_response));
+	#sdo_scs_initiate_download_response{} -> 
+	    format_record(R,record_info(fields,sdo_scs_initiate_download_response));
+	#sdo_scs_upload_segment_response{} -> 
+	    format_record(R,record_info(fields,sdo_scs_upload_segment_response));
+	#sdo_scs_block_initiate_download_response{} -> 
+	    format_record(R,record_info(fields,sdo_scs_block_initiate_download_response));
+	#sdo_scs_block_download_end_response{} -> 
+	    format_record(R,record_info(fields,sdo_scs_block_download_end_response));
+	#sdo_scs_block_download_response{} -> 
+	    format_record(R,record_info(fields,sdo_scs_block_download_response));
+	#sdo_scs_block_upload_response{} -> 
+	    format_record(R,record_info(fields,sdo_scs_block_upload_response));
+	#sdo_scs_block_upload_end_request{} -> 
+	    format_record(R,record_info(fields,sdo_scs_block_upload_end_request));
+	#sdo_ccs_download_segment_request{} -> 
+	    format_record(R,record_info(fields,sdo_ccs_download_segment_request));
+	#sdo_ccs_upload_segment_request{} -> 
+	    format_record(R,record_info(fields,sdo_ccs_upload_segment_request));
+	#sdo_ccs_initiate_download_request{} -> 
+	    format_record(R,record_info(fields,sdo_ccs_initiate_download_request));
+	#sdo_ccs_initiate_upload_request{} -> 
+	    format_record(R,record_info(fields,sdo_ccs_initiate_upload_request));
+	#sdo_ccs_block_upload_request{} -> 
+	    format_record(R,record_info(fields,sdo_ccs_block_upload_request));
+	#sdo_ccs_block_upload_end_response{} -> 
+	    format_record(R,record_info(fields,sdo_ccs_block_upload_end_response));
+	#sdo_ccs_block_upload_start{} -> 
+	    format_record(R,record_info(fields,sdo_ccs_block_upload_start));
+	#sdo_ccs_block_upload_response{} -> 
+	    format_record(R,record_info(fields,sdo_ccs_block_upload_response));
+	#sdo_ccs_block_download_request{} -> 
+	    format_record(R,record_info(fields,sdo_ccs_block_download_request));
+	#sdo_ccs_block_download_end_request{} -> 
+	    format_record(R,record_info(fields,sdo_ccs_block_download_end_request));
+	#sdo_block_segment{} -> 
+	    format_record(R,record_info(fields,sdo_block_segment));
+	#sdo_scs_download_segment_response{} -> 
+	    format_record(R,record_info(fields,sdo_scs_download_segment_response));
+	#sdo_abort{} -> 
+	    format_record(R,record_info(fields,sdo_abort));
 	_ ->
 	    io_lib:format("~p", [R])
     end.
-		
 
     
      

@@ -1,5 +1,6 @@
 %%%------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
+%%% @author Malotte Westman Lönne <malotte@malotte.net>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
 %%% CANopen script interpretor.
@@ -28,8 +29,21 @@
 
 -endif.
 
+%%====================================================================
+%% API
+%%====================================================================
+%% @private
+-spec run() -> ok.
 run() ->
     usage().
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Runs the command specified in File(s) and halts.
+%% @end
+%%--------------------------------------------------------------------
+-spec run(list(File::atom() | string())) ->
+	ok | {error, Reason::term()}.
 
 run([File]) when is_atom(File) ->
     script(atom_to_list(File));
@@ -38,15 +52,38 @@ run([File]) when is_list(File) ->
 run([]) ->
     usage().
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Gives usage info.
+%% @end
+%%--------------------------------------------------------------------
+-spec usage() -> ok.
+
 usage() ->
     io:format("usage: co_script <file>\n", []),
     ok.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Runs the command specified in File and halts.
+%% @end
+%%--------------------------------------------------------------------
+-spec script(File::string()) ->
+	ok | {error, Reason::term()}.
 
 script(File) ->
     case file(File) of
 	ok -> hlt(0);
 	_Error -> hlt(1)
     end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Runs the command specified in File.
+%% @end
+%%--------------------------------------------------------------------
+-spec file(File::string()) ->
+	ok | {error, Reason::term()}.
 
 file(File) ->
     FileName =
@@ -69,7 +106,7 @@ file(File) ->
 hlt(N) ->
     halt(N).
 
-
+%% @private
 string(Cs) ->
     string("*stdin*", Cs).
 
@@ -166,12 +203,12 @@ eval_func(fetch, [Index,SubInd]) ->
     co_mgr:client_fetch(Index,SubInd);
 eval_func(fetch, [Index]) ->
      co_mgr:client_fetch(Index);
-eval_func(noify, [Nid,Index,SubInd,Value]) ->
-    co_mgr:client_notify(Nid,Index,SubInd,Value);
-eval_func(notify, [Index,SubInd,Value]) ->
-    co_mgr:client_notify(Index,SubInd,Value);
-eval_func(notify, [Index,Value]) ->
-    co_mgr:client_notify(Index,Value).
+eval_func(noify, [Nid,Func,Index,SubInd,Value]) ->
+    co_mgr:client_notify(Nid,Func,Index,SubInd,Value);
+eval_func(notify, [Func,Index,SubInd,Value]) ->
+    co_mgr:client_notify(Func,Index,SubInd,Value);
+eval_func(notify, [Func,Index,Value]) ->
+    co_mgr:client_notify(Func,Index,Value).
 
 
 

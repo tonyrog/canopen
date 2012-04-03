@@ -1,5 +1,6 @@
 %%%-------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
+%%% @author Malotte W Lönne <malotte@malotte.net>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
 %%% CANopen utilities.
@@ -17,11 +18,6 @@
 -export([serial_to_nodeid/1]).
 -export([cobid_to_nodeid/1]).
 -export([cobid/2]).
--export([load_definition/1]).
--export([load_def_mod/2]).
--export([object/2]).
--export([entry/2,entry/3]).
--export([enum_by_id/2]).
 -export([encode_type/1]).
 -export([encode_struct/1]).
 -export([encode_access/1]).
@@ -30,30 +26,73 @@
 -export([decode_type/1]).
 -export([decode_struct/1]).
 -export([decode_access/1]).
+-export([decode_transmission/1]).
+-export([load_definition/1,load_definition/2]).
+-export([object/2]).
+-export([entry/2,entry/3]).
+-export([enum_by_id/2]).
 
 -include("canopen.hrl").
 -include("co_debug.hrl").
 
+
+%%--------------------------------------------------------------------
+%% @doc
 %% Convert 4 bytes serial number to a string xx:xx:xx:xx
+%% @end
+%%--------------------------------------------------------------------
+-spec serial_to_string(Serial::binary() | integer()) ->
+			      String::string().
+
 serial_to_string(<<Serial:32>>) ->
     serial_to_string(Serial);
 serial_to_string(Serial) when is_integer(Serial) ->
     lists:flatten(io_lib:format("~8.16.0B", [Serial band 16#ffffffff])).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Convert a string xx:xx:xx:xx to 4 bytes serial number
+%% @end
+%%--------------------------------------------------------------------
+-spec string_to_serial(String::string()) ->
+			      Serial::integer().
+
 string_to_serial(String) when is_list(String) ->
     erlang:list_to_integer(String, 16).
 
+%%--------------------------------------------------------------------
+%% @doc
 %% Convert Serial to extended nodeid 
 %% (remove least significant byte)
-serial_to_xnodeid(Serial) ->
+%% @end
+%%--------------------------------------------------------------------
+-spec serial_to_xnodeid(Serial::integer()) ->
+			       XNodeId::integer().
+
+serial_to_xnodeid(Serial) when is_integer(Serial)->
     (Serial bsr 8).
 
+%%--------------------------------------------------------------------
+%% @doc
 %% Convert Serial to nodeid 
 %% (remove least significant byte and cut to 7)
-serial_to_nodeid(Serial) ->
+%% @end
+%%--------------------------------------------------------------------
+-spec serial_to_nodeid(Serial::integer()) ->
+			      NodeId::integer().
+
+serial_to_nodeid(Serial) when is_integer(Serial) ->
     ((Serial bsr 8) band 16#7f).
 
-cobid_to_nodeid(CobId) ->
+%%--------------------------------------------------------------------
+%% @doc
+%% Retreive nodeid from cobid.
+%% @end
+%%--------------------------------------------------------------------
+-spec cobid_to_nodeid(Cobid::integer()) ->
+			     NodeId::integer().
+
+cobid_to_nodeid(CobId) when is_integer(CobId)->
     if ?is_cobid_extended((CobId)) ->
 	    ?XNODE_ID(CobId);
        ?is_not_cobid_extended((CobId)) ->
@@ -62,30 +101,54 @@ cobid_to_nodeid(CobId) ->
 	    undefined
     end.
 
-%% 
+%%--------------------------------------------------------------------
+%% @doc
 %% Combine nodeid with function code
-cobid(F, NodeID) ->
+%% @end
+%%--------------------------------------------------------------------
+-spec cobid(Func::atom(), NodeId::integer()) ->
+	      CobId::integer().
+cobid(F, NodeId) when is_atom(F), is_integer(NodeId)->
     Func = co_lib:encode_func(F),
-    if ?is_nodeid_extended(NodeID) ->
-	    NodeID1 = NodeID band ?COBID_ENTRY_ID_MASK,
-	    ?XCOB_ID(Func,NodeID1);
-       ?is_nodeid(NodeID) ->
-	    ?COB_ID(Func,NodeID);
+    if ?is_nodeid_extended(NodeId) ->
+	    XNodeId = NodeId band ?COBID_ENTRY_ID_MASK,
+	    ?XCOB_ID(Func,XNodeId);
+       ?is_nodeid(NodeId) ->
+	    ?COB_ID(Func,NodeId);
        true ->
 	    erlang:error(badarg)
     end.
 
-%% Encode/Decode category
+%%--------------------------------------------------------------------
+%% @doc
+%% Encode category 
+%% @end
+%%--------------------------------------------------------------------
+-spec encode_category(C::atom()) -> Category::integer().
+
 encode_category(optional) -> ?CATEGORY_OPTIONAL;
 encode_category(mandatory) -> ?CATEGORY_MANDATORY;
 encode_category(conditional) ->  ?CATEGORY_CONDITIONAL.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Decode category 
+%% @end
+%%--------------------------------------------------------------------
+-spec decode_category(C::integer()) -> Category::atom().
 
 decode_category(?CATEGORY_OPTIONAL) -> optional;
 decode_category(?CATEGORY_MANDATORY) -> mandatory;
 decode_category(?CATEGORY_CONDITIONAL) -> conditional.
 
 
-%% Encode/Decode access field
+%%--------------------------------------------------------------------
+%% @doc
+%% Encode access field
+%% @end
+%%--------------------------------------------------------------------
+-spec encode_access(A::atom()) -> Access::integer().
+
 encode_access(A) when is_integer(A), A band 16#f == A ->
     A;
 encode_access(rw)    -> ?ACCESS_RW;
@@ -100,6 +163,13 @@ encode_access(const) -> ?ACCESS_C;   %% alias
 encode_access([A|As]) ->
     encode_access(A) bor encode_access(As);
 encode_access([]) -> 0.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Decode access field
+%% @end
+%%--------------------------------------------------------------------
+-spec decode_access(A::integer()) -> Access::atom().
 
 decode_access(A) when is_integer(A) ->
     A1 = 
@@ -124,7 +194,15 @@ decode_access(A) when is_integer(A) ->
 	true -> [A1|L]
     end.
 
-%% Encode/Decode standard type field
+%%--------------------------------------------------------------------
+%% @doc
+%% Encode standard type field
+%% @end
+%%--------------------------------------------------------------------
+-spec encode_type(T::atom() |
+		     {enum, Base::integer(), Name::atom()} |
+		     {bitfield, Base::integer(), Name::atom()}) -> 
+			 Type::integer().
 
 encode_type(T) when is_integer(T), T band 16#ff == T ->
     T;
@@ -175,6 +253,13 @@ simple_type(T) ->
 	_Complex -> false
     end.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Decode standard type field
+%% @end
+%%--------------------------------------------------------------------
+-spec decode_type(T::integer()) -> Type::atom().
+
 decode_type(?BOOLEAN) -> boolean;
 decode_type(?INTEGER8) -> integer8;
 decode_type(?INTEGER16) -> integer16;
@@ -206,13 +291,37 @@ decode_type(?PDO_MAPPING) -> pdo_mapping;
 decode_type(?SDO_PARAMETER) -> sdo_parameter;
 decode_type(?IDENTITY) -> identity.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Encode pdo mapping flag
+%% @end
+%%--------------------------------------------------------------------
+-spec encode_pdo_mapping(P::atom()) -> 
+				PdoMap::integer().
+
 encode_pdo_mapping(no) -> ?MAPPING_NO;
 encode_pdo_mapping(optional) -> ?MAPPING_OPTIONAL;
 encode_pdo_mapping(default) -> ?MAPPING_DEFAULT.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Decode pdo mapping flag
+%% @end
+%%--------------------------------------------------------------------
+-spec decode_pdo_mapping(P::integer()) -> 
+				PdoMap::atom().
+
 decode_pdo_mapping(?MAPPING_NO) -> no;
 decode_pdo_mapping(?MAPPING_OPTIONAL) -> optional;
 decode_pdo_mapping(?MAPPING_DEFAULT) -> default.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Encode struct
+%% @end
+%%--------------------------------------------------------------------
+-spec encode_struct(S::atom()) -> 
+			   Struct::integer().
 
 encode_struct(null)      -> ?OBJECT_NULL;
 encode_struct(domain)    -> ?OBJECT_DOMAIN;
@@ -223,6 +332,14 @@ encode_struct(array)     -> ?OBJECT_ARRAY;
 encode_struct(rec)       -> ?OBJECT_RECORD;
 encode_struct(defpdo)    -> ?OBJECT_DEFPDO.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Decode struct
+%% @end
+%%--------------------------------------------------------------------
+-spec decode_struct(S::integer()) -> 
+				Struct::atom().
+
 decode_struct(?OBJECT_NULL)      -> null;
 decode_struct(?OBJECT_DOMAIN)    -> domain;
 decode_struct(?OBJECT_DEFTYPE)   -> deftype;
@@ -231,7 +348,15 @@ decode_struct(?OBJECT_VAR)       -> var;
 decode_struct(?OBJECT_ARRAY)     -> array;
 decode_struct(?OBJECT_RECORD)    -> rec.
 
+
+%%--------------------------------------------------------------------
+%% @doc
 %% Encode PDO parameter transmission type
+%% @end
+%%--------------------------------------------------------------------
+-spec encode_transmission(T::atom()) -> 
+				 Transmission::integer().
+
 encode_transmission(specific)  -> ?TRANS_EVENT_SPECIFIC;
 encode_transmission(profile)   -> ?TRANS_EVENT_PROFILE;
 encode_transmission(rtr)       -> ?TRANS_RTR;
@@ -242,6 +367,14 @@ encode_transmission({sync,N}) when is_integer(N),N >= 0,N =< ?TRANS_SYNC_MAX->
 encode_transmission(N) when is_integer(N), N >= 0, N =< 255 ->
     N.
 %% Decode PDO parameter transmission type
+%%--------------------------------------------------------------------
+%% @doc
+%% Decode PDO parameter transmission type
+%% @end
+%%--------------------------------------------------------------------
+-spec decode_transmission(T::integer()) -> 
+				Transmission::atom().
+
 decode_transmission(?TRANS_EVENT_SPECIFIC) -> specific;
 decode_transmission(?TRANS_EVENT_PROFILE) -> profile;
 decode_transmission(?TRANS_RTR) -> rtr;
@@ -255,7 +388,6 @@ decode_transmission(N) when is_integer(N), N >= 0, N =< 255 ->
 %%--------------------------------------------------------------------
 %% @doc
 %% Encode function codes.
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec encode_func(Func::atom()) -> FuncCode::integer().
@@ -279,14 +411,6 @@ encode_func(emergency) -> ?EMERGENCY;
 encode_func(F) when F >= 0, F < 15 -> F;
 encode_func(_) -> erlang:error(badarg).
 
-%% Encode COBID
-%% encode_cobid(pdo1)
-%% Decode COBID
-
-%%
-%% Load all description objects in a def file
-%%
-%%
 
 -record(def_mod,
 	{
@@ -313,12 +437,149 @@ new_def_mod(Module) ->
 	       objects = [] }.
 
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Load all description objects in a def file
+%% @end
+%%--------------------------------------------------------------------
+-spec load_definition(File::string()) -> 
+			     {ok, DefinitionContext::term()}.
+
 load_definition(File) ->
     load_definition(filename:basename(File),[filename:dirname(File)]).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Load all description objects in a def file
+%% @end
+%%--------------------------------------------------------------------
+-spec load_definition(File::string(), Path::list(Dir::string())) -> 
+			     {ok, DefinitionContext::term()}.
 
 load_definition(File,Path) ->
     load_def_mod(list_to_atom(File), #def_ctx { path=Path }).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Locate object in a def context.
+%% @end
+%%--------------------------------------------------------------------
+-spec object(Key::integer() | atom(), DefCtx::term()) ->
+		    Obj::record() | {error, Reason::term()}.
+
+object(Key, DefCtx=#def_ctx {modules = Modules}) 
+  when ?is_index(Key) ->
+    ?dbg(lib,"object: searching for index ~p in whole context", [Key]),
+    case find_in_mods(Key, #def_mod.ixs, Modules) of
+	{error, _Error} = E -> E;
+	{ok, Id} -> object(Id, DefCtx#def_ctx.modules)
+    end;
+object(Key, _DefCtx=#def_ctx {modules = Modules})  ->
+    ?dbg(lib,"object: searching for ~p in whole context", [Key]),
+    object(Key, Modules);
+object(_Key, []) ->
+    {error, not_found};
+object(Key, [{_ModName, DefMod=#def_mod {objects = Objects}} | DefMods]) 
+  when is_record(DefMod, def_mod)->
+    ?dbg(lib,"object: searching for ~p in ~p", [Key, _ModName]),
+    case object(Key, Objects) of
+	false ->
+	    object(Key, DefMods);
+	Obj when is_record(Obj, objdef) ->
+	    Obj;
+	{error, _Error} = E -> 
+	    E
+    end;
+object(Id, ObjList) 
+  when is_atom(Id) andalso is_list(ObjList) ->
+    ?dbg(lib,"object: searching for ~p", [Id]),
+    lists:keyfind(Id, #objdef.id, ObjList);
+object(Name, ObjList)
+  when is_list(Name) andalso is_list(ObjList) ->
+    ?dbg(lib,"object: searching for ~p", [Name]),
+    lists:keyfind(Name, #objdef.name, ObjList);
+object(Index, [Obj| Objects]) 
+  when ?is_index(Index) andalso is_record(Obj, objdef)->
+    ?dbg(lib,"object: searching for ~p", [Index]),
+    %% Index can be a range
+    case match_index(Index, Obj#objdef.index) of
+	true -> Obj;
+	false -> object(Index, Objects)
+    end.
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Locate entry in a def context.
+%% @end
+%%--------------------------------------------------------------------
+-spec entry(Key::integer() | atom(), Obj::record(), DefCtx::term()) ->
+		    Entry::record() | {error, Reason::term()}.
+
+entry(Key, _Obj=#objdef {entries = [], type = Type}, DefCtx) 
+  when is_record(DefCtx, def_ctx) ->
+    ?dbg(lib,"entry: searching for ~p when no entries", [Key]),
+    case object(Type, DefCtx) of
+	{error, _Error} = E -> E;
+	TypeObj -> entry(Key, TypeObj)
+    end;
+entry(Key, Obj=#objdef {entries = _E}, DefCtx) 
+  when is_record(DefCtx, def_ctx) ->
+    ?dbg(lib,"entry: searching for ~p when entries ~p", [Key,_E]),
+    entry(Key, Obj);
+entry(Index, SubInd, DefCtx) 
+  when is_record(DefCtx, def_ctx)->
+    ?dbg(lib,"entry: searching for ~p:~p", [Index, SubInd]),
+    case object(Index, DefCtx) of
+	{error, _Error} = E -> E;
+	Obj ->
+	   entry(SubInd, Obj, DefCtx)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Locate entry in a def context.
+%% @end
+%%--------------------------------------------------------------------
+-spec entry(Key::integer() | atom(), DefCtx::term()) ->
+		    Entry::record() | {error, Reason::term()}.
+
+entry(_Key, []) ->
+    {error, not_found};
+entry(Name, _Obj=#objdef {entries = Entries}) 
+  when is_list(Name)->
+    ?dbg(lib,"entry: searching for ~p when name", [Name]),
+    lists:keyfind(Name, #entdef.name, Entries);
+entry(Id, _Obj=#objdef {entries = Entries}) 
+  when is_atom(Id)->
+    ?dbg(lib,"entry: searching for ~p when id", [Id]),
+    lists:keyfind(Id, #entdef.id, Entries);
+entry(SubIndex, _Obj=#objdef {entries = Entries}) 
+  when ?is_subind(SubIndex) ->
+    ?dbg(lib,"entry: searching for ~p when index", [SubIndex]),
+    entry(SubIndex, Entries);
+entry(SubIndex, [Ent|Entries]) 
+  when ?is_subind(SubIndex) ->
+    ?dbg(lib,"entry: searching for ~p when index", [SubIndex]),
+    %% Index can be a range
+    case match_index(SubIndex, Ent#entdef.index) of
+	true -> Ent;
+	false -> entry(SubIndex, Entries)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Locate enum definition in a def context.
+%% @end
+%%--------------------------------------------------------------------
+-spec enum_by_id(Key::atom(), DefCtx::term()) ->
+			list(Enums::{Name::atom(), Value::integer()}) | 
+			{error, Reason::term()}.
+
+enum_by_id(Id, DefCtx) when is_atom(Id) ->
+    find_in_mods(Id, #def_mod.enums, DefCtx#def_ctx.modules).    
+
+%% @private
 load_def_mod(Module, DefCtx) when is_atom(Module) ->
     File = atom_to_list(Module) ++ ".def",
     case file:path_consult(DefCtx#def_ctx.path, File) of
@@ -349,7 +610,7 @@ def_mod([{module, Module}|Forms], DMod, DefCtx) when is_atom(Module) ->
 	_DefMod ->
 	    erlang:error({module_already_defined, Module}) 
     end;
-def_mod([_AnyButModule|Forms], undefined, _DefCtx) ->
+def_mod([_AnyButModule|_Forms], undefined, _DefCtx) ->
     erlang:error(module_tag_required);
 %% {require, def} - load a module
 def_mod([{require, Module}|Forms], DMod, DefCtx) when is_atom(Module) ->
@@ -855,91 +1116,6 @@ in_range(A, [{B,_}|_]) when A < B -> false;
 in_range(A, [_ | Rs]) -> in_range(A, Rs);
 in_range(_A, _) -> false.
 
-%% return #objdef | error
-object(Key, DefCtx=#def_ctx {modules = Modules}) 
-  when ?is_index(Key) ->
-    ?dbg(lib,"object: searching for index ~p in whole context", [Key]),
-    case find_in_mods(Key, #def_mod.ixs, Modules) of
-	{error, _Error} = E -> E;
-	{ok, Id} -> object(Id, DefCtx#def_ctx.modules)
-    end;
-object(Key, _DefCtx=#def_ctx {modules = Modules})  ->
-    ?dbg(lib,"object: searching for ~p in whole context", [Key]),
-    object(Key, Modules);
-object(_Key, []) ->
-    {error, not_found};
-object(Key, [{ModName, DefMod=#def_mod {objects = Objects}} | DefMods]) 
-  when is_record(DefMod, def_mod)->
-    ?dbg(lib,"object: searching for ~p in ~p", [Key, ModName]),
-    case object(Key, Objects) of
-	false ->
-	    object(Key, DefMods);
-	Obj when is_record(Obj, objdef) ->
-	    Obj;
-	{error, _Error} = E -> 
-	    E
-    end;
-object(Id, ObjList) 
-  when is_atom(Id) andalso is_list(ObjList) ->
-    ?dbg(lib,"object: searching for ~p", [Id]),
-    lists:keyfind(Id, #objdef.id, ObjList);
-object(Name, ObjList)
-  when is_list(Name) andalso is_list(ObjList) ->
-    ?dbg(lib,"object: searching for ~p", [Name]),
-    lists:keyfind(Name, #objdef.name, ObjList);
-object(Index, [Obj| Objects]) 
-  when ?is_index(Index) andalso is_record(Obj, objdef)->
-    ?dbg(lib,"object: searching for ~p", [Index]),
-    %% Index can be a range
-    case match_index(Index, Obj#objdef.index) of
-	true -> Obj;
-	false -> object(Index, Objects)
-    end.
-
-
-entry(Key, _Obj=#objdef {entries = [], type = Type}, DefCtx) 
-  when is_record(DefCtx, def_ctx) ->
-    ?dbg(lib,"entry: searching for ~p when no entries", [Key]),
-    case object(Type, DefCtx) of
-	{error, _Error} = E -> E;
-	TypeObj -> entry(Key, TypeObj)
-    end;
-entry(Key, Obj=#objdef {entries = E}, DefCtx) 
-  when is_record(DefCtx, def_ctx) ->
-    ?dbg(lib,"entry: searching for ~p when entries ~p", [Key,E]),
-    entry(Key, Obj);
-entry(Index, SubInd, DefCtx) 
-  when is_record(DefCtx, def_ctx)->
-    ?dbg(lib,"entry: searching for ~p:~p", [Index, SubInd]),
-    case object(Index, DefCtx) of
-	{error, _Error} = E -> E;
-	Obj ->
-	   entry(SubInd, Obj, DefCtx)
-    end.
-
-entry(_Key, []) ->
-    {error, not_found};
-entry(Name, _Obj=#objdef {entries = Entries}) 
-  when is_list(Name)->
-    ?dbg(lib,"entry: searching for ~p when name", [Name]),
-    lists:keyfind(Name, #entdef.name, Entries);
-entry(Id, _Obj=#objdef {entries = Entries}) 
-  when is_atom(Id)->
-    ?dbg(lib,"entry: searching for ~p when id", [Id]),
-    lists:keyfind(Id, #entdef.id, Entries);
-entry(SubIndex, _Obj=#objdef {entries = Entries}) 
-  when ?is_subind(SubIndex) ->
-    ?dbg(lib,"entry: searching for ~p when index", [SubIndex]),
-    entry(SubIndex, Entries);
-entry(SubIndex, [Ent|Entries]) 
-  when ?is_subind(SubIndex) ->
-    ?dbg(lib,"entry: searching for ~p when index", [SubIndex]),
-    %% Index can be a range
-    case match_index(SubIndex, Ent#entdef.index) of
-	true -> Ent;
-	false -> entry(SubIndex, Entries)
-    end.
-
 
 %% Check if index match object index
 match_index(Index, Index) -> 
@@ -957,9 +1133,6 @@ object_idx(Index, {From,To}) when Index >= From, Index =< To ->
     (Index - From)+1;
 object_idx(Index, {From,To,Step}) when Index >= From, Index =< To, (Index-From) rem Step == 0 ->
     (Index - From)+1.
-
-enum_by_id(Id, DefCtx) when is_atom(Id) ->
-    find_in_mods(Id, #def_mod.enums, DefCtx#def_ctx.modules).    
 
 
 find_in_mods(Key, Pos, [{_ModName, DMod}|DMods]) ->

@@ -27,7 +27,7 @@
 -export([client_set_mode/1]).
 -export([client_store/4, client_store/3, client_store/2]).
 -export([client_fetch/3, client_fetch/2, client_fetch/1]).
--export([client_notify/4, client_notify/3, client_notify/2]).
+-export([client_notify/5, client_notify/4, client_notify/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -67,8 +67,7 @@
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Starts the CANOpen SDO manager and a co_node with
-%% Serial = 16#0, unless it is already running.
+%% See {link start/1}.
 %% @end
 %%--------------------------------------------------------------------
 -spec start() -> {ok, Pid::pid()} | {error, Reason::atom()}.
@@ -135,7 +134,7 @@ load(File) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Fetch object specified by Index, Subind from remote CANOpen
+%% Fetch Data/VAlue from object specified by Index, Subind from remote CANOpen
 %% node identified by NodeId.<br/>
 %% TransferMode controls whether block or segment transfer is used between
 %% the CANOpen nodes.<br/>
@@ -186,6 +185,11 @@ fetch(NodeId, Ix, Si, TransferMode, {value, Type})
 fetch(NodeId, Ix, Si, TransferMode, data = Term) ->
     co_api:fetch(?MGR_NODE, NodeId, Ix, Si, TransferMode, Term).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link fetch/5}.
+%% @end
+%%--------------------------------------------------------------------
 -spec fetch(NodeId::integer(), {Ix::integer(), Si::integer()},
 	    TransferMode:: block | segment,
 	    Destination:: {app, Pid::pid(), Mod::atom()} | 
@@ -204,7 +208,7 @@ fetch(NodeId, Ix, Si, TransferMode, Term).
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Stores object specified by Index, Subind at remote CANOpen
+%% Stores Data/Value at object specified by Index, Subind at remote CANOpen
 %% node identified by NodeId.<br/>
 %% TransferMode controls whether block or segment transfer is used between
 %% the CANOpen nodes.<br/>
@@ -252,6 +256,11 @@ store(NodeId, Ix, Si, TransferMode, {data, Bin} = Term)
        is_binary(Bin) ->
     co_api:store(?MGR_NODE, NodeId, Ix, Si, TransferMode, Term).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link  store/5}.
+%% @end
+%%--------------------------------------------------------------------
 -spec store(NodeId::integer(), {Ix::integer(), Si::integer()},
 	    TransferMode:: block | segment,
 	    Source:: {app, Pid::pid(), Mod::atom()} | 
@@ -267,60 +276,187 @@ store(NodeId, {Ix, Si}, TransferMode,  Term)
 store(NodeId, Ix, Si, TransferMode,  Term).
 
 %% API used by co_script
+%%--------------------------------------------------------------------
+%% @doc
+%% Installs Module definitions in the manager.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_require(Mod::atom()) ->
+			    ok | {error, Reason::term()}.
 
 client_require(Mod) 
   when is_atom(Mod) ->
     ?dbg(mgr, "client_require: module ~p", [Mod]),
     gen_server:call(?CO_MGR, {require, Mod}).
 
-%% Set the default nodeid - for short interface
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Set the default nodeid - for short interface.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_set_nid(Nid::integer()) ->
+			    ok | {error, Reason::term()}.
+
 client_set_nid(Nid) 
   when is_integer(Nid) andalso Nid < 2#1000000000000000000000000 -> %% Max 24 bit
     gen_server:call(?CO_MGR, {set_nid, Nid}).
 
-%% Set the default transfer mode
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Set the default transfer mode.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_set_mode(Mod:: block | segment) ->
+			    ok | {error, Reason::term()}.
+
 client_set_mode(Mode) 
   when Mode == block;
        Mode == segment ->
     gen_server:call(?CO_MGR, {set_mode, Mode}).
 
-%% Store value
+%%--------------------------------------------------------------------
+%% @doc
+%% Stores Value at object specified by Index, Subind at remote CANOpen
+%% node identified by NodeId.<br/>
+%% Atoms defined in the loaded modules can be used instead of integers
+%% for Index and SubInd.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_store(NodeId::integer(), 
+		   Index::integer() | atom(), 
+		   SubInd::integer() | atom(), 
+		   Value::term()) ->
+			    ok | {error, Reason::term()}.
+
 client_store(Nid, Index, SubInd, Value) ->
     gen_server:call(?CO_MGR, {store, Nid, Index, SubInd, Value}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link  client_store/4}.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_store(Index::integer() | atom(), 
+		   SubInd::integer() | atom(), 
+		   Value::term()) ->
+			    ok | {error, Reason::term()}.
 
 client_store(Index, SubInd, Value) ->
     gen_server:call(?CO_MGR, {store, Index, SubInd, Value}).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link  client_store4}.
+%% SubInd = 0.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_store(Index::integer() | atom(), 
+		   Value::term()) ->
+			    ok | {error, Reason::term()}.
+
 client_store(Index, Value) ->
     gen_server:call(?CO_MGR, {store, Index, 0, Value}).
 
-%% Fetch value
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Fetch Value for object specified by Index, Subind from remote CANOpen
+%% node identified by NodeId.<br/>
+%% TransferMode controls whether block or segment transfer is used between
+%% the CANOpen nodes.<br/>
+%% Atoms defined in the loaded modules can be used instead of integers
+%% for Index and SubInd.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_fetch(NodeId::integer(), 
+		   Index::integer() | atom(),
+		   SubInd::integer() | atom()) -> 
+			  Value::term() | {error, Reason::term()}.
+
 client_fetch(Nid, Index, SubInd) ->
     gen_server:call(?CO_MGR, {fetch, Nid, Index, SubInd}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link  client_fetch/3}.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_fetch(Index::integer() | atom(),
+		   SubInd::integer() | atom()) -> 
+			  Value::term() | {error, Reason::term()}.
 
 client_fetch(Index, SubInd)  ->
     gen_server:call(?CO_MGR, {fetch, Index, SubInd}).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link  client_fetch/3}.
+%% SubInd = 0.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_fetch(Index::integer() | atom()) ->
+			  Value::term() | {error, Reason::term()}.
+
 client_fetch(Index)  ->
     gen_server:call(?CO_MGR, {fetch, Index, 0}).
 
-%% Send notification
-client_notify(Nid, Index, Subind, Value) ->
-    gen_server:cast(?CO_MGR, {notify, Nid, Index, Subind, Value}).
+%%--------------------------------------------------------------------
+%% @doc
+%% Send notification of with CobId constructed from Func and NodeId. <br/>
+%% Atoms defined in the loaded modules can be used instead of integers
+%% for Index and SubInd.
+%% See {@link co_api:notify/4}.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_notify(NodeId::integer(),
+		    Func::atom(),
+		    Index::integer() | atom(),
+		    SubInd::integer() | atom(), 
+		    Value::term()) ->
+			   ok | {error, Reason::term()}.
 
-client_notify(Index, Subind, Value) ->
-    gen_server:cast(?CO_MGR, {notify, Index, Subind, Value}).
+client_notify(Nid, Func, Index, Subind, Value) ->
+    gen_server:cast(?CO_MGR, {notify, Nid, Func, Index, Subind, Value}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link  client_notify/4}.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_notify(Func::atom(),
+		    Index::integer() | atom(),
+		    SubInd::integer() | atom(), 
+		    Value::term()) ->
+			   ok | {error, Reason::term()}.
+
+client_notify(Func, Index, Subind, Value) ->
+    gen_server:cast(?CO_MGR, {notify, Func, Index, Subind, Value}).
   
-client_notify(Index, Value) ->
-    gen_server:cast(?CO_MGR, {notify, Index, 0, Value}).
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link  client_notify/4}.
+%% SubInd = 0.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_notify(Func::atom(),
+		    Index::integer() | atom(), 
+		    Value::term()) ->
+			   ok | {error, Reason::term()}.
+
+client_notify(Func, Index, Value) ->
+    gen_server:cast(?CO_MGR, {notify, Func, Index, 0, Value}).
 
 %% For testing
 %% @private
 debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
     gen_server:call(?CO_MGR, {debug, TrueOrFalse}).
 
+%% @private
 loop_data(Qual) when Qual == no_ctx ->
     gen_server:call(?CO_MGR, {loop_data, Qual}).
+%% @private
 loop_data() ->
     gen_server:call(?CO_MGR, {loop_data, all}).
 
@@ -429,11 +565,11 @@ handle_call(_Request, _From, Mgr) ->
 			 {noreply, Mgr::record(), Timeout::timeout()} |
 			 {stop, Reason::term(), Mgr::record()}.
 
-handle_cast({notify, Nid, Index, SubInd, Value}, Mgr) ->
-    do_notify(Nid, Index, SubInd, Value, Mgr);
-handle_cast({notify, Index, SubInd, Value}, Mgr=#mgr {def_nid = DefNid})
+handle_cast({notify, Nid, Func, Index, SubInd, Value}, Mgr) ->
+    do_notify(Nid, Func, Index, SubInd, Value, Mgr);
+handle_cast({notify, Func, Index, SubInd, Value}, Mgr=#mgr {def_nid = DefNid})
   when DefNid =/= 0 ->
-    do_notify(DefNid, Index, SubInd, Value, Mgr);
+    do_notify(DefNid, Func, Index, SubInd, Value, Mgr);
 handle_cast(_Msg, Mgr) ->
     ?dbg(mgr, "handle_cast: Unknown msg ~p", [_Msg]),
     {noreply, Mgr}.
@@ -572,6 +708,7 @@ spawn_request(F, Args, Client, Request, Dbg) ->
     ?dbg(mgr, "spawn_request: spawned  ~p", [Pid]),
     Pid.
 
+%% @private
 execute_request(F, Args, Client, Request, Dbg) ->
     put(dbg, Dbg),
     ?dbg(mgr, "execute_request: F = ~p Args = ~w)", [F, Args]),
@@ -589,18 +726,18 @@ handle_reply(Other, Client, _Request) -> %% ok ???
     ?dbg(mgr,"handle_reply: Other ~p", [Other]),
     gen_server:reply(Client, Other).
 
-do_notify(Nid,Index,SubInd,Value, Mgr) ->
+do_notify(Nid, Func,Index,SubInd,Value, Mgr) ->
     Ctx = context(Nid, Mgr),
     case translate_index(Ctx,Index,SubInd,Value) of
 	{ok,{Ti,Tsi,{Tv, Type}} = _T} ->
 	    ?dbg(mgr, "do_notify: translated  ~p", [_T]),
 	    try co_codec:encode(Tv, {Type, 32}) of
 		Data ->
-		    ?dbg(mgr,"do_notify: ~w ~p ~p ~p\n", [Nid,Ti,Tsi,Data]),
-		    co_api:notify(Nid,Ti,Tsi,Data)
+		    ?dbg(mgr,"do_notify: ~w ~w ~.16.0#:~w ~w\n", [Nid,Func,Ti,Tsi,Data]),
+		    co_api:notify({xnodeid,Nid}, Func,Ti,Tsi,Data)
 	    catch error:_Reason ->
-		    ?dbg(mgr,"do_notify: encode failed ~w ~p ~p ~p, reason ~p\n", 
-			      [Nid, Index, SubInd, Value, _Reason])
+		    ?dbg(mgr,"do_notify: encode failed ~w ~w ~.16.0#~w ~w, reason ~p\n", 
+			      [Nid, Func, Index, SubInd, Value, _Reason])
 	    end;
 	_Error ->
 	    ?dbg(mgr,"do_notify: translation failed, error: ~p\n", [_Error]),

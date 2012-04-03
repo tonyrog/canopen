@@ -10,3 +10,5 @@ fetch(cobid_time_stamp).
 fetch(cobid_time_stamp,0).
 fetch(cobid_time_stamp,7).
 
+notify(pdo1_tx, 16#3002, 0, 16#BBBB).
+fetch(16#3002, 0). 

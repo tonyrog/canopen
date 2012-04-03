@@ -1,13 +1,13 @@
-%%% @author Marina Westman Lönne <malotte@malotte.net>
+%%% @author Malotte Westman Lönne <malotte@malotte.net>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
-%%% CANopen application behaviour.
+%%% CANopen application behaviour. <br/>
 %%% Defines behaviour for an application using the 
 %%% {streamed, Module} transfer mode in communicating with the 
 %%% CANOpen node.
 %%%
 %%% File: co_stream_app.erl<br/>
-%%% Created:  4 Jan 2012 by Marina Westman Lönne 
+%%% Created:  4 Jan 2012 by Malotte Westman Lönne 
 %%% @end
 
 

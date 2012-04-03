@@ -1,11 +1,11 @@
 %%%-------------------------------------------------------------------
-%%% @author Marina Westman Lönne <malotte@malotte.net>
-%%% @copyright (C) 2012, Marina Westman Lönne
+%%% @author Malotte Westman Lönne <malotte@malotte.net>
+%%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
 %%%  Process dictionary.
 %%%
 %%% File: co_proc.erl
-%%% Created:  9 Feb 2012 by Marina Westman Lönne
+%%% Created:  9 Feb 2012 by Malotte Westman Lönne
 %%% @end
 %%%-------------------------------------------------------------------
 -module(co_proc).
