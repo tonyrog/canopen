@@ -18,7 +18,6 @@
 -include("co_app.hrl").
 
 -behaviour(gen_server).
--behaviour(co_tpdo_app).
 
 -compile(export_all).
 
@@ -31,7 +30,6 @@
 
 %% CO node callbacks
 -export([index_specification/2,
-	 tpdo_callback/3,
 	 value/2]).
 
 
@@ -43,7 +41,7 @@
 	{
 	  co_node,
 	  tpdo_dict,
-	  callback,
+	  state = init,
 	  starter
 	}).
 
@@ -96,17 +94,6 @@ index_specification(_Pid, {Index, SubInd} = I) ->
 index_specification(Pid, Index) when is_integer(Index) ->
     index_specification(Pid, {Index, 0}).
 
-
-%% TPDO callbacks
-tpdo_callback(_Pid, {Index, SubInd} = I, MF) ->
-    ?dbg("tpdo_callback: ~.16B:~.8B callback = ~w",[Index, SubInd, MF]),
-    case ets:lookup(tpdo_dict, I) of
-	[{I, Type, _Value}] ->
-	    gen_server:cast(?MODULE, {callback, I, MF}),
-	    {ok, co_test_lib:type(Type)};
-	[] ->
-	    {error, ?ABORT_NO_SUCH_OBJECT}
-    end.
 
 value(_Pid, {Index, SubInd} = I) ->
     ?dbg("value: ~.16B:~.8B ",[Index, SubInd]),
@@ -229,26 +216,30 @@ handle_call(Request, _From, LD) ->
 %% </ul>
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({callback, {_Ix, _Si} = I, {M, F} = MF} = Msg, 
-	    LD=#loop_data {co_node = CoNode}) ->
-    ?dbg("handle_cast: callback called for ~.16B:~.8B with mf = ~w",
-	 [_Ix, _Si, MF]),
-%%    LD#loop_data.starter ! Msg,
-%%    case ets:lookup(tpdo_dict, I) of
-%%	[{I, _Type, Value}] ->
-%%	    ok = M:F(CoNode, I, Value);
-%%	[] ->
-%%	    ?dbg("handle_cast: callback - unknown index ", [])
-%%    end,
-    {noreply, LD#loop_data {callback = MF}};
-handle_cast({value, {_Ix, _Si}} = Msg, LD) ->
+handle_cast({index_in_tpdo, {_Ix, _Si} = I}, 
+	    LD=#loop_data {co_node = CoNode, state = State}) ->
+    ?dbg("handle_cast: index_in_tpdo called for ~.16B:~.8B", [_Ix, _Si]),
+
+    case ets:lookup(tpdo_dict, I) of
+	[{I, Type, Value}] ->
+	    if State == init ->
+		    ok = co_api:tpdo_set(CoNode, I, {Value, Type}, overwrite);
+	       true ->
+		    do_nothing
+	    end;
+	[] ->
+	    %% Hmmm
+	    ?dbg("handle_cast: unknown index!!!",[])
+    end,
+    {noreply, LD#loop_data {state = up}};
+handle_cast({value, {_Ix, _Si}}, LD) ->
     ?dbg("handle_cast: value called for ~.16B:~.8B ",[_Ix, _Si]),
 %%    LD#loop_data.starter ! Msg,
     {noreply, LD};
-handle_cast({set, {_Ix, _Si} = I, Value, Type} = Msg, 
-	    LD=#loop_data {co_node = CoNode, callback = {M, F}}) ->
+handle_cast({set, {_Ix, _Si} = I, Value, Type}, 
+	    LD=#loop_data {co_node = CoNode}) ->
     ?dbg("handle_cast: set called for ~.16B:~w with ~p",[_Ix, _Si, Value]),
-    ok = M:F(CoNode, I, {Value, Type}),
+    ok = co_api:tpdo_set(CoNode, I, {Value, Type}, append),
  %%   LD#loop_data.starter ! Msg,
     {noreply, LD};
 handle_cast(_Msg, LD) ->

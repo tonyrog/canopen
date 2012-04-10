@@ -238,6 +238,7 @@ load_objects([{mpdo_dispatch,I,Map}|Es], Os) ->
 					       ?RMPDO_MAP(Bs,Li,Ls,Ri,Rs,Ni),
 					       ?UNSIGNED64) }
 		  end, lists:zip(seq(1,N), Map))]},
+    io:format("~p: MPDO-DISPATCH: ~w\n", [?MODULE, Obj]),
     load_objects(Es, [Obj|Os]);
 
 load_objects([{mpdo_scanner,I,Map}|Es], Os) ->

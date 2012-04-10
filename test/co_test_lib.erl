@@ -44,7 +44,7 @@ start_node(Serial, Dict, Port, Ttl) ->
 				    {dict_file, Dict},
 				    {max_blksize, 7},
 				    {vendor,16#2A1},
-				    {linked, false},
+	        		    {linked, false},
 				    {debug, true}]),
     ct:pal("Started co_node ~p, pid = ~p",[integer_to_list(Serial,16), Pid]),
     {ok, Pid}.
@@ -67,14 +67,11 @@ load_dict(C, Serial) ->
     co_api:load_dict(Serial, filename:join(DataDir, ?DICT)).
 
 serial() ->
-    case os:getenv("SERIAL") of
+    case os:getenv("CO_SERIAL") of
 	false ->
 	    ct:get_config(serial);
-	S -> 
-	    case string:tokens(S, "#") of
-		["16", Serial] -> list_to_integer(Serial,16);
-		[Serial] -> list_to_integer(Serial,16)
-	    end
+	"0x"++SerX -> erlang:list_to_integer(SerX, 16);
+	Ser -> erlang:list_to_integer(Ser, 10)
     end.
 
 app_dict() ->

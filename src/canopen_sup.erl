@@ -81,7 +81,7 @@ init(Args) ->
     Opts = proplists:get_value(options, Args, []),
     CU = can_udp,
     CP = co_proc,
-    CN = co_node,
+    CN = co_api,
     SA = co_sys_app,
     OA = co_os_app,
     %% can_router started by can application

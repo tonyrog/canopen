@@ -29,7 +29,7 @@
 %% Application interface
 -export([subscribe/2, unsubscribe/2]).
 -export([reserve/3, unreserve/2]).
--export([extended_notify_subscribe/3, extended_notify_unsubscribe/2]).
+-export([extended_notify_subscribe/2, extended_notify_unsubscribe/2]).
 -export([my_subscriptions/1, my_subscriptions/2]).
 -export([my_reservations/1, my_reservations/2]).
 -export([all_subscribers/1, all_subscribers/2]).
@@ -44,7 +44,7 @@
 -export([store/6, fetch/6]).
 -export([subscribers/2]).
 -export([reserver_with_module/2]).
--export([tpdo_mapping/2, rpdo_mapping/2, tpdo_set/3, tpdo_data/2]).
+-export([tpdo_mapping/2, rpdo_mapping/2, tpdo_set/4, tpdo_data/2]).
 
 %% Test interface
 -export([dump/1, dump/2, loop_data/1]).
@@ -73,7 +73,7 @@
 %%          {readbufsize, integer()}  - size of buf when reading from app <br/>
 %%          {load_ratio, float()}     - ratio when time to fill read_buf <br/> 
 %%          {atomic_limit, integer()} - limit to size of atomic variable <br/>
-%%          {load_last_saved, boolean()} - load default dictionary file <br/>
+%%          {load_last_saved, boolean()} - load last dictionary file <br/>
 %%          {dict_file, string()}     - non default dictionary file to load,
 %%                                      overrides load_last_saved <br/>
 %%          {debug, boolean()}        - Enable/Disable trace output<br/>
@@ -393,12 +393,11 @@ unsubscribe(Identity, Ix) ->
 %%--------------------------------------------------------------------
 -spec extended_notify_subscribe(Identity::term(), 
 				Index::integer() | 
-				       list(Index::integer()),
-			       {Module::atom(), Function::atom()}) -> 
+				       list(Index::integer())) -> 
 		       ok | {error, Error::atom()}.
 
-extended_notify_subscribe(Identity, Ix, {M,F}) ->
-    gen_server:call(identity_to_pid(Identity), {xnot_subscribe, Ix, {self(), {M, F}}}).
+extended_notify_subscribe(Identity, Ix) ->
+    gen_server:call(identity_to_pid(Identity), {xnot_subscribe, Ix, self()}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -642,30 +641,32 @@ set(Identity, Ix, Value) when is_integer(Ix) ->
 %%--------------------------------------------------------------------
 -spec tpdo_set(Identity::term(), 
 	       Index::{Ix::integer(), Si::integer()} | integer(), 
-	       Data::binary() | {Value::term(), Type::term()}) -> 
+	       Data::binary() | {Value::term(), Type::term()},
+	       Mode:: append | overwrite) -> 
 		      ok | {error, Error::atom()}.
 
-tpdo_set(Identity, {Ix, Si} = I, Data) 
-  when ?is_index(Ix), ?is_subind(Si), is_binary(Data) ->
-    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Data = ~p",
-	 [Identity, Ix, Si, Data]), 
+tpdo_set(Identity, {Ix, Si} = I, Data, Mode) 
+  when ?is_index(Ix), ?is_subind(Si), is_binary(Data) andalso
+       (Mode == append orelse Mode == overwrite) ->
+    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Data = ~p, Mode ~p",
+	 [Identity, Ix, Si, Data, Mode]), 
     Data64 = co_codec:encode_binary(Data, 64),
-    gen_server:call(identity_to_pid(Identity), {tpdo_set,I,Data64});   
-tpdo_set(Identity, {Ix, Si} = I, {Value, Type}) 
+    gen_server:call(identity_to_pid(Identity), {tpdo_set,I,Data64,Mode});   
+tpdo_set(Identity, {Ix, Si} = I, {Value, Type}, Mode) 
   when ?is_index(Ix), ?is_subind(Si) ->
-    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Value = ~p, Type = ~p",
-	 [Identity, Ix, Si, Value, Type]), 
+    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Value = ~p, Type = ~p, Mode ~p",
+	 [Identity, Ix, Si, Value, Type, Mode]), 
     try co_codec:encode(Value, Type) of
 	Data ->
-	    tpdo_set(Identity, I, Data) 
+	    tpdo_set(Identity, I, Data, Mode) 
     catch
 	error:_Reason ->
 	    ?dbg(node, "tpdo_set: encode failed, reason = ~p", [_Reason]), 
 	    {error, badarg}
     end;
-tpdo_set(Identity, Ix, Term) 
+tpdo_set(Identity, Ix, Term, Mode) 
   when is_integer(Ix) ->
-    tpdo_set(Identity, {Ix, 0}, Term).
+    tpdo_set(Identity, {Ix, 0}, Term, Mode).
 
 
 %%--------------------------------------------------------------------

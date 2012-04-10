@@ -295,8 +295,8 @@ initialization(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
 handle_call({set,{Ix,Si},Value}, _From, Ctx) ->
     {Reply,Ctx1} = set_dict_value(Ix,Si,Value,Ctx),
     {reply, Reply, Ctx1};
-handle_call({tpdo_set,I,Value}, _From, Ctx) ->
-    {Reply,Ctx1} = set_tpdo_data(I,Value,Ctx),
+handle_call({tpdo_set,I,Value,Mode}, _From, Ctx) ->
+    {Reply,Ctx1} = set_tpdo_data(I,Value,Mode,Ctx),
     {reply, Reply, Ctx1};
 handle_call({direct_set,{Ix,Si},Value}, _From, Ctx) ->
     {Reply,Ctx1} = direct_set_dict_value(Ix,Si,Value,Ctx),
@@ -470,34 +470,34 @@ handle_call({reservers}, _From, Ctx)  ->
     Res = reservers(Ctx#co_ctx.res_table),
     {reply, Res, Ctx};
 
-handle_call({xnot_subscribe,{Ix1, Ix2},{Pid, _MF} = Key}, _From, 
+handle_call({xnot_subscribe,{Ix1, Ix2},Pid}, _From, 
 	    Ctx=#co_ctx {name = _Name}) 
   when is_pid(Pid) ->
-    ?dbg(node, "~s: handle_call: xnot_subscribe index = ~.16.0#-~.16.0# key = ~p",  
-	 [_Name, Ix1, Ix2, Key]),    
-    Res = add_subscription(Ctx#co_ctx.xnot_table, Ix1, Ix2, Key),
+    ?dbg(node, "~s: handle_call: xnot_subscribe index = ~.16.0#-~.16.0# pid = ~p",  
+	 [_Name, Ix1, Ix2, Pid]),    
+    Res = add_subscription(Ctx#co_ctx.xnot_table, Ix1, Ix2, Pid),
     {reply, Res, Ctx};
 
-handle_call({xnot_subscribe,Ix,{Pid, _MF} = Key}, _From, Ctx=#co_ctx {name = _Name})
+handle_call({xnot_subscribe,Ix,Pid}, _From, Ctx=#co_ctx {name = _Name})
   when is_pid(Pid) ->
-    ?dbg(node, "~s: handle_call: xnot_subscribe index = ~.16.0# key = ~p",  
-	 [_Name, Ix, Key]),    
-    Res = add_subscription(Ctx#co_ctx.xnot_table, Ix, Key),
+    ?dbg(node, "~s: handle_call: xnot_subscribe index = ~.16.0# pid = ~p",  
+	 [_Name, Ix, Pid]),    
+    Res = add_subscription(Ctx#co_ctx.xnot_table, Ix, Pid),
     {reply, Res, Ctx};
 
-handle_call({xnot_unsubscribe,{Ix1, Ix2},{Pid, _MF} = Key}, _From, Ctx) 
+handle_call({xnot_unsubscribe,{Ix1, Ix2},Pid}, _From, Ctx) 
   when is_pid(Pid) ->
-    Res = remove_subscription(Ctx#co_ctx.xnot_table, Ix1, Ix2, Key),
+    Res = remove_subscription(Ctx#co_ctx.xnot_table, Ix1, Ix2, Pid),
     {reply, Res, Ctx};
 
-handle_call({xnot_unsubscribe,Ix,{Pid, _MF} = Key}, _From, Ctx) 
+handle_call({xnot_unsubscribe,Ix,Pid}, _From, Ctx) 
   when is_pid(Pid) ->
-    Res = remove_subscription(Ctx#co_ctx.xnot_table, Ix, Key),
+    Res = remove_subscription(Ctx#co_ctx.xnot_table, Ix, Pid),
     {reply, Res, Ctx};
 
 handle_call({xnot_subscriptions,Pid}, _From, Ctx) 
   when is_pid(Pid) ->
-    Subs = subscriptions(Ctx#co_ctx.xnot_table, {Pid, any}),
+    Subs = subscriptions(Ctx#co_ctx.xnot_table, Pid),
     {reply, Subs, Ctx};
 
 handle_call({xnot_subscribers,Ix}, _From, Ctx)  ->
@@ -558,6 +558,21 @@ handle_call({dump, Qualifier}, _From, Ctx) ->
       fun({Ix, Mod, Pid},_) ->
 	      io:format("~7.16.0# reserved by ~p, module ~s\n",[Ix, Pid, Mod])
       end, ok, Ctx#co_ctx.res_table),
+    io:format("---- XNOT SUB TABLE ----\n"),
+    ets:foldl(
+      fun({Pid, IxList},_) ->
+	      io:format("~p => \n", [Pid]),
+	      lists:foreach(
+		fun(Ixs) ->
+			case Ixs of
+			    {IxStart, IxEnd} ->
+				io:format("[~7.16.0#-~7.16.0#]\n", [IxStart, IxEnd]);
+			    Ix ->
+				io:format("~7.16.0#\n",[Ix])
+			end
+		end,
+		IxList)
+      end, ok, Ctx#co_ctx.xnot_table),
     io:format("---- TPDO CACHE ----\n"),
     ets:foldl(
       fun({{Ix,Si}, Value},_) ->
@@ -1029,6 +1044,7 @@ load_dict_internal(File, Ctx=#co_ctx {dict = Dict, name = _Name}) ->
 			  {Ixs, _SubIxs} = lists:unzip(ChangedEIxs),
 			  OIxs ++ lists:usort(Ixs)
 		  end, [], Os),
+
 	    %% Now take action if needed
 	    ?dbg(node, "~s: load_dict_internal: changed entries ~p", 
 		 [_Name, ChangedIxs]),
@@ -1036,10 +1052,6 @@ load_dict_internal(File, Ctx=#co_ctx {dict = Dict, name = _Name}) ->
 		foldl(fun(I, Ctx0) ->
 			      handle_notify(I, Ctx0)
 		      end, Ctx, ChangedIxs),
-
-	    %% Inform subscribers and reservers of changed indexes
-	    %%foreach(fun(Ix) -> inform_subscribers(Ix, Ctx1) end, ChangedIxs),
-	    %%foreach(fun(Ix) -> inform_reserver(Ix, Ctx1) end, ChangedIxs),
 
 	    {ok, Ctx1};
 	Error ->
@@ -1382,7 +1394,7 @@ extended_notify(Ctx=#co_ctx {xnot_table = XNotTable, name = _Name}, Ix, Frame) -
 		 [_Name, Ix]);
 	PidList ->
 	    lists:foreach(
-	      fun({Pid, {M, F}}) ->
+	      fun(Pid) ->
 		      case Pid of
 			  dead ->
 			      %% Warning ??
@@ -1391,7 +1403,7 @@ extended_notify(Ctx=#co_ctx {xnot_table = XNotTable, name = _Name}, Ix, Frame) -
 			  P when is_pid(P)->
 			      ?dbg(node, "~s: extended_notify: Process ~p subscribes "
 				   "to index ~7.16.0#", [_Name, Pid, Ix]),
-			      M:F(Pid, Frame)
+			      gen_server:cast(Pid, {extended_notify, Ix, Frame})
 		      end
 	      end, PidList)
     end,
@@ -1909,7 +1921,6 @@ add_subscription(Tab, Ix1, Ix2, Key)
 	[{_,ISet}] -> ets:insert(Tab, {Key, co_iset:union(ISet, I)})
     end.
 
-    
 remove_subscriptions(Tab, Key) ->
     ets:delete(Tab, Key).
 
@@ -2059,7 +2070,7 @@ inform_reserver(Ix, _Ctx=#co_ctx {name = _Name, res_table = RTable}) ->
 	[Self] -> do_nothing;
 	[] -> do_nothing;
 	[Pid] when is_pid(Pid) -> 
-	    ?dbg(node, "~s: inform_subscribers: "
+	    ?dbg(node, "~s: inform_reservers: "
 		 "Sending object event to ~p", [_Name, Pid]),
 	    gen_server:cast(Pid, {object_event, Ix})
     end.
@@ -2148,12 +2159,12 @@ update_nmt_value(Key,Value,E) when is_record(E, nmt_entry) ->
 %%
 %% Callback functions for changes in tpdo elements
 %%
-set_tpdo_data({_Ix, _Si} = I, Data, 
+set_tpdo_data({_Ix, _Si} = I, Data, Mode,
 	       Ctx=#co_ctx {tpdo_cache = Cache, name = _Name}) ->
-    ?dbg(node, "~s: set_tpdo_data: Ix = ~.16#:~w, Data = ~w",
-	 [_Name, _Ix, _Si, Data]), 
-    case ets:lookup(Cache, I) of
-	[] ->
+    ?dbg(node, "~s: set_tpdo_data: Ix = ~.16#:~w, Data = ~w, Mode ~p",
+	 [_Name, _Ix, _Si, Data, Mode]), 
+    case {ets:lookup(Cache, I), Mode} of
+	{[], _} ->
 	    %% Previously unknown tpdo element, probably in sam_mpdo
 	    %% with block size > 1
 	    %% Insert ??
@@ -2165,17 +2176,17 @@ set_tpdo_data({_Ix, _Si} = I, Data,
 	    %% io:format("WARNING!" 
 	    %% "~s: set_tpdo_data: unknown tpdo element\n", [_Name]),
 	    %% {{error,unknown_tpdo_element}, Ctx};
-	[{I, OldData}] when length(OldData) >= ?MAX_TPDO_CACHE->
+	{[{I, OldData}], append} when length(OldData) >= ?MAX_TPDO_CACHE->
 	    io:format("WARNING!" 
 		      "~s: set_tpdo_data: tpdo cache for ~.16#:~w full.\n", 
 		      [_Name,  _Ix, _Si]),
 	    {{error, tpdo_cache_full}, Ctx};
-	[{I, OldData}] ->
+	{[{I, OldData}], append} ->
 	    NewData = case OldData of
 			    [0] -> [Data]; %% remove default
 			    _List -> OldData ++ [Data]
 			end,
-	    ?dbg(node, "~s: set_tpdo_data: old = ~p, new = ~p",
+	    ?dbg(node, "~s: set_tpdo_data: append, old = ~p, new = ~p",
 		 [_Name, OldData, NewData]), 
 	    try ets:insert(Cache,{I,NewData}) of
 		true -> {ok, Ctx}
@@ -2185,7 +2196,12 @@ set_tpdo_data({_Ix, _Si} = I, Data,
 			      "~s: set_tpdo_data: insert of ~p failed, reason = ~w\n", 
 			      [_Name, NewData, Reason]),
 		    {{error,Reason}, Ctx}
-	    end
+	    end;
+	{[{I, _OldData}], overwrite} ->
+	    ?dbg(node, "~s: set_tpdo_data: overwrite, old = ~p, new = ~p",
+		 [_Name, _OldData, Data]), 
+	    ets:insert(Cache, {I, [Data]}),
+	    {ok, Ctx}
     end.
 
 %%
@@ -2270,7 +2286,7 @@ pdo_mapping(MType,Ix,Si,Sn,Is,ResTable,Dict,TpdoCache) ->
 	    Index = {_I,_S} = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
 	    ?dbg(node, "pdo_mapping: entry[~w] = {~7.16.0#:~w}", 
 		 [Si,_I,_S]),
-	    maybe_install_callback(MType, Index, ResTable, Dict, TpdoCache),
+	    maybe_inform_reserver(MType, Index, ResTable, Dict, TpdoCache),
 	    pdo_mapping(MType,Ix,Si+1,Sn,
 			[{Index, ?PDO_MAP_BITS(Map)}|Is], 
 			ResTable, Dict, TpdoCache);
@@ -2305,19 +2321,19 @@ mpdo_mapping(MType,{IxInScanList,SiInScanList},ResTable,Dict,TpdoCache)
 	    Index = {_Ix,_Si} = {?TMPDO_MAP_INDEX(Map),?TMPDO_MAP_SUBIND(Map)},
 	    BlockSize = ?TMPDO_MAP_SIZE(Map), %% TODO ????
 	    ?dbg(node, "mpdo_mapping: sam_mpdo, local index = ~7.16.0#:~w", [_Ix,_Si]),
-	    maybe_install_callback(MType, Index, ResTable, Dict, TpdoCache),
+	    maybe_inform_reserver(MType, Index, ResTable, Dict, TpdoCache),
 	    {MType, [{{Index, BlockSize}, ?MPDO_DATA_SIZE}]};
 	Error ->
 	    Error %%??
     end.
        
-maybe_install_callback(MType, {Ix, Si}, ResTable, _Dict, TpdoCache) ->
+maybe_inform_reserver(MType, {Ix, Si} = Index, ResTable, _Dict, TpdoCache) ->
     case reserver_with_module(ResTable, Ix) of
 	[] ->
-	    ?dbg(node, "entry: No reserver for index ~7.16.0#", [Ix]),
+	    ?dbg(node, "maybe_inform_reserver: No reserver for index ~7.16.0#", [Ix]),
 	    ok;
-	{Pid, Mod} when is_pid(Pid)->
-	    ?dbg(node, "entry: Process ~p has reserved index ~7.16.0#", 
+	{Pid, _Mod} when is_pid(Pid)->
+	    ?dbg(node, "maybe_inform_reserver: Process ~p has reserved index ~7.16.0#", 
 		 [Pid, Ix]),
 
 	    %% Handle differently when TPDO and RPDO
@@ -2326,25 +2342,16 @@ maybe_install_callback(MType, {Ix, Si}, ResTable, _Dict, TpdoCache) ->
 		    ok;
 		T when T == tpdo orelse T == sam_mpdo orelse T == dam_mpdo ->
 		    %% Store default value in cache ??
-		    ets:insert(TpdoCache, {{Ix, Si}, [0]}),
-		    try Mod:tpdo_callback(Pid, {Ix, Si}, {co_api, tpdo_set}) of
-			Res -> Res %% Handle error??
-		    catch error:Reason ->
-			    io:format("WARNING!" 
-				      "~p: ~p: maybe_install_callback: "
-				      "tpdo_callback call failed " 
-				      "for process ~p module ~p, index ~7.16.0#"
-				      ":~w, reason ~p\n", 
-				      [self(), ?MODULE, Pid, Mod, Ix, Si, Reason]),
-			    {error,  ?abort_internal_error}
-		    end
+		    ets:insert(TpdoCache, {Index, [0]}),
+		    gen_server:cast(Pid, {index_in_tpdo, Index}),
+		    ok
 	    end;
 	{dead, _Mod} ->
-	    ?dbg(node, "maybe_install_callback: "
+	    ?dbg(node, "maybe_inform_reserver: "
 		 "Reserver process for index ~7.16.0# dead.", [Ix]),
 	    {error, ?abort_internal_error}; %% ???
 	_Other ->
-	    ?dbg(node, "maybe_install_callback: "
+	    ?dbg(node, "maybe_inform_reserver: "
 		 "Other case = ~p", [_Other]),
 	    {error, ?abort_internal_error}
     end.
@@ -2352,23 +2359,23 @@ maybe_install_callback(MType, {Ix, Si}, ResTable, _Dict, TpdoCache) ->
 tpdo_data({Ix, Si} = I, ResTable, Dict, TpdoCache) ->
     case reserver_with_module(ResTable, Ix) of
 	[] ->
-	    ?dbg(node, "tpdo_value: No reserver for index ~7.16.0#", [Ix]),
+	    ?dbg(node, "tpdo_data: No reserver for index ~7.16.0#", [Ix]),
 	    co_dict:data(Dict, Ix, Si);
 	{Pid, _Mod} when is_pid(Pid)->
-	    ?dbg(node, "tpdo_value: Process ~p has reserved index ~7.16.0#", 
+	    ?dbg(node, "tpdo_data: Process ~p has reserved index ~7.16.0#", 
 		 [Pid, Ix]),
 	    %% Value cached ??
 	    cache_value(TpdoCache, I);
 	{dead, _Mod} ->
-	    ?dbg(node, "tpdo_value: Reserver process for index ~7.16.0# dead.", 
+	    ?dbg(node, "tpdo_data: Reserver process for index ~7.16.0# dead.", 
 		 [Ix]),
 	    %% Value cached??
 	    cache_value(TpdoCache, I);
 	_Other ->
 	    %% How handle ???
 	    io:format("WARNING!" 
-		      "~p: tpdo_value: unknown tpdo element\n", [self()]),
-	    ?dbg(node, "tpdo_value: Other case = ~p, returning default value.", 
+		      "~p: tpdo_data: unknown tpdo element\n", [self()]),
+	    ?dbg(node, "tpdo_data: Other case = ~p, returning default value.", 
 		 [_Other]),
 	    {ok, [0]}
     end.
