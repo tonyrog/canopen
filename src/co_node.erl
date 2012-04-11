@@ -415,19 +415,29 @@ handle_call({detach,Pid}, _From, Ctx) when is_pid(Pid) ->
     end;
 
 handle_call({subscribe,{Ix1, Ix2},Pid}, _From, Ctx) when is_pid(Pid) ->
-    Res = add_subscription(Ctx#co_ctx.sub_table, Ix1, Ix2, Pid),
-    {reply, Res, Ctx};
+    case index_defined(lists:seq(Ix1, Ix2), Ctx) of
+	true ->
+	    Res = add_subscription(Ctx#co_ctx.sub_table, Ix1, Ix2, Pid),
+	    {reply, Res, Ctx};
+	false ->
+	    {reply, {error, no_such_object}, Ctx}
+    end;
 
 handle_call({subscribe,Ix,Pid}, _From, Ctx) when is_pid(Pid) ->
-    Res = add_subscription(Ctx#co_ctx.sub_table, Ix, Pid),
-    {reply, Res, Ctx};
+    case index_defined([Ix], Ctx) of
+	true ->
+	    Res = add_subscription(Ctx#co_ctx.sub_table, Ix, Ix, Pid),
+	    {reply, Res, Ctx};
+	false ->
+	    {reply, {error, no_such_object}, Ctx}
+    end;
 
 handle_call({unsubscribe,{Ix1, Ix2},Pid}, _From, Ctx) when is_pid(Pid) ->
     Res = remove_subscription(Ctx#co_ctx.sub_table, Ix1, Ix2, Pid),
     {reply, Res, Ctx};
 
 handle_call({unsubscribe,Ix,Pid}, _From, Ctx) when is_pid(Pid) ->
-    Res = remove_subscription(Ctx#co_ctx.sub_table, Ix, Pid),
+    Res = remove_subscription(Ctx#co_ctx.sub_table, Ix, Ix, Pid),
     {reply, Res, Ctx};
 
 handle_call({subscriptions,Pid}, _From, Ctx) when is_pid(Pid) ->
@@ -482,7 +492,7 @@ handle_call({xnot_subscribe,Ix,Pid}, _From, Ctx=#co_ctx {name = _Name})
   when is_pid(Pid) ->
     ?dbg(node, "~s: handle_call: xnot_subscribe index = ~.16.0# pid = ~p",  
 	 [_Name, Ix, Pid]),    
-    Res = add_subscription(Ctx#co_ctx.xnot_table, Ix, Pid),
+    Res = add_subscription(Ctx#co_ctx.xnot_table, Ix, Ix, Pid),
     {reply, Res, Ctx};
 
 handle_call({xnot_unsubscribe,{Ix1, Ix2},Pid}, _From, Ctx) 
@@ -1168,7 +1178,10 @@ handle_can(Frame, Ctx=#co_ctx {state = State, name = _Name}) ->
 			    %% Reserved
 			    ?dbg(node, "~s: handle_can: SAM-MPDO: Addr = 0, reserved "
 				 "Frame = ~w", [_Name, Frame]),
-			    Ctx;
+			    %% Ctx;
+			    %% Temporary fix for fault in seasone rc
+			    handle_dam_mpdo(Ctx, COBID, {Ix, Si}, Data),
+			    extended_notify(Ctx, Ix, Frame);
 			{0, SourceNid} ->
 			    handle_sam_mpdo(Ctx, SourceNid, {Ix, Si}, Data)
 		    end;
@@ -1829,17 +1842,16 @@ update_tpdo(P=#pdo_parameter {offset = Offset, cob_id = CId, valid = Valid},
     end.
 
 restart_tpdo(T=#tpdo {offset = Offset, rc = RC}, 
-	     Ctx=#co_ctx {tpdo = TpdoCtx}) ->
+	     Ctx=#co_ctx {tpdo = TpdoCtx, name = _Name}) ->
     case load_pdo_parameter(?IX_TPDO_PARAM_FIRST + Offset, Offset, Ctx) of
 	undefined -> 
 	    ?dbg(node, "~s: restart_tpdo: pdo param for ~p not found", 
-		 [Ctx#co_ctx.name, Offset]),
+		 [_Name, Offset]),
 	    {error, not_found};
 	Param ->
 	    case RC > ?RESTART_LIMIT of
 		true ->
-		    ?dbg(node, "~s: restart_tpdo: restart counter exceeded", 
-			 [Ctx#co_ctx.name]),
+		    ?dbg(node, "~s: restart_tpdo: restart counter exceeded",  [_Name]),
 		    {error, restart_not_allowed};
 		false ->
 		    {ok,Pid} = 
@@ -1853,12 +1865,12 @@ restart_tpdo(T=#tpdo {offset = Offset, rc = RC},
 
 
 
-load_pdo_parameter(I, Offset, Ctx) ->
-    ?dbg(node, "~s: load_pdo_parameter ~p + ~p", [Ctx#co_ctx.name, I, Offset]),
-    case load_list(Ctx#co_ctx.dict, [{I, ?SI_PDO_COB_ID}, 
-				     {I,?SI_PDO_TRANSMISSION_TYPE, 255},
-				     {I,?SI_PDO_INHIBIT_TIME, 0},
-				     {I,?SI_PDO_EVENT_TIMER, 0}]) of
+load_pdo_parameter(I, Offset, Ctx=#co_ctx {dict = Dict, name = _Name}) ->
+    ?dbg(node, "~s: load_pdo_parameter ~p + ~p", [_Name, I, Offset]),
+    case load_list(Dict, [{I, ?SI_PDO_COB_ID}, 
+			  {I,?SI_PDO_TRANSMISSION_TYPE, 255},
+			  {I,?SI_PDO_INHIBIT_TIME, 0},
+			  {I,?SI_PDO_EVENT_TIMER, 0}]) of
 	[ID,Trans,Inhibit,Timer] ->
 	    Valid = (ID band ?COBID_ENTRY_INVALID) =:= 0,
 	    RtrAllowed = (ID band ?COBID_ENTRY_RTR_DISALLOWED) =:=0,
@@ -1875,8 +1887,8 @@ load_pdo_parameter(I, Offset, Ctx) ->
     end.
     
 
-load_sdo_parameter(I, Ctx) ->
-    case load_list(Ctx#co_ctx.dict, [{I,?SI_SDO_CLIENT_TO_SERVER},{I,?SI_SDO_SERVER_TO_CLIENT},
+load_sdo_parameter(I, Ctx=#co_ctx {dict = Dict}) ->
+    case load_list(Dict, [{I,?SI_SDO_CLIENT_TO_SERVER},{I,?SI_SDO_SERVER_TO_CLIENT},
 			  {I,?SI_SDO_NODEID,undefined}]) of
 	[CS,SC,NodeID] ->
 	    #sdo_parameter { client_to_server_id = CS, 
@@ -1905,6 +1917,25 @@ load_list(Dict, [{Ix,Si,Default}|List],Acc) ->
 load_list(_Dict, [], Acc) ->
     reverse(Acc).
 
+index_defined([], Ctx) ->
+    true;
+index_defined([Ix | Rest], Ctx=#co_ctx {dict = Dict, res_table = RTable, name = _Name}) ->
+    case co_dict:lookup_object(Dict, Ix) of
+	{ok, _Obj} -> 
+	    true,
+	    index_defined(Rest, Ctx);
+	{error, _Reason} ->
+	    ?dbg(node, "~s: index_defined: index ~.16# not in dictionary",  [_Name, Ix]),
+	    case reserver_pid(RTable, Ix) of
+		[] -> 
+		    ?dbg(node, "~s: index_defined: index ~.16# not reserved",  [_Name, Ix]),
+		    false;
+		[_Any] ->
+		    true,
+		    index_defined(Rest, Ctx)
+	    end
+    end.
+    
 
 
 add_subscription(Tab, Ix, Key) ->
