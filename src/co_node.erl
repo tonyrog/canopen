@@ -5,7 +5,7 @@
 %%% @doc
 %%% CANopen node.
 %%%
-%%% File    : co_node.erl <br/>
+%%% File: co_node.erl <br/>
 %%% Created: 10 Jan 2008 by Tony Rogvall
 %%% @end
 %%%-------------------------------------------------------------------
@@ -30,7 +30,9 @@
 -export([notify/4]). %% To send MPOs
 -export([subscribers/2]).
 -export([reserver_with_module/2]).
--export([tpdo_mapping/2, rpdo_mapping/2, tpdo_data/4]).
+-export([tpdo_mapping/2, 
+	 rpdo_mapping/2, 
+	 tpdo_data/4]).
 
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
 
@@ -1178,10 +1180,10 @@ handle_can(Frame, Ctx=#co_ctx {state = State, name = _Name}) ->
 			    %% Reserved
 			    ?dbg(node, "~s: handle_can: SAM-MPDO: Addr = 0, reserved "
 				 "Frame = ~w", [_Name, Frame]),
-			    %% Ctx;
+			    Ctx;
 			    %% Temporary fix for fault in seasone rc
-			    handle_dam_mpdo(Ctx, COBID, {Ix, Si}, Data),
-			    extended_notify(Ctx, Ix, Frame);
+			    %% handle_dam_mpdo(Ctx, COBID, {Ix, Si}, Data),
+			    %% extended_notify(Ctx, Ix, Frame);
 			{0, SourceNid} ->
 			    handle_sam_mpdo(Ctx, SourceNid, {Ix, Si}, Data)
 		    end;

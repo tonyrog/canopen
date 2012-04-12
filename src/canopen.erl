@@ -46,7 +46,10 @@ start(_StartType, _StartArgs) ->
 
 %% @private
 start() ->
-    start(normal, []).
+    application:start(eapi),
+    application:start(sl),
+    application:start(can),
+    application:start(canopen).
 
 %%--------------------------------------------------------------------
 %% @doc
