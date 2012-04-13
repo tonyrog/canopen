@@ -299,7 +299,7 @@ handle_call({set,{Ix,Si},Value}, _From, Ctx) ->
     {Reply,Ctx1} = set_dict_value(Ix,Si,Value,Ctx),
     {reply, Reply, Ctx1};
 handle_call({tpdo_set,I,Value,Mode}, _From, Ctx) ->
-    {Reply,Ctx1} = set_tpdo_data(I,Value,Mode,Ctx),
+    {Reply,Ctx1} = tpdo_set(I,Value,Mode,Ctx),
     {reply, Reply, Ctx1};
 handle_call({direct_set,{Ix,Si},Value}, _From, Ctx) ->
     {Reply,Ctx1} = direct_set_dict_value(Ix,Si,Value,Ctx),
@@ -1379,11 +1379,11 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx=#co_ctx {name = _Name}) ->
 
 handle_sam_mpdo(Ctx=#co_ctx {mpdo_dispatch = MpdoDispatch, name = _Name}, 
 		SourceNid, {SourceIx, SourceSi}, Data ) ->
-    ?dbg(node, "~s: handle_sam_mpdo: Index = ~7.16.0#:~w, Nid = ~.16.0#, Data = ~w", 
+    ?dbg(node, "~s: handle_sam_mpdo: Index = ~.16#:~w, Nid = ~.16.0#, Data = ~w", 
 	 [_Name,SourceIx,SourceSi,SourceNid,Data]),
     case ets:lookup(MpdoDispatch, {SourceIx, SourceSi, SourceNid}) of
 	[{{SourceIx, SourceSi, SourceNid}, LocalIndex = {_LocalIx, _LocalSi}}] ->
-	    ?dbg(node, "~s: handle_sam_mpdo: Found Index = ~7.16.0#:~w, updating", 
+	    ?dbg(node, "~s: handle_sam_mpdo: Found Index = ~.16#:~w, updating", 
 		 [_Name,_LocalIx,_LocalSi]),
 	    rpdo_value(LocalIndex,Data,Ctx);
 	[] ->
@@ -1397,14 +1397,14 @@ handle_sam_mpdo(Ctx=#co_ctx {mpdo_dispatch = MpdoDispatch, name = _Name},
 %% DAM-MPDO
 %%
 handle_dam_mpdo(Ctx, _CobId, Index = {_Ix, _Si}, Data) ->
-    ?dbg(node, "~s: handle_dam_mpdo: Index = ~7.16.0#:~w", [Ctx#co_ctx.name,_Ix,_Si]),
+    ?dbg(node, "~s: handle_dam_mpdo: Index = ~.16#:~w", [Ctx#co_ctx.name,_Ix,_Si]),
     %% Enough ??
     rpdo_value(Index,Data,Ctx).
 
 extended_notify(Ctx=#co_ctx {xnot_table = XNotTable, name = _Name}, Ix, Frame) ->
     case lists:usort(subscribers(XNotTable, Ix)) of
 	[] ->
-	    ?dbg(node, "~s: extended_notify: No xnot subscribers for index ~7.16.0#", 
+	    ?dbg(node, "~s: extended_notify: No xnot subscribers for index ~.16#", 
 		 [_Name, Ix]);
 	PidList ->
 	    lists:foreach(
@@ -1413,10 +1413,10 @@ extended_notify(Ctx=#co_ctx {xnot_table = XNotTable, name = _Name}, Ix, Frame) -
 			  dead ->
 			      %% Warning ??
 			      ?dbg(node, "~s: extended_notify: Process subscribing "
-				   "to index ~7.16.0# is dead", [_Name, Ix]);
+				   "to index ~.16# is dead", [_Name, Ix]);
 			  P when is_pid(P)->
 			      ?dbg(node, "~s: extended_notify: Process ~p subscribes "
-				   "to index ~7.16.0#", [_Name, Pid, Ix]),
+				   "to index ~.16#", [_Name, Pid, Ix]),
 			      gen_server:cast(Pid, {extended_notify, Ix, Frame})
 		      end
 	      end, PidList)
@@ -1589,7 +1589,7 @@ handle_notify(I, Ctx) ->
     NewCtx.
 
 handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg(node, "~s: handle_notify: Index=~7.16.0#",[_Name, I]),
+    ?dbg(node, "~s: handle_notify: Index=~.16#",[_Name, I]),
     case I of
 	?IX_COB_ID_SYNC_MESSAGE ->
 	    update_sync(Ctx);
@@ -1620,7 +1620,7 @@ handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
 		    Ctx
 	    end;
 	_ when I >= ?IX_RPDO_PARAM_FIRST, I =< ?IX_RPDO_PARAM_LAST ->
-	    ?dbg(node, "~s: handle_notify: update RPDO offset=~7.16.0#", 
+	    ?dbg(node, "~s: handle_notify: update RPDO offset=~.16#", 
 		 [_Name, (I-?IX_RPDO_PARAM_FIRST)]),
 	    case load_pdo_parameter(I, (I-?IX_RPDO_PARAM_FIRST), Ctx) of
 		undefined -> 
@@ -1637,7 +1637,7 @@ handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
 		    Ctx
 	    end;
 	_ when I >= ?IX_TPDO_PARAM_FIRST, I =< ?IX_TPDO_PARAM_LAST ->
-	    ?dbg(node, "~s: handle_notify: update TPDO: offset=~7.16.0#",
+	    ?dbg(node, "~s: handle_notify: update TPDO: offset=~.16#",
 		 [_Name, I - ?IX_TPDO_PARAM_FIRST]),
 	    case load_pdo_parameter(I, (I-?IX_TPDO_PARAM_FIRST), Ctx) of
 		undefined -> Ctx;
@@ -1946,7 +1946,7 @@ add_subscription(Tab, Ix, Key) ->
 add_subscription(Tab, Ix1, Ix2, Key) 
   when ?is_index(Ix1), ?is_index(Ix2), 
        Ix1 =< Ix2 ->
-    ?dbg(node, "add_subscription: ~7.16.0#:~7.16.0# for ~w", 
+    ?dbg(node, "add_subscription: ~.16#:~.16# for ~w", 
 	 [Ix1, Ix2, Key]),
     I = co_iset:new(Ix1, Ix2),
     case ets:lookup(Tab, Key) of
@@ -1961,7 +1961,7 @@ remove_subscription(Tab, Ix, Key) ->
     remove_subscription(Tab, Ix, Ix, Key).
 
 remove_subscription(Tab, Ix1, Ix2, Key) when Ix1 =< Ix2 ->
-    ?dbg(node, "remove_subscription: ~7.16.0#:~7.16.0# for ~w", 
+    ?dbg(node, "remove_subscription: ~.16#:~.16# for ~w", 
 	 [Ix1, Ix2, Key]),
     case ets:lookup(Tab, Key) of
 	[] -> ok;
@@ -2010,12 +2010,12 @@ add_reservation(_Tab, [], _Mod, _Pid) ->
 add_reservation(Tab, [Ix | Tail], Mod, Pid) ->
     case ets:lookup(Tab, Ix) of
 	[] -> 
-	    ?dbg(node, "add_reservation: ~7.16.0# for ~w",[Ix, Pid]), 
+	    ?dbg(node, "add_reservation: ~.16# for ~w",[Ix, Pid]), 
 	    ets:insert(Tab, {Ix, Mod, Pid}), 
 	    add_reservation(Tab, Tail, Mod, Pid);
 	[{Ix, Mod, dead}] ->  %% M or Mod ???
 	    ok, 
-	    ?dbg(node, "add_reservation: renewing ~7.16.0# for ~w",[Ix, Pid]), 
+	    ?dbg(node, "add_reservation: renewing ~.16# for ~w",[Ix, Pid]), 
 	    ets:insert(Tab, {Ix, Mod, Pid}), 
 	    add_reservation(Tab, Tail, Mod, Pid);
 	[{Ix, _M, Pid}] -> 
@@ -2029,14 +2029,14 @@ add_reservation(Tab, [Ix | Tail], Mod, Pid) ->
 
 
 add_reservation(_Tab, Ix1, Ix2, _Mod, _Pid) when Ix1 < ?MAN_SPEC_MIN;
-						Ix2 < ?MAN_SPEC_MIN->
-    ?dbg(node, "add_reservation: not possible for ~7.16.0#:~7.16.0# for ~w", 
+						 Ix2 < ?MAN_SPEC_MIN->
+    ?dbg(node, "add_reservation: not possible for ~.16#:~w for ~w", 
 	 [Ix1, Ix2, _Pid]),
     {error, not_possible_to_reserve};
 add_reservation(Tab, Ix1, Ix2, Mod, Pid) when ?is_index(Ix1), ?is_index(Ix2), 
 					      Ix1 =< Ix2, 
 					      is_pid(Pid) ->
-    ?dbg(node, "add_reservation: ~7.16.0#:~7.16.0# for ~w", 
+    ?dbg(node, "add_reservation: ~.16#:~w for ~w", 
 	 [Ix1, Ix2, Pid]),
     add_reservation(Tab, lists:seq(Ix1, Ix2), Mod, Pid).
 	    
@@ -2048,7 +2048,7 @@ remove_reservations(Tab, Pid) ->
 remove_reservation(_Tab, [], _Pid) ->
     ok;
 remove_reservation(Tab, [Ix | Tail], Pid) ->
-    ?dbg(node, "remove_reservation: ~7.16.0# for ~w", [Ix, Pid]),
+    ?dbg(node, "remove_reservation: ~.16# for ~w", [Ix, Pid]),
     case ets:lookup(Tab, Ix) of
 	[] -> 
 	    ok, 
@@ -2063,7 +2063,7 @@ remove_reservation(Tab, [Ix | Tail], Pid) ->
     end.
 
 remove_reservation(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
-    ?dbg(node, "remove_reservation: ~7.16.0#:~7.16.0# for ~w", 
+    ?dbg(node, "remove_reservation: ~.16#:~.16# for ~w", 
 	 [Ix1, Ix2, Pid]),
     remove_reservation(Tab, lists:seq(Ix1, Ix2), Pid).
 
@@ -2073,7 +2073,7 @@ reset_reservations(Tab, Pid) ->
 reset_reservation(_Tab, [], _Pid) ->
     ok;
 reset_reservation(Tab, [Ix | Tail], Pid) ->
-    ?dbg(node, "reset_reservation: ~7.16.0# for ~w", [Ix, Pid]),
+    ?dbg(node, "reset_reservation: ~.16# for ~w", [Ix, Pid]),
     case ets:lookup(Tab, Ix) of
 	[] -> 
 	    ok, 
@@ -2192,44 +2192,44 @@ update_nmt_value(Key,Value,E) when is_record(E, nmt_entry) ->
 %%
 %% Callback functions for changes in tpdo elements
 %%
-set_tpdo_data({_Ix, _Si} = I, Data, Mode,
+tpdo_set({_Ix, _Si} = I, Data, Mode,
 	       Ctx=#co_ctx {tpdo_cache = Cache, name = _Name}) ->
-    ?dbg(node, "~s: set_tpdo_data: Ix = ~.16#:~w, Data = ~w, Mode ~p",
+    ?dbg(node, "~s: tpdo_set: Ix = ~.16#:~w, Data = ~w, Mode ~p",
 	 [_Name, _Ix, _Si, Data, Mode]), 
     case {ets:lookup(Cache, I), Mode} of
 	{[], _} ->
 	    %% Previously unknown tpdo element, probably in sam_mpdo
 	    %% with block size > 1
 	    %% Insert ??
-	    ?dbg(node, "~s: set_tpdo_data: inserting first value for "
+	    ?dbg(node, "~s: tpdo_set: inserting first value for "
 		 "previously unknown tpdo element.",
 		 [_Name]), 
 	    ets:insert(Cache, {I, [Data]}),
 	    {ok, Ctx};
 	    %% io:format("WARNING!" 
-	    %% "~s: set_tpdo_data: unknown tpdo element\n", [_Name]),
+	    %% "~s: tpdo_set: unknown tpdo element\n", [_Name]),
 	    %% {{error,unknown_tpdo_element}, Ctx};
 	{[{I, OldData}], append} when length(OldData) >= ?MAX_TPDO_CACHE->
-	    error_logger:warning_msg( "~s: set_tpdo_data: tpdo cache for ~.16#:~w "
+	    error_logger:warning_msg( "~s: tpdo_set: tpdo cache for ~.16#:~w "
 				      "full.\n", [_Name,  _Ix, _Si]),
 	    {{error, tpdo_cache_full}, Ctx};
 	{[{I, OldData}], append} ->
 	    NewData = case OldData of
-			    [0] -> [Data]; %% remove default
+			    [(<<>>)] -> [Data]; %% remove default
 			    _List -> OldData ++ [Data]
 			end,
-	    ?dbg(node, "~s: set_tpdo_data: append, old = ~p, new = ~p",
+	    ?dbg(node, "~s: tpdo_set: append, old = ~p, new = ~p",
 		 [_Name, OldData, NewData]), 
 	    try ets:insert(Cache,{I,NewData}) of
 		true -> {ok, Ctx}
 	    catch
 		error:Reason -> 
-		    error_logger:warning_msg("~s: set_tpdo_data: insert of ~p failed, "
+		    error_logger:warning_msg("~s: tpdo_set: insert of ~p failed, "
 					     "reason = ~w\n", [_Name, NewData, Reason]),
 		    {{error,Reason}, Ctx}
 	    end;
 	{[{I, _OldData}], overwrite} ->
-	    ?dbg(node, "~s: set_tpdo_data: overwrite, old = ~p, new = ~p",
+	    ?dbg(node, "~s: tpdo_set: overwrite, old = ~p, new = ~p",
 		 [_Name, _OldData, Data]), 
 	    ets:insert(Cache, {I, [Data]}),
 	    {ok, Ctx}
@@ -2270,13 +2270,15 @@ rpdo_set([], [], Ctx) ->
     Ctx.
 
 %%
-%% read PDO mapping  => {MapType,[{Type,Len}],[Index]}
+%% read PDO mapping  => {tpdo | dam_mpdo, [{Index, Len}} |
+%%                      {sam_mpdo, [{{Index,BlockSize}, Len}} 
 %%
 pdo_mapping(Ix, _TpdoCtx=#tpdo_ctx {dict = Dict, res_table = ResTable, 
 				   tpdo_cache = TpdoCache}) ->
+    ?dbg(node, "pdo_mapping: api call for ~.16#", [Ix]),
     pdo_mapping(Ix, ResTable, Dict, TpdoCache).
 pdo_mapping(Ix, ResTable, Dict, TpdoCache) ->
-    ?dbg(node, "pdo_mapping: ~7.16.0#", [Ix]),
+    ?dbg(node, "pdo_mapping: ~.16#", [Ix]),
     case co_dict:value(Dict, Ix, 0) of
 	{ok,N} when N >= 0, N =< 64 -> %% Standard tpdo/rpdo
 	    MType = case Ix of
@@ -2308,32 +2310,32 @@ pdo_mapping(MType,_Ix,Si,Sn,Is,_ResTable,_Dict,_TpdoCache) when Si > Sn ->
 	 [MType, Is]),
     {MType, reverse(Is)};
 pdo_mapping(MType,Ix,Si,Sn,Is,ResTable,Dict,TpdoCache) -> 
-    ?dbg(node, "pdo_mapping: type = ~p, index = ~7.16.0#:~w", [MType,Ix,Si]),
+    ?dbg(node, "pdo_mapping: type = ~p, index = ~.16#:~w", [MType,Ix,Si]),
     case co_dict:value(Dict, Ix, Si) of
 	{ok,Map} ->
-	    ?dbg(node, "pdo_mapping: map = ~11.16.0#", [Map]),
+	    ?dbg(node, "pdo_mapping: map = ~.16#", [Map]),
 	    Index = {_I,_S} = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
-	    ?dbg(node, "pdo_mapping: entry[~w] = {~7.16.0#:~w}", 
+	    ?dbg(node, "pdo_mapping: entry[~w] = {~.16#:~w}", 
 		 [Si,_I,_S]),
 	    maybe_inform_reserver(MType, Index, ResTable, Dict, TpdoCache),
 	    pdo_mapping(MType,Ix,Si+1,Sn,
 			[{Index, ?PDO_MAP_BITS(Map)}|Is], 
 			ResTable, Dict, TpdoCache);
 	Error ->
-	    ?dbg(node, "pdo_mapping: ~7.16.0#:~w = Error ~w", 
+	    ?dbg(node, "pdo_mapping: ~.16#:~w = Error ~w", 
 		 [Ix,Si,Error]),
 	    Error
     end.
 
 mpdo_mapping(MType,Ix,ResTable,Dict,TpdoCache) 
   when MType == sam_mpdo andalso is_integer(Ix) ->
-    ?dbg(node, "mpdo_mapping: index = ~7.16.0#", [Ix]),
+    ?dbg(node, "mpdo_mapping: index = ~.16#", [Ix]),
     case co_dict:value(Dict, Ix, 1) of
 	{ok,Map} ->
 	   Index = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
 	   mpdo_mapping(MType,Index,ResTable,Dict,TpdoCache);
 	Error ->
-	    ?dbg(node, "mpdo_mapping: ~7.16.0# = Error ~w", [Ix,Error]),
+	    ?dbg(node, "mpdo_mapping: ~.16# = Error ~w", [Ix,Error]),
 	    Error
     end;
 mpdo_mapping(MType,{IxInScanList,SiInScanList},ResTable,Dict,TpdoCache) 
@@ -2342,14 +2344,14 @@ mpdo_mapping(MType,{IxInScanList,SiInScanList},ResTable,Dict,TpdoCache)
        IxInScanList =< ?IX_OBJECT_SCANNER_LAST  ->
     %% MPDO Producer mapping
     %% The entry in PDO Map has been read, now read the entry in MPDO Scan List
-    ?dbg(node, "mpdo_mapping: sam_mpdo, scan index = ~7.16.0#:~w", 
+    ?dbg(node, "mpdo_mapping: sam_mpdo, scan index = ~.16#:~w", 
 	 [IxInScanList,SiInScanList]),
     case co_dict:value(Dict, IxInScanList, SiInScanList) of
 	{ok, Map} ->
-	    ?dbg(node, "mpdo_mapping: map = ~11.16.0#", [Map]),
+	    ?dbg(node, "mpdo_mapping: map = ~.16#", [Map]),
 	    Index = {_Ix,_Si} = {?TMPDO_MAP_INDEX(Map),?TMPDO_MAP_SUBIND(Map)},
 	    BlockSize = ?TMPDO_MAP_SIZE(Map), %% TODO ????
-	    ?dbg(node, "mpdo_mapping: sam_mpdo, local index = ~7.16.0#:~w", [_Ix,_Si]),
+	    ?dbg(node, "mpdo_mapping: sam_mpdo, local index = ~.16#:~w", [_Ix,_Si]),
 	    maybe_inform_reserver(MType, Index, ResTable, Dict, TpdoCache),
 	    {MType, [{{Index, BlockSize}, ?MPDO_DATA_SIZE}]};
 	Error ->
@@ -2359,10 +2361,10 @@ mpdo_mapping(MType,{IxInScanList,SiInScanList},ResTable,Dict,TpdoCache)
 maybe_inform_reserver(MType, {Ix, _Si} = Index, ResTable, _Dict, TpdoCache) ->
     case reserver_with_module(ResTable, Ix) of
 	[] ->
-	    ?dbg(node, "maybe_inform_reserver: No reserver for index ~7.16.0#", [Ix]),
+	    ?dbg(node, "maybe_inform_reserver: No reserver for index ~.16#", [Ix]),
 	    ok;
 	{Pid, _Mod} when is_pid(Pid)->
-	    ?dbg(node, "maybe_inform_reserver: Process ~p has reserved index ~7.16.0#", 
+	    ?dbg(node, "maybe_inform_reserver: Process ~p has reserved index ~.16#", 
 		 [Pid, Ix]),
 
 	    %% Handle differently when TPDO and RPDO
@@ -2370,14 +2372,20 @@ maybe_inform_reserver(MType, {Ix, _Si} = Index, ResTable, _Dict, TpdoCache) ->
 		rpdo ->
 		    ok;
 		T when T == tpdo orelse T == sam_mpdo orelse T == dam_mpdo ->
+
 		    %% Store default value in cache ??
-		    ets:insert(TpdoCache, {Index, [0]}),
+		    case ets:lookup(TpdoCache, Index) of
+			[] ->
+			    ets:insert(TpdoCache, {Index, [(<<>>)]});
+			[_Something] ->
+			    do_nothing
+		    end,
 		    gen_server:cast(Pid, {index_in_tpdo, Index}),
 		    ok
 	    end;
 	{dead, _Mod} ->
 	    ?dbg(node, "maybe_inform_reserver: "
-		 "Reserver process for index ~7.16.0# dead.", [Ix]),
+		 "Reserver process for index ~.16# dead.", [Ix]),
 	    {error, ?abort_internal_error}; %% ???
 	_Other ->
 	    ?dbg(node, "maybe_inform_reserver: "
@@ -2388,15 +2396,15 @@ maybe_inform_reserver(MType, {Ix, _Si} = Index, ResTable, _Dict, TpdoCache) ->
 tpdo_data({Ix, Si} = I, ResTable, Dict, TpdoCache) ->
     case reserver_with_module(ResTable, Ix) of
 	[] ->
-	    ?dbg(node, "tpdo_data: No reserver for index ~7.16.0#", [Ix]),
+	    ?dbg(node, "tpdo_data: No reserver for index ~.16#", [Ix]),
 	    co_dict:data(Dict, Ix, Si);
 	{Pid, _Mod} when is_pid(Pid)->
-	    ?dbg(node, "tpdo_data: Process ~p has reserved index ~7.16.0#", 
+	    ?dbg(node, "tpdo_data: Process ~p has reserved index ~.16#", 
 		 [Pid, Ix]),
 	    %% Value cached ??
 	    cache_value(TpdoCache, I);
 	{dead, _Mod} ->
-	    ?dbg(node, "tpdo_data: Reserver process for index ~7.16.0# dead.", 
+	    ?dbg(node, "tpdo_data: Reserver process for index ~.16# dead.", 
 		 [Ix]),
 	    %% Value cached??
 	    cache_value(TpdoCache, I);
@@ -2405,17 +2413,18 @@ tpdo_data({Ix, Si} = I, ResTable, Dict, TpdoCache) ->
 	    error_logger:error_msg("~p: tpdo_data: unknown tpdo element\n", [self()]),
 	    ?dbg(node, "tpdo_data: Other case = ~p, returning default value.", 
 		 [_Other]),
-	    {ok, [0]}
+	    {ok, [(<<>>)]}
     end.
 
-cache_value(Cache, I) ->
+cache_value(Cache, I = {_Ix, _Si}) ->
     case ets:lookup(Cache, I) of
 	[] ->
 	    %% How handle ???
-	    error_logger:error_msg( "~p: cache_value: unknown tpdo element\n", [self()]),
-	    ?dbg(node, "cache_value: tpdo element not found, returning default value.", 
-		 []),
-	    {ok, [0]};
+	    error_logger:warning_msg( "~p: cache_value: unknown tpdo element "
+				      "~.16#:~w\n", [self(), _Ix, _Si]),
+	    ?dbg(node, "cache_value: tpdo element not found for ~.16#:~w, "
+		 "returning default value.",  [_Ix, _Si]),
+	    {error, no_value};
 	[{I,[LastValue | []]}]  ->
 	    %% Leave last value in cache
 	    ?dbg(node, "cache_value: Last value = ~p.", [LastValue]),
@@ -2432,7 +2441,7 @@ cache_value(Cache, I) ->
 rpdo_value({Ix,Si},Data,Ctx) ->
     case reserver_with_module(Ctx#co_ctx.res_table, Ix) of
 	[] ->
-	    ?dbg(node, "rpdo_value: No reserver for index ~7.16.0#", [Ix]),
+	    ?dbg(node, "rpdo_value: No reserver for index ~.16#", [Ix]),
 	    try co_dict:set_data(Ctx#co_ctx.dict, Ix, Si, Data) of
 		ok -> 
 		    handle_notify(Ix, Ctx);
@@ -2445,7 +2454,7 @@ rpdo_value({Ix,Si},Data,Ctx) ->
 		    Ctx
 	    end;
 	{Pid, Mod} when is_pid(Pid)->
-	    ?dbg(node, "rpdo_value: Process ~p has reserved index ~7.16.0#", 
+	    ?dbg(node, "rpdo_value: Process ~p has reserved index ~.16#", 
 		 [Pid, Ix]),
 	    case co_set_fsm:start({Pid, Mod}, {Ix, Si}, Data) of
 		{ok, _FsmPid} -> 
@@ -2460,7 +2469,7 @@ rpdo_value({Ix,Si},Data,Ctx) ->
 		    Ctx
 	    end;
 	{dead, _Mod} ->
-	    ?dbg(node, "rpdo_value: Reserver process for index ~7.16.0# dead.", 
+	    ?dbg(node, "rpdo_value: Reserver process for index ~.16# dead.", 
 		 [Ix]),
 	    Ctx;
 	_Other ->

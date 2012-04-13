@@ -41,7 +41,6 @@
 	{
 	  co_node,
 	  tpdo_dict,
-	  state = init,
 	  starter
 	}).
 
@@ -82,7 +81,7 @@ stop() ->
 index_specification(_Pid, {Index, SubInd} = I) ->
     ?dbg("index_specification: ~.16B:~.8B ",[Index, SubInd]),
     case ets:lookup(tpdo_dict, I) of
-	[{I, Type, _Value}] ->
+	[{I, Type, _Value, _State}] ->
 	    Spec = #index_spec{index = I,
 			       type = co_test_lib:type(Type),
 			       access = ?ACCESS_RW,
@@ -98,7 +97,7 @@ index_specification(Pid, Index) when is_integer(Index) ->
 value(_Pid, {Index, SubInd} = I) ->
     ?dbg("value: ~.16B:~.8B ",[Index, SubInd]),
     case ets:lookup(tpdo_dict, I) of
-	[{I, _Type, Value}] ->
+	[{I, _Type, Value, _State}] ->
 	    gen_server:cast(?MODULE, {value, I}),
 	    {ok, Value};
 	[] ->
@@ -110,8 +109,8 @@ value(Pid, Index) when is_integer(Index) ->
 set(_Pid, {Index, SubInd} = I, NewValue) ->
     ?dbg("value: ~.16B:~.8B ",[Index, SubInd]),
     case ets:lookup(tpdo_dict, I) of
-	[{I, Type, _Value}] ->
-	    ets:insert(tpdo_dict, {I, Type, NewValue}),
+	[{I, Type, _Value, State}] ->
+	    ets:insert(tpdo_dict, {I, Type, NewValue, State}),
 	    gen_server:cast(?MODULE, {set, I, NewValue, Type}),
 	    ok;
 	[] ->
@@ -147,10 +146,11 @@ init([CoSerial, IndexList, Starter]) ->
 
 load_dict(CoSerial, DictTable, IndexList) ->
     ?dbg("Dict ~p", [IndexList]),
-    lists:foreach(fun({{Index, _SubInd}, _Type, _Value} = Entry) ->
+    lists:foreach(fun({Index = {Ix,_Si}, Type, Value}) ->
+			  Entry = {Index, Type, Value, init},
 			  ets:insert(DictTable, Entry),
 			  ?dbg("Inserting entry = ~p", [Entry]),
-			  co_api:reserve(CoSerial, Index, ?MODULE)
+			  co_api:reserve(CoSerial, Ix, ?MODULE)
 		  end, IndexList).
 
 %%--------------------------------------------------------------------
@@ -162,33 +162,18 @@ load_dict(CoSerial, DictTable, IndexList) ->
 %%                                   {stop, Reason, Reply, LD} |
 %%                                   {stop, Reason, LD}
 %%
-%% Request = {get, Index, SubIndex} |
-%%           {set, Index, SubInd, Value}
-%% LD = term()
-%% Index = integer()
-%% SubInd = integer()
-%% Value = term()
-%%
-%% @doc
-%% Handling call messages.
-%% Required to at least handle get and set requests as specified above.
-%% Handling all non call/cast messages.
-%% Required to at least handle a notify msg as specified above. <br/>
-%% Index = Index in Object Dictionary <br/>
-%% SubInd = Sub index in Object Disctionary  <br/>
-%% Value = Any value the node chooses to send.
-%% 
 %% @end
 %%--------------------------------------------------------------------
 handle_call(loop_data, _From, LD) ->
     io:format("~p: LD = ~p", [?MODULE, LD]),
     {reply, ok, LD};
+
 handle_call(stop, _From, LD=#loop_data {co_node = CoNode}) ->
     ?dbg("handle_call: stop",[]),
     case co_api:alive(CoNode) of
 	true ->
 	    lists:foreach(
-	      fun({{Index, _SubInd}, _Type, _Value}) ->
+	      fun({{Index, _SubInd}, _Type, _Value, _State}) ->
 		      co_api:unreserve(CoNode, Index)
 	      end, ets:tab2list(LD#loop_data.tpdo_dict)),
 	    ?dbg("stop: unsubscribed.",[]),
@@ -198,6 +183,7 @@ handle_call(stop, _From, LD=#loop_data {co_node = CoNode}) ->
     end,
     ?dbg("handle_call: stop detached.",[]),
     {stop, normal, ok, LD};
+
 handle_call(Request, _From, LD) ->
     ?dbg("handle_call: bad call ~p.",[Request]),
     {reply, {error,bad_call}, LD}.
@@ -210,38 +196,55 @@ handle_call(Request, _From, LD) ->
 %% @doc
 %% Handling cast messages:
 %% <ul>
-%% <li>  callback </li>
+%% <li>  index_in_tpdo </li>
 %% <li>  value </li>
 %% <li>  set </li>
 %% </ul>
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({index_in_tpdo, {_Ix, _Si} = I}, 
-	    LD=#loop_data {co_node = CoNode, state = State}) ->
+	    LD=#loop_data {co_node = CoNode}) ->
     ?dbg("handle_cast: index_in_tpdo called for ~.16B:~.8B", [_Ix, _Si]),
 
     case ets:lookup(tpdo_dict, I) of
-	[{I, Type, Value}] ->
-	    if State == init ->
-		    ok = co_api:tpdo_set(CoNode, I, {Value, Type}, overwrite);
-	       true ->
-		    do_nothing
-	    end;
+	[{I, Type, Value, init}] ->
+	    ?dbg("handle_cast: store init value ~p in cache", [Value]),
+	    ok = co_api:tpdo_set(CoNode, I, {Value, Type}, overwrite),
+	    ets:insert(tpdo_dict, {I, Type, Value, first});
+	[{I, _Type, _Value, first}] ->
+	    do_nothing;
 	[] ->
 	    %% Hmmm
 	    ?dbg("handle_cast: unknown index!!!",[])
     end,
-    {noreply, LD#loop_data {state = up}};
+    {noreply, LD};
+
 handle_cast({value, {_Ix, _Si}}, LD) ->
     ?dbg("handle_cast: value called for ~.16B:~.8B ",[_Ix, _Si]),
 %%    LD#loop_data.starter ! Msg,
     {noreply, LD};
+
 handle_cast({set, {_Ix, _Si} = I, Value, Type}, 
 	    LD=#loop_data {co_node = CoNode}) ->
     ?dbg("handle_cast: set called for ~.16B:~w with ~p",[_Ix, _Si, Value]),
-    ok = co_api:tpdo_set(CoNode, I, {Value, Type}, append),
+    case ets:lookup(tpdo_dict, I) of
+	[{I, Type, Value, State}] when State == init;
+				       State == first ->
+	    ?dbg("handle_cast: store first set value ~p in cache", [Value]),
+	    ok = co_api:tpdo_set(CoNode, I, {Value, Type}, overwrite),
+	    ets:insert(tpdo_dict, {I, Type, Value, more});
+	[{I, Type, Value, more}] ->
+	    ?dbg("handle_cast: store more values ~p in cache", [Value]),
+	    ok = co_api:tpdo_set(CoNode, I, {Value, Type}, append);
+	[{I, Type, Value, _Other}] ->
+	    do_nothing;
+	[] ->
+	    %% Hmmm
+	    ?dbg("handle_cast: unknown index!!!",[])
+    end,
  %%   LD#loop_data.starter ! Msg,
     {noreply, LD};
+
 handle_cast(_Msg, LD) ->
     ?dbg("handle_cast: Unknown message ~p. ", [_Msg]),
     {noreply, LD}.

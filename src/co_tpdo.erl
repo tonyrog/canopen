@@ -371,7 +371,7 @@ update_param_int(Param, S) ->
  
 
 tpdo_mapping(Offset, Ctx) ->
-    ?dbg(tpdo, "tpdo_mapping: offset=~8.16.0#", [Offset]),
+    ?dbg(tpdo, "tpdo_mapping: offset=~.16#", [Offset]),
     case co_api:tpdo_mapping(Offset, Ctx) of
 	{Type, Mapping} -> 
 	    ?dbg(tpdo, "tpdo_mapping: ~p mapping = ~p", [Type, Mapping]),
