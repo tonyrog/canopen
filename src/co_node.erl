@@ -140,7 +140,8 @@ reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
 		  {stop, Reason::atom()}.
 
 
-init({Serial, NodeName, Opts}) ->
+init({Serial, NodeName, Opts} = Args) ->
+    error_logger:info_msg("~p: init: args = ~p,\n pid = ~p\n", [?MODULE, Args, self()]),
 
     %% Trace output enable/disable
     put(dbg, proplists:get_value(debug,Opts,false)), 
@@ -218,8 +219,8 @@ init({Serial, NodeName, Opts}) ->
 		    {ok, reset_application(Ctx1)}
 		end;
 	{error, Reason} ->
-	    io:format("WARNING! ~p: Loading of dict failed, exiting\n", 
-		      [Ctx#co_ctx.name]),
+	    error_logger:error_msg(" ~p: Loading of dict failed, reason = ~p, "
+				   "exiting.\n", [NodeName, Reason]),
 	    {stop, Reason}
     end.
 
@@ -238,18 +239,18 @@ reg(Term) ->
 %%
 %%
 %%
-reset_application(Ctx) ->
-    io:format("Node '~s' id=~w,~w reset_application\n", 
-	      [Ctx#co_ctx.name, Ctx#co_ctx.xnodeid, Ctx#co_ctx.nodeid]),
+reset_application(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
+    error_logger:info_msg("Node '~s' id=~w,~w reset_application\n", 
+	      [Name, XNodeId, SNodeId]),
     reset_communication(Ctx).
 
-reset_communication(Ctx) ->
-    io:format("Node '~s' id=~w,~w reset_communication\n",
-	      [Ctx#co_ctx.name, Ctx#co_ctx.xnodeid, Ctx#co_ctx.nodeid]),
+reset_communication(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
+    error_logger:info_msg("Node '~s' id=~w,~w reset_communication\n",
+	      [Name, XNodeId, SNodeId]),
     initialization(Ctx).
 
 initialization(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
-    io:format("Node '~s' id=~w,~w initialization\n",
+    error_logger:info_msg("Node '~s' id=~w,~w initialization\n",
 	      [Name, XNodeId, SNodeId]),
 
     %% ??
@@ -1346,16 +1347,15 @@ handle_sdo_tx(Frame, Tx, Rx, Ctx) ->
 %% SDO rx - here we receive client requests
 %% FIXME: conditional compile this
 %%
-handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
+handle_sdo_rx(Frame, Rx, Tx, Ctx=#co_ctx {name = _Name}) ->
     ?dbg(node, "~s: handle_sdo_rx: ~s", 
-	      [Ctx#co_ctx.name,
-	       co_format:format_sdo(co_sdo:decode_rx(Frame#can_frame.data))]),
+	      [_Name,co_format:format_sdo(co_sdo:decode_rx(Frame#can_frame.data))]),
     ID = {Rx,Tx},
     Sessions = Ctx#co_ctx.sdo_list,
     case lists:keysearch(ID,#sdo.id,Sessions) of
 	{value, S} ->
 	    ?dbg(node, "~s: handle_sdo_rx: Frame sent to old process ~p", 
-		 [Ctx#co_ctx.name,S#sdo.pid]),
+		 [_Name,S#sdo.pid]),
 	    gen_fsm:send_event(S#sdo.pid, Frame),
 	    Ctx;
 	false ->
@@ -1363,15 +1363,14 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx) ->
 	    %% like late aborts etc here !!!
 	    case co_sdo_srv_fsm:start(Ctx#co_ctx.sdo,Rx,Tx) of
 		{error, Reason} ->
-		    io:format("WARNING!" 
-			      "~p: unable to start co_sdo_srv_fsm: ~p\n",
-			      [Ctx#co_ctx.name, Reason]),
+		   error_logger:warning_msg("~p: unable to start co_sdo_srv_fsm: ~p\n",
+					    [_Name, Reason]),
 		    Ctx;
 		{ok,Pid} ->
 		    Mon = erlang:monitor(process, Pid),
 		    sys:trace(Pid, true),
 		    ?dbg(node, "~s: handle_sdo_rx: Frame sent to new process ~p", 
-			 [Ctx#co_ctx.name,Pid]),		    
+			 [_Name,Pid]),		    
 		    gen_fsm:send_event(Pid, Frame),
 		    S = #sdo { id=ID, pid=Pid, mon=Mon },
 		    Ctx#co_ctx { sdo_list = [S|Sessions]}
@@ -1397,7 +1396,7 @@ handle_sam_mpdo(Ctx=#co_ctx {mpdo_dispatch = MpdoDispatch, name = _Name},
 %%
 %% DAM-MPDO
 %%
-handle_dam_mpdo(Ctx, CobId, Index = {_Ix, _Si}, Data) ->
+handle_dam_mpdo(Ctx, _CobId, Index = {_Ix, _Si}, Data) ->
     ?dbg(node, "~s: handle_dam_mpdo: Index = ~7.16.0#:~w", [Ctx#co_ctx.name,_Ix,_Si]),
     %% Enough ??
     rpdo_value(Index,Data,Ctx).
@@ -1446,7 +1445,7 @@ handle_sdo_process(S, Reason, Ctx) ->
 maybe_warning(normal, _Type, _Name) ->
     ok;
 maybe_warning(Reason, Type, Name) ->
-    io:format("WARNING! ~s: ~s died: ~p\n", [Name, Type, Reason]).
+    error_logger:error_msg("~s: ~s died: ~p\n", [Name, Type, Reason]).
 
 handle_app_processes(Pid, Reason, Ctx) when is_pid(Pid)->
     case lists:keysearch(Pid, #app.pid, Ctx#co_ctx.app_list) of
@@ -1460,8 +1459,8 @@ handle_app_processes(Ref, Reason, Ctx) ->
     end.
 
 handle_app_process(A, Reason, Ctx) ->
-    io:format("WARNING! ~s: id=~w application died:~p\n", 
-	      [Ctx#co_ctx.name,A#app.pid, Reason]),
+    error_logger:error_msg("~s: id=~w application died:~p\n", 
+			   [Ctx#co_ctx.name,A#app.pid, Reason]),
     remove_subscriptions(Ctx#co_ctx.sub_table, A#app.pid), %% Or reset ??
     reset_reservations(Ctx#co_ctx.res_table, A#app.pid),
     %% FIXME: restart application? application_mod ?
@@ -1478,19 +1477,20 @@ handle_tpdo_processes(Ref, Reason, Ctx) ->
 	false -> Ctx
     end.
 
-handle_tpdo_process(T, Reason, Ctx) ->
-    io:format("WARNING! ~s: id=~w tpdo process died: ~p\n", 
-	      [Ctx#co_ctx.name,T#tpdo.pid, Reason]),
+handle_tpdo_process(T=#tpdo {pid = _Pid, offset = _Offset}, _Reason, 
+		    Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
+    error_logger:error_msg("~s: id=~w tpdo process died: ~p\n", 
+			   [_Name,_Pid, _Reason]),
     case restart_tpdo(T, Ctx) of
-	{error, Error} ->
-	    io:format("WARNING! ~s: not possible to restart "
-		      "tpdo process for offset ~p, reason = ~p\n", 
-		      [Ctx#co_ctx.name,T#tpdo.offset,Error]),
+	{error, _Error} ->
+	    error_logger:error_msg(" ~s: not possible to restart "
+				   "tpdo process for offset ~p, reason = ~p\n", 
+				   [_Name,_Offset,_Error]),
 	    Ctx;
 	NewT ->
 	    ?dbg(node, "~s: handle_tpdo_processes: new tpdo process ~p started", 
-		 [Ctx#co_ctx.name, NewT#tpdo.pid]),
-	    Ctx#co_ctx { tpdo_list = [NewT | Ctx#co_ctx.tpdo_list]--[T]}
+		 [_Name, NewT#tpdo.pid]),
+	    Ctx#co_ctx { tpdo_list = [NewT | TList]--[T]}
     end.
 
 
@@ -1692,9 +1692,9 @@ update_mpdo_disp(Ctx=#co_ctx {dict = Dict, name = _Name}, I) ->
  	    update_mpdo_disp1(Ctx, Ixs)
     catch
 	error:_Reason ->
-	    io:format("WARNING!" 
-		      "~s: update_mpdo_disp: reading dict failed, reason = ~w\n", 
-			      [_Name, _Reason]),
+	    error_logger:warning_msg("~s: update_mpdo_disp: reading dict, "
+				     "index  ~.16#:~w failed, reason = ~w\n",  
+				     [_Name, I, 0, _Reason]),
 	    Ctx
     end.
 
@@ -1702,7 +1702,7 @@ update_mpdo_disp1(Ctx, []) ->
     Ctx;
 update_mpdo_disp1(Ctx=#co_ctx {dict = Dict, mpdo_dispatch = MpdoDisp, name = _Name}, 
 		 [Index = {_Ix, _Si} | Ixs]) ->
-    ?dbg(node, "~s: update_mpdo_disp: index ~.16.0#:~w ", [_Name, _Ix, _Si]),
+    ?dbg(node, "~s: update_mpdo_disp: index ~.16#:~w ", [_Name, _Ix, _Si]),
     try co_dict:direct_value(Dict,Index) of
 	Map ->
 	    {SourceIx, SourceSi, SourceNid} = 
@@ -1717,9 +1717,9 @@ update_mpdo_disp1(Ctx=#co_ctx {dict = Dict, mpdo_dispatch = MpdoDisp, name = _Na
 	    insert_mpdo_disp(MpdoDisp,EntryList)
     catch
 	error:_Reason ->
-	    io:format("WARNING!" 
-		      "~s: update_mpdo_disp: reading dict failed, reason = ~w\n", 
-			      [_Name, _Reason])
+	    error_logger:warning_msg("~s: update_mpdo_disp: reading dict, "
+				     "index  ~.16#:~w failed, reason = ~w\n",  
+				     [_Name, _Ix, _Si, _Reason])
     end,
     update_mpdo_disp1(Ctx, Ixs).
     
@@ -1867,7 +1867,7 @@ restart_tpdo(T=#tpdo {offset = Offset, rc = RC},
 
 
 
-load_pdo_parameter(I, Offset, Ctx=#co_ctx {dict = Dict, name = _Name}) ->
+load_pdo_parameter(I, Offset, _Ctx=#co_ctx {dict = Dict, name = _Name}) ->
     ?dbg(node, "~s: load_pdo_parameter ~p + ~p", [_Name, I, Offset]),
     case load_list(Dict, [{I, ?SI_PDO_COB_ID}, 
 			  {I,?SI_PDO_TRANSMISSION_TYPE, 255},
@@ -1889,7 +1889,7 @@ load_pdo_parameter(I, Offset, Ctx=#co_ctx {dict = Dict, name = _Name}) ->
     end.
     
 
-load_sdo_parameter(I, Ctx=#co_ctx {dict = Dict}) ->
+load_sdo_parameter(I, _Ctx=#co_ctx {dict = Dict}) ->
     case load_list(Dict, [{I,?SI_SDO_CLIENT_TO_SERVER},{I,?SI_SDO_SERVER_TO_CLIENT},
 			  {I,?SI_SDO_NODEID,undefined}]) of
 	[CS,SC,NodeID] ->
@@ -1919,7 +1919,7 @@ load_list(Dict, [{Ix,Si,Default}|List],Acc) ->
 load_list(_Dict, [], Acc) ->
     reverse(Acc).
 
-index_defined([], Ctx) ->
+index_defined([], _Ctx) ->
     true;
 index_defined([Ix | Rest], Ctx=#co_ctx {dict = Dict, res_table = RTable, name = _Name}) ->
     case co_dict:lookup_object(Dict, Ix) of
@@ -2210,9 +2210,8 @@ set_tpdo_data({_Ix, _Si} = I, Data, Mode,
 	    %% "~s: set_tpdo_data: unknown tpdo element\n", [_Name]),
 	    %% {{error,unknown_tpdo_element}, Ctx};
 	{[{I, OldData}], append} when length(OldData) >= ?MAX_TPDO_CACHE->
-	    io:format("WARNING!" 
-		      "~s: set_tpdo_data: tpdo cache for ~.16#:~w full.\n", 
-		      [_Name,  _Ix, _Si]),
+	    error_logger:warning_msg( "~s: set_tpdo_data: tpdo cache for ~.16#:~w "
+				      "full.\n", [_Name,  _Ix, _Si]),
 	    {{error, tpdo_cache_full}, Ctx};
 	{[{I, OldData}], append} ->
 	    NewData = case OldData of
@@ -2225,9 +2224,8 @@ set_tpdo_data({_Ix, _Si} = I, Data, Mode,
 		true -> {ok, Ctx}
 	    catch
 		error:Reason -> 
-		    io:format("WARNING!" 
-			      "~s: set_tpdo_data: insert of ~p failed, reason = ~w\n", 
-			      [_Name, NewData, Reason]),
+		    error_logger:warning_msg("~s: set_tpdo_data: insert of ~p failed, "
+					     "reason = ~w\n", [_Name, NewData, Reason]),
 		    {{error,Reason}, Ctx}
 	    end;
 	{[{I, _OldData}], overwrite} ->
@@ -2252,14 +2250,12 @@ rpdo_unpack(I, Data, Ctx=#co_ctx {name = _Name}) ->
 		    ?dbg(node, "~s: rpdo_unpack: decoded data ~p", [_Name, Ds]),
 		    rpdo_set(IL, Ds, Ctx)
 	    catch error:_Reason ->
-		    io:format("WARNING!" 
-			      "~s: rpdo_unpack: decode failed = ~p\n", 
-			      [_Name, _Reason]),
+		    error_logger:warning_msg("~s: rpdo_unpack: decode failed, "
+					     "reason ~p\n",  [_Name, _Reason]),
 		    Ctx
 	    end;
-	Error ->
-	    io:format("WARNING!" 
-		      "~s: rpdo_unpack: error = ~p\n", [_Name, Error]),
+	_Error ->
+	    error_logger:warning_msg("~s: rpdo_unpack: error = ~p\n", [_Name, _Error]),
 	    Ctx
     end.
 
@@ -2360,7 +2356,7 @@ mpdo_mapping(MType,{IxInScanList,SiInScanList},ResTable,Dict,TpdoCache)
 	    Error %%??
     end.
        
-maybe_inform_reserver(MType, {Ix, Si} = Index, ResTable, _Dict, TpdoCache) ->
+maybe_inform_reserver(MType, {Ix, _Si} = Index, ResTable, _Dict, TpdoCache) ->
     case reserver_with_module(ResTable, Ix) of
 	[] ->
 	    ?dbg(node, "maybe_inform_reserver: No reserver for index ~7.16.0#", [Ix]),
@@ -2406,8 +2402,7 @@ tpdo_data({Ix, Si} = I, ResTable, Dict, TpdoCache) ->
 	    cache_value(TpdoCache, I);
 	_Other ->
 	    %% How handle ???
-	    io:format("WARNING!" 
-		      "~p: tpdo_data: unknown tpdo element\n", [self()]),
+	    error_logger:error_msg("~p: tpdo_data: unknown tpdo element\n", [self()]),
 	    ?dbg(node, "tpdo_data: Other case = ~p, returning default value.", 
 		 [_Other]),
 	    {ok, [0]}
@@ -2417,8 +2412,7 @@ cache_value(Cache, I) ->
     case ets:lookup(Cache, I) of
 	[] ->
 	    %% How handle ???
-	    io:format("WARNING!" 
-		      "~p: cache_value: unknown tpdo element\n", [self()]),
+	    error_logger:error_msg( "~p: cache_value: unknown tpdo element\n", [self()]),
 	    ?dbg(node, "cache_value: tpdo element not found, returning default value.", 
 		 []),
 	    {ok, [0]};

@@ -593,8 +593,11 @@ handle_info({'EXIT', Pid, Reason}, Mgr=#mgr {pids = PList}) ->
     case lists:member(Pid, PList) of
 	true -> 
 	    case Reason of
-		normal -> do_nothing;
-		_Other -> io:format("WARNING, request failed, reason ~p\n", [Reason])
+		normal -> 
+		    do_nothing;
+		_Other -> 
+		    error_logger:warning_msg("Request failed, reason ~p\n", 
+					     [Reason])
 	    end,
 	    {noreply, Mgr#mgr {pids = PList -- [Pid]}};
 	false ->

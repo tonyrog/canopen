@@ -11,8 +11,8 @@
 -module(co_sdo).
 
 -include_lib("can/include/can.hrl").
--include("../include/canopen.hrl").
--include("../include/sdo.hrl").
+-include("canopen.hrl").
+-include("sdo.hrl").
 
 -export([decode_tx/1, decode_rx/1, encode/1]).
 -export([decode_abort_code/1,encode_abort_code/1]).
@@ -21,7 +21,7 @@
 -define(ENDIAN, little).
 
 co_log(Fmt, As) ->
-    io:format(Fmt, As).
+    error_logger:warning_msg(Fmt, As).
 
 %% Decode SDO - client side
 decode_tx(Bin) when is_binary(Bin) ->

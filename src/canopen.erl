@@ -30,7 +30,7 @@
 		   {error, Reason::term()}.
 
 start(_StartType, _StartArgs) ->
-    io:format("~p: Starting up\n", [?MODULE]),
+    error_logger:info_msg("~p: start: arguments ignored.\n", [?MODULE]),
     case application:get_env(serial) of
 	undefined -> 
 	    {error, no_serial_specified};
@@ -40,7 +40,6 @@ start(_StartType, _StartArgs) ->
 		       {ok, O} -> O
 		   end,
 	    Args = [{serial, Serial}, {options, Opts}],
-	    io:format("~p: Args=~p\n", [?MODULE,Args]),
 	    canopen_sup:start_link(Args)
     end.
 

@@ -592,8 +592,8 @@ load_def_mod(Module, DefCtx) when is_atom(Module) ->
 		{ok, Forms} ->
 		    def_mod(Forms, undefined, DefCtx);
 		{error,Error} = E ->
-		    io:format("load_mod: loading ~p failed, reason ~p\n", 
-			      [PrivFile, Error]),
+		    error_logger:error_msg("load_mod: loading ~p failed, reason ~p\n", 
+					   [PrivFile, Error]),
 		    {E, DefCtx}
 	    end;
 	Err = {error,_} ->
@@ -638,7 +638,6 @@ def_mod([{enum,Id,Enums}|Forms], DMod=#def_mod {enums = EnumDict}, DefCtx) ->
 def_mod([{objdef,Index,Options}|Forms], 
 	DMod=#def_mod {objects = Objects, ixs = IxsDict}, 
 	DefCtx) ->
-    %% io:format("objdef ixs=~p\n", [Index]),
     NewIxs = 
 	case Index of
 	    I when I > 0, I =< 16#ffff ->
@@ -699,7 +698,6 @@ store_one(Key, Value, Dict) ->
 
 
 decode_obj([Opt|Options], Obj) ->
-    %%io:format("decode_option: ~p\n", [Opt]),
     Obj1 = decode_obj_opt(Opt, Obj),
     decode_obj(Options, Obj1);
 decode_obj([], Obj) ->
@@ -718,7 +716,6 @@ decode_obj_opt({entry,Index,Options}, Obj) ->
     Es = Obj#objdef.entries,
     Obj#objdef { entries=[E|Es]};
 decode_obj_opt(_Kv={Key,Value}, Obj) ->
-    %%io:format("decode object option: ~p\n", [_Kv]),
     case Key of
 	name ->
 	    Obj#objdef { name=Value };
@@ -751,7 +748,6 @@ decode_ent([], Ent) ->
 decode_ent_opt(Kv, undefined) ->
     decode_ent_opt(Kv, #entdef {});
 decode_ent_opt(_Kv={Key,Value}, Ent) ->
-    %%io:format("decode entry option: ~p\n", [_Kv]),
     case Key of
 	name ->
 	    Ent#entdef { name=Value };

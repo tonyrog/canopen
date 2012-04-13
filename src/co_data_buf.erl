@@ -738,7 +738,7 @@ timeout(Buf) ->
 app_call(Buf, Pid, Msg) ->
     case catch do_call(Pid, Msg) of 
 	{'EXIT', Reason} ->
-	    io:format("app_call: catch error ~p\n",[Reason]), 
+	    error_logger:warning_msg("app_call: catch error ~p\n",[Reason]), 
 	    {error, ?abort_internal_error};
 	Mref ->
 	    {ok, Buf, Mref}

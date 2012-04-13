@@ -228,8 +228,9 @@ handle_cast({nodeid_change, nodeid, OldNid, NewNid},
 	    S=#s {ctx = Ctx=#tpdo_ctx {nodeid = OldNid}, type = Type}) ->
     case {NewNid, Type} of
 	{undefined, sam_mpdo} -> 
-	    io:format("WARNING! ~p: (Short) nodeid undefined"
-		      "not possible to send sam-mpdos", [self()]);
+	    error_logger:warning_msg("~p: (Short) nodeid undefined"
+				     "not possible to send sam-mpdos", 
+				     [self()]);
 	{undefined, _OtherType} ->
 	    ?dbg(tpdo, "handle_cast: nodeid set to undefined", []);
 	_Defined ->
@@ -477,8 +478,8 @@ send_tpdo(S=#s {ctx = Ctx, index_list = IL}) ->
     ?dbg(tpdo, "send_tpdo: indexes = ~w", [IL]),
     case tpdo_data(IL, Ctx, []) of
 	{error, Reason} ->
-	    io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
-		      [self(), Reason]),
+	    error_logger:error_msg("~p: TPDO value not retreived, reason = ~p\n", 
+				   [self(), Reason]),
 	    S;
 	DataList ->
 	    ?dbg(tpdo, "send_tpdo: values = ~w, ", [DataList]),
@@ -513,8 +514,8 @@ send_dam_mpdo(S=#s {ctx = Ctx, index_list = [{Index = {Ix, Si}, _Size}]},
 	    ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
 	    S#s { emit=false, itmr=ITmr };
 	{error, Reason}->
-	    io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
-		      [self(), Reason]),
+	    error_logger:warning_msg("~p: TPDO value not retreived, reason = ~p\n", 
+				     [self(), Reason]),
 	    S
     end.
 
@@ -537,8 +538,8 @@ send_sam_mpdo(S=#s {state = ?Operational, type = sam_mpdo,
 		ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
 		S#s { emit=false, itmr=ITmr };
 	    {error, Reason} ->
-		io:format("WARNING! ~p: TPDO value not retreived, reason = ~p\n", 
-			  [self(), Reason]),
+		error_logger:warning_msg("~p: TPDO value not retreived, reason = ~p\n", 
+					 [self(), Reason]),
 		S
 	end,
     send_sam_mpdo(S1, Ixs).

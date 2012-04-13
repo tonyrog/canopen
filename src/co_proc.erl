@@ -52,7 +52,7 @@
 			{ok, Pid::pid()} | ignore | {error, Error::term()}.
 
 start_link(Opts) ->
-    io:format("co_proc: start_link: Opts = ~p\n", [Opts]),
+    error_logger:info_msg("~p: start_link: args = ~p\n", [?MODULE, Opts]),
     F =	case proplists:get_value(linked,Opts,true) of
 	    true -> start_link;
 	    false -> start
@@ -205,7 +205,7 @@ debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
 		  ignore |
 		  {stop, Reason::term()}.
 init([]) ->
-    io:format("co_proc: init:\n", []),
+    error_logger:info_msg("~p: init: args = [], pid = ~p\n", [?MODULE, self()]),
 
     PD = ets:new(co_proc_dict, [protected, named_table, ordered_set]),
     TD = ets:new(co_term_dict, [protected, named_table, ordered_set]),
@@ -327,10 +327,9 @@ handle_cast(_Msg, Ctx) ->
 
 handle_info({'DOWN',_Ref, process, Pid, Reason}, 
 	    Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
-    io:format("WARNING! ~p: Monitored process ~p died\n", [?MODULE, Pid]),
+    error_logger:warning_msg("~p: Monitored process ~p died\n", [?MODULE, Pid]),
     ets:match_delete(TD, {'_', Pid}),
     ets:insert(PD, {Pid, {dead, Reason}, []}),
-%%    io:format("TD = ~p\nPD = ~p\n", [ets:tab2list(TD), ets:tab2list(PD)]),
     {noreply, Ctx};
 handle_info(_Info, Ctx) ->
     {noreply, Ctx}.
