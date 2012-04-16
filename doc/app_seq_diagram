@@ -1,0 +1,55 @@
+#wsd
+participant "CoApplication" as A
+participant "CoNode" as B
+participant "Remote CoNode" as C
+
+
+note over A: initialization
+A -> B: attach
+A -> B: reserve
+
+note over A, B, C: Set Index I1 to Value1 
+C -> B: download Value1 to I1
+B -> A: index_specification I1
+A -> B: type atomic
+B -> A: set I1 to Value1
+B -> C: ok
+
+note over A, B, C: Get value for Index I1
+C -> B: upload I1
+B -> A: index_specification I1
+A -> B: type atomic
+B -> A: get value for I1
+A -> B: Value1
+B -> C: Value1
+
+note over A, B, C: Set Index I2 to Value2
+C -> B: download Value2 to I2
+B -> A: index_specification I2
+A -> B: type streamed
+B -> A: write_begin I2
+A -> B: ok
+B -> A: write Value2 - first part
+A -> B: ok
+note over A, B: ...
+B -> A: write Value2 - last part
+A -> B: ok
+B -> C: ok
+
+note over A, B, C: Get value for Index I2
+C -> B: upload I2
+B -> A: index_specification I2
+A -> B: type streamed
+B -> A: read_begin for I1
+A -> B: ok
+B -> A: read 
+A -> B: Value2 first part
+note over A, B: ...
+B -> A: read 
+A -> B: Value2 last part
+B -> C: Value2
+
+note over A: termination
+A -> B: unreserve
+A -> B: detach
+destroy A

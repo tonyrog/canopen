@@ -739,12 +739,14 @@ handle_cast(_Msg, Ctx) ->
 %% Description: Handling all non call/cast messages
 %% @end
 %%--------------------------------------------------------------------
-handle_info(Frame, Ctx) when is_record(Frame, can_frame) ->
+handle_info(Frame, Ctx) 
+  when is_record(Frame, can_frame) ->
     ?dbg(node, "~s: handle_info: CAN frame received", [Ctx#co_ctx.name]),
     Ctx1 = handle_can(Frame, Ctx),
     {noreply, Ctx1};
 
-handle_info({timeout,Ref,sync}, Ctx) when Ref =:= Ctx#co_ctx.sync_tmr ->
+handle_info({timeout,Ref,sync}, Ctx) 
+  when Ref =:= Ctx#co_ctx.sync_tmr ->
     %% Send a SYNC frame
     %% FIXME: check that we still are sync producer?
     ?dbg(node, "~s: handle_info: sync timeout received", [Ctx#co_ctx.name]),
@@ -755,7 +757,8 @@ handle_info({timeout,Ref,sync}, Ctx) when Ref =:= Ctx#co_ctx.sync_tmr ->
     Ctx1 = Ctx#co_ctx { sync_tmr = start_timer(Ctx#co_ctx.sync_time, sync) },
     {noreply, Ctx1};
 
-handle_info({timeout,Ref,time_stamp}, Ctx) when Ref =:= Ctx#co_ctx.time_stamp_tmr ->
+handle_info({timeout,Ref,time_stamp}, Ctx) 
+  when Ref =:= Ctx#co_ctx.time_stamp_tmr ->
     %% FIXME: Check that we still are time stamp producer
     ?dbg(node, "~s: handle_info: time_stamp timeout received", [Ctx#co_ctx.name]),
     FrameID = ?COBID_TO_CANID(Ctx#co_ctx.time_stamp_id),
@@ -768,6 +771,19 @@ handle_info({timeout,Ref,time_stamp}, Ctx) when Ref =:= Ctx#co_ctx.time_stamp_tm
     Ctx1 = Ctx#co_ctx { time_stamp_tmr = start_timer(Ctx#co_ctx.time_stamp_time, time_stamp) },
     {noreply, Ctx1};
 
+handle_info({rc_reset, Pid}, Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
+    ?dbg(node, "~s: handle_info: rc_reset for process ~p received",  [_Name, Pid]),
+    case lists:keysearch(Pid, #tpdo.pid, TList) of
+	{value,T} -> 
+	    NewT = T#tpdo {rc = 0},
+	    ?dbg(node, "~s: handle_info: rc counter cleared",  [_Name]),
+	    {noreply, Ctx#co_ctx { tpdo_list = [NewT | TList]--[T]}};
+	false -> 
+	    ?dbg(node, "~s: handle_info: rc_reset no process found", [_Name]),
+	    {noreply, Ctx}
+    end;
+
+    
 handle_info({'DOWN',Ref,process,_Pid,Reason}, Ctx) ->
     ?dbg(node, "~s: handle_info: DOWN for process ~p received", 
 	 [Ctx#co_ctx.name, _Pid]),
@@ -1585,7 +1601,8 @@ send_to_tpdos(Msg, _Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
 handle_notify(I, Ctx) ->
     NewCtx = handle_notify1(I, Ctx),
     inform_subscribers(I, NewCtx),
-    inform_reserver(I, NewCtx),
+    
+inform_reserver(I, NewCtx),
     NewCtx.
 
 handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
@@ -1851,7 +1868,7 @@ restart_tpdo(T=#tpdo {offset = Offset, rc = RC},
 		 [_Name, Offset]),
 	    {error, not_found};
 	Param ->
-	    case RC > ?RESTART_LIMIT of
+	    case RC >= ?RESTART_LIMIT of
 		true ->
 		    ?dbg(node, "~s: restart_tpdo: restart counter exceeded",  [_Name]),
 		    {error, restart_not_allowed};
@@ -1861,6 +1878,10 @@ restart_tpdo(T=#tpdo {offset = Offset, rc = RC},
 		    co_tpdo:debug(Pid, get(dbg)),
 		    gen_server:cast(Pid, {state, Ctx#co_ctx.state}),
 		    Mon = erlang:monitor(process, Pid),
+		    
+		    %% If process still ok after 1 min, reset counter
+		    timer:send_after(60 * 1000,  {rc_reset, Pid}),
+
 		    T#tpdo {pid = Pid, mon = Mon, rc = RC+1}
 	    end
     end.

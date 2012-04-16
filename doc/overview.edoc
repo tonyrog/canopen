@@ -9,7 +9,7 @@ See  <a href="http://www.canopensolutions.com/index.html">Canopen</a> for a deta
 
 == Architecture ==
 
-The heart of our CANopen implementation is a CoNode. It listens to the CAN bus and acts when a relevent CAN frame is received.<br/>
+The heart of our CANopen implementation is a CoNode. It listens to the CAN bus and acts when a relevant CAN frame is received.<br/>
 It has an object dictionary where objects can be stored, deleted and updated.<br/>
 The initial dictionary is loaded from a file given as an argument at start up.<br/>
 If TPDOs are defined in the dictionary separate TPDO processes are started to handle these.<br/>
@@ -39,7 +39,7 @@ Applications can attach to the CoNode and and reserve or subscribe to indexes in
 <b>Reserve</b> means that any upload or download requests and notifications connected to that index will be relayed to the application. The CoNode itself does not keep track of these objects. <br/>
 <b>Subscribe</b> means that notifications will be relayed to the application. The application will also be notified if the index is handled by the CoNode (included in the co_nodes dictionary) and it's value has been changed.<br/>
 When reserving/subscribing to an index a Module parameter is included. <br/><br/>
-There is also a possibilty for applications to receive an 'extended' notification comprising of the whole CAN frame. This is acheived via the extended_notification_subscription where a {Module, Function} argument is given. Note that it is then necessary for the application to interpret the CANOpen part, no decoding etc will be done by the CoNode. 
+There is also a possibility for applications to receive an 'extended' notification comprising of the whole CAN frame. This is achieved via the extended_notification_subscription. Note that it is then necessary for the application to interpret the CANOpen part, no decoding etc will be done by the CoNode. 
 
 
 ==== SDO interface ====
@@ -61,13 +61,8 @@ There are two behaviours defined for the above:
 </ul>
 
 ==== TPDO interface ====
-When an application has reserved an index that is included in a TPDO the TPDO process infor
-The application must thus have a function <code>Module:tpdo_callback()</code> that is called by the TPDO process when it builds its TPDO map. In this way the application is given a Module:Function that it should call as soon as the value of the given index is changed. It is god practise for the application to call this immediately to replace the default value stored in the co_node with the current value. <br/>
-
-There is one behaviour defined for the above:
-<ul>
-<li>co_tpdo_app - For applications reserving an index included in a TPDO. See {@link co_tpdo_app}.</li>
-</ul>
+When an application has reserved an index that is included in a TPDO the TPDO process informs the application with a <code>index_in_tpdo</code> message. 
+This means it should call <code>co_api:tpdo_set()</code> as soon as the value of the given index is changed. It is god practise for the application to call this immediately upon getting the <code>index_in_tpdo</code> message to replace the default value stored in the co_node with the current value. <br/>
 
 === Modules ===
 ====Header files ====

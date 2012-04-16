@@ -16,6 +16,7 @@ MODULES = \
 	co_test_tpdo_app \
 	co_test_stream_app \
 	co_test_dict_app \
+	co_ex_app \
 	codec_bench
 
 

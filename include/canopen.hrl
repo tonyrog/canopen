@@ -507,7 +507,7 @@
 	  cob_id, %% Active TPDO cobid
 	  pid,    %% gen_server pid
 	  mon,    %% gen_server monitor
-	  rc=0    %% restart_counter
+	  rc=0    %% restart counter
 	}).
 
 %% Action on upload / download

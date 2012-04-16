@@ -1,457 +1,395 @@
 %%-------------------------------------------------------------------
-%% @author Malotte W Lonne <malotte@malotte.net>
-%% @copyright (C) 2011, Tony Rogvall
+%% @author Malotte W Lönne <malotte@malotte.net>
+%% @copyright (C) 2012, Tony Rogvall
 %% @doc
-%%    Example CANopen application.
-%% 
-%% Required minimum API:
-%% <ul>
-%% <li>handle_call - get</li>
-%% <li>handle_call - set</li>
-%% <li>handle_info - notify</li>
-%% </ul>
+%%    Example CANOpen application.
+%%
+%%    Responsible for index MY_INDEX. <br/>
+%%      MY_INDEX:0 - size = unsigned8, access ro, value 2 <br/>
+%%      MY_INDEX:1 - entry1 = unsigned32, access rw <br/>
+%%      MY_INDEX:2 - entry2 = visible_string, access rw <br/>
+%%
+%% File: co_ex_app.erl<br/>
+%% Created: April 2012 by Malotte W Lönne<br/>
 %% @end
 %%===================================================================
-
 -module(co_ex_app).
 -include_lib("canopen/include/canopen.hrl").
 -include("co_app.hrl").
+-include("co_debug.hrl").
 
 -behaviour(gen_server).
-
--compile(export_all).
+-behaviour(co_app).
 
 %% API
 -export([start/1, stop/0]).
+
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
-%% CO node callbacks
+
+%% co_app callbacks
 -export([index_specification/2,
-	 set/3, get/2,
-	 write_begin/3, write/3, write_end/3,
-	 read_begin/3, read/3,
-	 abort/2]).
+	 set/3, get/2]).
 
-%% Testing
--ifdef(debug).
--define(dbg(Fmt,As), ct:pal((Fmt), (As))).
--else.
--define(dbg(Fmt,As), ok).
--endif.
+%% Test
+-export([loop_data/0,
+	 debug/1]).
 
--define(SERVER, ?MODULE). 
--define(TEST_IX, 16#2003).
--define(DICT,[{{16#2003, 0}, undef, atomic, undef}, %% To test notify after central set
-	      {{16#6033, 0}, ?VISIBLE_STRING, atomic, "Mine"},
-	      {{16#6034, 0}, ?VISIBLE_STRING, streamed, "Long string"},
-	      {{16#6035, 0}, ?VISIBLE_STRING, {atomic, ?MODULE}, "Mine2"},
-	      {{16#6036, 0}, ?VISIBLE_STRING, {streamed, ?MODULE}, "Long string2"},
-	      {{16#6037, 0}, ?VISIBLE_STRING, streamed, 
-	       "Indefinite string"},
-	      {{16#7033, 0}, ?INTEGER, atomic, 7},
-	      {{16#7333, 2}, ?INTEGER, atomic, 0},
-	      {{16#7334, 0}, ?INTEGER, atomic, 0}, %% To test timeout
-	      {{16#6000, 0}, undef, atomic, undef}]). %% To test notify of mpdo
+-define(NAME, co_example).
+-define(MY_INDEX, 16#9898).
+-define(SUBSCRIBED_INDEX, 16#9899).
 
 -record(loop_data,
 	{
-	  state,
-	  co_node,
-	  dict,
-	  store
+	  state           ::atom(),
+	  co_node         ::atom()     %% Name of co_node
 	}).
 
--record(store,
-	{
-	  ref,
-	  index,
-	  type,
-	  data
-	}).
 
 %%--------------------------------------------------------------------
-%% @spec start(CoSerial) -> {ok, Pid} | ignore | {error, Error}
 %% @doc
-%%
 %% Starts the server.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-spec start(CoSerial::integer()) -> 
+		   {ok, Pid::pid()} | 
+		   ignore | 
+		   {error, Error::atom()}.
+
 start(CoSerial) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [CoSerial], []).
-
+    gen_server:start({local, ?NAME}, ?MODULE, CoSerial,[]).
+	
 %%--------------------------------------------------------------------
-%% @spec stop() -> ok | {error, Error}
 %% @doc
-%%
 %% Stops the server.
-%%
 %% @end
 %%--------------------------------------------------------------------
+-spec stop() -> ok | 
+		{error, Error::atom()}.
+
 stop() ->
-    gen_server:call(?MODULE, stop).
-
-loop_data() ->
-    gen_server:call(?MODULE, loop_data).
-
-dict() ->
-    gen_server:call(?MODULE, dict).
-
-%% transfer_mode == {atomic, Module}
-set(Pid, {Index, SubInd}, NewValue) ->
-    ?dbg("~p: set ~.16B:~.8B to ~p\n",[?MODULE, Index, SubInd, NewValue]),
-    gen_server:call(Pid, {set, {Index, SubInd}, NewValue}).
-get(Pid, {Index, SubInd}) ->
-    ?dbg("~p: get ~.16B:~.8B\n",[?MODULE, Index, SubInd]),
-    case gen_server:call(Pid, {get, {Index, SubInd}}) of
-	{ok, _Type, Value} -> {ok, Value};
-	Other -> Other
-    end.
-
-%% transfer_mode = {streamed, Module}
-write_begin(Pid, {Index, SubInd}, Ref) ->
-    ?dbg("~p: write_begin ~.16B:~.8B, ref = ~p\n",[?MODULE, Index, SubInd, Ref]),
-    gen_server:call(Pid, {write_begin, {Index, SubInd}, Ref}).
-write(Pid, Ref, Data) ->
-    ?dbg("~p: write ref = ~p, data = ~p\n",[?MODULE, Ref, Data]),
-    gen_server:cast(Pid, {write, Ref, Data}).
-write_end(Pid, Ref, N) ->
-    ?dbg("~p: write_end ref = ~p, n = ~p\n",[?MODULE, Ref, N]),
-    gen_server:call(Pid, {write_end, Ref, N}).
-
-read_begin(Pid, {Index, SubInd}, Ref) ->
-    ?dbg("~p: read_begin ~.16B:~.8B, ref = ~p\n",[?MODULE, Index, SubInd, Ref]),
-    gen_server:call(Pid, {read_begin, {Index, SubInd}, Ref}).
-read(Pid, Bytes, Ref) ->
-    ?dbg("~p: read ref = ~p, \n",[?MODULE, Ref]),
-    gen_server:call(Pid, {read, Bytes, Ref}).
-
-abort(Pid, Ref) ->
-    ?dbg("~p: abort ref = ~p\n",[?MODULE, Ref]),
-    gen_server:call(Pid, {abort, Ref}).
-    
-%%%===================================================================
-%%% gen_server callbacks
-%%%===================================================================
-
-%%--------------------------------------------------------------------
-%% @private
-%% @spec init(Args) -> {ok, LoopData} |
-%%                     {ok, LoopData, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
-%% @doc
-%% Initializes the server
-%%
-%% @end
-%%--------------------------------------------------------------------
-init([CoSerial]) ->
-    Dict = ets:new(my_dict, [public, ordered_set]),
-    {ok, _DictRef} = co_api:attach(CoSerial),
-    load_dict(CoSerial, Dict),
-    {ok, #loop_data {state=init, co_node = CoSerial, dict=Dict}}.
-
-load_dict(CoSerial, Dict) ->
-    lists:foreach(fun({{Index, _SubInd}, _Type, _Transfer, _Value} = Entry) ->
-			  ets:insert(Dict, Entry),
-			  case Index of
-			      16#6000 ->			      
-				  co_api:subscribe(CoSerial, Index);
-			      16#2003 ->			      
-				  co_api:subscribe(CoSerial, Index);
-			      _Other ->
-				  co_api:reserve(CoSerial, Index, ?MODULE)
-			  end
-		  end, ?DICT).
-
-%%--------------------------------------------------------------------
-%% @spec handle_call(Request, From, LoopData) ->
-%%                                   {reply, Reply, LoopData} |
-%%                                   {reply, Reply, LoopData, Timeout} |
-%%                                   {noreply, LoopData} |
-%%                                   {noreply, LoopData, Timeout} |
-%%                                   {stop, Reason, Reply, LoopData} |
-%%                                   {stop, Reason, LoopData}
-%%
-%% Request = {get, Index, SubIndex} |
-%%           {set, Index, SubInd, Value}
-%% LoopData = term()
-%% Index = integer()
-%% SubInd = integer()
-%% Value = term()
-%%
-%% @doc
-%% Handling call messages.
-%% Required to at least handle get and set requests as specified above.
-%% Handling all non call/cast messages.
-%% Required to at least handle a notify msg as specified above. <br/>
-%% RemoteId = Id of remote CANnode initiating the msg. <br/>
-%% Index = Index in Object Dictionary <br/>
-%% SubInd = Sub index in Object Disctionary  <br/>
-%% Value = Any value the node chooses to send.
-%% 
-%% @end
-%%--------------------------------------------------------------------
-handle_call({get, {16#7334, _SubInd}}, _From, LoopData) ->
-    %% To test timeout
-    ?dbg("~p: handle_call: sleeping for 2 secs\n", [?MODULE]), 
-    timer:sleep(2000),
-    {reply, {ok, 0}, LoopData};
-handle_call({get, {Index, SubInd}}, _From, LoopData) ->
-    ?dbg("~p: handle_call: get ~.16B:~.8B \n",[?MODULE, Index, SubInd]),
-    case ets:lookup(LoopData#loop_data.dict, {Index, SubInd}) of
-	[] ->
-	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{{Index, SubInd}, _Type, _Transfer, Value}] ->
-	    {reply, {ok, Value}, LoopData}
-    end;
-handle_call({set, {16#7334, _SubInd}, _NewValue}, _From, LoopData) ->
-    %% To test timeout
-    timer:sleep(2000),
-    {reply, ok, LoopData};
-handle_call({set, {Index, SubInd}, NewValue}, _From, LoopData) ->
-    ?dbg("~p: handle_call: set ~.16B:~.8B to ~p\n",
-	 [?MODULE, Index, SubInd, NewValue]),
-    handle_set(LoopData, {Index, SubInd}, NewValue);
-handle_call({write_begin, {Index, SubInd} = I, Ref}, _From, LoopData) ->
-    ?dbg("~p: handle_call: write_begin ~.16B:~.8B, ref = ~p\n",
-	 [?MODULE, Index, SubInd, Ref]),
-    case ets:lookup(LoopData#loop_data.dict, I) of
-	[] ->
-	    ?dbg("~p: handle_call: write_begin error = ~.16B\n", 
-		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
-	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{I, Type, _Transfer, _OldValue}] ->
-	    Store = #store {ref = Ref, index = I, type = Type},
-	    {reply, ok, LoopData#loop_data {store = Store}}
-    end;
-handle_call({write_end, Ref, N}, _From, LoopData) ->
-    ?dbg("~p: handle_call: write_end ref = ~p, n = ~p\n",[?MODULE, Ref,N]),
-    Store = LoopData#loop_data.store,
-    ?dbg("~p: handle_call: write_end data = ~p, type ~p\n",
-	 [?MODULE, Store#store.data, Store#store.type]),
-    AccData = Store#store.data,
-    %% Check if all downloaded bytes should be used
-    Data = if N =:= 0 ->
-		AccData;
-	   true ->
-		Size1 = size(AccData) - N,
-		<<TruncData:Size1/binary,_/binary>> = AccData,
-		TruncData
-	   end,
-    {NewValue, _} = co_codec:decode(Data, Store#store.type),
-    ?dbg("~p: handle_call: write_end decoded data = ~p\n",[?MODULE, NewValue]),
-    handle_set(LoopData,Store#store.index, NewValue);
-handle_call({read_begin, {16#6037 = Index, SubInd} = I, Ref}, _From, LoopData) ->
-    %% To test 'real' streaming
-    ?dbg("~p: handle_call: read_begin ~.16B:~.8B, ref = ~p\n",
-	 [?MODULE, Index, SubInd, Ref]),
-    case ets:lookup(LoopData#loop_data.dict, I) of
-	[] ->
-	    ?dbg("~p: handle_call: read_begin error = ~.16B\n", 
-		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
-	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{I, Type, _Transfer, Value}] ->
-	    Data = co_codec:encode(Value, Type),
-	    Store = #store {ref = Ref, index = I, type = Type, data = Data},
-	    {reply, {ok, Ref, unknown}, LoopData#loop_data {store = Store}}
-    end;
-handle_call({read_begin, {Index, SubInd} = I, Ref}, _From, LoopData) ->
-    ?dbg("~p: handle_call: read_begin ~.16B:~.8B, ref = ~p\n",
-	 [?MODULE, Index, SubInd, Ref]),
-    case ets:lookup(LoopData#loop_data.dict, I) of
-	[] ->
-	    ?dbg("~p: handle_call: read_begin error = ~.16B\n", 
-		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
-	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{I, Type, _Transfer, Value}] ->
-	    Data = co_codec:encode(Value, Type),
-	    Size = size(Data),
-	    Store = #store {ref = Ref, index = I, type = Type, data = Data},
-	    {reply, {ok, Ref, Size}, LoopData#loop_data {store = Store}}
-    end;
-handle_call({read, Bytes, Ref}, _From, LoopData) ->
-    ?dbg("~p: handle_call: read ref = ~p\n",[?MODULE, Ref]),
-    Store = LoopData#loop_data.store,
-    Data = Store#store.data,
-    Size = size(Data),
-    case Size - Bytes of
-	RestSize when RestSize > 0 -> 
-	    <<DataToSend:Bytes/binary, RestData/binary>> = Data,
-	    Store1 = Store#store {data = RestData},
-	    {reply, {ok, Ref, DataToSend}, LoopData#loop_data {store = Store1}};
-	RestSize when RestSize =< 0 ->
-	    Store1 = Store#store {data = (<<>>)},
-	    {reply, {ok, Ref, Data}, LoopData#loop_data {store = Store1}}
-    end;
-handle_call({abort, Ref}, _From, LoopData) ->
-    ?dbg("~p: handle_call: abort ref = ~p\n",[?MODULE, Ref]),
-    {reply, ok, LoopData};
-handle_call(loop_data, _From, LoopData) ->
-    io:format("~p: LoopData = ~p\n", [?MODULE, LoopData]),
-    {reply, ok, LoopData};
-handle_call(dict, _From, LoopData) ->
-    Dict = ets:tab2list(LoopData#loop_data.dict),
-    io:format("~p: Dictionary = ~p\n", [?MODULE, Dict]),
-    {reply, Dict, LoopData};    
-handle_call(stop, _From, LoopData) ->
-    ?dbg("~p: handle_call: stop\n",[?MODULE]),
-    case whereis(list_to_atom(co_lib:serial_to_string(LoopData#loop_data.co_node))) of
-	undefined -> 
-	    do_nothing; %% Not possible to detach and unsubscribe
-	_Pid ->
-	    lists:foreach(
-	      fun({{Index, _SubInd}, _Type, _Transfer, _Value}) ->
-		      co_api:unsubscribe(LoopData#loop_data.co_node, Index)
-	      end, ?DICT),
-	    ?dbg("~p: stop: unsubscribed.\n",[?MODULE]),
-	    co_api:detach(LoopData#loop_data.co_node)
-    end,
-    ?dbg("~p: handle_call: stop detached.\n",[?MODULE]),
-    {stop, normal, ok, LoopData};
-handle_call(Request, _From, LoopData) ->
-    ?dbg("~p: handle_call: bad call ~p.\n",[?MODULE, Request]),
-    {reply, {error,bad_call}, LoopData}.
-
-handle_set(LoopData, I, NewValue) ->
-    case ets:lookup(LoopData#loop_data.dict, I) of
-	[] ->
-	    ?dbg("~p: handle_set: set error = ~.16B\n", 
-		 [?MODULE, ?ABORT_NO_SUCH_OBJECT]),
-	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData};
-	[{I, _Type, _Transfer, NewValue}] ->
-	    %% No change
-	    ?dbg("~p: handle_set: set no change\n", [?MODULE]),
-	    {reply, ok, LoopData};
-	[{{Index, SubInd}, Type, Transfer, _OldValue}] ->
-	    ets:insert(LoopData#loop_data.dict, {I, Type, Transfer, NewValue}),
-	    ?dbg("~p: handle_set: set ~.16B:~.8B updated to ~p\n",[?MODULE, Index, SubInd, NewValue]),
-	    {reply, ok, LoopData}
+    case whereis(?NAME) of
+	undefined -> do_nothing;
+	Pid -> gen_server:call(Pid, stop)
     end.
 
 %%--------------------------------------------------------------------
-%% @private
-%% @spec handle_cast(Msg, LoopData) -> {noreply, LoopData} |
-%%                                  {noreply, LoopData, Timeout} |
-%%                                  {stop, Reason, LoopData}
-%% @doc
-%% Handling cast messages
-%%
-%% @end
+%%% Callbacks for co_app behaviour.
 %%--------------------------------------------------------------------
-%% transfer_mode == atomic
-handle_cast({set, {Index, SubInd} = I, NewValue}, LoopData) ->
-    ?dbg("~p: handle_cast: set ~.16B:~.8B to ~p\n",
-	 [?MODULE, Index, SubInd, NewValue]),
-    case ets:lookup(LoopData#loop_data.dict, I) of
-	[] ->
-	    ?dbg("~p: set error = ~.16B\n", [?MODULE, ?ABORT_NO_SUCH_OBJECT]);
-	[{I, _Type, _Transfer, NewValue}] ->
-	    ok; %% No change
-	[{I, Type, _Transfer, _OldValue}] ->
-	    ets:insert(LoopData#loop_data.dict, {I, Type, NewValue})
-    end,
-    {noreply, LoopData};
-%% transfer_mode == streamed
-handle_cast({write, Ref, Data}, LoopData) ->
-    ?dbg("~p: handle_cast: write ref = ~p, data = ~p\n",[?MODULE, Ref, Data]),
-    Store = case LoopData#loop_data.store#store.data of
-		undefined ->
-		    LoopData#loop_data.store#store {data = <<Data/binary>>};
-		OldData ->
-		    LoopData#loop_data.store#store {data = <<OldData/binary, Data/binary>>}
-	    end,
-    {noreply, LoopData#loop_data {store = Store}};
-handle_cast({object_event, Ix}, LoopData) ->
-    ?dbg("~p: handle_cast: My object ~w has changed. ", [?MODULE, Ix]),
-    {ok, Val} = co_api:value(LoopData#loop_data.co_node, Ix),
-    ?dbg("New value is ~p\n", [Val]),
-    {noreply, LoopData};
-handle_cast(_Msg, LoopData) ->
-    {noreply, LoopData}.
 
 %%--------------------------------------------------------------------
-%% @spec handle_info(Info, LoopData) -> {noreply, LoopData} |
-%%                                   {noreply, LoopData, Timeout} |
-%%                                   {stop, Reason, LoopData}
-%%
-%% Info = {notify, RemoteId, Index, SubInd, Value}
-%% LoopData = term()
-%% RemoteId = integer()
-%% Index = integer()
-%% SubInd = integer()
-%% Value = term()
-%%
-%% @doc
-%% Handling all non call/cast messages.
-%% Required to at least handle a notify msg as specified above. <br/>
-%% RemoteId = Id of remote CANnode initiating the msg. <br/>
-%% Index = Index in Object Dictionary <br/>
-%% SubInd = Sub index in Object Disctionary  <br/>
-%% Value = Any value the node chooses to send.
-%% 
-%% @end
-%%--------------------------------------------------------------------
-handle_info({notify, RemoteId, {Index, SubInd}, Value}, LoopData) ->
-    ?dbg("~p: handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w \n", 
-	      [?MODULE, RemoteId, Index, SubInd, Value]),
-    {noreply, LoopData};
-handle_info(Info, LoopData) ->
-    ?dbg("~p: handle_info: Unknown Info ~p\n", [?MODULE, Info]),
-    {noreply, LoopData}.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @spec terminate(Reason, LoopData) -> void()
-%%
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @end
-%%--------------------------------------------------------------------
-terminate(_Reason, _LoopData) ->
-    ok.
-
-%%--------------------------------------------------------------------
-%% @private
-%% @spec code_change(OldVsn, LoopData, Extra) -> {ok, NewLoopData}
-%%
-%% @doc
-%% Convert process state when code is changed
-%%
-%% @end
-%%--------------------------------------------------------------------
-code_change(_OldVsn, LoopData, _Extra) ->
-    %% Note!
-    %% If the code change includes a change in which indexes that should be
-    %% reserved it is vital to unreserve the indexes no longer used.
-    {ok, LoopData}.
-
-%%--------------------------------------------------------------------
-%% @spec index_specification(Pid, {Index, SubInd}) -> 
-%%      {spec, Spec::record()} | false
-%%
 %% @doc
 %% Returns the data structure for {Index, SubInd}.
 %% Should if possible be implemented without process context switch.
 %%
 %% @end
 %%--------------------------------------------------------------------
-index_specification(_Pid, {Index, SubInd}) ->
-    ?dbg("~p: index_specification ~.16B:~.8B \n",[?MODULE, Index, SubInd]),
-    case lists:keyfind({Index, SubInd}, 1, ?DICT) of
-	{{Index, SubInd}, Type, Transfer, _Value} ->
-	    Spec = #index_spec{index = Index,
-				type = Type,
-				access = ?ACCESS_RW,
-				transfer = Transfer},
-	    {spec, Spec};
-	false ->
-	    {error, ?ABORT_NO_SUCH_OBJECT}
-    end;
-index_specification(Pid, Index) ->
-    index_specification(Pid, {Index, 0}).
+-spec index_specification(Pid::pid(), {Index::integer(), SubInd::integer()}) -> 
+		       {spec, Spec::record()} |
+		       {error, Reason::atom()}.
+
+index_specification(_Pid, {?MY_INDEX = _Index, 255} = I) ->
+    ?dbg(?NAME,"index_specification: store type ~.16B ",[_Index]),
+    Value = ((?UNSIGNED32 band 16#ff) bsl 8) bor (?VISIBLE_STRING band 16#ff),
+    reply_specification(I, ?UNSIGNED32, ?ACCESS_RO, {value, Value});
+index_specification(_Pid, {?MY_INDEX, 0} = I) ->
+    reply_specification(I, ?UNSIGNED8, ?ACCESS_RO, {value, 2});
+index_specification(_Pid, {?MY_INDEX, 1} = I) ->
+    reply_specification(I, ?UNSIGNED32, ?ACCESS_RW, atomic);
+index_specification(_Pid, {?MY_INDEX, 2} = I) ->
+    reply_specification(I, ?VISIBLE_STRING, ?ACCESS_RW, atomic);
+index_specification(_Pid, {?MY_INDEX, _SubInd})  ->
+    ?dbg(?NAME,"index_specification: unknown subindex ~.8B ",[_SubInd]),
+    {error, ?abort_no_such_subindex};
+index_specification(_Pid, {_Index, _SubInd})  ->
+    ?dbg(?NAME,"index_specification: unknown index ~.16B:~.8B ",[_Index, _SubInd]),
+    {error, ?abort_no_such_object}.
+
+reply_specification({_Index, _SubInd} = I, Type, Access, Mode) ->
+    ?dbg(?NAME,"reply_specification: ~.16B:~.8B, "
+	 "type = ~w, access = ~w, mode = ~w", 
+	 [_Index, _SubInd, Type, Access, Mode]),
+    Spec = #index_spec{index = I,
+		       type = Type,
+		       access = Access,
+		       transfer = Mode},
+    {spec, Spec}.
+
+%%--------------------------------------------------------------------
+%% Callback functions for transfer_mode == {atomic, Module}
+%%--------------------------------------------------------------------
+%%--------------------------------------------------------------------
+%% @doc
+%% Sets {Index, SubInd} to NewValue.<br/>
+%% Used for transfer_mode = {atomic, Module}.
+%% @end
+%%--------------------------------------------------------------------
+-spec set(Pid::pid(), {Index::integer(), SubInd::integer()}, NewValue::term()) ->
+		 ok |
+		 {error, Reason::atom()}.
+
+set(_Pid, Index = {_Ix, _Si}, NewValue) ->
+    ?dbg(?NAME," set ~.16#:~.8# to ~p",[_Ix, _Si, NewValue]),
+    handle_set(Index, NewValue).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Gets Value for {Index, SubInd}.<br/>
+%% Used for transfer_mode = {atomic, Module}.
+%% @end
+%%--------------------------------------------------------------------
+-spec get(Pid::pid(), {Index::integer(), SubInd::integer()}) ->
+		 {ok, Value::term()} |
+		 {error, Reason::atom()}.
+
+get(_Pid, Index = {_Ix, _Si}) ->
+    ?dbg(?NAME," get ~.16#:~.8#",[_Ix, _Si]),
+    handle_get(Index).
+
+
+%% Test functions
+%% @private
+debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
+    gen_server:call(?NAME, {debug, TrueOrFalse}).
+
+%% @private
+loop_data() ->
+    gen_server:call(?NAME, loop_data).
+
+
+
+%%%===================================================================
+%%% gen_server callbacks
+%%%===================================================================
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% Initializes the server.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec init(CoSerial::term()) -> {ok, LoopData::#loop_data{}} |
+				{stop, Reason::term()}.
+
+init(CoSerial) ->
+    {ok, _Dict} = co_api:attach(CoSerial),
+    co_api:reserve(CoSerial, ?MY_INDEX, ?MODULE),
+    co_api:subscribe(CoSerial, ?SUBSCRIBED_INDEX),
+    ets:new(co_ex_table, [public, named_table, ordered_set]),
+
+    %% Insert default values
+    ets:insert(co_ex_table, {{?MY_INDEX, 1}, 0}),
+    ets:insert(co_ex_table, {{?MY_INDEX, 2}, "undefined"}),
+
+    {ok, #loop_data {state=running, co_node = CoSerial}}.
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Handling call messages.
+%% Used for transfer mode atomic (set, get) and streamed 
+%% (write_begin, write, read_begin, read).
+%%
+%% Index = Index in Object Dictionary <br/>
+%% SubInd =  SubIndex in Object Dictionary  <br/>
+%% Value =  Any value the node chooses to send.
+%%
+%% For description of requests compare with the corresponding functions:
+%% @see set/3  
+%% @see get/2 
+%% @end
+%%--------------------------------------------------------------------
+-type call_request()::
+	{get, {Index::integer(), SubIndex::integer()}} |
+	{set, {Index::integer(), SubInd::integer()}, Value::term()} |
+	stop.
+
+-spec handle_call(Request::call_request(), From::pid(), LoopData::#loop_data{}) ->
+			 {reply, Reply::term(), LoopData::#loop_data{}} |
+			 {reply, Reply::term(), LoopData::#loop_data{}, Timeout::timeout()} |
+			 {noreply, LoopData::#loop_data{}} |
+			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
+			 {stop, Reason::atom(), Reply::term(), LoopData::#loop_data{}} |
+			 {stop, Reason::atom(), LoopData::#loop_data{}}.
+
+handle_call({set, Index, Value}, _From, LoopData) ->
+    {reply, handle_set(Index, Value), LoopData};
+
+handle_call({get, Index}, _From, LoopData) ->
+    {reply, handle_get(Index), LoopData};
+
+handle_call(loop_data, _From, LoopData) ->
+    io:format("~p: LoopData = ~p", [?MODULE,LoopData]),
+    {reply, ok, LoopData};
+
+handle_call({debug, TrueOrFalse}, _From, LoopData) ->
+    put(dbg, TrueOrFalse),
+    {reply, ok, LoopData};
+
+handle_call(stop, _From, LoopData=#loop_data {co_node = CoNode}) ->
+    ?dbg(?NAME," handle_call: stop",[]),    
+    case co_api:alive(CoNode) of
+	true ->
+	    co_api:unreserve(CoNode, ?IX_STORE_PARAMETERS),
+	    co_api:unreserve(CoNode, ?IX_RESTORE_DEFAULT_PARAMETERS),
+	    co_api:detach(CoNode);
+	false -> 
+	    do_nothing %% Not possible to detach and unsubscribe
+    end,
+    ?dbg(?NAME," handle_stop: detached.",[]),
+    {stop, normal, ok, LoopData};
+
+handle_call(_Request, _From, LoopData) ->
+    ?dbg(?NAME," handle_call: bad call ~p.",[_Request]),
+    {reply, {error, ?abort_internal_error}, LoopData}.
+
+    
+%%--------------------------------------------------------------------
+%% @doc
+%% Handling cast messages.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-type cast_msg()::go.
+
+-spec handle_cast(Msg::cast_msg(), LoopData::#loop_data{}) ->
+			 {noreply, LoopData::#loop_data{}} |
+			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
+			 {stop, Reason::atom(), LoopData::#loop_data{}}.
+			 
+handle_cast(_Msg, LoopData) ->
+    ?dbg(?NAME," handle_cast: Message = ~p. ", [_Msg]),
+    {noreply, LoopData}.
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Handling all non call/cast messages.
+%%
+%% Info types:
+%% {notify, RemoteCobId, Index, SubInd, Value} - 
+%%   When Index subscribed to by this process has been updated. <br/>
+%% RemoteCobId = Id of remote CANnode initiating the msg. <br/>
+%% Index = Index in Object Dictionary <br/>
+%% SubInd = Sub index in Object Disctionary  <br/>
+%% Value = Any value the node chooses to send.
+%% 
+%% @end
+%%--------------------------------------------------------------------
+-type info()::
+	{notify, RemoteCobId::term(), Index::integer(), SubInd::integer(), Value::term()} |
+	%% Unknown info
+	term().
+
+-spec handle_info(Info::info(), LoopData::#loop_data{}) ->
+			 {noreply, LoopData::#loop_data{}} |
+			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
+			 {stop, Reason::atom(), LoopData::#loop_data{}}.
+			 
+handle_info({object_event, ?SUBSCRIBED_INDEX = I}, LoopData) ->
+    ?dbg(?NAME," handle_info: object_event for ~.16#",  [I]),
+    do_something,
+    {noreply, LoopData};
+handle_info({object_event, _I}, LoopData) ->
+    ?dbg(?NAME," handle_info: object_event unknwon index ~.16#",  [_I]),
+    {noreply, LoopData};
+handle_info(_Info, LoopData) ->
+    ?dbg(?NAME," handle_info: Unknown Info ~p", [_Info]),
+    {noreply, LoopData}.
+
+%%--------------------------------------------------------------------
+%% @private
+%%--------------------------------------------------------------------
+-spec terminate(Reason::term(), LoopData::#loop_data{}) -> 
+		       no_return().
+
+terminate(_Reason, _LoopData) ->
+    ok.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% Convert process loop data when code is changed
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec code_change(OldVsn::term(), LoopData::#loop_data{}, Extra::term()) -> 
+			 {ok, NewLoopData::#loop_data{}}.
+
+code_change(_OldVsn, LoopData, _Extra) ->
+    %% Note!
+    %% If the code change includes a change in which indexes that should be
+    %% reserved it is vital to unreserve the indexes no longer used.
+    {ok, LoopData}.
+
+     
+%%%===================================================================
+%%% Support functions
+%%%===================================================================
+handle_set({?MY_INDEX, 0}, _Value) ->
+    ?dbg(?NAME," handle_set: 0 not allowed",[]),
+    {error, ?abort_unsupported_access};
+handle_set({?MY_INDEX, 1} = Index, Value) 
+  when is_integer(Value)->
+    ?dbg(?NAME," handle_set: 1 to ~p",[Value]),
+    handle_set1(Index, Value);
+handle_set({?MY_INDEX, 1}, Value) ->
+    ?dbg(?NAME," handle_set: 1 to ~p",[Value]),
+    {error, ?abort_parameter_error};
+handle_set({?MY_INDEX, 2} = Index, Value) 
+  when is_list(Value) ->
+    ?dbg(?NAME," handle_set: 2 to ~p",[Value]),
+    handle_set1(Index, Value);
+handle_set({?MY_INDEX, 2}, Value) ->
+    ?dbg(?NAME," handle_set: 2 to ~p",[Value]),
+    {error, ?abort_parameter_error};
+handle_set({?MY_INDEX, _SubInd}, _Value) ->
+    ?dbg(?NAME, "handle_set: unknown subindex ~.8B ",[_SubInd]),    
+    {error, ?abort_no_such_subindex};
+handle_set({_Index, _SubInd}, _NewValue) ->
+    ?dbg(?NAME, "handle_set, unknown index ~.16B:~.8B ",[_Index, _SubInd]),    
+    {error, ?abort_no_such_object};
+handle_set(Index, NewValue) 
+  when is_integer(Index) ->
+    handle_set({Index,0}, NewValue).
+
+handle_set1(Index, Value) ->
+    try ets:insert(co_ex_table, {Index, Value}) of
+	true ->
+	    ok
+    catch error:_Reason ->
+	    ?dbg(?NAME, "handle_set: set failed, reason = ~p ",[_Reason]),
+	    {error, ?abort_hardware_failure}
+    end.
+
+handle_get({?MY_INDEX, 0}) ->
+    ?dbg(?NAME, "handle_call: get object size = 1",[]),    
+    {ok, 2};
+handle_get({?MY_INDEX, 1} = Index) ->
+    ?dbg(?NAME, "handle_call: get 1",[]),
+    handle_get1(Index);
+handle_get({?MY_INDEX, 2} = Index) ->
+    ?dbg(?NAME, "handle_call: get 2",[]),
+    handle_get1(Index);
+handle_get({?MY_INDEX, _SubInd}) ->
+    ?dbg(?NAME, "handle_get: unknown subindex ~.8B ",[_SubInd]),    
+    {error, ?abort_no_such_subindex};
+handle_get({_Index, _SubInd}) ->
+    ?dbg(?NAME, "handle_get: unknown index ~.16B:~.8B ",[_Index, _SubInd]),
+   {error, ?abort_no_such_object};
+handle_get(Index) 
+  when is_integer(Index)->
+    handle_get({Index, 0}).
+
+handle_get1(Index) ->
+    case ets:lookup(co_ex_table, Index) of
+	[{Index, Value}] ->
+	    {ok, Value};
+	_Other ->
+	    ?dbg(?NAME, "handle_get: get failed, got = ~p ",[_Other]),
+	    {error, ?abort_hardware_failure}
+    end.
+
+

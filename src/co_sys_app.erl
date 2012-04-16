@@ -86,7 +86,7 @@ stop(CoSerial) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec index_specification(Pid::pid(), {Index::integer(), SubInd::integer()}) -> 
-		       {spec, Spec::record()} |
+		       {spec, Spec::#index_spec{}} |
 		       {error, Reason::atom()}.
 
 index_specification(_Pid, {?IX_STORE_PARAMETERS = _Index, 255} = I) ->
@@ -182,15 +182,13 @@ loop_data(Pid) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @spec init(Args) -> {ok, LoopData} |
-%%                     {ok, LoopData, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
 %% @doc
 %% Initializes the server
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec init(CoSerial::term()) -> {ok, LoopData::#loop_data{}}.
+
 init(CoSerial) ->
     {ok, _Dict} = co_api:attach(CoSerial),
     co_api:reserve(CoSerial, ?IX_STORE_PARAMETERS, ?MODULE),
@@ -277,7 +275,6 @@ handle_call(_Request, _From, LoopData) ->
     ?dbg(?NAME," handle_call: bad call ~p.",[_Request]),
     {reply, {error, ?abort_internal_error}, LoopData}.
 
-    
 handle_store(LoopData=#loop_data {co_node = CoNode}, ?EVAS) ->
     case co_api:save_dict(CoNode) of
 	ok ->
@@ -304,7 +301,7 @@ handle_restore(LoopData, _NotOk) ->
 
 
 handle_stop(LoopData=#loop_data {co_node = CoNode}) ->
-    case co_api:alive(LoopData#loop_data.co_node) of
+    case co_api:alive(CoNode) of
 	true ->
 	    co_api:unreserve(CoNode, ?IX_STORE_PARAMETERS),
 	    co_api:unreserve(CoNode, ?IX_RESTORE_DEFAULT_PARAMETERS),
@@ -315,16 +312,13 @@ handle_stop(LoopData=#loop_data {co_node = CoNode}) ->
     ?dbg(?NAME," handle_stop: detached.",[]),
     {stop, normal, ok, LoopData}.
 
-
 %%--------------------------------------------------------------------
 %% @doc
 %% Handling cast messages.
 %%
 %% @end
 %%--------------------------------------------------------------------
--type cast_msg()::go.
-
--spec handle_cast(Msg::cast_msg(), LoopData::#loop_data{}) ->
+-spec handle_cast(Msg::term(), LoopData::#loop_data{}) ->
 			 {noreply, LoopData::#loop_data{}} |
 			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
 			 {stop, Reason::atom(), LoopData::#loop_data{}}.
@@ -337,31 +331,13 @@ handle_cast(_Msg, LoopData) ->
 %%--------------------------------------------------------------------
 %% @doc
 %% Handling all non call/cast messages.
-%%
-%% Info types:
-%% {notify, RemoteCobId, Index, SubInd, Value} - 
-%%   When Index subscribed to by this process has been updated. <br/>
-%% RemoteCobId = Id of remote CANnode initiating the msg. <br/>
-%% Index = Index in Object Dictionary <br/>
-%% SubInd = Sub index in Object Disctionary  <br/>
-%% Value = Any value the node chooses to send.
-%% 
-%% @end
+%%% @end
 %%--------------------------------------------------------------------
--type info()::
-	{notify, RemoteCobId::term(), Index::integer(), SubInd::integer(), Value::term()} |
-	%% Unknown info
-	term().
-
--spec handle_info(Info::info(), LoopData::#loop_data{}) ->
+-spec handle_info(Info::term(), LoopData::#loop_data{}) ->
 			 {noreply, LoopData::#loop_data{}} |
 			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
 			 {stop, Reason::atom(), LoopData::#loop_data{}}.
 			 
-handle_info({notify, _RemoteCobId, _Index, _SubInd, _Value}, LoopData) ->
-    ?dbg(?NAME," handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w ", 
-	      [_RemoteCobId, _Index, _SubInd, _Value]),
-    {noreply, LoopData};
 handle_info(_Info, LoopData) ->
     ?dbg(?NAME," handle_info: Unknown Info ~p", [_Info]),
     {noreply, LoopData}.
@@ -369,27 +345,24 @@ handle_info(_Info, LoopData) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @spec terminate(Reason, LoopData) -> void()
-%%
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @end
 %%--------------------------------------------------------------------
+-spec terminate(Reason::term(), LoopData::#loop_data{}) -> 
+		       no_return().
+
 terminate(_Reason, _LoopData) ->
     ok.
 
 %%--------------------------------------------------------------------
 %% @private
-%% @spec code_change(OldVsn, LoopData, Extra) -> {ok, NewLoopData}
 %%
 %% @doc
-%% Convert process loop data when code is changed
+%% Convert process loop data when code is changed.
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec code_change(OldVsn::term(), LoopData::#loop_data{}, Extra::term()) -> 
+			 {ok, NewLoopData::#loop_data{}}.
+
 code_change(_OldVsn, LoopData, _Extra) ->
     %% Note!
     %% If the code change includes a change in which indexes that should be
@@ -397,5 +370,9 @@ code_change(_OldVsn, LoopData, _Extra) ->
     {ok, LoopData}.
 
      
+%%%===================================================================
+%%% Support functions
+%%%===================================================================
 name(CoSerial) ->
     list_to_atom(atom_to_list(?MODULE) ++ integer_to_list(CoSerial,16)).
+

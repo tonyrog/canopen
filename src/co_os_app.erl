@@ -68,7 +68,7 @@
 		   {error, Error::atom()}.
 
 start_link(CoSerial) ->
-    gen_server:start_link({local,  name(CoSerial)}, ?MODULE, [CoSerial],[]).
+    gen_server:start_link({local,  name(CoSerial)}, ?MODULE, CoSerial,[]).
 	
 %%--------------------------------------------------------------------
 %% @doc
@@ -97,7 +97,7 @@ stop(CoSerial) ->
 		   {error, Error::atom()}.
 
 start(CoSerial) ->
-    gen_server:start({local,  name(CoSerial)}, ?MODULE, [CoSerial],[]).
+    gen_server:start({local,  name(CoSerial)}, ?MODULE, CoSerial,[]).
 	
 %%--------------------------------------------------------------------
 %%% CAllbacks for co_app and co_stream_app behavious
@@ -111,7 +111,7 @@ start(CoSerial) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec index_specification(Pid::pid(), {Index::integer(), SubInd::integer()}) -> 
-		       {spec, Spec::record()} |
+		       {spec, Spec::#index_spec{}} |
 		       {error, Reason::atom()}.
 
 index_specification(_Pid, {?IX_OS_COMMAND = _Index, 255} = I) ->
@@ -263,16 +263,14 @@ loop_data(Pid) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @spec init(Args) -> {ok, LoopData} |
-%%                     {ok, LoopData, Timeout} |
-%%                     ignore |
-%%                     {stop, Reason}
 %% @doc
 %% Initializes the server
 %%
 %% @end
 %%--------------------------------------------------------------------
-init([CoSerial]) ->
+-spec init(CoSerial::term()) -> {ok, LoopData::#loop_data{}}.
+
+init(CoSerial) ->
     process_flag(trap_exit, true),
     {ok, _Dict} = co_api:attach(CoSerial),
     co_api:reserve(CoSerial, ?IX_OS_COMMAND, ?MODULE),
@@ -309,11 +307,8 @@ init([CoSerial]) ->
 
 -spec handle_call(Request::call_request(), From::pid(), LoopData::#loop_data{}) ->
 			 {reply, Reply::term(), LoopData::#loop_data{}} |
-			 {reply, Reply::term(), LoopData::#loop_data{}, Timeout::timeout()} |
 			 {noreply, LoopData::#loop_data{}} |
-			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
-			 {stop, Reason::atom(), Reply::term(), LoopData::#loop_data{}} |
-			 {stop, Reason::atom(), LoopData::#loop_data{}}.
+			 {stop, Reason::atom(), Reply::term(), LoopData::#loop_data{}}.
 
 handle_call({set, {?IX_OS_COMMAND, ?SI_OS_COMMAND}, Command}, _From, LoopData) ->
     ?dbg(?NAME," handle_call: set command = ~p\n",[Command]),
@@ -493,9 +488,7 @@ handle_stop(LoopData) ->
 	term().
 
 -spec handle_cast(Msg::cast_msg(), LoopData::#loop_data{}) ->
-			 {noreply, LoopData::#loop_data{}} |
-			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
-			 {stop, Reason::atom(), LoopData::#loop_data{}}.
+			 {noreply, LoopData::#loop_data{}}.
 			 
 handle_cast({abort, Ref, _Reason}, LoopData) ->
     ?dbg(?NAME," handle_cast: abort ref = ~p, reason\n", [Ref, _Reason]),
@@ -517,29 +510,20 @@ handle_cast(_Msg, LoopData) ->
 %% @doc
 %% Handling all non call/cast messages.
 %%
-%% Ref - Reference in communication with the CANopen node.
-%% RemoteCobId = CobId of remote CANnode initiating the msg. <br/>
-%% Index = Index in Object Dictionary <br/>
-%% SubInd = Sub index in Object Disctionary  <br/>
-%% Value = Any value the node chooses to send.
-%% 
-%% Info types:
+%% Info types: <br/>
 %% {Status, Reply} - When spawned process has finished executing. <br/>
-%% {notify, RemoteCobId, {Index, SubInd}, Value} - 
-%%   When Index subscribed to by this process has been updated. <br/>
+%% {'EXIT', Pid, Reason} - When spawned process has terminated. <br/>
+%% 
 %% @end
 %%--------------------------------------------------------------------
 -type info()::
 	{Status::integer(), Reply::term()} |
-	{notify, RemoteCobId::term(), {Index::integer(), SubInd::integer()}, 
-	 Value::term()} |
+	{'EXIT', Pid::pid(), Reason::term()} |
 	%% Unknown info
 	term().
 
 -spec handle_info(Info::info(), LoopData::#loop_data{}) ->
-			 {noreply, LoopData::#loop_data{}} |
-			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
-			 {stop, Reason::atom(), LoopData::#loop_data{}}.
+			 {noreply, LoopData::#loop_data{}}.
 			 
 handle_info({Status, Reply} = _Info, LoopData) ->
     %% Result received from spawned process
@@ -547,10 +531,7 @@ handle_info({Status, Reply} = _Info, LoopData) ->
     {noreply, LoopData#loop_data {state = executed,
 				  status = Status, 
 				  reply = Reply}};
-handle_info({notify, _RemoteCobId, _Index, _SubInd, _Value}, LoopData) ->
-    ?dbg(?NAME," handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w \n", 
-	      [_RemoteCobId, _Index, _SubInd, _Value]),
-    {noreply, LoopData};
+
 handle_info({'EXIT', Pid, normal}, LoopData=#loop_data {exec_pid = Pid}) ->
     %% Execution process terminated normally
     {noreply, LoopData};
@@ -565,34 +546,30 @@ handle_info({'EXIT', _Pid, _Reason}, LoopData) ->
    ?dbg(?NAME, "handle_info: unexpected EXIT for process ~p received, reason ~p", 
 	 [_Pid, _Reason]),
     {noreply, LoopData};
+
 handle_info(_Info, LoopData) ->
     ?dbg(?NAME," handle_info: Unknown Info ~p\n", [_Info]),
     {noreply, LoopData}.
 
 %%--------------------------------------------------------------------
 %% @private
-%% @spec terminate(Reason, LoopData) -> void()
-%%
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @end
 %%--------------------------------------------------------------------
+-spec terminate(Reason::term(), LoopData::#loop_data{}) -> 
+		       no_return().
+
 terminate(_Reason, _LoopData) ->
     ok.
 
 %%--------------------------------------------------------------------
 %% @private
-%% @spec code_change(OldVsn, LoopData, Extra) -> {ok, NewLoopData}
-%%
 %% @doc
 %% Convert process state when code is changed
 %%
 %% @end
 %%--------------------------------------------------------------------
+-spec code_change(OldVsn::term(), LoopData::#loop_data{}, Extra::term()) -> 
+			 {ok, NewLoopData::#loop_data{}}.
+
 code_change(_OldVsn, LoopData, _Extra) ->
     %% Note!
     %% If the code change includes a change in which indexes that should be
@@ -600,5 +577,9 @@ code_change(_OldVsn, LoopData, _Extra) ->
     {ok, LoopData}.
 
      
+%%%===================================================================
+%%% Support functions
+%%%===================================================================
 name(CoSerial) ->
     list_to_atom(atom_to_list(?MODULE) ++ integer_to_list(CoSerial,16)).
+

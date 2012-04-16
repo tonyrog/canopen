@@ -126,7 +126,8 @@ end_per_suite(Config) ->
 			    {skip,Reason::term()} | 
 			    {skip_and_save,Reason::term(),Config1::list(tuple())}.
 
-init_per_testcase(Case, Config) when Case == os_command;
+init_per_testcase(Case, Config) when Case == start_stop_app;
+				     Case == os_command;
 				     Case == os_command_slow;
 				     Case == os_command_seq ->
     {ok, Pid} = co_os_app:start(serial()),
@@ -153,9 +154,9 @@ init_per_testcase(_TestCase, Config) ->
 			      {save_config,Config1::list(tuple())}.
 
 end_per_testcase(Case, Config) when Case == start_stop_app;
-				     Case == os_command;
-				     Case == os_command_slow;
-				     Case == os_command_seq ->
+				    Case == os_command;
+				    Case == os_command_slow;
+				    Case == os_command_seq ->
     Pid = ?config(os_app_pid, Config),
     co_os_app:stop(Pid),
     ok;
@@ -173,14 +174,14 @@ end_per_testcase(_TestCase, _Config) ->
 %%--------------------------------------------------------------------
 -spec start_stop_app(Config::list(tuple())) -> ok.
 
-start_stop_app(_Config) ->
-    {ok, Pid} = co_os_app:start_link(serial()),
+start_stop_app(Config) ->
+    %% Start and stop done in init/end_per testcase
 
-    %% Check that is it up
-    ok = co_os_app:debug(Pid, true),
+    %% Verify that it stays up for a sec
     timer:sleep(1000),
+    Pid = ?config(os_app_pid, Config),
+    ok = co_os_app:debug(Pid, true),
 
-    ok = co_os_app:stop(serial()),
     ok.
 
 %%--------------------------------------------------------------------
