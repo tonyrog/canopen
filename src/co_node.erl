@@ -277,8 +277,8 @@ initialization(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
 %%                                            {noreply, Context, Timeout} |
 %%                                            {stop, Reason, Reply, Context} |
 %%                                            {stop, Reason, Context}
-%% Request = {set, Index, SubInd, Value} | 
-%%           {direct_set, Index, SubInd, Value} | 
+%% Request = {set_value, Index, SubInd, Value} | 
+%%           {set_data, Index, SubInd, Data} | 
 %%           {value, {index, SubInd}} | 
 %%           {value, Index} | 
 %%           {store, Block, CobId, Index, SubInd, Bin} | 
@@ -294,18 +294,28 @@ initialization(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
 %% @end
 %%--------------------------------------------------------------------
 
-handle_call({set,{Ix,Si},Value}, _From, Ctx) ->
-    {Reply,Ctx1} = set_dict_value(Ix,Si,Value,Ctx),
+handle_call({set_value,{Ix,Si},Value}, _From, Ctx) ->
+    {Reply,Ctx1} = set_value(Ix,Si,Value,Ctx),
     {reply, Reply, Ctx1};
-handle_call({tpdo_set,I,Value,Mode}, _From, Ctx) ->
-    {Reply,Ctx1} = tpdo_set(I,Value,Mode,Ctx),
+handle_call({direct_set_value,{Ix,Si},Value}, _From, Ctx) ->
+    {Reply,Ctx1} = direct_set_value(Ix,Si,Value,Ctx),
     {reply, Reply, Ctx1};
-handle_call({direct_set,{Ix,Si},Value}, _From, Ctx) ->
-    {Reply,Ctx1} = direct_set_dict_value(Ix,Si,Value,Ctx),
+handle_call({set_data,{Ix,Si},Data}, _From, Ctx) ->
+    {Reply,Ctx1} = set_data(Ix,Si,Data,Ctx),
+    {reply, Reply, Ctx1};
+handle_call({direct_set_data,{Ix,Si},Data}, _From, Ctx) ->
+    {Reply,Ctx1} = direct_set_data(Ix,Si,Data,Ctx),
     {reply, Reply, Ctx1};
 handle_call({value,{Ix, Si}}, _From, Ctx) ->
     Result = co_dict:value(Ctx#co_ctx.dict, Ix, Si),
     {reply, Result, Ctx};
+handle_call({data,{Ix, Si}}, _From, Ctx) ->
+    Result = co_dict:data(Ctx#co_ctx.dict, Ix, Si),
+    {reply, Result, Ctx};
+
+handle_call({tpdo_set,I,Value,Mode}, _From, Ctx) ->
+    {Reply,Ctx1} = tpdo_set(I,Value,Mode,Ctx),
+    {reply, Reply, Ctx1};
 
 handle_call({Action,Mode,NodeId,Ix,Si,Term}, From, 
 	    Ctx=#co_ctx {name = _Name, sdo_list = Sessions, sdo = SdoCtx}) 
@@ -340,6 +350,17 @@ handle_call({Action,Mode,NodeId,Ix,Si,Term}, From,
 	    ?dbg(node, "~s: ~p: No sdo server found for node ~.16.0#.", 
 		 [_Name, Action, Nid]),
 	    {reply, {error, badarg}, Ctx}
+    end;
+
+handle_call({add_object,Object, Es}, _From, Ctx) when is_record(Object, dict_object) ->
+    try set_dict_object({Object, Es}, Ctx) of
+	Error = {error,_} ->
+	    {reply, Error, Ctx};
+	Ctx1 ->
+	    {reply, ok, Ctx1}
+    catch
+	error:Reason ->
+	    {reply, {error,Reason}, Ctx}
     end;
 
 handle_call({add_entry,Entry}, _From, Ctx) when is_record(Entry, dict_entry) ->
@@ -1098,35 +1119,46 @@ load_dict_internal(File, Ctx=#co_ctx {dict = Dict, name = _Name}) ->
 %% Update dictionary
 %% Only valid for 'local' objects
 %%
-set_dict_object({O,Es}, Ctx) when is_record(O, dict_object) ->
-    lists:foreach(fun(E) -> ets:insert(Ctx#co_ctx.dict, E) end, Es),
-    ets:insert(Ctx#co_ctx.dict, O),
-    I = O#dict_object.index,
-    handle_notify(I, Ctx).
+set_dict_object({Object,Es}, Ctx=#co_ctx {dict = Dict}) 
+  when is_record(Object, dict_object) ->
+    case co_dict:add_object(Dict, Object, Es) of
+	ok ->
+	    I = Object#dict_object.index,
+	    handle_notify(I, Ctx);
+	Error ->
+	    Error
+    end.
 
-set_dict_entry(E, Ctx) when is_record(E, dict_entry) ->
-    {I,_} = E#dict_entry.index,
-    ets:insert(Ctx#co_ctx.dict, E),
-    handle_notify(I, Ctx).
+set_dict_entry(Entry, Ctx=#co_ctx {dict = Dict}) 
+  when is_record(Entry, dict_entry) ->
+    case co_dict:add_entry(Dict, Entry) of
+	ok ->
+	    {I,_} = Entry#dict_entry.index,
+	    handle_notify(I, Ctx);
+	Error ->
+	    Error
+    end.
 
-set_dict_value(Ix,Si,Value,Ctx) ->
-    try co_dict:set_value(Ctx#co_ctx.dict, Ix,Si,Value) of
+set_value(Ix,Si,Value,Ctx) ->
+    set(set_value, Ix,Si, Value, Ctx).
+
+set_data(Ix,Si,Data,Ctx) ->
+    set(set_data, Ix,Si, Data, Ctx).
+
+direct_set_value(Ix,Si,Value,Ctx) ->
+    set(direct_set_value, Ix,Si, Value, Ctx).
+
+direct_set_data(Ix,Si,Data,Ctx) ->
+    set(direct_set_data, Ix,Si, Data, Ctx).
+
+set(Func, Ix,Si,ValueOrData,Ctx) ->
+    try co_dict:Func(Ctx#co_ctx.dict, Ix,Si,ValueOrData) of
 	ok -> {ok, handle_notify(Ix, Ctx)};
 	Error -> {Error, Ctx}
     catch
 	error:Reason -> {{error,Reason}, Ctx}
     end.
 
-
-direct_set_dict_value(Ix,Si,Value,Ctx) ->
-    ?dbg(node, "~s: direct_set_dict_value: Ix = ~.16#:~w, Value = ~p",
-	 [Ctx#co_ctx.name, Ix, Si, Value]), 
-    try co_dict:direct_set_value(Ctx#co_ctx.dict, Ix,Si,Value) of
-	ok -> {ok, handle_notify(Ix, Ctx)};
-	Error -> {Error, Ctx}
-    catch
-	error:Reason -> {{error,Reason}, Ctx}
-    end.
 
 
 %%

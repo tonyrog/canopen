@@ -1,3 +1,4 @@
+%% -*- erlang -*-
 %%
 %% DS-401 Generic I/O modules
 %%
@@ -22,1450 +23,1453 @@
 %%                            00    No specifc function
 %%                            01    Joy stick
 %%                            _     Reserved
+{module, 'DS-401'}.
+
+{require, type}.
 
 {objdef,16#6000,[
-  {name,"Read Inputs 8 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 8 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Read Inputs 0x%X to 0x%X[(sub*8-7,sub*8)]"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Read Inputs 8 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 8 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Read Inputs 0x%X to 0x%X[(sub*8-7,sub*8)]"},
+				 {type,unsigned8},
+				 {access,ro},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6002,[
-  {name,"Polarity Input 8 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 8 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Polarity Input 0x%X to 0x%X[(sub*8-7,sub*8)]"},
-    {type,unsigned8},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Polarity Input 8 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 8 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Polarity Input 0x%X to 0x%X[(sub*8-7,sub*8)]"},
+				 {type,unsigned8},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6003,[
-  {name,"Filter Constant Input 8 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 8 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Filter Constant Input 0x%X to 0x%X[(sub*8-7,sub*8)]"},
-    {type,unsigned8},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Filter Constant Input 8 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 8 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Filter Constant Input 0x%X to 0x%X[(sub*8-7,sub*8)]"},
+				 {type,unsigned8},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6005,[
-  {name,"Global Interrupt Enable Digital"},
-  {struct,var},
-  {category,optional},
-  {entry,0,[
-    {name,"Global Interrupt Enable Digital"},
-    {type,boolean},
-    {access,rw},
-    {pdo_mapping,no}
-  ]}
-]}.
+		 {name,"Global Interrupt Enable Digital"},
+		 {struct,var},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Global Interrupt Enable Digital"},
+			   {type,boolean},
+			   {access,rw},
+			   {pdo_mapping,no}
+			  ]}
+		]}.
 
 {objdef,16#6006,[
-  {name,"Interrupt Mask Any Change 8 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 8 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Interrupt Any Change 0x%X to 0x%X[(sub*8-7,sub*8)]"},
-    {type,unsigned8},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Interrupt Mask Any Change 8 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 8 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Interrupt Any Change 0x%X to 0x%X[(sub*8-7,sub*8)]"},
+				 {type,unsigned8},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6007,[
-  {name,"Interrupt Mask Low to High 8 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 8 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Interrupt Low to High 0x%X to 0x%X[(sub*8-7,sub*8)]"},
-    {type,unsigned8},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Interrupt Mask Low to High 8 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 8 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Interrupt Low to High 0x%X to 0x%X[(sub*8-7,sub*8)]"},
+				 {type,unsigned8},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6008,[
-  {name,"Interrupt Mask High to Low 8 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 8 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Interrupt High to Low 0x%X to 0x%X[(sub*8-7,sub*8)]"},
-    {type,unsigned8},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Interrupt Mask High to Low 8 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 8 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Interrupt High to Low 0x%X to 0x%X[(sub*8-7,sub*8)]"},
+				 {type,unsigned8},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,{16#6020,16#6027},[
-  {name,"Read Input Bit 0x%X to 0x%X[(idx*128-127,idx*128)]"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 1 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,128},[
-    {name,"Read Single Input 0x%X[((idx-1)*128+sub)]"},
-    {type,boolean},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+			   {name,"Read Input Bit 0x%X to 0x%X[(idx*128-127,idx*128)]"},
+			   {struct,rec},
+			   {category,optional},
+			   {entry,0,[
+				     {name,"Number of Input 1 bit"},
+				     {type,unsigned8},
+				     {access,ro},
+				     {pdo_mapping,no}
+				    ]},
+			   {entry,{1,128},[
+					   {name,"Read Single Input 0x%X[((idx-1)*128+sub)]"},
+					   {type,boolean},
+					   {access,rw},
+					   {pdo_mapping,optional}
+					  ]}
+			  ]}.
 
 {objdef,{16#6030,16#6037},[
-  {name,"Polarity Input Bit 0x%X to 0x%X[(idx*128-127,idx*128)]"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 1 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,128},[
-    {name,"Polarity Input bit 0x%X[((idx-1)*128+sub)]"},
-    {type,boolean},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+			   {name,"Polarity Input Bit 0x%X to 0x%X[(idx*128-127,idx*128)]"},
+			   {struct,rec},
+			   {category,optional},
+			   {entry,0,[
+				     {name,"Number of Input 1 bit"},
+				     {type,unsigned8},
+				     {access,ro},
+				     {pdo_mapping,no}
+				    ]},
+			   {entry,{1,128},[
+					   {name,"Polarity Input bit 0x%X[((idx-1)*128+sub)]"},
+					   {type,boolean},
+					   {access,rw},
+					   {pdo_mapping,optional}
+					  ]}
+			  ]}.
 
 {objdef,{16#6038,16#603F},[
-  {name,"Filter Constant Input Bit 0x%X to 0x%X[(idx*128-127,idx*128)]"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 1 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,128},[
-    {name,"Filter Constant Input bit 0x%X[((idx-1)*128+sub)]"},
-    {type,boolean},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+			   {name,"Filter Constant Input Bit 0x%X to 0x%X[(idx*128-127,idx*128)]"},
+			   {struct,rec},
+			   {category,optional},
+			   {entry,0,[
+				     {name,"Number of Input 1 bit"},
+				     {type,unsigned8},
+				     {access,ro},
+				     {pdo_mapping,no}
+				    ]},
+			   {entry,{1,128},[
+					   {name,"Filter Constant Input bit 0x%X[((idx-1)*128+sub)]"},
+					   {type,boolean},
+					   {access,rw},
+					   {pdo_mapping,optional}
+					  ]}
+			  ]}.
 
 {objdef,{16#6050,16#6057},[
-  {name,"Interrupt Mask Input Any Change Bit 0x%X to 0x%X[(idx*128-127,idx*128)]"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 1 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,128},[
-    {name,"Interrupt Mask Any Change Input bit 0x%X[((idx-1)*128+sub)]"},
-    {type,boolean},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+			   {name,"Interrupt Mask Input Any Change Bit 0x%X to 0x%X[(idx*128-127,idx*128)]"},
+			   {struct,rec},
+			   {category,optional},
+			   {entry,0,[
+				     {name,"Number of Input 1 bit"},
+				     {type,unsigned8},
+				     {access,ro},
+				     {pdo_mapping,no}
+				    ]},
+			   {entry,{1,128},[
+					   {name,"Interrupt Mask Any Change Input bit 0x%X[((idx-1)*128+sub)]"},
+					   {type,boolean},
+					   {access,rw},
+					   {pdo_mapping,optional}
+					  ]}
+			  ]}.
 
 {objdef,{16#6060,16#6067},[
-  {name,"Interrupt Mask Input Low to High Bit 0x%X to 0x%X[(idx*128-127,idx*128)]"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 1 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,128},[
-    {name,"Interrupt Mask Any Change Input bit 0x%X[((idx-1)*128+sub)]"},
-    {type,boolean},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+			   {name,"Interrupt Mask Input Low to High Bit 0x%X to 0x%X[(idx*128-127,idx*128)]"},
+			   {struct,rec},
+			   {category,optional},
+			   {entry,0,[
+				     {name,"Number of Input 1 bit"},
+				     {type,unsigned8},
+				     {access,ro},
+				     {pdo_mapping,no}
+				    ]},
+			   {entry,{1,128},[
+					   {name,"Interrupt Mask Any Change Input bit 0x%X[((idx-1)*128+sub)]"},
+					   {type,boolean},
+					   {access,rw},
+					   {pdo_mapping,optional}
+					  ]}
+			  ]}.
 
 {objdef,{16#6070,16#6077},[
-  {name,"Interrupt Mask Input High  to Low Bit 0x%X to 0x%X[(idx*128-127,idx*128)]"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 1 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,128},[
-    {name,"Interrupt Mask Any Change Input bit 0x%X[((idx-1)*128+sub)]"},
-    {type,boolean},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+			   {name,"Interrupt Mask Input High  to Low Bit 0x%X to 0x%X[(idx*128-127,idx*128)]"},
+			   {struct,rec},
+			   {category,optional},
+			   {entry,0,[
+				     {name,"Number of Input 1 bit"},
+				     {type,unsigned8},
+				     {access,ro},
+				     {pdo_mapping,no}
+				    ]},
+			   {entry,{1,128},[
+					   {name,"Interrupt Mask Any Change Input bit 0x%X[((idx-1)*128+sub)]"},
+					   {type,boolean},
+					   {access,rw},
+					   {pdo_mapping,optional}
+					  ]}
+			  ]}.
 
 {objdef,16#6100,[
-  {name,"Read Inputs 16 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 16 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Read Inputs 0x%X to 0x%X[(sub*16-15,sub*16)]"},
-    {type,unsigned16},
-    {access,ro},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Read Inputs 16 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 16 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Read Inputs 0x%X to 0x%X[(sub*16-15,sub*16)]"},
+				 {type,unsigned16},
+				 {access,ro},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6102,[
-  {name,"Polarity Input 16 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 16 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Polarity Input 0x%X to 0x%X[(sub*16-15,sub*16)]"},
-    {type,unsigned16},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Polarity Input 16 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 16 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Polarity Input 0x%X to 0x%X[(sub*16-15,sub*16)]"},
+				 {type,unsigned16},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6103,[
-  {name,"Filter Constant Input 16 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 16 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Filter Constant Input 0x%X to 0x%X[(sub*16-15,sub*16)]"},
-    {type,unsigned16},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Filter Constant Input 16 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 16 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Filter Constant Input 0x%X to 0x%X[(sub*16-15,sub*16)]"},
+				 {type,unsigned16},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6106,[
-  {name,"Interrupt Mask Any Change 16 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 16 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Interrupt Any Change 0x%X to 0x%X[(sub*16-15,sub*16)]"},
-    {type,unsigned16},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Interrupt Mask Any Change 16 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 16 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Interrupt Any Change 0x%X to 0x%X[(sub*16-15,sub*16)]"},
+				 {type,unsigned16},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6107,[
-  {name,"Interrupt Mask Low to High 16 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 16 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Interrupt Low to High 0x%X to 0x%X[(sub*16-15,sub*16)]"},
-    {type,unsigned16},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Interrupt Mask Low to High 16 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 16 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Interrupt Low to High 0x%X to 0x%X[(sub*16-15,sub*16)]"},
+				 {type,unsigned16},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6106,[
-  {name,"Interrupt Mask High to Low 16 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 16 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Interrupt High to Low 0x%X to 0x%X[(sub*16-15,sub*16)]"},
-    {type,unsigned16},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Interrupt Mask High to Low 16 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 16 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Interrupt High to Low 0x%X to 0x%X[(sub*16-15,sub*16)]"},
+				 {type,unsigned16},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6120,[
-  {name,"Read Input 4 Byte"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 32 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,128},[
-    {name,"Read Input 0x%X to 0x%X[(sub*32-31,sub*32)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Read Input 4 Byte"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 32 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,128},[
+				 {name,"Read Input 0x%X to 0x%X[(sub*32-31,sub*32)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6122,[
-  {name,"Polarity Input 32 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 32 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Polarity Input 0x%X to 0x%X[(sub*32-31,sub*32)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,no}
-  ]}
-]}.
+		 {name,"Polarity Input 32 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 32 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Polarity Input 0x%X to 0x%X[(sub*32-31,sub*32)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,no}
+				]}
+		]}.
 
 {objdef,16#6123,[
-  {name,"Filter Constant Input 32 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 32 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Polarity Input  0x%X to 0x%X[(sub*32-31,sub*32)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,no}
-  ]}
-]}.
+		 {name,"Filter Constant Input 32 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 32 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Polarity Input  0x%X to 0x%X[(sub*32-31,sub*32)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,no}
+				]}
+		]}.
 
 {objdef,16#6126,[
-  {name,"Interrupt Mask Input Any Change 32 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 32 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Interrupt Any Change Input 0x%X to 0x%X[(sub*32-31,sub*32)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Interrupt Mask Input Any Change 32 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 32 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Interrupt Any Change Input 0x%X to 0x%X[(sub*32-31,sub*32)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6127,[
-  {name,"Interrupt Mask Input Low to High 32 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 32 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Interrupt Low to High Input  0x%X to 0x%X[(sub*32-31,sub*32)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Interrupt Mask Input Low to High 32 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 32 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Interrupt Low to High Input  0x%X to 0x%X[(sub*32-31,sub*32)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6128,[
-  {name,"Interrupt Mask Input High to Low 32 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Input 32 bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Interrupt High to Low Input 0x%X to 0x%X[(sub*32-31,sub*32)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Interrupt Mask Input High to Low 32 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Input 32 bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Interrupt High to Low Input 0x%X to 0x%X[(sub*32-31,sub*32)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6200,[
-  {name,"Write Outputs 8 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 8 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Write Outputs 0x%X to 0x%X[(sub*8-7,sub*8)]"},
-    {type,unsigned8},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Write Outputs 8 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 8 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Write Outputs 0x%X to 0x%X[(sub*8-7,sub*8)]"},
+				 {type,unsigned8},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6202,[
-  {name,"Change Polarity Outputs 8 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 8 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Change Polarity Outputs 0x%X to 0x%X[(sub*8-7,sub*8)]"},
-    {type,unsigned8},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Change Polarity Outputs 8 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 8 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Change Polarity Outputs 0x%X to 0x%X[(sub*8-7,sub*8)]"},
+				 {type,unsigned8},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6206,[
-  {name,"Error Mode Outputs 8 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 8 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Error Mode Outputs 0x%X to 0x%X[(sub*8-7,sub*8)]"},
-    {type,unsigned8},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Error Mode Outputs 8 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 8 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Error Mode Outputs 0x%X to 0x%X[(sub*8-7,sub*8)]"},
+				 {type,unsigned8},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6207,[
-  {name,"Error Value Outputs 8 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 8 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Error Value Outputs 0x%X to 0x%X[(sub*8-7,sub*8)]"},
-    {type,unsigned8},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Error Value Outputs 8 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 8 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Error Value Outputs 0x%X to 0x%X[(sub*8-7,sub*8)]"},
+				 {type,unsigned8},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6208,[
-  {name,"Filter Mask Outputs 8 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 8 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Filter Mask Outputs 0x%X to 0x%X[(sub*8-7,sub*8)]"},
-    {type,unsigned8},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Filter Mask Outputs 8 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 8 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Filter Mask Outputs 0x%X to 0x%X[(sub*8-7,sub*8)]"},
+				 {type,unsigned8},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,{16#6220,16#6227},[
-  {name,"Write Outputs Bit %d to %d[(idx*128-127,idx*128)]"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 1 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,128},[
-    {name,"Write Outputs 0x%X[((idx-1)*128+sub)]"},
-    {type,boolean},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+			   {name,"Write Outputs Bit %d to %d[(idx*128-127,idx*128)]"},
+			   {struct,rec},
+			   {category,optional},
+			   {entry,0,[
+				     {name,"Number of Output 1 Bit"},
+				     {type,unsigned8},
+				     {access,ro},
+				     {pdo_mapping,no}
+				    ]},
+			   {entry,{1,128},[
+					   {name,"Write Outputs 0x%X[((idx-1)*128+sub)]"},
+					   {type,boolean},
+					   {access,rw},
+					   {pdo_mapping,optional}
+					  ]}
+			  ]}.
 
 {objdef,{16#6240,16#6247},[
-  {name,"Change Polarity Outputs Bit %d to %d[(idx*128-127,idx*128)]"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 1 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,128},[
-    {name,"Write Outputs 0x%X[((idx-1)*128+sub)]"},
-    {type,boolean},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+			   {name,"Change Polarity Outputs Bit %d to %d[(idx*128-127,idx*128)]"},
+			   {struct,rec},
+			   {category,optional},
+			   {entry,0,[
+				     {name,"Number of Output 1 Bit"},
+				     {type,unsigned8},
+				     {access,ro},
+				     {pdo_mapping,no}
+				    ]},
+			   {entry,{1,128},[
+					   {name,"Write Outputs 0x%X[((idx-1)*128+sub)]"},
+					   {type,boolean},
+					   {access,rw},
+					   {pdo_mapping,optional}
+					  ]}
+			  ]}.
 
 {objdef,{16#6250,16#6257},[
-  {name,"Error Mode Outputs Lines %d to %d[(idx*128-127,idx*128)]"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 1 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,128},[
-    {name,"Error Mode Outputs 0x%X[((idx-1)*128+sub)]"},
-    {type,boolean},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+			   {name,"Error Mode Outputs Lines %d to %d[(idx*128-127,idx*128)]"},
+			   {struct,rec},
+			   {category,optional},
+			   {entry,0,[
+				     {name,"Number of Output 1 Bit"},
+				     {type,unsigned8},
+				     {access,ro},
+				     {pdo_mapping,no}
+				    ]},
+			   {entry,{1,128},[
+					   {name,"Error Mode Outputs 0x%X[((idx-1)*128+sub)]"},
+					   {type,boolean},
+					   {access,rw},
+					   {pdo_mapping,optional}
+					  ]}
+			  ]}.
 
 {objdef,{16#6260,16#6267},[
-  {name,"Error Value Outputs Lines %d to %d[(idx*128-127,idx*128)]"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 1 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,128},[
-    {name,"Error Value Outputs 0x%X[((idx-1)*128+sub)]"},
-    {type,boolean},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+			   {name,"Error Value Outputs Lines %d to %d[(idx*128-127,idx*128)]"},
+			   {struct,rec},
+			   {category,optional},
+			   {entry,0,[
+				     {name,"Number of Output 1 Bit"},
+				     {type,unsigned8},
+				     {access,ro},
+				     {pdo_mapping,no}
+				    ]},
+			   {entry,{1,128},[
+					   {name,"Error Value Outputs 0x%X[((idx-1)*128+sub)]"},
+					   {type,boolean},
+					   {access,rw},
+					   {pdo_mapping,optional}
+					  ]}
+			  ]}.
 
 {objdef,{16#6270,16#6277},[
-  {name,"Filter Constant Outputs Lines %d to %d[(idx*128-127,idx*128)]"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 1 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,128},[
-    {name,"Filter Constant Outputs 0x%X[((idx-1)*128+sub)]"},
-    {type,boolean},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+			   {name,"Filter Constant Outputs Lines %d to %d[(idx*128-127,idx*128)]"},
+			   {struct,rec},
+			   {category,optional},
+			   {entry,0,[
+				     {name,"Number of Output 1 Bit"},
+				     {type,unsigned8},
+				     {access,ro},
+				     {pdo_mapping,no}
+				    ]},
+			   {entry,{1,128},[
+					   {name,"Filter Constant Outputs 0x%X[((idx-1)*128+sub)]"},
+					   {type,boolean},
+					   {access,rw},
+					   {pdo_mapping,optional}
+					  ]}
+			  ]}.
 
 {objdef,16#6300,[
-  {name,"Write Outputs 16 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 16 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Write Outputs 0x%X to 0x%X[(sub*16-15,sub*16)]"},
-    {type,unsigned16},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Write Outputs 16 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 16 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Write Outputs 0x%X to 0x%X[(sub*16-15,sub*16)]"},
+				 {type,unsigned16},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6302,[
-  {name,"Change Polarity Outputs 16 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 16 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Change Polarity Outputs 0x%X to 0x%X[(sub*16-15,sub*16)]"},
-    {type,unsigned16},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Change Polarity Outputs 16 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 16 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Change Polarity Outputs 0x%X to 0x%X[(sub*16-15,sub*16)]"},
+				 {type,unsigned16},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6306,[
-  {name,"Error Mode Outputs 16 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 16 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Error Mode Outputs 0x%X to 0x%X[(sub*16-15,sub*16)]"},
-    {type,unsigned16},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Error Mode Outputs 16 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 16 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Error Mode Outputs 0x%X to 0x%X[(sub*16-15,sub*16)]"},
+				 {type,unsigned16},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6307,[
-  {name,"Error Value Outputs 16 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 16 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Error Value Outputs 0x%X to 0x%X[(sub*16-15,sub*16)]"},
-    {type,unsigned16},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Error Value Outputs 16 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 16 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Error Value Outputs 0x%X to 0x%X[(sub*16-15,sub*16)]"},
+				 {type,unsigned16},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6308,[
-  {name,"Filter Mask Outputs 16 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 16 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Filter Mask Outputs 0x%X to 0x%X[(sub*16-15,sub*16)]"},
-    {type,unsigned16},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Filter Mask Outputs 16 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 16 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Filter Mask Outputs 0x%X to 0x%X[(sub*16-15,sub*16)]"},
+				 {type,unsigned16},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6320,[
-  {name,"Write Output 32 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 32 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Write Outputs 0x%X to 0x%X[(sub*32-31,sub*32)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Write Output 32 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 32 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Write Outputs 0x%X to 0x%X[(sub*32-31,sub*32)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6322,[
-  {name,"Change Polarity Outputs 32 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 32 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Polarity Outputs 0x%X to 0x%X[(sub*32-31,sub*32)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Change Polarity Outputs 32 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 32 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Polarity Outputs 0x%X to 0x%X[(sub*32-31,sub*32)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6326,[
-  {name,"Error Mode Outputs 32 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 32 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Error Mode Outputs 0x%X to 0x%X[(sub*32-31,sub*32)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Error Mode Outputs 32 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 32 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Error Mode Outputs 0x%X to 0x%X[(sub*32-31,sub*32)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6327,[
-  {name,"Error Value Outputs 32 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 32 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Error Value Outputs 0x%X to 0x%X[(sub*32-31,sub*32)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Error Value Outputs 32 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 32 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Error Value Outputs 0x%X to 0x%X[(sub*32-31,sub*32)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6328,[
-  {name,"Filter Mask Outputs 32 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Output 32 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Filter Mask Outputs 0x%X to 0x%X[(sub*32-31,sub*32)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Filter Mask Outputs 32 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Output 32 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Filter Mask Outputs 0x%X to 0x%X[(sub*32-31,sub*32)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6400,[
-  {name,"Read Analogue Input 8 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Input 8 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,integer8},
-    {access,ro},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Read Analogue Input 8 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Input 8 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,integer8},
+				 {access,ro},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6401,[
-  {name,"Read Analogue Input 16 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Input 16 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,integer16},
-    {access,ro},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Read Analogue Input 16 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Input 16 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,integer16},
+				 {access,ro},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6402,[
-  {name,"Read Analogue Input 32 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Input 32 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,integer32},
-    {access,ro},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Read Analogue Input 32 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Input 32 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,integer32},
+				 {access,ro},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6403,[
-  {name,"Read Analogue Input Float"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Input Float"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,real32},
-    {access,ro},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Read Analogue Input Float"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Input Float"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,real32},
+				 {access,ro},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6404,[
-  {name,"Read Manufacturer specific Analogue Input"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Input"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,real64},
-    {access,ro},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Read Manufacturer specific Analogue Input"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Input"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,real64},
+				 {access,ro},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6410,[
-  {name,"Write Analogue Output 8 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Input 8 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,integer8},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Write Analogue Output 8 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Input 8 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,integer8},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6411,[
-  {name,"Write Analogue Output 16 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Input 16 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Output %d[(sub)]"},
-    {type,integer16},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Write Analogue Output 16 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Input 16 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Output %d[(sub)]"},
+				 {type,integer16},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6412,[
-  {name,"Write Analogue Output 32 Bit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Outputs 32 Bit"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Output %d[(sub)]"},
-    {type,integer32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Write Analogue Output 32 Bit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Outputs 32 Bit"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Output %d[(sub)]"},
+				 {type,integer32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6413,[
-  {name,"Write Analogue Output Float"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Outputs Float"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Output %d[(sub)]"},
-    {type,real32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Write Analogue Output Float"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Outputs Float"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Output %d[(sub)]"},
+				 {type,real32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6414,[
-  {name,"Write Manufacturer specific Analogue Output"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Outputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Output %d[(sub)]"},
-    {type,real64},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Write Manufacturer specific Analogue Output"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Outputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Output %d[(sub)]"},
+				 {type,real64},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6421,[
-  {name,"Interrupt Trigger Selection"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analog Inputs 0x%X[(sub)]"},
-    {type,unsigned8},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Interrupt Trigger Selection"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analog Inputs 0x%X[(sub)]"},
+				 {type,unsigned8},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6422,[
-  {name,"Analogue Input Interrupt Source"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Interrupt Source Bank"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Interrupt Source Bank 0x%X[(sub)]"},
-    {type,unsigned32},
-    {access,ro},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Interrupt Source"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Interrupt Source Bank"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Interrupt Source Bank 0x%X[(sub)]"},
+				 {type,unsigned32},
+				 {access,ro},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6423,[
-  {name,"Analogue Input Global Interrupt Enable"},
-  {struct,var},
-  {category,optional},
-  {entry,0,[
-    {name,"Analogue Input Global Interrupt Enable"},
-    {type,boolean},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Global Interrupt Enable"},
+		 {struct,var},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Analogue Input Global Interrupt Enable"},
+			   {type,boolean},
+			   {access,rw},
+			   {pdo_mapping,optional}
+			  ]}
+		]}.
 
 {objdef,16#6424,[
-  {name,"Analogue Input Interrupt Upper Limit Interger"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,integer32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Interrupt Upper Limit Interger"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,integer32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6425,[
-  {name,"Analogue Input Interrupt Lower Limit Interger"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,integer32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Interrupt Lower Limit Interger"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,integer32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6426,[
-  {name,"Analogue Input Interrupt Delta Unsigned"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Interrupt Delta Unsigned"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6427,[
-  {name,"Analogue Input Interrupt Negative Delta Unsigned"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Interrupt Negative Delta Unsigned"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6428,[
-  {name,"Analogue Input Interrupt Positive Delta Unsigned"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Interrupt Positive Delta Unsigned"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6429,[
-  {name,"Analogue Input Interrupt Upper Limit Float"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,real32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Interrupt Upper Limit Float"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,real32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#642A,[
-  {name,"Analogue Input Interrupt Lower Limit Float"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,real32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Interrupt Lower Limit Float"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,real32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#642B,[
-  {name,"Analogue Input Interrupt Delta Float"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,real32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Interrupt Delta Float"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,real32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#642C,[
-  {name,"Analogue Input Interrupt Negative Delta Float"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,real32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Interrupt Negative Delta Float"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,real32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#642D,[
-  {name,"Analogue Input Interrupt Positive Delta Float"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,real32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Interrupt Positive Delta Float"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,real32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#642E,[
-  {name,"Analogue Input Offset Float"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,real32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Offset Float"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,real32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#642F,[
-  {name,"Analogue Input Scaling Float"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,real32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Scaling Float"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,real32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6430,[
-  {name,"Analogue Input SI unit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input SI unit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6431,[
-  {name,"Analogue Input Offset Integer"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,integer32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Offset Integer"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,integer32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6432,[
-  {name,"Analogue Input Scaling Integer"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Inputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Input %d[(sub)]"},
-    {type,integer32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Input Scaling Integer"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Inputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Input %d[(sub)]"},
+				 {type,integer32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6441,[
-  {name,"Analogue Output Offset Float"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Outputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Output %d[(sub)]"},
-    {type,real32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Output Offset Float"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Outputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Output %d[(sub)]"},
+				 {type,real32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6442,[
-  {name,"Analogue Output Scaling Float"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Outputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Output %d[(sub)]"},
-    {type,real32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Output Scaling Float"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Outputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Output %d[(sub)]"},
+				 {type,real32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6443,[
-  {name,"Analogue Output Error Mode"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Outputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Error Mode Analogue Output %d[(sub)]"},
-    {type,unsigned8},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Output Error Mode"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Outputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Error Mode Analogue Output %d[(sub)]"},
+				 {type,unsigned8},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6444,[
-  {name,"Analogue Output Error Value Integer"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Outputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Output %d[(sub)]"},
-    {type,integer32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Output Error Value Integer"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Outputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Output %d[(sub)]"},
+				 {type,integer32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6445,[
-  {name,"Analogue Output Error Value Float"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Outputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Output %d[(sub)]"},
-    {type,real32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Output Error Value Float"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Outputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Output %d[(sub)]"},
+				 {type,real32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6446,[
-  {name,"Analogue Output Offset Integer"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Outputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Output %d[(sub)]"},
-    {type,integer32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Output Offset Integer"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Outputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Output %d[(sub)]"},
+				 {type,integer32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6447,[
-  {name,"Analogue Output Scaling Integer"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Outputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Output %d[(sub)]"},
-    {type,integer32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Output Scaling Integer"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Outputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Output %d[(sub)]"},
+				 {type,integer32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 
 {objdef,16#6450,[
-  {name,"Analogue Output SI Unit"},
-  {struct,rec},
-  {category,optional},
-  {entry,0,[
-    {name,"Number of Analogue Outputs"},
-    {type,unsigned8},
-    {access,ro},
-    {pdo_mapping,no}
-  ]},
-  {entry,{1,254},[
-    {name,"Analogue Output %d[(sub)]"},
-    {type,unsigned32},
-    {access,rw},
-    {pdo_mapping,optional}
-  ]}
-]}.
+		 {name,"Analogue Output SI Unit"},
+		 {struct,rec},
+		 {category,optional},
+		 {entry,0,[
+			   {name,"Number of Analogue Outputs"},
+			   {type,unsigned8},
+			   {access,ro},
+			   {pdo_mapping,no}
+			  ]},
+		 {entry,{1,254},[
+				 {name,"Analogue Output %d[(sub)]"},
+				 {type,unsigned32},
+				 {access,rw},
+				 {pdo_mapping,optional}
+				]}
+		]}.
 

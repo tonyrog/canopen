@@ -36,11 +36,17 @@
 -export([all_reservers/1, reserver/2]).
 -export([object_event/2, pdo_event/2, dam_mpdo_event/3]).
 -export([notify/3, notify/4, notify/5]). %% To send MPOs
+-export([add_object/4, add_entry/3]).
+-export([delete_object/3, delete_entry/3]).
+-export([set_data/4, set_value/4]).
+-export([data/3, value/3]).
 
 %% CANopen application internal
 -export([add_entry/2, get_entry/2]).
--export([get_object/2]).
--export([set/3, value/2]).
+-export([add_object/3, get_object/2]).
+%%-export([delete_object/2, delete_entry/2]).
+-export([set_data/3, set_value/3]).
+-export([data/2, value/2]).
 -export([store/6, fetch/6]).
 -export([subscribers/2]).
 -export([reserver_with_module/2]).
@@ -49,7 +55,6 @@
 %% Test interface
 -export([dump/1, dump/2, loop_data/1]).
 -export([state/2]).
--export([direct_set/3]).
 
 -define(CO_NODE, co_node).
 
@@ -194,7 +199,7 @@ verify_option(Option, NewValue)
 	    ok;
        true ->
 	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to an integer between 0 and 126"
+		 " can only be set to an integer between 0 and 126 (0 - 16#fe)"
 	         " or undefined."}
     end;
 verify_option(Option, NewValue) 
@@ -206,7 +211,7 @@ verify_option(Option, NewValue)
 	    ok;
        true ->
 	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to an integer value between 8 and 24 bits"
+		 " can only be set to an integer value between 0 and 16777215 (0 - 16#ffffff)"
 	         " or undefined."}
     end;
 verify_option(Option, NewValue) 
@@ -265,6 +270,39 @@ alive(Identity) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% Gets value of option variable. (For testing)
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_option(Identity::term(), Option::atom()) -> 
+			{option, Value::term()} | 
+			{error, unkown_option}.
+
+get_option(Identity, Option) ->
+    gen_server:call(identity_to_pid(Identity), {option, Option}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Sets value of option variable. (For testing)
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec set_option(Identity::term(), Option::atom(), NewValue::term()) -> 
+			ok | {error, Reason::string()}.
+
+set_option(Identity, Option, NewValue) ->
+    ?dbg(node, "set_option: Option = ~p, NewValue = ~p",[Option, NewValue]),
+    case verify_option(Option, NewValue) of
+	ok ->
+	    gen_server:call(identity_to_pid(Identity), {option, Option, NewValue});	    
+	{error, _Reason} = Error ->
+	    ?dbg(node, "set_option: option rejected, reason = ~p",[_Reason]),
+	    Error
+    end.
+
+
+%%--------------------------------------------------------------------
+%% @doc
 %% Loads the last saved dict.
 %%
 %% @end
@@ -314,39 +352,6 @@ save_dict(Identity) ->
 save_dict(Identity, File) ->
     gen_server:call(identity_to_pid(Identity), {save_dict, File}, 10000).
     
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Gets value of option variable. (For testing)
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec get_option(Identity::term(), Option::atom()) -> 
-			{option, Value::term()} | 
-			{error, unkown_option}.
-
-get_option(Identity, Option) ->
-    gen_server:call(identity_to_pid(Identity), {option, Option}).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Sets value of option variable. (For testing)
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec set_option(Identity::term(), Option::atom(), NewValue::term()) -> 
-			ok | {error, Reason::string()}.
-
-set_option(Identity, Option, NewValue) ->
-    ?dbg(node, "set_option: Option = ~p, NewValue = ~p",[Option, NewValue]),
-    case verify_option(Option, NewValue) of
-	ok ->
-	    gen_server:call(identity_to_pid(Identity), {option, Option, NewValue});	    
-	{error, _Reason} = Error ->
-	    ?dbg(node, "set_option: option rejected, reason = ~p",[_Reason]),
-	    Error
-    end.
-
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -565,12 +570,14 @@ reserver(Identity, Ix) ->
 %% co_sdo_cli_fsm.erl.
 %% @end
 %%--------------------------------------------------------------------
--spec object_event(CoNodePid::pid(), Index::{Ix::integer(), Si::integer()}) ->
+-spec object_event(Identity::term(), Index::{Ix::integer(), Si::integer()}) ->
 			  ok | {error, Error::atom()}.
 
 object_event(CoNodePid, Index) 
   when is_pid(CoNodePid) ->
-    gen_server:cast(CoNodePid, {object_event, Index}).
+    gen_server:cast(CoNodePid, {object_event, Index});
+object_event(Identity, Index) ->
+    gen_server:cast(identity_to_pid(Identity), {object_event, Index}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -601,9 +608,159 @@ dam_mpdo_event(_Identity, _CobId, _DestinationNode) ->
     ?dbg(node, "dam_mpdo_event: Invalid destination = ~p", [_DestinationNode]),
     {error, invalid_destination}.
 
+
+
+%%--------------------------------------------------------------------
+%%
+%% Functions accessing the dictionary in calling party context
+%%
+%%--------------------------------------------------------------------
+
 %%--------------------------------------------------------------------
 %% @doc
-%% Adds Entry to the Object dictionary.
+%% Add a new object to a dictionary. 
+%% Addition is done in calling partys context but an object_event is also sent
+%% to the node.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec add_object(Identity::term(), Dict::term(), Object::record(), list(Entry::record())) ->
+			ok | {error, badarg}.
+
+add_object(Identity, Dict, Object, Es) when is_record(Object, dict_object) ->
+     update_dict(Identity, Object#dict_object.index, add_object, [Dict, Object, Es]).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Add a new entry to a dictionary. 
+%% Addition is done in calling partys context but an object_event is also sent
+%% to the node.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec add_entry(Identity::term(), Dict::term(), Entry::record()) ->
+		       ok | {error, badarg}.
+
+add_entry(Identity, Dict, Entry) when is_record(Entry, dict_entry) ->
+    update_dict(Identity, Entry#dict_entry.index, add_entry, [Dict, Entry]).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Delete existing object in dictionary.
+%% Deletion is done in calling partys context but an object_event is also sent
+%% to the node.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec delete_object(Identity::term(), Dict::term(), Index::integer()) ->
+			ok | {error, badarg}.
+
+delete_object(Identity, Dict, Ix) when ?is_index(Ix) ->
+    update_dict(Identity, Ix, delete_object, [Dict, Ix]).
+    
+%%--------------------------------------------------------------------
+%% @doc
+%% Delete existing entry in dictionary.
+%% Deletion is done in calling partys context but an object_event is also sent
+%% to the node.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec delete_entry(Identity::term(), Dict::term(), 
+		   Index::integer() | {integer(), integer()}) ->
+		       ok | {error, badarg}.
+
+delete_entry(Identity, Dict, Index={Ix,Sx}) when ?is_index(Ix), ?is_subind(Sx) ->
+    update_dict(Identity, Ix, delete_entry, [Dict, Index]);
+delete_entry(Identity, Dict, Ix) when ?is_index(Ix) ->
+    delete_entry(Identity, Dict, {Ix,0}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Sets {Ix, Si} to Value.
+%% @end
+%%--------------------------------------------------------------------
+-spec set_value(Identity::term(), Dict::term(), 
+		Index::{Ix::integer(), Si::integer()} |integer(), 
+		Value::term()) -> 
+		       ok | {error, Error::atom()}.
+
+set_value(Identity, Dict, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
+    update_dict(Identity, Ix, set_value, [Dict, I, Value]);
+set_value(Identity, Dict, Ix, Value) when is_integer(Ix) ->
+    set_value(Identity, Dict, {Ix, 0}, Value).
+
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Sets {Ix, Si} to Data.
+%% @end
+%%--------------------------------------------------------------------
+-spec set_data(Identity::term(), Dict::term(), 
+	       Index::{Ix::integer(), Si::integer()} |integer(), 
+	       Data::binary()) -> 
+		      ok | {error, Error::atom()}.
+
+set_data(Identity, Dict, {Ix, Si} = I, Data) 
+  when ?is_index(Ix), ?is_subind(Si), is_binary(Data) ->
+    update_dict(Identity, Ix, set_data, [Dict, I, Data]);
+set_data(Identity, Dict, Ix, Data) when is_integer(Ix), is_binary(Data) ->
+    set_data(Identity, Dict, {Ix, 0}, Data).
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Gets Value for Index.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec value(Identity::term(), Dict::term(), 
+	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
+		   Value::term() | {error, Error::atom()}.
+
+value(_Identity, Dict, {Ix, Si} = I) when ?is_index(Ix), ?is_subind(Si)  ->
+    co_dict:value(Dict, I);
+value(Identity, Dict, Ix) when is_integer(Ix) ->
+    value(Identity, Dict, {Ix, 0}).
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Gets Data for Index.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec data(Identity::term(), Dict::term(), 
+	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
+		   Data::term() | {error, Error::atom()}.
+
+data(_Identity, Dict, {Ix, Si} = I) when ?is_index(Ix), ?is_subind(Si)  ->
+    co_dict:data(Dict, I);
+data(Identity, Dict, Ix) when is_integer(Ix) ->
+    data(Identity, Dict, {Ix, 0}).
+
+%%--------------------------------------------------------------------
+%%
+%% Functions accessing the dictionary in co_node process context
+%%
+%%--------------------------------------------------------------------
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Adds Object to the CoNode internal Object dictionary.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec add_object(Identity::term(), Object::record(), list(Entry::record())) -> 
+		       ok | {error, Error::atom()}.
+
+add_object(Identity, Object, Es) when is_record(Object, dict_object) ->
+     gen_server:call(identity_to_pid(Identity), {add_object, Object, Es}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Adds Entry to the CoNode internal Object dictionary.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -642,65 +799,34 @@ get_object(Identity, Ix) ->
 %% Sets {Ix, Si} to Value.
 %% @end
 %%--------------------------------------------------------------------
--spec set(Identity::term(), 
-	  Index::{Ix::integer(), Si::integer()} |integer(), 
-	  Value::term()) -> 
-		 ok | {error, Error::atom()}.
+-spec set_value(Identity::term(), 
+		Index::{Ix::integer(), Si::integer()} |integer(), 
+		Value::term()) -> 
+		       ok | {error, Error::atom()}.
 
-set(Identity, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    gen_server:call(identity_to_pid(Identity), {set,I,Value});   
-set(Identity, Ix, Value) when is_integer(Ix) ->
-    set(Identity, {Ix, 0}, Value).
+set_value(Identity, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
+    gen_server:call(identity_to_pid(Identity), {set_value,I,Value});   
+set_value(Identity, Ix, Value) when is_integer(Ix) ->
+    set_value(Identity, {Ix, 0}, Value).
+
+
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Cache {Ix, Si} Data or encoded Value truncated to 64 bits.
+%% Sets {Ix, Si} to Data.
 %% @end
 %%--------------------------------------------------------------------
--spec tpdo_set(Identity::term(), 
-	       Index::{Ix::integer(), Si::integer()} | integer(), 
-	       Data::binary() | {Value::term(), Type::term()},
-	       Mode:: append | overwrite) -> 
+-spec set_data(Identity::term(), 
+	       Index::{Ix::integer(), Si::integer()} |integer(), 
+	       Data::binary()) -> 
 		      ok | {error, Error::atom()}.
 
-tpdo_set(Identity, {Ix, Si} = I, Data, Mode) 
-  when ?is_index(Ix), ?is_subind(Si), is_binary(Data) andalso
-       (Mode == append orelse Mode == overwrite) ->
-    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Data = ~p, Mode ~p",
-	 [Identity, Ix, Si, Data, Mode]), 
-    Data64 = co_codec:encode_binary(Data, 64),
-    gen_server:call(identity_to_pid(Identity), {tpdo_set,I,Data64,Mode});   
-tpdo_set(Identity, {Ix, Si} = I, {Value, Type}, Mode) 
-  when ?is_index(Ix), ?is_subind(Si) ->
-    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Value = ~p, Type = ~p, Mode ~p",
-	 [Identity, Ix, Si, Value, Type, Mode]), 
-    try co_codec:encode(Value, Type) of
-	Data ->
-	    tpdo_set(Identity, I, Data, Mode) 
-    catch
-	error:_Reason ->
-	    ?dbg(node, "tpdo_set: encode failed, reason = ~p", [_Reason]), 
-	    {error, badarg}
-    end;
-tpdo_set(Identity, Ix, Term, Mode) 
-  when is_integer(Ix) ->
-    tpdo_set(Identity, {Ix, 0}, Term, Mode).
+set_data(Identity, {Ix, Si} = I, Data) 
+  when ?is_index(Ix), ?is_subind(Si), is_binary(Data) ->
+    gen_server:call(identity_to_pid(Identity), {set_data,I,Data});   
+set_data(Identity, Ix, Data) when is_integer(Ix), is_binary(Data) ->
+    set_data(Identity, {Ix, 0}, Data).
 
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Set raw value (used to update internal read only tables etc)
-%% @end
-%%--------------------------------------------------------------------
--spec direct_set(Identity::term(), 
-		 Index::{Ix::integer(), Si::integer()} | integer(), 
-		 Value::term()) -> 
-		 ok | {error, Error::atom()}.
-
-direct_set(Identity, {Ix, Si} = I, Value) when ?is_index(Ix), ?is_subind(Si) ->
-    gen_server:call(identity_to_pid(Identity), {direct_set,I,Value});
-direct_set(Identity, Ix, Value) when is_integer(Ix) ->
-    direct_set(Identity, {Ix, 0}, Value).
 
 
 %%--------------------------------------------------------------------
@@ -718,19 +844,21 @@ value(Identity, {Ix, Si} = I) when ?is_index(Ix), ?is_subind(Si)  ->
 value(Identity, Ix) when is_integer(Ix) ->
     value(Identity, {Ix, 0}).
 
-%% 
-%% Note on COBID for SDO service
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Gets Data for Index.
 %%
-%% The manager may have a IX_SDO_SERVER list (1200 - 127F)
-%% Then look there:
-%% If not then check the COBID.
-%% if COBID has the form of:
-%%    0000-xxxxxxx, assume 7bit-NodeID
-%% if COBID has the form of:
-%%    0010000-xxxxxxxxxxxxxxxxxxxxxxxxx, assume 25bit-NodeID
-%% If COBID is either a NodeID  (7-bit or 29-bit25-bit)
-%% 
-%%
+%% @end
+%%--------------------------------------------------------------------
+-spec data(Identity::term(), 
+	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
+		   Data::term() | {error, Error::atom()}.
+
+data(Identity, {Ix, Si} = I) when ?is_index(Ix), ?is_subind(Si)  ->
+    gen_server:call(identity_to_pid(Identity), {data,I});
+data(Identity, Ix) when is_integer(Ix) ->
+    data(Identity, {Ix, 0}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -822,6 +950,40 @@ state(Identity, preoperational) ->
     gen_server:call(identity_to_pid(Identity), {state, ?PreOperational});
 state(Identity, stopped) ->
     gen_server:call(identity_to_pid(Identity), {state, ?Stopped}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Cache {Ix, Si} Data or encoded Value truncated to 64 bits.
+%% @end
+%%--------------------------------------------------------------------
+-spec tpdo_set(Identity::term(), 
+	       Index::{Ix::integer(), Si::integer()} | integer(), 
+	       Data::binary() | {Value::term(), Type::term()},
+	       Mode:: append | overwrite) -> 
+		      ok | {error, Error::atom()}.
+
+tpdo_set(Identity, {Ix, Si} = I, Data, Mode) 
+  when ?is_index(Ix), ?is_subind(Si), is_binary(Data) andalso
+       (Mode == append orelse Mode == overwrite) ->
+    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Data = ~p, Mode ~p",
+	 [Identity, Ix, Si, Data, Mode]), 
+    Data64 = co_codec:encode_binary(Data, 64),
+    gen_server:call(identity_to_pid(Identity), {tpdo_set,I,Data64,Mode});   
+tpdo_set(Identity, {Ix, Si} = I, {Value, Type}, Mode) 
+  when ?is_index(Ix), ?is_subind(Si) ->
+    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Value = ~p, Type = ~p, Mode ~p",
+	 [Identity, Ix, Si, Value, Type, Mode]), 
+    try co_codec:encode(Value, Type) of
+	Data ->
+	    tpdo_set(Identity, I, Data, Mode) 
+    catch
+	error:_Reason ->
+	    ?dbg(node, "tpdo_set: encode failed, reason = ~p", [_Reason]), 
+	    {error, badarg}
+    end;
+tpdo_set(Identity, Ix, Term, Mode) 
+  when is_integer(Ix) ->
+    tpdo_set(Identity, {Ix, 0}, Term, Mode).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -947,4 +1109,14 @@ identity_to_pid(Pid) when is_pid(Pid) ->
     Pid;
 identity_to_pid(Term) ->
     co_proc:lookup(Term).
+
+
+update_dict(Identity, Index, Func, Args) ->
+    case apply(co_dict,Func,Args) of
+	ok ->
+	    object_event(identity_to_pid(Identity), Index);
+	_Other ->
+	    _Other
+    end.
+
 

@@ -202,9 +202,7 @@ set_options_ok(_Config) ->
 	       {time_stamp, 30000},
 	       {debug, false}],
 
-    lists:foreach(
-      fun(Option) -> set_option_ok(Option) end, Options),
-
+    lists:foreach(fun(Option) -> set_option_ok(Option) end, Options), 
     ok.
 
 %%--------------------------------------------------------------------
@@ -227,16 +225,14 @@ set_options_nok(_Config) ->
 		"Option load_ratio can only be set to a float value between 0 and 1."},
 	       {time_stamp, 0, 
 		"Option time_stamp can only be set to a positive integer value."},
-	       {xnodeid, 7, 
-		"Option xnodeid can only be set to an integer value between 8 and 24 bits or undefined."},
+	       {xnodeid, 16#ffffffff, 
+		"Option xnodeid can only be set to an integer value between 0 and 16777215 (0 - 16#ffffff) or undefined."},
 	       {nodeid, 177,
-	       "Option nodeid can only be set to an integer between 0 and 126 or undefined."},
+	       "Option nodeid can only be set to an integer between 0 and 126 (0 - 16#fe) or undefined."},
 	       {nodeid, 0, 
 		"NodeId 0 is reserved for the CANopen manager co_mgr."}],
 
-    lists:foreach(
-      fun(Option) -> set_option_nok(Option) end, Options),
-
+    lists:foreach( fun(Option) -> set_option_nok(Option) end, Options), 
     ok.
 
 %%--------------------------------------------------------------------
@@ -302,7 +298,7 @@ restore_dict(_Config) ->
     ok = co_api:save_dict(serial()),
 
     %% Change a value and see that it is changed
-    ok = co_api:set(serial(), Index, NewValue),
+    ok = co_api:set_value(serial(), Index, NewValue),
     {ok, NewValue} = co_api:value(serial(), Index),
 
     %% Restore the dictionary and see that the value is restored
@@ -328,7 +324,7 @@ save_and_load(Config) ->
 				   ?EVAS, unsigned32, segment, 9000)),
 
     %% Change a value and see that it is changed
-    ok = co_api:set(serial(), Index, NewValue),
+    ok = co_api:set_value(serial(), Index, NewValue),
     {ok, NewValue} = co_api:value(serial(), Index),
 
     %% Restore the dictionary and see that the value is restored

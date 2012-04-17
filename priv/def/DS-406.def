@@ -1,6 +1,10 @@
 %%
 %% DS-406	Encoders
 %%
+{module, 'DS-406'}.
+
+{require, type}.
+
 {objdef,16#6000,[
   {name,"Operating Parameters"},
   {struct,var},

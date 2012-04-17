@@ -649,33 +649,33 @@ def_mod([{objdef,Index,Options}|Forms],
 		lists:seq(I,J,S)
 	end,
     Obj0 = decode_obj(Options, #objdef { index=hd(NewIxs)}),
-    Obj1  = verify_obj(Obj0,DMod),
+    Obj1 = verify_obj_id(Obj0, DefCtx),
+    Obj2 = verify_obj(Obj1,DMod),
     ?dbg(lib,"def_mod: obj ~p verified", [Obj1]),
-    verify_uniqe_id(Obj1, DefCtx),
 
     %% If no entries and 'simple' type add default entry for subindex 0
     %% If 'complex' type it structure needs to be checked at runtime
-    Obj2 = case {Obj1#objdef.entries, simple_type(Obj1#objdef.type)} of
+    Obj3 = case {Obj2#objdef.entries, simple_type(Obj2#objdef.type)} of
 	       {[], true} ->
 		   ?dbg(lib,"def_mod: adding def entry with type ~p", 
-			[Obj1#objdef.type]),
+			[Obj2#objdef.type]),
 		   DefEntry = #entdef {index = 0,
-				       type = Obj1#objdef.type,
-				       range = Obj1#objdef.range,
-				       access = Obj1#objdef.access},
-		   Obj1#objdef {entries = [DefEntry]};
+				       type = Obj2#objdef.type,
+				       range = Obj2#objdef.range,
+				       access = Obj2#objdef.access},
+		   Obj2#objdef {entries = [DefEntry]};
 	       _Other ->
-		   Obj1
+		   Obj2
 	   end,
 
-    Id = Obj2#objdef.id,
+    Id = Obj3#objdef.id,
     ?dbg(lib,"def_mod: obj id ~p verified", [Id]),
     NewIxsDict =
 	lists:foldl(
 	  fun(Ix, Dict) ->
 		  store_one(Ix, Id, Dict)
 	  end, IxsDict, NewIxs),
-    def_mod(Forms, DMod#def_mod {objects = [Obj2 | Objects], ixs = NewIxsDict}, DefCtx);
+    def_mod(Forms, DMod#def_mod {objects = [Obj3 | Objects], ixs = NewIxsDict}, DefCtx);
 def_mod([], DMod, DefCtx) ->
     NewDefCtx = add_module(DefCtx, DMod),
     {ok, NewDefCtx}.
@@ -772,23 +772,28 @@ decode_ent_opt(_Kv={Key,Value}, Ent) ->
     end.
 
 %%
+%% Verify object id
 %% Check that id is uniq
 %%
-verify_uniqe_id(_Obj=#objdef {id = undefined, index = Index}, _DefCtx) ->
-    erlang:error({id_required, Index});
-verify_uniqe_id(_Obj=#objdef {id = Id}, DefCtx) ->
+verify_obj_id(Obj=#objdef {id = undefined, index = Index}, DefCtx) ->
+    %% generate generic id
+    Id = list_to_atom("id" ++ integer_to_list(Index,10)),
+    verify_obj_id(Obj#objdef {id = Id}, DefCtx);
+    %%erlang:error({id_required, Index});
+verify_obj_id(Obj=#objdef {id = Id}, DefCtx) when is_atom(Id) ->
     case object(Id, DefCtx) of
-	{error, _} -> true;
-	Obj2 ->
-	    erlang:error({id_not_uniq,Id,Obj2#objdef.index})
-    end.
-    
+	{error, _} -> Obj;
+	Obj2 -> erlang:error({id_not_uniq,Id,Obj2#objdef.index})
+    end;
+verify_obj_id(Obj=#objdef {id = Id}, _DefCtx) ->
+    %% Not atom
+    erlang:error({bad_entry_id, Obj#objdef.id}).
+
 %%
 %% Verify object
 %%
 verify_obj(Obj,Def) ->    
-    verify([fun verify_obj_id/2,
-	    fun verify_obj_name/2,
+    verify([fun verify_obj_name/2,
 	    fun verify_obj_type/2,
 	    fun verify_obj_struct/2,
 	    fun verify_obj_category/2,
@@ -814,15 +819,6 @@ verify([V|Vs], Data, Def) ->
     verify(Vs, V(Data, Def), Def);
 verify([], Data, _Def) ->
     Data.
-
-%% Verify object id
-verify_obj_id(_Obj=#objdef {id = undefined, index = Index}, _DefCtx) ->
-    erlang:error({id_required, Index});
-verify_obj_id(Obj,_Def) ->
-    if is_atom(Obj#objdef.id),
-       Obj#objdef.id =/= undefined -> Obj;
-       true -> erlang:error({bad_entry_id, Obj#objdef.id})
-    end.
 
 %% Verify object name
 verify_obj_name(Obj,_Def) ->

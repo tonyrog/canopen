@@ -1,6 +1,10 @@
 %%
 %% DS-404 Measuring devices and closed loop controllers
 %%
+{module, 'DS-404'}.
+
+{require, type}.
+
 {objdef,16#6000,[
   {name,"DI Read state 8 Input Lines"},
   {struct,rec},

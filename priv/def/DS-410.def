@@ -1,6 +1,10 @@
 %%
 %% DS-410	Declinometers
 %%
+{module, 'DS-410'}.
+
+{require, type}.
+
 {objdef,16#6000,[
   {name,"resolution"},
   {struct,var},

@@ -2,6 +2,10 @@
 %% DS-418	Battery Modules
 %%
 %%
+{module, 'DS-418'}.
+
+{require, type}.
+
 {objdef,16#6000,[
   {name,"Battery Status"},
   {struct,var},

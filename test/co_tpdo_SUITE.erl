@@ -261,7 +261,7 @@ send_tpdo0(_Config) ->
     lists:foreach(
       fun({{Ix, Si} = SourceIndex, SourceValue}) -> 
 	      ct:pal("Setting ~.16B:~w to ~p",[Ix, Si, SourceValue]),
-	      co_api:set(serial(), SourceIndex, SourceValue)
+	      co_api:set_value(serial(), SourceIndex, SourceValue)
       end, SourceList),
 
     %% Send tpdo with new value

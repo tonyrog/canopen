@@ -1,3 +1,7 @@
+{module, 'DS-302'}.
+
+{require, type}.
+
 {objdef,16#1F20,[
   {name,"Store DCF"},
   {struct,rec},

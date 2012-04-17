@@ -3,6 +3,8 @@
 %%
 {module, 'DS-419'}.
 
+{require, type}.
+
 {objdef,16#6000,[
   {id,battery_status},
   {name,"Battery status"},
