@@ -1,8 +1,8 @@
 canopen
 =====
 
-canopen implements a CANOpen stack.<br/>
-See www.canopensolutions.com for a description of CANOpen. 
+canopen implements a CANopen stack.<br/>
+See [www.can-cia.org](http://www.can-cia.org/index.php?id=canopen) for a description of CANopen.
 
 ### Dependencies
 

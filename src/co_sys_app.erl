@@ -344,7 +344,7 @@ handle_info(_Info, LoopData) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @spec terminate(Reason, LoopData) -> void()
+%%
 %%--------------------------------------------------------------------
 -spec terminate(Reason::term(), LoopData::#loop_data{}) -> 
 		       no_return().
