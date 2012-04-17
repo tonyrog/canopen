@@ -3,7 +3,6 @@ participant "CoApplication" as A
 participant "CoNode" as B
 participant "Remote CoNode" as C
 
-
 note over A: initialization
 A -> B: attach
 A -> B: reserve

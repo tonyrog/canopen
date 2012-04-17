@@ -36,14 +36,14 @@ If you need a CANopen manager you can use the co_mgr interface, see {@link co_mg
 
 === Applications ===
 Applications can attach to the CoNode and and reserve or subscribe to indexes in the object dictionary. <br/>
-<b>Reserve</b> means that any upload or download requests and notifications connected to that index will be relayed to the application. The CoNode itself does not keep track of these objects. <br/>
+<b>Reserve</b> means that any upload or download requests and notifications connected to that index will be relayed to the application. The CoNode itself does not keep track of these objects. It is however possible for the application to store it in the CoNode dictionary.<br/>
 <b>Subscribe</b> means that notifications will be relayed to the application. The application will also be notified if the index is handled by the CoNode (included in the co_nodes dictionary) and it's value has been changed.<br/>
 When reserving/subscribing to an index a Module parameter is included. <br/><br/>
 There is also a possibility for applications to receive an 'extended' notification comprising of the whole CAN frame. This is achieved via the extended_notification_subscription. Note that it is then necessary for the application to interpret the CANOpen part, no decoding etc will be done by the CoNode. 
 
 
 ==== SDO interface ====
-When an SDO upload/download request is received the function <code>Module:index_specification()</code> is called. The call should return a record of type <code>indec_spec</code> that holds information needed for the data transfer between the co_node and the application. Among these is whether the object value should be transfered atomically, that is once completely, or streamed, that is partioned. You can also here supply a Module parameter meaning that function calls to that module should be used instead of generic gen_server:call.<br/>
+When an SDO upload/download request is received the function <code>Module:index_specification()</code> is called. The call should return a record of type <code>indec_spec</code> that holds information needed for the data transfer between the co_node and the application. Among these is whether the object value should be transferred atomically, that is once completely, or streamed, that is partitioned. You can also here supply a Module parameter meaning that function calls to that module should be used instead of generic gen_server:call.<br/>
 Note that when using <b>atomic</b> the value is decoded, whereas when using <b>streamed</b> the value is still a binary since it normally isn't possible to decode it until the complete value is available. <br/> 
 
 This gives the below transfer possibilities:
@@ -61,7 +61,7 @@ There are two behaviours defined for the above:
 </ul>
 
 ==== TPDO interface ====
-When an application has reserved an index that is included in a TPDO the TPDO process informs the application with a <code>index_in_tpdo</code> message. 
+When an application has reserved an index that is included in a TPDO the TPDO process informs the application with an index_in_tpdo message. I.e. such an application must implement <code>handle_call({index_in_tpdo, ..})</code>
 This means it should call <code>co_api:tpdo_set()</code> as soon as the value of the given index is changed. It is god practise for the application to call this immediately upon getting the <code>index_in_tpdo</code> message to replace the default value stored in the co_node with the current value. <br/>
 
 === Modules ===
