@@ -63,7 +63,8 @@
 %%
 %% Options: 
 %%          {use_serial_as_xnodeid, boolean()} 
-%%          {nodeid, integer()}       - 1-126
+%%          {nodeid, integer()}       - 1 - 16#7e
+%%          {xnodeid, integer()}      - 1 - 16#ffffff
 %%          {time_stamp,  timeout()}  - ( 60000 )  1m <br/>
 %%          {sdo_timeout, timeout()}  - ( 1000 ) <br/>
 %%          {blk_timeout, timeout()}  - ( 500 ) <br/>
@@ -84,6 +85,7 @@
 -type option()::
           {use_serial_as_xnodeid, boolean()} |
           {nodeid, integer()} | 
+          {xnodeid, integer()} | 
           {time_stamp,  timeout()} | 
           {sdo_timeout, timeout()} | 
           {blk_timeout, timeout()} | 
@@ -183,7 +185,7 @@ verify_option(Option, NewValue)
     end;
 verify_option(Option, NewValue) 
   when Option == xnodeid ->
-    if is_integer(NewValue) andalso NewValue > 2#1111111 %% Min 8 bits ??
+    if is_integer(NewValue) andalso NewValue > 0
        andalso NewValue < 2#1000000000000000000000000 -> %% Max 24 bits
 	    ok;
        NewValue =:= undefined ->

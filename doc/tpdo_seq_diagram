@@ -9,14 +9,14 @@ participant "CANOpen network" as D
 
 note over A, B, C: initialization
 B -> C: map TPDO
-note over C: process TPDO data\nI1 in TPDO\I1 reserved by CoApplication
+note over C: process TPDO data\nIndex I1 in TPDO\nI1 reserved by CoApplication
 C -> A: index_in_tpdo I1
 A -> B: tpdo_set I1, Value1
 
 note over A: I1 value change
 A -> B: tpdo_set I1, Value2
 
-note over B, C: TPDO event
+note over B: TPDO event
 B -> C: transmit TPDO
 note over C: build TPDO
 C -> B: tpdo_data I1

@@ -32,12 +32,13 @@ $ git clone git://github.com/tonyrog/canopen.git
 ### Configurating
 #### Concepts
 
-...
+canopen can be started with a numer of options.<br/>
+For details either check [co_api.erl - start_link()](https://github.com/tonyrog/canopen/raw/master/src/co_api.erl) or in the full implementation documentation, see below on how to create it.
 
 #### Files
 
 Arguments to all applicable erlang applications are specified in an erlang configuration file.<br/>
-An example can be found in ["sys.config"](https://github.com/tonyrog/canopen/blob/master/sys.config).<br/>
+An example can be found in ["sys.config"](https://github.com/tonyrog/canopen/raw/master/sys.config).<br/>
 
 
 ### Building
@@ -70,8 +71,7 @@ Stop:
 
 ### Release
 
-To generate a proper release follow the instructions in 
-https://github.com/basho/rebar/wiki/Release-handling.
+To generate a proper release follow the instructions in [Release Handling](https://github.com/basho/rebar/wiki/Release-handling).
 
 You have to update the file "canopen/rel/files/sys.config" with your own settings <b> before </b> the last step, 
 ```
