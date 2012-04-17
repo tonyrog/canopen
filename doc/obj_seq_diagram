@@ -1,0 +1,16 @@
+#wsd
+
+# Description of object event
+
+participant "CoApplication" as A
+participant "CoNode" as B
+participant "Client" as C
+
+note over B: Load dictionary\nStore I1 object
+note over A: initialization
+A -> B: attach
+A -> B: subscribe I1
+
+note over C: Change I1 value
+C -> B: set I1 value to Value1
+B -> A: object_event I1
