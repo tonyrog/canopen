@@ -32,7 +32,7 @@ $ git clone git://github.com/tonyrog/canopen.git
 ### Configurating
 #### Concepts
 
-canopen can be started with a numer of options.<br/>
+canopen can be started with a number of options.<br/>
 For details either check [co_api.erl - start_link()](https://github.com/tonyrog/canopen/raw/master/src/co_api.erl) or in the full implementation documentation, see below on how to create it.
 
 #### Files

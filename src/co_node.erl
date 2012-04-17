@@ -37,8 +37,6 @@
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
 
 -define(LAST_SAVED_FILE, "last.dict").
--define(RESTART_LIMIT, 10). %% Add clear timer ??
--define(MAX_TPDO_CACHE, 1024). %% ???
 
 %%====================================================================
 %% API
@@ -163,7 +161,7 @@ init({Serial, NodeName, Opts} = Args) ->
       timeout         = proplists:get_value(sdo_timeout,Opts,1000),
       blk_timeout     = proplists:get_value(blk_timeout,Opts,500),
       pst             = proplists:get_value(pst,Opts,16),
-      max_blksize     = proplists:get_value(max_blksize,Opts,7),
+      max_blksize     = proplists:get_value(max_blksize,Opts,74),
       use_crc         = proplists:get_value(use_crc,Opts,true),
       readbufsize     = proplists:get_value(readbufsize,Opts,1024),
       load_ratio      = proplists:get_value(load_ratio,Opts,0.5),
@@ -195,6 +193,7 @@ init({Serial, NodeName, Opts} = Args) ->
       dict = Dict,
       mpdo_dispatch = MpdoDispatch,
       tpdo_cache = TpdoCache,
+      tpdo_cache_limit = proplists:get_value(tpdo_cache_limit,Opts,512),
       tpdo = TpdoCtx,
       cob_table = CobTable,
       app_list = [],
@@ -1601,8 +1600,7 @@ send_to_tpdos(Msg, _Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
 handle_notify(I, Ctx) ->
     NewCtx = handle_notify1(I, Ctx),
     inform_subscribers(I, NewCtx),
-    
-inform_reserver(I, NewCtx),
+    inform_reserver(I, NewCtx),
     NewCtx.
 
 handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
@@ -1861,14 +1859,14 @@ update_tpdo(P=#pdo_parameter {offset = Offset, cob_id = CId, valid = Valid},
     end.
 
 restart_tpdo(T=#tpdo {offset = Offset, rc = RC}, 
-	     Ctx=#co_ctx {tpdo = TpdoCtx, name = _Name}) ->
+	     Ctx=#co_ctx {tpdo = TpdoCtx, tpdo_restart_limit = TRL, name = _Name}) ->
     case load_pdo_parameter(?IX_TPDO_PARAM_FIRST + Offset, Offset, Ctx) of
 	undefined -> 
 	    ?dbg(node, "~s: restart_tpdo: pdo param for ~p not found", 
 		 [_Name, Offset]),
 	    {error, not_found};
 	Param ->
-	    case RC >= ?RESTART_LIMIT of
+	    case RC >= TRL of
 		true ->
 		    ?dbg(node, "~s: restart_tpdo: restart counter exceeded",  [_Name]),
 		    {error, restart_not_allowed};
@@ -2214,7 +2212,7 @@ update_nmt_value(Key,Value,E) when is_record(E, nmt_entry) ->
 %% Callback functions for changes in tpdo elements
 %%
 tpdo_set({_Ix, _Si} = I, Data, Mode,
-	       Ctx=#co_ctx {tpdo_cache = Cache, name = _Name}) ->
+	 Ctx=#co_ctx {tpdo_cache = Cache, tpdo_cache_limit = TCL, name = _Name}) ->
     ?dbg(node, "~s: tpdo_set: Ix = ~.16#:~w, Data = ~w, Mode ~p",
 	 [_Name, _Ix, _Si, Data, Mode]), 
     case {ets:lookup(Cache, I), Mode} of
@@ -2230,7 +2228,7 @@ tpdo_set({_Ix, _Si} = I, Data, Mode,
 	    %% io:format("WARNING!" 
 	    %% "~s: tpdo_set: unknown tpdo element\n", [_Name]),
 	    %% {{error,unknown_tpdo_element}, Ctx};
-	{[{I, OldData}], append} when length(OldData) >= ?MAX_TPDO_CACHE->
+	{[{I, OldData}], append} when length(OldData) >= TCL ->
 	    error_logger:warning_msg( "~s: tpdo_set: tpdo cache for ~.16#:~w "
 				      "full.\n", [_Name,  _Ix, _Si]),
 	    {{error, tpdo_cache_full}, Ctx};

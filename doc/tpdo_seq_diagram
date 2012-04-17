@@ -7,9 +7,9 @@ participant "CoNode" as B
 participant "TPDOprocess" as C
 participant "CANOpen network" as D
 
-note over A, B, C: initialization
+note over A, B, C: Initialization
 B -> C: map TPDO
-note over C: process TPDO data\nIndex I1 in TPDO\nI1 reserved by CoApplication
+note over C: Process TPDO data\nIndex I1 in TPDO\nI1 reserved by CoApplication
 C -> A: index_in_tpdo I1
 A -> B: tpdo_set I1, Value1
 
@@ -18,7 +18,7 @@ A -> B: tpdo_set I1, Value2
 
 note over B: TPDO event
 B -> C: transmit TPDO
-note over C: build TPDO
+note over C: Build TPDO
 C -> B: tpdo_data I1
 B -> C: Value2
 C -> D: TPDO

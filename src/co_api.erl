@@ -61,44 +61,58 @@
 %% @doc
 %% Description: Starts the CANOpen node.
 %%
-%% Options: 
-%%          {use_serial_as_xnodeid, boolean()} 
-%%          {nodeid, integer()}       - 1 - 16#7e
-%%          {xnodeid, integer()}      - 1 - 16#ffffff
-%%          {time_stamp,  timeout()}  - ( 60000 )  1m <br/>
-%%          {sdo_timeout, timeout()}  - ( 1000 ) <br/>
-%%          {blk_timeout, timeout()}  - ( 500 ) <br/>
-%%          {pst, integer()}          - ( 16 ) <br/>
-%%          {max_blksize, integer()}  - ( 74 = 518 bytes) <br/>
-%%          {use_crc, boolean()}      - use crc for block (true) <br/>
-%%          {readbufsize, integer()}  - size of buf when reading from app <br/>
-%%          {load_ratio, float()}     - ratio when time to fill read_buf <br/> 
-%%          {atomic_limit, integer()} - limit to size of atomic variable <br/>
-%%          {load_last_saved, boolean()} - load last dictionary file <br/>
+%% Options (default values given if applicale): 
+%%          {use_serial_as_xnodeid, boolean()} - create extended node id from
+%%                                      serial number.<br/>
+%%          {nodeid, integer()}       - node id, range: 1 - 16#7e.<br/>
+%%          {xnodeid, integer()}      - extended node id, range: 1 - 16#ffffff.<br/>
+%%          {time_stamp,  timeout()}  - ( 60000 ) in msec. <br/>
+%%
+%%            Dictionary options
+%%          {load_last_saved, boolean()} - load last dictionary file. <br/>
 %%          {dict_file, string()}     - non default dictionary file to load,
-%%                                      overrides load_last_saved <br/>
-%%          {debug, boolean()}        - Enable/Disable trace output<br/>
-%%          {linked, boolean()}       - Start process linked (default) or not <br/>
+%%                                      overrides load_last_saved. <br/>
+%%
+%%            SDO transfer options
+%%          {sdo_timeout, timeout()}  - ( 1000 ) in msec. <br/>
+%%          {blk_timeout, timeout()}  - ( 500 ) in msec. <br/>
+%%          {pst, integer()}          - ( 16 ) protocol switch limit.<br/>
+%%          {max_blksize, integer()}  - ( 74 = 518 bytes) <br/>
+%%          {use_crc, boolean()}      - (true) use crc for block. <br/>
+%%          {readbufsize, integer()}  - (1024) size of buf when reading from app. <br/>
+%%          {load_ratio, float()}     - (0.5) ratio when time to fill read_buf. <br/> 
+%%          {atomic_limit, integer()} - (1024) limit to size of atomic variable. <br/>
+%%
+%%            TPDO options
+%%          {tpdo_cache_limit, integer()} - (512) limits number of cached tpdo values
+%%                                      for an index.<br/>
+%%          {tpdo_restart_limit, integer()} - (10) limits number of restart attempts for 
+%%                                      tpdo processes.<br/>
+%%
+%%            Testing
+%%          {debug, boolean()}        - Enable/Disable trace output.<br/>
+%%          {linked, boolean()}       - Start process linked (default) or not. <br/>
 %%         
 %% @end
 %%--------------------------------------------------------------------
 -type option()::
-          {use_serial_as_xnodeid, boolean()} |
-          {nodeid, integer()} | 
-          {xnodeid, integer()} | 
-          {time_stamp,  timeout()} | 
-          {sdo_timeout, timeout()} | 
-          {blk_timeout, timeout()} | 
-          {pst, integer()} | 
-          {max_blksize, integer()} | 
-          {use_crc, boolean()} | 
-          {readbufsize, integer()} | 
-          {load_ratio, float()} | 
-          {atomic_limit, integer()} | 
-          {load_last_saved, boolean()} | 
-          {dict_file, string()} | 
-          {debug, boolean()} | 
-          {linked, boolean()}.
+	{use_serial_as_xnodeid, boolean()} |
+	{nodeid, integer()} | 
+	{xnodeid, integer()} | 
+	{load_last_saved, boolean()} | 
+	{dict_file, string()} | 
+	{time_stamp,  timeout()} | 
+	{sdo_timeout, timeout()} | 
+	{blk_timeout, timeout()} | 
+	{pst, integer()} | 
+	{max_blksize, integer()} | 
+	{use_crc, boolean()} | 
+	{readbufsize, integer()} | 
+	{load_ratio, float()} | 
+	{atomic_limit, integer()} | 
+	{tpdo_cache_limit, integer()} |
+	{debug, boolean()} | 
+	{linked, boolean()}.
 	
 -spec start_link(Serial::integer(), list(Option::option())) ->
 			{ok, Pid::pid()} |
@@ -547,13 +561,15 @@ reserver(Identity, Ix) ->
 %%--------------------------------------------------------------------
 %% @doc
 %% Tells the co_node that an object has been updated so that any
-%% subscribers can be informed.
+%% subscribers can be informed. Called by co_sdo_srv_fsm.erl and
+%% co_sdo_cli_fsm.erl.
 %% @end
 %%--------------------------------------------------------------------
 -spec object_event(CoNodePid::pid(), Index::{Ix::integer(), Si::integer()}) ->
 			  ok | {error, Error::atom()}.
 
-object_event(CoNodePid, Index) ->
+object_event(CoNodePid, Index) 
+  when is_pid(CoNodePid) ->
     gen_server:cast(CoNodePid, {object_event, Index}).
 
 %%--------------------------------------------------------------------

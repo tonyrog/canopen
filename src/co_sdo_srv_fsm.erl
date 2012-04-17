@@ -1077,7 +1077,7 @@ segment_or_block(S) ->
 	     end,
     if S#co_session.pst =/= 0, NBytes > 0, 
        NBytes =< S#co_session.pst ->
-	    ?dbg(srv, "protocol switch\n",[]),
+	    ?dbg(srv, "segment_or_block: protocol switch",[]),
 	    start_segmented_upload(S);
        true ->
 	    start_block_upload(S)

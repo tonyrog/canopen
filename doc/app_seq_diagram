@@ -5,7 +5,8 @@ participant "Remote CoNode" as C
 
 note over A: initialization
 A -> B: attach
-A -> B: reserve
+A -> B: reserve I1
+A -> B: reserve I2
 
 note over A, B, C: Set Index I1 to Value1 
 C -> B: download Value1 to I1

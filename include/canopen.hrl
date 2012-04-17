@@ -532,11 +532,13 @@
 	  nmt_table,        %% node states,  #nmt_entry {}
 	  dict,             %% can dictionary
 	  mpdo_dispatch,    %% MPDO dispatch list 
-	  tpdo_cache,       %% caching values used in tpdos
 	  res_table,        %% dictionary reservations
 	  sub_table,        %% dictionary subscriptions
 	  xnot_table,       %% extended notify subscriptions
 	  cob_table,        %% COB lookup table
+	  tpdo_cache,       %% caching values used in tpdos
+	  tpdo_cache_limit, %% max number of cached values for one index
+	  tpdo_restart_limit, %% max number of restarts for tpdo processes
 	  tpdo,             %% tpdo context
 	  tpdo_list=[],     %% [#tpdo{}]
 	  app_list=[],      %% [#app{}]
