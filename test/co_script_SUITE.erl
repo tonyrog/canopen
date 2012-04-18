@@ -14,7 +14,7 @@
 -include_lib("common_test/include/ct.hrl").
 -include("canopen.hrl").
 
--define(SCRIPT1, 'test1.script').
+-define(SCRIPT1, "test1.script").
 
 %%--------------------------------------------------------------------
 %% COMMON TEST CALLBACK FUNCTIONS
@@ -206,21 +206,22 @@ fetch_store(_Config) ->
 			      cobid_time_stamp, 0),
 
     %% Change
-    NewCTS = CTS + 1,
+    NewCTS = list_to_integer(CTS) + 1,
     ok = co_mgr:client_store(co_lib:serial_to_xnodeid(serial()),
 			     cobid_time_stamp, 0, NewCTS),
 
     %% Verify change
-    NewCTS = co_mgr:client_fetch(co_lib:serial_to_xnodeid(serial()),
-				 cobid_time_stamp, 0),
+    NewCTS = list_to_integer(
+	       co_mgr:client_fetch(co_lib:serial_to_xnodeid(serial()),
+				 cobid_time_stamp, 0)),
 
     %% Restore
     ok = co_mgr:client_store(co_lib:serial_to_xnodeid(serial()),
-			     cobid_time_stamp, 0, CTS),
+			     cobid_time_stamp, 0, list_to_integer(CTS)),
 
     %% Verify restore
-    CTS = co_mgr:client_fetch(co_lib:serial_to_xnodeid(serial()),
-			      cobid_time_stamp, 0),
+    CTS	= co_mgr:client_fetch(co_lib:serial_to_xnodeid(serial()),
+				cobid_time_stamp, 0),
 
     ok.
 
@@ -234,7 +235,7 @@ basic_script(Config) ->
     DataDir = ?config(data_dir, Config),
 
     %% Using file instead of run/script to avoid halt of node
-    ok = co_script:file([filename:join(DataDir, ?SCRIPT1)]),
+    ok = co_script:file(filename:join(DataDir, ?SCRIPT1)),
     ok.
 
 %%--------------------------------------------------------------------

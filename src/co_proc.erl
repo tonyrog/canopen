@@ -200,10 +200,8 @@ debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec init([]) -> {ok, Ctx::record()} |
-		  {ok, Ctx::record(), Timeout::timeout()} |
-		  ignore |
-		  {stop, Reason::term()}.
+-spec init([]) -> {ok, Ctx::#ctx{}}.
+
 init([]) ->
     error_logger:info_msg("~p: init: args = [], pid = ~p\n", [?MODULE, self()]),
 
@@ -218,18 +216,17 @@ init([]) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec handle_call(Request::{reg, Term::term(), Pid::pid()} |
-			   {unreg, Term::term()} |
-			   {clear, Pid::pid()} |
-			   {debug, TrueOrFalse::boolean()} |
-			   stop,
-		  From::pid(), Ctx::record()) ->
-			 {reply, Reply::term(), Ctx::record()} |
-			 {reply, Reply::term(), Ctx::record(), Timeout::timeout()} |
-			 {noreply, Ctx::record()} |
-			 {noreply, Ctx::record(), Timeout::timeout()} |
-			 {stop, Reason::term(), Reply::term(), Ctx::record()} |
-			 {stop, Reason::term(), Ctx::record()}.
+-type call_request()::
+	{reg, Term::term(), Pid::pid()} |
+	{unreg, Term::term()} |
+	{clear, Pid::pid()} |
+	{debug, TrueOrFalse::boolean()} |
+	stop.
+
+-spec handle_call(Request::call_request(),
+		  From::{pid(), term()}, Ctx::#ctx{}) ->
+			 {reply, Reply::term(), Ctx::#ctx{}} |
+			 {stop, Reason::term(), Reply::term(), Ctx::#ctx{}}.
 
 handle_call({reg, Term, Pid}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) 
   when is_pid(Pid) ->
@@ -305,10 +302,8 @@ handle_call(stop, _From, Ctx) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec handle_cast(Msg::term(), Ctx::record()) -> 
-			 {noreply, Ctx::record()} |
-			 {noreply, Ctx::record(), Timeout::timeout()} |
-			 {stop, Reason::term(), Ctx::record()}.
+-spec handle_cast(Msg::term(), Ctx::#ctx{}) -> 
+			 {noreply, Ctx::#ctx{}}.
 
 handle_cast(_Msg, Ctx) ->
     {noreply, Ctx}.
@@ -320,10 +315,13 @@ handle_cast(_Msg, Ctx) ->
 %% Handles 'DOWN' messages for monitored processes.
 %% @end
 %%--------------------------------------------------------------------
--spec handle_info(Info::term(), Ctx::record()) -> 
-			 {noreply, Ctx::record()} |
-			 {noreply, Ctx::record(), Timeout::timeout()} |
-			 {stop, Reason::term(), Ctx::record()}.
+-type info()::
+	{'DOWN', Ref::reference(), process, Pid::pid(), Reason::term()} |
+	term().
+
+
+-spec handle_info(Info::info(), Ctx::#ctx{}) -> 
+			 {noreply, Ctx::#ctx{}}.
 
 handle_info({'DOWN',_Ref, process, Pid, Reason}, 
 	    Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->

@@ -76,7 +76,7 @@
 %% </ul>
 %% @end
 %%--------------------------------------------------------------------
--spec start(Ctx::#tpdo_ctx{}, Param::record()) -> 
+-spec start(Ctx::#tpdo_ctx{}, Param::#pdo_parameter{}) -> 
 		   {ok, Pid::pid()} | ignore | {error, Error::atom()}.
 
 start(Ctx, Param) ->
@@ -373,7 +373,10 @@ update_param_int(Param, S) ->
 tpdo_mapping(Offset, Ctx) ->
     ?dbg(tpdo, "tpdo_mapping: offset=~.16#", [Offset]),
     case co_api:tpdo_mapping(Offset, Ctx) of
-	{Type, Mapping} -> 
+	{Type, Mapping} when Type == tpdo;
+			     Type == rpdo;
+			     Type == dam_mpdo;
+			     Type == sam_mpdo -> 
 	    ?dbg(tpdo, "tpdo_mapping: ~p mapping = ~p", [Type, Mapping]),
 	    {Type, Mapping};
 	_Error ->
@@ -470,8 +473,6 @@ do_send(S=#s {state = ?Operational, itmr = Itmr}, _Dest, true)
 do_send(S,_Dest,true) ->
     ?dbg(tpdo, "do_send: invalid combination, session = ~p, destination = ~p", 
 	 [S, _Dest]),
-    S;
-do_send(S,_, false) ->
     S.
 
 send_tpdo(S=#s {ctx = Ctx, index_list = IL}) ->

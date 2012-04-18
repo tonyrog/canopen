@@ -21,17 +21,26 @@
 -behaviour(co_stream_app).
 
 %% API
--export([start/1, start_link/1, stop/1]).
+-export([start/1, 
+	 start_link/1, 
+	 stop/1]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
+-export([init/1, 
+	 handle_call/3, 
+	 handle_cast/2, 
+	 handle_info/2,
+	 terminate/2, 
+	 code_change/3]).
 
 %% co_app and co_stream_app callbacks
 -export([index_specification/2,
-	 set/3, get/2,
-	 write_begin/3, write/4,
-	 read_begin/3, read/3,
+	 set/3, 
+	 get/2,
+	 write_begin/3, 
+	 write/4,
+	 read_begin/3, 
+	 read/3,
 	 abort/3]).
 
 %% Execution process
@@ -47,13 +56,13 @@
 -record(loop_data,
 	{
 	  state            ::atom(),
-	  command = ""     ::string(),   %% Subindex 1
+	  command = ""     ::string() | binary(),   %% Subindex 1
 	  status = 0       ::integer(),  %% Subindex 2
 	  reply =""        ::string(),   %% Subindex 3
 	  exec_pid         ::pid(),      %% Pid of process executing command
 	  co_node          ::atom(),     %% Name of co_node
 	  ref              ::reference(),%% Reference for communication with session
-	  read_buf = <<>>  ::binary()    %% Tmp buffer when uploading reply
+	  read_buf = (<<>>)::binary()    %% Tmp buffer when uploading reply
 	}).
 
 
@@ -305,7 +314,7 @@ init(CoSerial) ->
 	{read, Ref::reference(), Bytes::integer()} |
 	stop.
 
--spec handle_call(Request::call_request(), From::pid(), LoopData::#loop_data{}) ->
+-spec handle_call(Request::call_request(), From::{pid(), term()}, LoopData::#loop_data{}) ->
 			 {reply, Reply::term(), LoopData::#loop_data{}} |
 			 {noreply, LoopData::#loop_data{}} |
 			 {stop, Reason::atom(), Reply::term(), LoopData::#loop_data{}}.
@@ -390,7 +399,7 @@ handle_call(_Request, _From, LoopData) ->
     ?dbg(?NAME," handle_call: bad call ~p.\n",[_Request]),
     {reply, {error,bad_call}, LoopData}.
 
-handle_write(Data, Eod, LoopData=#loop_data {command = undefined}) ->
+handle_write(Data, Eod, LoopData=#loop_data {command = ""}) ->
     handle_write_i(<<Data/binary>>, Eod, LoopData);
 handle_write(Data, Eod, LoopData=#loop_data {command = S}) when is_list(S) ->
     %% Old command, remove ??
@@ -402,8 +411,6 @@ handle_write_i(NewC, true, LoopData) ->
     handle_command(LoopData#loop_data {command = NewC});
 handle_write_i(NewC, false, LoopData=#loop_data {ref = Ref}) ->
     {reply, {ok, Ref}, LoopData#loop_data {command = NewC}}.
-
-
 
 handle_command(LoopData=#loop_data {command = Command}) when is_list(Command) ->
     ?dbg(?NAME," handle_command: command = ~p.\n",[Command]),
@@ -433,9 +440,6 @@ execute_command(Command, Starter) ->
 
 execute_command(Command) ->
     try os:cmd(Command) of
-	{error, E} ->
-	    ?dbg(?NAME," handle_command: execute Error = ~p\n",[E]), 
-	    {3, E};
 	[] ->
 	    ?dbg(?NAME," handle_command: execute no result\n",[]),  
 	    {0, ""};

@@ -86,7 +86,7 @@ stop() ->
 %% @end
 %%--------------------------------------------------------------------
 -spec index_specification(Pid::pid(), {Index::integer(), SubInd::integer()}) -> 
-		       {spec, Spec::record()} |
+		       {spec, Spec::#index_spec{}} |
 		       {error, Reason::atom()}.
 
 index_specification(_Pid, {?MY_INDEX = _Index, 255} = I) ->
@@ -206,7 +206,7 @@ init(CoSerial) ->
 	{set, {Index::integer(), SubInd::integer()}, Value::term()} |
 	stop.
 
--spec handle_call(Request::call_request(), From::pid(), LoopData::#loop_data{}) ->
+-spec handle_call(Request::call_request(), From::{pid(), term()}, LoopData::#loop_data{}) ->
 			 {reply, Reply::term(), LoopData::#loop_data{}} |
 			 {reply, Reply::term(), LoopData::#loop_data{}, Timeout::timeout()} |
 			 {noreply, LoopData::#loop_data{}} |

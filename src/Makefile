@@ -33,7 +33,8 @@ MODULES = \
 	co_session \
 	co_sys_app \
 	co_tpdo \
-	eds_file
+	eds_file \
+	prf_to_def
 
 
 

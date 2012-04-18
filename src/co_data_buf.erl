@@ -32,16 +32,16 @@
 	  access          ::atom(),
 	  data = (<<>>)   ::binary(),
 	  i               ::{integer(), integer()},
-	  type = undefined::integer(),
-	  size = 0        ::integer(),
-	  buf_size = 0    ::integer(),
-	  load_level      ::integer(),
+	  type            ::integer(),
+	  size            ::non_neg_integer(),
+	  buf_size = 0    ::non_neg_integer(),
+	  load_level = 0  ::non_neg_integer(),
 	  tmp = (<<>>)    ::binary(),
-	  write_size = 0  ::integer(),
+	  write_size = 0  ::non_neg_integer(),
 	  pid             ::pid(),
 	  ref             ::reference(),
-	  mode = undefined::term(),
-	  timeout = undefined::timeout(),
+	  mode            ::term(),
+	  timeout         ::timeout(),
 	  eof = false     ::boolean()
 	}).
 
@@ -299,6 +299,7 @@ open_i(write, Buf) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec load(Buf::#co_data_buf{}) -> {ok, NewBuf::#co_data_buf{}} |
+				   {ok, NewBuf::#co_data_buf{}, Mref::reference()} |
 				   {error, Error::atom()}.
 		  
 load(Buf) when is_record(Buf, co_data_buf) ->
@@ -715,7 +716,7 @@ eof(Buf) when is_record(Buf, co_data_buf) ->
 %% Get size of data in buffer.
 %% @end
 %%--------------------------------------------------------------------
--spec data_size(Buf::#co_data_buf{}) -> integer().
+-spec data_size(Buf::#co_data_buf{}) -> integer() | undefined.
 
 data_size(Buf) ->
     Buf#co_data_buf.size.

@@ -275,8 +275,8 @@ alive(Identity) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec get_option(Identity::term(), Option::atom()) -> 
-			{option, Value::term()} | 
-			{error, unkown_option}.
+			{Option::atom(), Value::term()} | 
+			{error, Reason::string()}.
 
 get_option(Identity, Option) ->
     gen_server:call(identity_to_pid(Identity), {option, Option}).
@@ -624,7 +624,7 @@ dam_mpdo_event(_Identity, _CobId, _DestinationNode) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec add_object(Identity::term(), Dict::term(), Object::record(), list(Entry::record())) ->
+-spec add_object(Identity::term(), Dict::term(), Object::#dict_object{}, list(Entry::#dict_entry{})) ->
 			ok | {error, badarg}.
 
 add_object(Identity, Dict, Object, Es) when is_record(Object, dict_object) ->
@@ -638,7 +638,7 @@ add_object(Identity, Dict, Object, Es) when is_record(Object, dict_object) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec add_entry(Identity::term(), Dict::term(), Entry::record()) ->
+-spec add_entry(Identity::term(), Dict::term(), Entry::#dict_entry{}) ->
 		       ok | {error, badarg}.
 
 add_entry(Identity, Dict, Entry) when is_record(Entry, dict_entry) ->
@@ -752,7 +752,7 @@ data(Identity, Dict, Ix) when is_integer(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec add_object(Identity::term(), Object::record(), list(Entry::record())) -> 
+-spec add_object(Identity::term(), Object::#dict_object{}, list(Entry::#dict_entry{})) -> 
 		       ok | {error, Error::atom()}.
 
 add_object(Identity, Object, Es) when is_record(Object, dict_object) ->
@@ -764,7 +764,7 @@ add_object(Identity, Object, Es) when is_record(Object, dict_object) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec add_entry(Identity::term(), Entry::record()) -> 
+-spec add_entry(Identity::term(), Entry::#dict_entry{}) -> 
 		       ok | {error, Error::atom()}.
 
 add_entry(Identity, Ent) ->
@@ -942,7 +942,7 @@ loop_data(Identity) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec state(Identity::term(), State::operational | preoperational | stopped) -> 
-		    NodeId::integer() | {error, Error::atom()}.
+		   ok | {error, Error::atom()}.
 
 state(Identity, operational) ->
     gen_server:call(identity_to_pid(Identity), {state, ?Operational});
@@ -1034,11 +1034,12 @@ notify({nodeid, Nid}, Func, Index, Subind, Data) ->
 %% Executing in calling process context.<br/>
 %% @end
 %%--------------------------------------------------------------------
--spec rpdo_mapping(Offset::integer(), Ctx::record()) -> 
-			  Map::term() | {error, Error::atom()}.
+-spec rpdo_mapping(Offset::integer(), TpdoCtx::#tpdo_ctx{}) -> 
+			  Map::term() | 
+			       {error, Error::atom()}.
 
-rpdo_mapping(Offset, Ctx) ->
-    co_node:rpdo_mapping(Offset, Ctx).
+rpdo_mapping(Offset, TpdoCtx) ->
+    co_node:rpdo_mapping(Offset, TpdoCtx).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -1047,11 +1048,11 @@ rpdo_mapping(Offset, Ctx) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec tpdo_mapping(Offset::integer(), Ctx::record()) -> 
+-spec tpdo_mapping(Offset::integer(), TpdoCtx::#tpdo_ctx{}) -> 
 			  Map::term() | {error, Error::atom()}.
 
-tpdo_mapping(Offset, Ctx) ->
-    co_node:tpdo_mapping(Offset, Ctx).
+tpdo_mapping(Offset, TpdoCtx) ->
+    co_node:tpdo_mapping(Offset, TpdoCtx).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -1060,7 +1061,7 @@ tpdo_mapping(Offset, Ctx) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec tpdo_data(Index::{integer(), integer()}, TpdoCtx::record()) ->
+-spec tpdo_data(Index::{integer(), integer()}, TpdoCtx::#tpdo_ctx{}) ->
 			{ok, Data::binary()} |
 			{error, Error::atom()}.
 
@@ -1077,7 +1078,7 @@ tpdo_data(Index = {Ix, Si}, #tpdo_ctx {res_table = ResTable, dict = Dict,
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec subscribers(Tab::reference(), Index::integer()) -> 
+-spec subscribers(Tab::atom() | integer(), Index::integer()) -> 
 			 list(Pid::pid()) | {error, Error::atom()}.
 
 subscribers(Tab, Ix) when ?is_index(Ix) ->
@@ -1090,8 +1091,8 @@ subscribers(Tab, Ix) when ?is_index(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec reserver_with_module(Tab::reference(), Index::integer()) -> 
-				  {Pid::pid(), Mod::atom()} | [].
+-spec reserver_with_module(Tab::atom() | integer(), Index::integer()) -> 
+				  {Pid::pid() | dead, Mod::atom()} | [].
 
 reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
     co_node:reserver_with_module(Tab, Ix).

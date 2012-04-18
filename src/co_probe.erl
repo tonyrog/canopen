@@ -192,7 +192,7 @@ print_node_guard(Frame) ->
 	      ]).
 
 %% fmt_verify_crc(Serial, Crc) ->
-%%    case crc:checksum(<<Serial:32/little>>) of
+%%    case co_crc:checksum(<<Serial:32/little>>) of
 %%	Crc -> "ok";
 %%	_ -> "failed"
 %%    end.

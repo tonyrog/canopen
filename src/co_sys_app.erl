@@ -20,15 +20,21 @@
 -behaviour(co_app).
 
 %% API
--export([start_link/1, stop/1]).
+-export([start_link/1, 
+	 stop/1]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
+-export([init/1, 
+	 handle_call/3, 
+	 handle_cast/2, 
+	 handle_info/2,
+	 terminate/2, 
+	 code_change/3]).
 
 %% co_app callbacks
 -export([index_specification/2,
-	 set/3, get/2]).
+	 set/3, 
+	 get/2]).
 
 %% Test
 -export([loop_data/1,
@@ -216,7 +222,7 @@ init(CoSerial) ->
 	{set, {Index::integer(), SubInd::integer()}, Value::term()} |
 	stop.
 
--spec handle_call(Request::call_request(), From::pid(), LoopData::#loop_data{}) ->
+-spec handle_call(Request::call_request(), From::{pid(), term()}, LoopData::#loop_data{}) ->
 			 {reply, Reply::term(), LoopData::#loop_data{}} |
 			 {reply, Reply::term(), LoopData::#loop_data{}, Timeout::timeout()} |
 			 {noreply, LoopData::#loop_data{}} |

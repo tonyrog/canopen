@@ -68,11 +68,11 @@ notify(CobId,Index,Subind,Data)
 %% Executing in calling process context.<br/>
 %% @end
 %%--------------------------------------------------------------------
--spec rpdo_mapping(Offset::integer(), Ctx::record()) -> 
+-spec rpdo_mapping(Offset::integer(), TpdoCtx::#tpdo_ctx{}) -> 
 			  Map::term() | {error, Error::atom()}.
 
-rpdo_mapping(Offset, Ctx) ->
-    pdo_mapping(Offset+?IX_RPDO_MAPPING_FIRST, Ctx).
+rpdo_mapping(Offset, TpdoCtx) ->
+    pdo_mapping(Offset+?IX_RPDO_MAPPING_FIRST, TpdoCtx).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -81,11 +81,11 @@ rpdo_mapping(Offset, Ctx) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec tpdo_mapping(Offset::integer(), Ctx::record()) -> 
+-spec tpdo_mapping(Offset::integer(), TpdoCtx::#tpdo_ctx{}) -> 
 			  Map::term() | {error, Error::atom()}.
 
-tpdo_mapping(Offset, Ctx) ->
-    pdo_mapping(Offset+?IX_TPDO_MAPPING_FIRST, Ctx).
+tpdo_mapping(Offset, TpdoCtx) ->
+    pdo_mapping(Offset+?IX_TPDO_MAPPING_FIRST, TpdoCtx).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -94,7 +94,7 @@ tpdo_mapping(Offset, Ctx) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec subscribers(Tab::reference(), Index::integer()) -> 
+-spec subscribers(Tab::atom() | integer(), Index::integer()) -> 
 			 list(Pid::pid()) | {error, Error::atom()}.
 
 subscribers(Tab, Ix) when ?is_index(Ix) ->
@@ -113,8 +113,9 @@ subscribers(Tab, Ix) when ?is_index(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec reserver_with_module(Tab::reference(), Index::integer()) -> 
-				  {Pid::pid(), Mod::atom()} | [].
+-spec reserver_with_module(Tab::atom() | integer(), Index::integer()) -> 
+				  {Pid::pid() | dead, Mod::atom()} | 
+				  [].
 
 reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
     case ets:lookup(Tab, Ix) of
@@ -132,10 +133,8 @@ reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec init({Identity::term(), NodeName::atom(), Opts::list(term())}) -> 
-		  {ok, Context::record()} |
-		  {ok, Context::record(), Timeout::integer()} |
-		  ignore               |
-		  {stop, Reason::atom()}.
+		  {ok, Context::#co_ctx{}} |
+		  {stop, Reason::term()}.
 
 
 init({Serial, NodeName, Opts} = Args) ->
@@ -302,9 +301,6 @@ handle_call({direct_set_value,{Ix,Si},Value}, _From, Ctx) ->
     {reply, Reply, Ctx1};
 handle_call({set_data,{Ix,Si},Data}, _From, Ctx) ->
     {Reply,Ctx1} = set_data(Ix,Si,Data,Ctx),
-    {reply, Reply, Ctx1};
-handle_call({direct_set_data,{Ix,Si},Data}, _From, Ctx) ->
-    {Reply,Ctx1} = direct_set_data(Ix,Si,Data,Ctx),
     {reply, Reply, Ctx1};
 handle_call({value,{Ix, Si}}, _From, Ctx) ->
     Result = co_dict:value(Ctx#co_ctx.dict, Ix, Si),
@@ -1555,10 +1551,12 @@ do_node_guard(Ctx, 0) ->
 	      update_nmt_entry(I, [{state,?UnknownState}], Ctx)
       end,
       lists:seq(0, 127)),
-    send_nmt_node_guard(0);
+    send_nmt_node_guard(0),
+    Ctx;
 do_node_guard(Ctx, I) when I > 0, I =< 127 ->
     update_nmt_entry(I, [{state,?UnknownState}], Ctx),
-    send_nmt_node_guard(I).
+    send_nmt_node_guard(I),
+    Ctx.
 
 
 send_nmt_state_change(NodeId, Cs) ->
@@ -1572,7 +1570,7 @@ send_nmt_node_guard(NodeId) ->
 			  len = 0, data = <<>>}).
 
 send_x_node_guard(NodeId, Cmd, Ctx) ->
-    Crc = crc:checksum(<<(Ctx#co_ctx.serial):32/little>>),
+    Crc = co_crc:checksum(<<(Ctx#co_ctx.serial):32/little>>),
     Data = <<Cmd:8, (Ctx#co_ctx.serial):32/little, Crc:16/little,
 	     (Ctx#co_ctx.state):8>>,
     can:send(#can_frame { id = ?COB_ID(?NODE_GUARD,NodeId),
@@ -2437,10 +2435,6 @@ maybe_inform_reserver(MType, {Ix, _Si} = Index, ResTable, _Dict, TpdoCache) ->
 	{dead, _Mod} ->
 	    ?dbg(node, "maybe_inform_reserver: "
 		 "Reserver process for index ~.16# dead.", [Ix]),
-	    {error, ?abort_internal_error}; %% ???
-	_Other ->
-	    ?dbg(node, "maybe_inform_reserver: "
-		 "Other case = ~p", [_Other]),
 	    {error, ?abort_internal_error}
     end.
 
@@ -2458,13 +2452,7 @@ tpdo_data({Ix, Si} = I, ResTable, Dict, TpdoCache) ->
 	    ?dbg(node, "tpdo_data: Reserver process for index ~.16# dead.", 
 		 [Ix]),
 	    %% Value cached??
-	    cache_value(TpdoCache, I);
-	_Other ->
-	    %% How handle ???
-	    error_logger:error_msg("~p: tpdo_data: unknown tpdo element\n", [self()]),
-	    ?dbg(node, "tpdo_data: Other case = ~p, returning default value.", 
-		 [_Other]),
-	    {ok, [(<<>>)]}
+	    cache_value(TpdoCache, I)
     end.
 
 cache_value(Cache, I = {_Ix, _Si}) ->
@@ -2522,9 +2510,6 @@ rpdo_value({Ix,Si},Data,Ctx) ->
 	{dead, _Mod} ->
 	    ?dbg(node, "rpdo_value: Reserver process for index ~.16# dead.", 
 		 [Ix]),
-	    Ctx;
-	_Other ->
-	    ?dbg(node, "rpdo_value: Other case = ~p", [_Other]),
 	    Ctx
     end.
 
@@ -2551,7 +2536,7 @@ set_error(Error, Code, Ctx) ->
 	true -> 
 	    Ctx;  %% condition already reported, do NOT send
 	false ->
-	    co_dict:direct_set(Ctx#co_ctx.dict,?IX_ERROR_REGISTER, 0, Error),
+	    co_dict:direct_set_value(Ctx#co_ctx.dict,?IX_ERROR_REGISTER, 0, Error),
 	    NewErrorList = update_error_list([Code | Ctx#co_ctx.error_list], 1, Ctx),
 	    if Ctx#co_ctx.emcy_id =:= 0 ->
 		    ok;

@@ -69,7 +69,7 @@ usage() ->
 %% @end
 %%--------------------------------------------------------------------
 -spec script(File::string()) ->
-	ok | {error, Reason::term()}.
+	no_return().
 
 script(File) ->
     case file(File) of
@@ -121,8 +121,8 @@ string(File, Cs) ->
 		Error ->
 		    Error
 	    end;
-	{error,Err={Ln,Mod,Error}} ->
-	    io:format("~s:~w: ~s\n", [File,Ln,Mod:format_error(Error)]),
+	{error,Err={ErrLoc,Mod,Error}, _EndLoc} ->
+	    io:format("~s:~w: ~s\n", [File,ErrLoc,Mod:format_error(Error)]),
 	    {error,Err}
     end.
 

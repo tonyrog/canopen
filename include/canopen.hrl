@@ -447,16 +447,16 @@
 	{
 	  src    :: cobid(),       %% Sender COBID
 	  dst    :: cobid(),       %% Receiver COBID
-	  index  :: index(),       %% object being transfered
-	  subind :: subind(),      %% sub-index of object
+	  index  :: uint16(),        %% object being transfered 1-16#ffff
+	  subind :: uint8(),        %% sub-index of object 1-16#ff
 	  data   :: binary(),      %% Data if expedited
 	  exp    :: uint1(),       %% Expedited flag
 	  n      :: uint8(),       %% bytes not used in data section
 	  size_ind :: uint1(),     %% Size indication
 	  t      :: uint1(),       %% session toggle bit (0|1)
 	  pst    :: uint8(),       %% Protocol switch threshold (block request)
-	  crc    :: boolean(),     %% generate/check CRC for block data
-	  clientcrc :: uint1(),    %% Client CRC support (for block request)
+	  crc    :: boolean(),     %% Generate/check CRC for block data
+	  clientcrc :: boolean(),  %% Client CRC support (for block request)
 	  size    :: uint32(),     %% Total data size (for block request)
 	  blksize :: uint8(),      %% Max number of segment per block
 	  blkseq  :: uint8(),      %% Block number to expect or to send
@@ -464,13 +464,11 @@
 	  lastblk  :: binary(),    %% last received block segment (7 bytes)
 	  blkcrc   :: uint16(),    %% Current block CRC value
 	  last     ::uint1(),      %% Flag indicating if last segment is received
-	  first    :: boolean(),   %% True for first block
 	  node_pid :: pid(),       %% Pid of the node
 	  client   :: term(),     %% Delayed gen_server:reply caller
 	  ctx      :: record(sdo_ctx),  %% general parameters
 	  buf      :: term(),      %% Data buffer
-	  mref     :: term(),      %% Ref to application
-	  streamed :: boolean()    %% True if data is streamed from application
+	  mref     :: term()      %% Ref to application
       }).
 
 -record(app,

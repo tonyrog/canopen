@@ -443,7 +443,8 @@ new_def_mod(Module) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec load_definition(File::string()) -> 
-			     {ok, DefinitionContext::term()}.
+			     {ok, DefinitionContext::#def_ctx{}} |
+			     {{error, Reason::term()}, DefinitionContext::#def_ctx{}}.
 
 load_definition(File) ->
     load_definition(filename:basename(File),[filename:dirname(File)]).
@@ -454,7 +455,8 @@ load_definition(File) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec load_definition(File::string(), Path::list(Dir::string())) -> 
-			     {ok, DefinitionContext::term()}.
+			     {ok, DefinitionContext::term()} |
+			     {{error, Reason::term()}, DefinitionContext::#def_ctx{}}.
 
 load_definition(File,Path) ->
     load_def_mod(list_to_atom(File), #def_ctx { path=Path }).
@@ -464,8 +466,11 @@ load_definition(File,Path) ->
 %% Locate object in a def context.
 %% @end
 %%--------------------------------------------------------------------
--spec object(Key::integer() | atom(), DefCtx::term()) ->
-		    Obj::record() | {error, Reason::term()}.
+-spec object(Key::integer() | atom() | string(), 
+	     Term::#def_ctx{} | 
+		   list({ModName::atom(), Mod::#def_mod{}}) |
+		   list(Object::#objdef{})) ->
+		    Obj::#objdef{} | {error, Reason::term()}.
 
 object(Key, DefCtx=#def_ctx {modules = Modules}) 
   when ?is_index(Key) ->
@@ -483,21 +488,27 @@ object(Key, [{_ModName, DefMod=#def_mod {objects = Objects}} | DefMods])
   when is_record(DefMod, def_mod)->
     ?dbg(lib,"object: searching for ~p in ~p", [Key, _ModName]),
     case object(Key, Objects) of
-	false ->
-	    object(Key, DefMods);
 	Obj when is_record(Obj, objdef) ->
 	    Obj;
+	{error, not_found} ->
+	    object(Key, DefMods);
 	{error, _Error} = E -> 
 	    E
     end;
 object(Id, ObjList) 
   when is_atom(Id) andalso is_list(ObjList) ->
     ?dbg(lib,"object: searching for ~p", [Id]),
-    lists:keyfind(Id, #objdef.id, ObjList);
+    case lists:keyfind(Id, #objdef.id, ObjList) of
+	false -> {error, not_found};
+	Obj -> Obj
+    end;
 object(Name, ObjList)
   when is_list(Name) andalso is_list(ObjList) ->
     ?dbg(lib,"object: searching for ~p", [Name]),
-    lists:keyfind(Name, #objdef.name, ObjList);
+    case lists:keyfind(Name, #objdef.name, ObjList) of
+	false -> {error, not_found};
+	Obj -> Obj
+    end;
 object(Index, [Obj| Objects]) 
   when ?is_index(Index) andalso is_record(Obj, objdef)->
     ?dbg(lib,"object: searching for ~p", [Index]),
@@ -513,8 +524,8 @@ object(Index, [Obj| Objects])
 %% Locate entry in a def context.
 %% @end
 %%--------------------------------------------------------------------
--spec entry(Key::integer() | atom(), Obj::record(), DefCtx::term()) ->
-		    Entry::record() | {error, Reason::term()}.
+-spec entry(Key::integer() | atom(), Obj::#objdef{}, DefCtx::term()) ->
+		    Entry::#entdef{} | {error, Reason::term()}.
 
 entry(Key, _Obj=#objdef {entries = [], type = Type}, DefCtx) 
   when is_record(DefCtx, def_ctx) ->
@@ -542,7 +553,7 @@ entry(Index, SubInd, DefCtx)
 %% @end
 %%--------------------------------------------------------------------
 -spec entry(Key::integer() | atom(), DefCtx::term()) ->
-		    Entry::record() | {error, Reason::term()}.
+		    Entry::#entdef{} | {error, Reason::term()}.
 
 entry(_Key, []) ->
     {error, not_found};
@@ -745,8 +756,6 @@ decode_ent([], Ent) ->
     Ent.
 
 %% Decode entry description option
-decode_ent_opt(Kv, undefined) ->
-    decode_ent_opt(Kv, #entdef {});
 decode_ent_opt(_Kv={Key,Value}, Ent) ->
     case Key of
 	name ->
@@ -785,9 +794,9 @@ verify_obj_id(Obj=#objdef {id = Id}, DefCtx) when is_atom(Id) ->
 	{error, _} -> Obj;
 	Obj2 -> erlang:error({id_not_uniq,Id,Obj2#objdef.index})
     end;
-verify_obj_id(Obj=#objdef {id = Id}, _DefCtx) ->
+verify_obj_id(_Obj=#objdef {id = Id}, _DefCtx) ->
     %% Not atom
-    erlang:error({bad_entry_id, Obj#objdef.id}).
+    erlang:error({bad_entry_id, Id}).
 
 %%
 %% Verify object

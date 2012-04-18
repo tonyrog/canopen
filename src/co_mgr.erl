@@ -176,9 +176,10 @@ fetch(NodeId, Ix, Si, TransferMode, {value, Type})
        is_integer(Type) ->
     case co_api:fetch(?MGR_NODE, NodeId, Ix, Si, TransferMode, data) of
 	{ok, Data} ->
-	    case co_codec:decode(Data, Type) of
-		{Value, _} -> {ok, Value};
-		Error -> Error
+	    try co_codec:decode(Data, Type) of
+		{Value, _Rest} -> {ok, Value}
+	    catch
+		error:Error -> {error, Error}
 	    end;
 	Error -> Error
     end;
@@ -470,10 +471,8 @@ loop_data() ->
 %% @end
 %%--------------------------------------------------------------------
 -spec init(Opts::list()) -> 
-		  {ok, Context::record()} |
-		  {ok, Context::record(), Timeout::integer()} |
-		  ignore               |
-		  {stop, Reason::atom()}.
+		  {ok, Mgr::#mgr{}}.
+
 init(Opts) ->
     %% Trace output enable/disable
     put(dbg, proplists:get_value(debug,Opts,false)), 
@@ -501,18 +500,18 @@ init(Opts) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec handle_call(Request::stop |
-			   {setnid, Nid::integer()} |
-			   {setmode, Mode:: block | segment} |
-			   {debug, TrueOrFalse::boolean()} |
-			   {loop_data, Qual:: all | no_ctx},
-		  From::pid(), Mgr::record()) ->
-			 {reply, Reply::term(), Mgr::record()} |
-			 {reply, Reply::term(), Mgr::record(), Timeout::timeout()} |
-			 {noreply, Mgr::record()} |
-			 {noreply, Mgr::record(), Timeout::timeout()} |
-			 {stop, Reason::term(), Reply::term(), Mgr::record()} |
-			 {stop, Reason::term(), Mgr::record()}.
+-type call_request()::
+	stop |
+	{setnid, Nid::integer()} |
+	{setmode, Mode:: block | segment} |
+	{debug, TrueOrFalse::boolean()} |
+	{loop_data, Qual:: all | no_ctx}.
+
+-spec handle_call(Request::call_request(),
+		  From::pid(), Mgr::#mgr{}) ->
+			 {reply, Reply::term(), Mgr::#mgr{}} |
+			 {noreply, Mgr::#mgr{}} |
+			 {stop, Reason::term(), Reply::term(), Mgr::#mgr{}}.
 
 handle_call({set_nid,Nid}, _From, Mgr) ->
     {reply, ok, Mgr#mgr { def_nid = Nid }};
@@ -560,10 +559,10 @@ handle_call(_Request, _From, Mgr) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec handle_cast(Msg::term(), Mgr::record()) -> 
-			 {noreply, Mgr::record()} |
-			 {noreply, Mgr::record(), Timeout::timeout()} |
-			 {stop, Reason::term(), Mgr::record()}.
+-spec handle_cast(Msg::term(), Mgr::#mgr{}) -> 
+			 {noreply, Mgr::#mgr{}} |
+			 {noreply, Mgr::#mgr{}, Timeout::timeout()} |
+			 {stop, Reason::term(), Mgr::#mgr{}}.
 
 handle_cast({notify, Nid, Func, Index, SubInd, Value}, Mgr) ->
     do_notify(Nid, Func, Index, SubInd, Value, Mgr);
@@ -582,10 +581,12 @@ handle_cast(_Msg, Mgr) ->
 %% Handles 'DOWN' messages for monitored processes.
 %% @end
 %%--------------------------------------------------------------------
--spec handle_info(Info::term(), Mgr::record()) -> 
-			 {noreply, Mgr::record()} |
-			 {noreply, Mgr::record(), Timeout::timeout()} |
-			 {stop, Reason::term(), Mgr::record()}.
+-type info()::
+	{'EXIT', Pid::pid(), Reason::term()} |
+	term().
+
+-spec handle_info(Info::info(), Mgr::#mgr{}) -> 
+			 {noreply, Mgr::#mgr{}}.
 
 handle_info({'EXIT', Pid, Reason}, Mgr=#mgr {pids = PList}) ->
     ?dbg(?NAME, "handle_info: EXIT for process ~p received, reason ~p", 
@@ -609,15 +610,10 @@ handle_info(_Info, Mgr) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc
-%% This function is called by a gen_server when it is about to
-%% terminate. It should be the opposite of Module:init/1 and do any
-%% necessary cleaning up. When it returns, the gen_server terminates
-%% with Reason. The return value is ignored.
-%%
-%% @spec terminate(Reason, Mgr) -> void()
-%% @end
 %%--------------------------------------------------------------------
+-spec terminate(Reason::term(), Mgr::#mgr{}) -> 
+		       no_return().
+
 terminate(_Reason, _Mgr) ->
    ?dbg(mgr, "terminate: reason ~p", [_Reason]),
     case co_proc:lookup(?MGR_NODE) of
@@ -635,9 +631,11 @@ terminate(_Reason, _Mgr) ->
 %% @doc
 %% Convert process ctx when code is changed
 %%
-%% @spec code_change(OldVsn, Mgr, Extra) -> {ok, NewMgr}
 %% @end
 %%--------------------------------------------------------------------
+-spec code_change(OldVsn::term(), Mgr::#mgr{}, Extra::term()) -> 
+			 {ok, NewMgr::#mgr{}}.
+
 code_change(_OldVsn, Mgr, _Extra) ->
     ?dbg(mgr, "code_change: Old version ~p", [_OldVsn]),
     {ok, Mgr}.
@@ -719,20 +717,28 @@ execute_request(F, Args, Client, Request, Dbg) ->
     ?dbg(mgr, "execute_request: reply  ~p", [Reply]),
     handle_reply(Reply, Client, Request).
 
-handle_reply({ok, Value}, Client, {fetch, _Nid, _Index, _SubInd, Type, Ctx}) ->
-    ?dbg(mgr,"handle_reply: Formatting ~p, type ~p", [Value, Type]),
-    Reply = format_value(Value, Type, Ctx),
+handle_reply({ok, Value}, Client, 
+	     {fetch, _Nid, _Index, _SubInd, {value, Type}, Ctx}) ->
+    Reply = format_value(Value, co_lib:decode_type(Type), Ctx),
+    ?dbg(mgr,"handle_reply: Format ~p, type ~p => ~p", [Value, Type, Reply]),
     gen_server:reply(Client, Reply);
+handle_reply({ok, Data}, Client, 
+	     {fetch, _Nid, _Index, _SubInd, data, _Ctx}) ->
+    ?dbg(mgr,"handle_reply: Formatting ~p, not possible", [Data]),
+    gen_server:reply(Client, Data);
 handle_reply({error, ECode}, Client, _Request) ->
     gen_server:reply(Client, {error, co_sdo:decode_abort_code(ECode)});
+handle_reply(ok, Client, _Request) -> 
+    ?dbg(mgr,"handle_reply: ok", []),
+    gen_server:reply(Client, ok);
 handle_reply(Other, Client, _Request) -> %% ok ???
     ?dbg(mgr,"handle_reply: Other ~p", [Other]),
     gen_server:reply(Client, Other).
 
-do_notify(Nid, Func,Index,SubInd,Value, Mgr) ->
+do_notify(Nid, Func,Index,SubInd, Value, Mgr) ->
     Ctx = context(Nid, Mgr),
     case translate_index(Ctx,Index,SubInd,Value) of
-	{ok,{Ti,Tsi,{Tv, Type}} = _T} ->
+	{ok,{Ti,Tsi,{value, Tv, Type}} = _T} ->
 	    ?dbg(mgr, "do_notify: translated  ~p", [_T]),
 	    try co_codec:encode(Tv, {Type, 32}) of
 		Data ->
@@ -754,7 +760,7 @@ translate_index(undefined,_Index,_SubInd,_Value) ->
     {error, no_context};
 translate_index(_Ctx,Index,SubInd,Value) 
   when ?is_index(Index), ?is_subind(SubInd),is_integer(Value) ->
-    {ok,{Index,SubInd,{Value, integer}}};
+    {ok,{Index,SubInd,{value, Value, integer}}};
 translate_index(Ctx,Index,SubInd,Value) 
   when  ?is_index(Index), ?is_subind(SubInd) ->
     Res = co_lib:entry(Index, SubInd, Ctx),
@@ -796,8 +802,8 @@ translate_index2(_Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, no_v
     {ok,{Index,SubInd,{value, co_lib:encode_type(Type)}}};
 translate_index2(Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, Value) ->
     case translate_value(Type, Value, Ctx) of
-	{ok,IValue} ->
-	    {ok,{Index,SubInd,{value, IValue,co_lib:encode_type(Type)}}};
+	{ok,TValue} ->
+	    {ok,{Index,SubInd,{value, TValue, co_lib:encode_type(Type)}}};
 	error ->
 	    {error,argument}
     end.
@@ -808,7 +814,7 @@ translate_value({enum,Base,_Id},Value,Ctx) when is_integer(Value) ->
     translate_value(Base, Value, Ctx);
 translate_value({enum,Base,Id},Value,Ctx) when is_atom(Value) ->
     case co_lib:enum_by_id(Id, Ctx) of
-	error -> error;
+	{error, _E} -> error;
 	{ok,Enums} ->
 	    case lists:keysearch(Value, 1, Enums) of
 		false -> error;
@@ -820,7 +826,7 @@ translate_value({bitfield,Base,_Id},Value,Ctx) when is_integer(Value) ->
     translate_value(Base, Value, Ctx);
 translate_value({bitfield,Base,Id},Value,Ctx) when is_atom(Value) ->
     case co_lib:enum_by_id(Id, Ctx) of
-	error -> error;
+	{error, _E} -> error;
 	{ok,Enums} ->
 	    case lists:keysearch(Value, 1, Enums) of
 		false -> error;
@@ -830,7 +836,7 @@ translate_value({bitfield,Base,Id},Value,Ctx) when is_atom(Value) ->
     end;
 translate_value({bitfield,Base,Id},Value,Ctx) when is_list(Value) ->
     case co_lib:enum_by_id(Id, Ctx) of
-	error -> error;
+	{error, _E} -> error;
 	{ok,Enums} ->
 	    IValue = 
 		lists:foldl(
@@ -868,6 +874,7 @@ context(Nid, Mgr) ->
 
 
 format_value(Value, Type, DCtx) ->
+   ?dbg(mgr,"format_value: Formatting ~p, type ~p", [Value, Type]),
     case Type of
 	boolean    -> ite(Value==0, "false", "true");
 	unsigned8  -> unsigned(Value,16#ff);
@@ -889,7 +896,7 @@ format_value(Value, Type, DCtx) ->
 			{value,{Key,_}} ->
 			    atom_to_list(Key)
 		    end;
-		error ->
+		{error, _E} ->
 		    format_value(Value, Type1, DCtx)
 	    end;
 	{bitfield,Type1,EId} ->
@@ -897,12 +904,12 @@ format_value(Value, Type, DCtx) ->
 		{ok,Enums} ->
 		    Fields = bitfield(Value, Enums),
 		    io_lib:format("~p", [Fields]);
-		error ->
+		{error, _E} ->
 		    format_value(Value, Type1, DCtx)
 	    end;
 	_ ->
-	    %%integer_to_list(Value) ??
-	    Value
+	    integer_to_list(Value)
+	    %%Value
     end.
 
 ite(true,Then,_Else) -> Then;
@@ -924,13 +931,13 @@ bitfield(_, [], Acc) ->
 
 
 unsigned(V, Mask) ->
-    %%integer_to_list(V band Mask). ??
-    (V band Mask).
+    integer_to_list(V band Mask).
+    %%(V band Mask).
 
 signed(V, UMask) ->
     if V band (bnot UMask) == 0 ->
 	    (V band UMask);
        true ->
-	    %%[$-|integer_to_list(((bnot V) band UMask)+1)] ??
-	    [$-|(((bnot V) band UMask)+1)]
+	    [$-|integer_to_list(((bnot V) band UMask)+1)]
+	    %%[$-|(((bnot V) band UMask)+1)]
     end.

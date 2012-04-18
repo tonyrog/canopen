@@ -24,7 +24,8 @@
 	 set_array_value/3, set_array_data/3,
 	 data/2, data/3, direct_data/2, direct_data/3,
 	 value/2, value/3, direct_value/2, direct_value/3,
-	 to_file/2, to_fd/2
+	 to_file/2, to_fd/2,
+	 from_file/1
 	]).
 
 -import(lists,[map/2, foreach/2]).
@@ -34,7 +35,8 @@
 %% Creates a dictionary.
 %% @end
 %%--------------------------------------------------------------------
--spec new() -> Dict::term().
+-spec new() -> Dict::atom() | integer().
+
 new() ->
     new(public).
 
@@ -49,7 +51,7 @@ new() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec new(Access::public | private | protected) -> Dict::term().
+-spec new(Access::public | private | protected) -> Dict::atom() | integer().
 
 new(Access) ->
     init(ets:new(co_dict, [{keypos,2},Access,ordered_set])).
@@ -158,6 +160,16 @@ init(Dict) ->
     Dict.
 				    
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Creates a dictionary from a file.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec from_file(FileName::string()) ->
+		       {ok, Table::atom() | integer()} |
+		       {error, Error::term()}.
+
 from_file(File) ->
     from_file(protected, File).
 
@@ -168,15 +180,6 @@ from_file(Access,File) ->
 	    add_objects(Dict, Os),
 	    {ok,Dict};
 	Error -> Error
-    end.
-
-add_from_file(Dict, File) ->
-    case co_file:load(File) of
-	{ok,Os} ->
-	    add_objects(Dict, Os),
-	    {ok,Dict};
-	Error ->
-	    Error
     end.
 
 %% Add objects and entries
@@ -192,7 +195,9 @@ add_objects(_Dict, []) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec to_file(Dict::term(), FileName::string()) -> ok.
+-spec to_file(Dict::atom() | integer(), FileName::string()) -> 
+		     ok |
+		     {error, Error::term()}.
 
 to_file(Dict, File) ->
     case file:open(File, [write]) of
@@ -210,7 +215,7 @@ to_file(Dict, File) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec to_fd(Dict::term(), FileDescriptor::term()) -> ok.
+-spec to_fd(Dict::atom() | integer(), FileDescriptor::term()) -> ok.
 
 to_fd(Dict, Fd) ->
     to_fd(Dict, first_object(Dict), Fd).
@@ -277,10 +282,17 @@ read_entries(Dict, Ix, Sx, Es) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec delete(Dict::term()) -> ok.
+-spec delete(Dict::atom() | integer()) -> ok.
 
 delete(Dict) ->
-    ets:delete(Dict).
+    try ets:delete(Dict) of
+	_ -> ok
+    catch
+	error:Reason ->
+	    {error,Reason}
+    end.    
+
+	    
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -288,7 +300,7 @@ delete(Dict) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec add_object(Dict::term(), Object::record(), list(Entry::record())) ->
+-spec add_object(Dict::atom() | integer(), Object::#dict_object{}, list(Entry::#dict_entry{})) ->
 			ok | {error, badarg}.
 
 add_object(Dict, Object, Es) when is_record(Object, dict_object) ->
@@ -306,7 +318,7 @@ add_object(Dict, Object, Es) when is_record(Object, dict_object) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec add_entry(Dict::term(), Entry::record()) ->
+-spec add_entry(Dict::atom() | integer(), Entry::#dict_entry{}) ->
 		       ok | {error, badarg}.
 
 add_entry(Dict, Entry) when is_record(Entry, dict_entry) ->
@@ -323,13 +335,20 @@ add_entry(Dict, Entry) when is_record(Entry, dict_entry) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec update_object(Dict::term(), Object::record()) ->
+-spec update_object(Dict::atom() | integer(), Object::#dict_object{}) ->
 			ok | {error, badarg}.
 
 update_object(Dict, Object) when is_record(Object, dict_object) ->
     case ets:member(Dict, Object#dict_object.index) of
-	false -> erlang:error(badarg);
-	true ->  ets:insert(Dict, Object)
+	false -> 
+	    erlang:error(badarg);
+	true ->  
+	    try  ets:insert(Dict, Object) of
+		 _ -> ok
+	    catch
+		error:Reason ->
+		    {error,Reason}
+	    end
     end.
 
 %%--------------------------------------------------------------------
@@ -338,13 +357,20 @@ update_object(Dict, Object) when is_record(Object, dict_object) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec update_entry(Dict::term(), Entry::record()) ->
+-spec update_entry(Dict::atom() | integer(), Entry::#dict_entry{}) ->
 		       ok | {error, badarg}.
 
 update_entry(Dict, Entry) when is_record(Entry, dict_entry) ->
     case ets:member(Dict, Entry#dict_entry.index) of
-	false -> erlang:error(badarg);
-	true ->  ets:insert(Dict, Entry)
+	false -> 
+	    erlang:error(badarg);
+	true ->  
+	    try ets:insert(Dict, Entry) of
+		 _ -> ok
+	    catch
+		error:Reason ->
+		    {error,Reason}
+	    end
     end.
 
 %%--------------------------------------------------------------------
@@ -353,12 +379,20 @@ update_entry(Dict, Entry) when is_record(Entry, dict_entry) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec delete_object(Dict::term(), Index::integer()) ->
+-spec delete_object(Dict::atom() | integer(), Index::integer()) ->
 			ok | {error, badarg}.
 
 delete_object(Dict, Ix) when ?is_index(Ix) ->
-    ets:delete(Dict, Ix),
-    ets:match_delete(Dict, #dict_entry { index={Ix,'_'}, _ = '_' }).
+    try ets:delete(Dict, Ix) of
+	_ -> 
+	    ets:match_delete(Dict, #dict_entry { index={Ix,'_'}, _ = '_' }),
+	    ok
+    catch
+	error:Reason ->
+	    {error,Reason}
+    end.
+	
+   
     
 %%--------------------------------------------------------------------
 %% @doc
@@ -366,11 +400,17 @@ delete_object(Dict, Ix) when ?is_index(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec delete_entry(Dict::term(), Index::integer() | {integer(), integer()}) ->
+-spec delete_entry(Dict::atom() | integer(), 
+		   Index::integer() | {integer(), integer()}) ->
 		       ok | {error, badarg}.
 
 delete_entry(Dict, Index={Ix,Sx}) when ?is_index(Ix), ?is_subind(Sx) ->
-    ets:delete(Dict, Index);
+    try ets:delete(Dict, Index) of
+	_ -> ok
+    catch
+	error:Reason ->
+	    {error,Reason}
+    end;
 delete_entry(Dict, Ix) when ?is_index(Ix) ->
     delete_entry(Dict, {Ix,0}).
 
@@ -380,8 +420,8 @@ delete_entry(Dict, Ix) when ?is_index(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec lookup_object(Dict::term(), Index::integer()) ->
-			{ok, Object::record()} | {error, no_such_object}.
+-spec lookup_object(Dict::atom() | integer(), Index::integer()) ->
+			{ok, Object::#dict_object{}} | {error, no_such_object}.
 
 lookup_object(Dict, Ix) when ?is_index(Ix) ->
     case ets:lookup(Dict, Ix) of
@@ -398,8 +438,9 @@ lookup_object(Dict, Ix) when ?is_index(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec lookup_entry(Dict::term(), Index::integer() | {integer(), integer()}) ->
-			  {ok, Entry::record()} | 
+-spec lookup_entry(Dict::atom() | integer(), 
+		   Index::integer() | {integer(), integer()}) ->
+			  {ok, Entry::#dict_entry{}} | 
 			  {error, no_such_object} |
 			  {error, no_such_subindex}.
 
@@ -431,7 +472,9 @@ lookup_entry(Dict, Ix) when ?is_index(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec set_data(Dict::term(), Index::integer(), SubInd::integer(), Data::binary()) ->
+-spec set_data(Dict::atom() | integer(), 
+	       Index::integer(), SubInd::integer(), 
+	       Data::binary()) ->
 		 ok | 
 		 {error, no_such_object} |
 		 {error, no_such_subindex} |
@@ -460,7 +503,9 @@ set_data(Dict, Ix, Si, Data)
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec set_data(Dict::term(), Index::{Ix::integer(), Si::integer()}, Data::binary()) ->
+-spec set_data(Dict::atom() | integer(), 
+	       Index::{Ix::integer(), Si::integer()}, 
+	       Data::binary()) ->
 		 ok | 
 		 {error, no_such_object} |
 		 {error, no_such_subindex} |
@@ -476,7 +521,8 @@ set_data(Dict, {Ix, Si}, Data)
 %% Work as set but without checking access !
 %% @end
 %%--------------------------------------------------------------------
--spec direct_set_data(Dict::term(), Index::integer(), SubInd::integer(), 
+-spec direct_set_data(Dict::atom() | integer(), 
+		      Index::integer(), SubInd::integer(), 
 		 Data::binary()) ->
 		 ok | 
 		 {error, no_such_object} |
@@ -498,8 +544,9 @@ direct_set_data(Dict, Ix, Si, Data)
 %% Work as set but without checking access !
 %% @end
 %%--------------------------------------------------------------------
--spec direct_set_data(Dict::term(), Index::{Ix::integer(), Si::integer()}, 
-		 Data::binary()) ->
+-spec direct_set_data(Dict::atom() | integer(), 
+		      Index::{Ix::integer(), Si::integer()}, 
+		      Data::binary()) ->
 		 ok | 
 		 {error, no_such_object} |
 		 {error, no_such_subindex} |
@@ -515,7 +562,7 @@ direct_set_data(Dict, {Ix, Si}, Data)
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec set_value(Dict::term(), Ix::integer(), Si::integer(), Value::term()) ->
+-spec set_value(Dict::atom() | integer(), Ix::integer(), Si::integer(), Value::term()) ->
 		 ok | 
 		 {error, no_such_object} |
 		 {error, no_such_subindex} |
@@ -544,7 +591,7 @@ set_value(Dict, Ix, Si,Value)
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec set_value(Dict::term(), Index::{Ix::integer(), Si::integer()}, Value::term()) ->
+-spec set_value(Dict::atom() | integer(), Index::{Ix::integer(), Si::integer()}, Value::term()) ->
 		 ok | 
 		 {error, no_such_object} |
 		 {error, no_such_subindex} |
@@ -560,7 +607,7 @@ set_value(Dict, {Ix, Si},Value)
 %% Work as set but without checking access !
 %% @end
 %%--------------------------------------------------------------------
--spec direct_set_value(Dict::term(), Index::integer(), SubInd::integer(), 
+-spec direct_set_value(Dict::atom() | integer(), Index::integer(), SubInd::integer(), 
 		 Value::term()) ->
 		 ok | 
 		 {error, no_such_object} |
@@ -580,7 +627,7 @@ direct_set_value(Dict, Ix, Si,Value)
 %% Work as set but without checking access !
 %% @end
 %%--------------------------------------------------------------------
--spec direct_set_value(Dict::term(), Index::{Ix::integer(), Si::integer()}, 
+-spec direct_set_value(Dict::atom() | integer(), Index::{Ix::integer(), Si::integer()}, 
 		 Value::term()) ->
 		 ok | 
 		 {error, no_such_object} |
@@ -596,7 +643,7 @@ direct_set_value(Dict, {Ix, Si},Value)
 %% Sets an array of data for subindex 1..254.
 %% @end
 %%--------------------------------------------------------------------
--spec set_array_data(Dict::term(), Index::integer(), list(Data::binary())) ->
+-spec set_array_data(Dict::atom() | integer(), Index::integer(), list(Data::binary())) ->
 		       ok | 
 		       {error, no_such_object} |
 		       {error, no_such_subindex} |
@@ -606,7 +653,7 @@ set_array_data(Dict, Ix, DataList) ->
     set_array_data(Dict, Ix, 1, DataList).
 
 set_array_data(Dict, Ix, Si, []) ->
-    direct_set_data(Dict, Ix, 0, Si);  %% number of elements
+    direct_set_value(Dict, Ix, 0, Si);  %% number of elements
 set_array_data(Dict, Ix, Si, [Data|Rest]) when Si < 255 ->
     direct_set_data(Dict, Ix, Si, Data),
     set_array_data(Dict, Ix, Si+1, Rest).
@@ -616,7 +663,7 @@ set_array_data(Dict, Ix, Si, [Data|Rest]) when Si < 255 ->
 %% Sets an array of values for subindex 1..254.
 %% @end
 %%--------------------------------------------------------------------
--spec set_array_value(Dict::term(), Index::integer(), list(Value::term())) ->
+-spec set_array_value(Dict::atom() | integer(), Index::integer(), list(Value::term())) ->
 		       ok | 
 		       {error, no_such_object} |
 		       {error, no_such_subindex} |
@@ -637,7 +684,7 @@ set_array_value(Dict, Ix, Si, [Value|Vs]) when Si < 255 ->
 %% Get data of existing object in dictionary.
 %% @end
 %%--------------------------------------------------------------------
--spec data(Dict::term(), Index::integer(), SubInd::integer()) ->
+-spec data(Dict::atom() | integer(), Index::integer(), SubInd::integer()) ->
 		   {ok, Value::term()} | 
 		   {error, Reason::atom()}.
 
@@ -648,7 +695,7 @@ data(Dict, Ix, Si) when ?is_index(Ix), ?is_subind(Si) ->
 %% Get data of existing object in dictionary.
 %% @end
 %%--------------------------------------------------------------------
--spec data(Dict::term(), Index::{Ix::integer(), Si::integer()}) ->
+-spec data(Dict::atom() | integer(), Index::{Ix::integer(), Si::integer()}) ->
 		   {ok, Value::term()} | 
 		   {error, Reason::atom()}.
 
@@ -671,7 +718,7 @@ data(Dict, {Ix, Si} = Index) when ?is_index(Ix), ?is_subind(Si) ->
 %% Works as data but without access check.
 %% @end
 %%--------------------------------------------------------------------
--spec direct_data(Dict::term(), Index::integer(), SubInd::integer()) ->
+-spec direct_data(Dict::atom() | integer(), Index::integer(), SubInd::integer()) ->
 			 Data::binary() | 
 			       {error, Reason::atom()}.
 
@@ -684,7 +731,7 @@ direct_data(Dict,Ix,Si) when ?is_index(Ix), ?is_subind(Si) ->
 %% Works as data but without access check.
 %% @end
 %%--------------------------------------------------------------------
--spec direct_data(Dict::term(), Index::{Ix::integer(), Si::integer()}) ->
+-spec direct_data(Dict::atom() | integer(), Index::{Ix::integer(), Si::integer()}) ->
 			 Data::binary() | 
 			  {error, Reason::atom()}.
 
@@ -696,7 +743,7 @@ direct_data(Dict,{Ix,Si} = Index) when ?is_index(Ix), ?is_subind(Si) ->
 %% Get value of existing object in dictionary.
 %% @end
 %%--------------------------------------------------------------------
--spec value(Dict::term(), Index::integer(), SubInd::integer()) ->
+-spec value(Dict::atom() | integer(), Index::integer(), SubInd::integer()) ->
 		   {ok, Value::term()} | 
 		   {error, Reason::atom()}.
 
@@ -708,7 +755,7 @@ value(Dict, Ix, Si) when ?is_index(Ix), ?is_subind(Si) ->
 %% Get value of existing object in dictionary.
 %% @end
 %%--------------------------------------------------------------------
--spec value(Dict::term(), Index::{Ix::integer(), Si::integer()}) ->
+-spec value(Dict::atom() | integer(), Index::{Ix::integer(), Si::integer()}) ->
 		   {ok, Value::term()} | 
 		   {error, Reason::atom()}.
 
@@ -733,7 +780,7 @@ value(Dict, {Ix, Si} = Index) when ?is_index(Ix), ?is_subind(Si) ->
 %% Works as value but without access check.
 %% @end
 %%--------------------------------------------------------------------
--spec direct_value(Dict::term(), Index::integer(), SubInd::integer()) ->
+-spec direct_value(Dict::atom() | integer(), Index::integer(), SubInd::integer()) ->
 			  Value::term() | 
 			  {error, Reason::atom()}.
 
@@ -746,7 +793,7 @@ direct_value(Dict,Ix,Si) when ?is_index(Ix), ?is_subind(Si) ->
 %% Works as value but without access check.
 %% @end
 %%--------------------------------------------------------------------
--spec direct_value(Dict::term(), Index::{Ix::integer(), Si::integer()}) ->
+-spec direct_value(Dict::atom() | integer(), Index::{Ix::integer(), Si::integer()}) ->
 			  Value::term() | 
 			  {error, Reason::atom()}.
 

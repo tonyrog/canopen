@@ -172,7 +172,7 @@ obj_options(Options) ->
 obj_entries([Entry|Entries],Acc,Index) ->
     Es = map(
 	   fun({"name",Name}) -> {name,Name};
-	      ({"type",T})    -> {type,can_open:decode_type(T)};
+	      ({"type",T})    -> {type,co_lib:decode_type(T)};
 	      ({"access",A})  -> {access,A};
 	      ({"pdo",true})  -> {pdo_mapping,optional};
 	      ({"pdo",false}) -> {pdo_mapping,no};

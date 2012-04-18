@@ -183,11 +183,12 @@ start_of_co_node(_Config) ->
     ok.
 
 %%--------------------------------------------------------------------
-%% @spec set_options_ok(Config) -> ok 
 %% @doc 
 %% Change co_node options.
 %% @end
 %%--------------------------------------------------------------------
+-spec set_options_ok(Config::list(tuple())) -> ok.
+
 set_options_ok(_Config) ->
 
     Options = [{name, "Test"},
@@ -206,11 +207,12 @@ set_options_ok(_Config) ->
     ok.
 
 %%--------------------------------------------------------------------
-%% @spec set_options_nok(Config) -> ok 
 %% @doc 
 %% Try changing co_node options to illegal values.
 %% @end
 %%--------------------------------------------------------------------
+-spec set_options_nok(Config::list(tuple())) -> ok.
+
 set_options_nok(_Config) ->
 
     Options = [{name, 7, 
@@ -236,11 +238,12 @@ set_options_nok(_Config) ->
     ok.
 
 %%--------------------------------------------------------------------
-%% @spec unknown_option(Config) -> ok 
 %% @doc 
 %% Try get and set of unknown option.
 %% @end
 %%--------------------------------------------------------------------
+-spec unknown_option(Config::list(tuple())) -> ok.
+
 unknown_option(_Config) ->
     {error, "Unknown option unknown_option"} = 
 	co_api:get_option(serial(), unknown_option),

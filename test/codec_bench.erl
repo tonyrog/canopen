@@ -24,8 +24,8 @@ verify() ->
     Ts1 = [{integer,10},{unsigned,5}],
     <<16#59,16#7A>> = co_codec:encode([-423, 30], Ts1),
     {[-423,30],_} = co_codec:decode(<<16#59,16#7A>>,Ts1),
-    V1 = ?T1(canopen_codec),
-    V2 = ?T2(canopen_codec).
+    V1 = ?T1(co_codec),
+    V2 = ?T2(co_codec).
 
 
 a1(0) ->  ok;
@@ -34,25 +34,25 @@ a1(N) ->  ?T1(co_codec), a1(N-1).
 a2(0) -> ok;
 a2(N) -> ?T2(co_codec), a2(N-1).
 
-d2(_D,0) -> ok;
-d2(D,N) -> co_api:tpdo_pack(0, D), d2(D,N-1).
+%%d2(_D,0) -> ok;
+%%d2(D,N) -> co_api:tpdo_pack(0, D), d2(D,N-1).
 
 dict() ->
     {ok,D} = co_dict:from_file("bench.dict"),
-    co_dict:aset(D, {16#2500,1}, 1),
-    co_dict:aset(D, {16#2500,2}, 2),
-    co_dict:aset(D, {16#2500,3}, 3),
-    co_dict:aset(D, {16#2500,4}, 0),
-    co_dict:aset(D, {16#2500,5}, 1),
-    co_dict:aset(D, {16#2500,6}, 2),
-    co_dict:aset(D, {16#2500,7}, 3),
-    co_dict:aset(D, {16#2500,8}, 0),
-    co_dict:aset(D, {16#2501,1}, 3),
-    co_dict:aset(D, {16#2501,2}, 2),
-    co_dict:aset(D, {16#2501,3}, 3),
-    co_dict:aset(D, {16#2501,4}, 2),
-    co_dict:aset(D, {16#2501,5}, 3),
-    co_dict:aset(D, {16#2501,6}, 2),
-    co_dict:aset(D, {16#2501,7}, 3),
-    co_dict:aset(D, {16#2501,8}, 2),
+    co_dict:set_value(D, {16#2500,1}, 1),
+    co_dict:set_value(D, {16#2500,2}, 2),
+    co_dict:set_value(D, {16#2500,3}, 3),
+    co_dict:set_value(D, {16#2500,4}, 0),
+    co_dict:set_value(D, {16#2500,5}, 1),
+    co_dict:set_value(D, {16#2500,6}, 2),
+    co_dict:set_value(D, {16#2500,7}, 3),
+    co_dict:set_value(D, {16#2500,8}, 0),
+    co_dict:set_value(D, {16#2501,1}, 3),
+    co_dict:set_value(D, {16#2501,2}, 2),
+    co_dict:set_value(D, {16#2501,3}, 3),
+    co_dict:set_value(D, {16#2501,4}, 2),
+    co_dict:set_value(D, {16#2501,5}, 3),
+    co_dict:set_value(D, {16#2501,6}, 2),
+    co_dict:set_value(D, {16#2501,7}, 3),
+    co_dict:set_value(D, {16#2501,8}, 2),
     D.

@@ -22,13 +22,18 @@
 	 bitsize/1, bytesize/1]).
 
 -compile(export_all).
+
+-type type_spec()::
+	integer() | 
+	atom() | 
+	{Type::integer() | atom(),  Size::integer()}.
 %%--------------------------------------------------------------------
 %% @doc
 %% Encodes data. 
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec encode(Data::term(), Type::integer() | atom()) -> 
+-spec encode(Data::term(), Type::type_spec() | list(type_spec())) -> 
 		    Bin::binary().
 
 encode(Data, Type) ->
@@ -43,7 +48,7 @@ encode(Data, Type) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec decode(Bin::binary(), Type::integer() | atom()) -> 
+-spec decode(Bin::binary(), Type::type_spec() | list(type_spec())) -> 
 		    {Value::term(), BitsTail::binary()}.
 
 decode(Data, Type) ->
