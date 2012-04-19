@@ -417,8 +417,8 @@ s_segmented_download_end(timeout, S) ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_reading_segment_started({Mref, Reply} = M, S)  ->
-    ?dbg(cli, "s_reading_segment_started: Got event = ~p", [M]),
+s_reading_segment_started({Mref, Reply} = _M, S)  ->
+    ?dbg(cli, "s_reading_segment_started: Got event = ~p", [_M]),
     case {S#co_session.mref, Reply} of
 	{Mref, {ok, _Value}} ->
 	    %% Atomic
@@ -645,8 +645,8 @@ s_segmented_upload(timeout, S) ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_writing_segment_started({Mref, Reply} = M, S)  ->
-    ?dbg(cli, "s_writing_segment_started: Got event = ~p", [M]),
+s_writing_segment_started({Mref, Reply} = _M, S)  ->
+    ?dbg(cli, "s_writing_segment_started: Got event = ~p", [_M]),
     case S#co_session.mref of
 	Mref ->
 	    erlang:demonitor(Mref, [flush]),
@@ -683,8 +683,8 @@ s_writing_segment_started(M, S)  ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_writing_segment({Mref, Reply} = M, S)  ->
-    ?dbg(cli, "s_writing_segment: Got event = ~p", [M]),
+s_writing_segment({Mref, Reply} = _M, S)  ->
+    ?dbg(cli, "s_writing_segment: Got event = ~p", [_M]),
     case {S#co_session.mref, Reply} of
 	{Mref, ok} ->
 	    %% Atomic reply
@@ -864,7 +864,11 @@ s_block_download_response_last(M, S) when is_record(M, can_frame) ->
 	      AckSeq =:= S#co_session.blkseq ->
 	    S1 = S#co_session { blkseq=0, blksize=BlkSize },
 	    CRC = co_crc:final(S1#co_session.blkcrc),
-	    N   = (7- (S1#co_session.blkbytes rem 7)) rem 7,	    
+	    N   = if S1#co_session.blkbytes =:= 0 ->
+			  7;
+		     true ->
+			  (7- (S1#co_session.blkbytes rem 7)) rem 7
+		  end,
 	    R = ?mk_ccs_block_download_end_request(N,CRC),
 	    send(S1, R),
 	    {next_state, s_block_download_end_response, S1, timeout(S1)};
@@ -927,8 +931,8 @@ s_block_download_end_response(timeout, S) ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_reading_block_started({Mref, Reply} = M, S)  ->
-    ?dbg(cli, "s_reading_block_started: Got event = ~p", [M]),
+s_reading_block_started({Mref, Reply} = _M, S)  ->
+    ?dbg(cli, "s_reading_block_started: Got event = ~p", [_M]),
     case {S#co_session.mref, Reply} of
 	{Mref, {ok, _Value}} ->
 	    %% Atomic
@@ -992,7 +996,7 @@ start_block_upload(S=#co_session {buf = Buf, ctx = Ctx, index = IX, subind = SI}
 
 s_block_upload_response(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
-	?ma_scs_block_upload_response(CrcSup,SizeInd,IX,SI,Size) when
+	?ma_scs_block_upload_response(CrcSup,_SizeInd,IX,SI,_Size) when
 	      IX =:= S#co_session.index,
 	      SI =:= S#co_session.subind ->
 	    R = ?mk_ccs_block_upload_start(),
@@ -1169,8 +1173,8 @@ s_block_upload_end(timeout, S) ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_writing_block_started({Mref, Reply} = M, S)  ->
-    ?dbg(cli, "s_writing_block_started: Got event = ~p", [M]),
+s_writing_block_started({Mref, Reply} = _M, S)  ->
+    ?dbg(cli, "s_writing_block_started: Got event = ~p", [_M]),
     case {S#co_session.mref, Reply} of
 	{Mref, {ok, _Ref, _WriteSze}} ->
 	    erlang:demonitor(Mref, [flush]),
