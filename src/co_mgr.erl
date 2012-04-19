@@ -908,8 +908,8 @@ format_value(Value, Type, DCtx) ->
 		    format_value(Value, Type1, DCtx)
 	    end;
 	_ ->
-	    integer_to_list(Value)
-	    %%Value
+	    %% integer_to_list(Value)
+	    Value
     end.
 
 ite(true,Then,_Else) -> Then;
@@ -931,13 +931,13 @@ bitfield(_, [], Acc) ->
 
 
 unsigned(V, Mask) ->
-    integer_to_list(V band Mask).
-    %%(V band Mask).
+    %%integer_to_list(V band Mask).
+    (V band Mask).
 
 signed(V, UMask) ->
     if V band (bnot UMask) == 0 ->
 	    (V band UMask);
        true ->
-	    [$-|integer_to_list(((bnot V) band UMask)+1)]
-	    %%[$-|(((bnot V) band UMask)+1)]
+	    %%[$-|integer_to_list(((bnot V) band UMask)+1)]
+	    (((bnot V) band UMask)+1)
     end.

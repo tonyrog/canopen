@@ -206,18 +206,17 @@ fetch_store(_Config) ->
 			      cobid_time_stamp, 0),
 
     %% Change
-    NewCTS = list_to_integer(CTS) + 1,
+    NewCTS = CTS + 1,
     ok = co_mgr:client_store(co_lib:serial_to_xnodeid(serial()),
 			     cobid_time_stamp, 0, NewCTS),
 
     %% Verify change
-    NewCTS = list_to_integer(
-	       co_mgr:client_fetch(co_lib:serial_to_xnodeid(serial()),
-				 cobid_time_stamp, 0)),
+    NewCTS = co_mgr:client_fetch(co_lib:serial_to_xnodeid(serial()),
+				 cobid_time_stamp, 0),
 
     %% Restore
     ok = co_mgr:client_store(co_lib:serial_to_xnodeid(serial()),
-			     cobid_time_stamp, 0, list_to_integer(CTS)),
+			     cobid_time_stamp, 0, CTS),
 
     %% Verify restore
     CTS	= co_mgr:client_fetch(co_lib:serial_to_xnodeid(serial()),
