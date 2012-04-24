@@ -538,8 +538,8 @@ s_segmented_download(timeout, S) ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_writing_segment_started({Mref, Reply} = M, S)  ->
-    ?dbg(srv, "s_writing_segment_started: Got event = ~p\n", [M]),
+s_writing_segment_started({Mref, Reply} = _M, S)  ->
+    ?dbg(srv, "s_writing_segment_started: Got event = ~p\n", [_M]),
     case S#co_session.mref of
 	Mref ->
 	    erlang:demonitor(Mref, [flush]),
@@ -576,8 +576,8 @@ s_writing_segment_started(M, S)  ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_writing_segment_end({Mref, Reply} = M, S)  ->
-    ?dbg(srv, "s_writing_segment_end: Got event = ~p\n", [M]),
+s_writing_segment_end({Mref, Reply} = _M, S)  ->
+    ?dbg(srv, "s_writing_segment_end: Got event = ~p\n", [_M]),
     Ok = case {S#co_session.mref, Reply} of
 	     {Mref, ok} ->
 		 %% Atomic reply
@@ -605,7 +605,7 @@ s_writing_segment_end({Mref, Reply} = M, S)  ->
 				 {S#co_session.index, S#co_session.subind}),
 	    {stop, normal, S};
 	not_ok ->
-	    ?dbg(srv, "s_writing_segment_end: received other = ~p, aborting", [M]),
+	    ?dbg(srv, "s_writing_segment_end: received other = ~p, aborting", [_M]),
 	    abort(S, ?abort_internal_error)
      end;
 s_writing_segment_end(timeout, S) ->
@@ -757,8 +757,8 @@ upload_segment(S, Data, Eod) ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_reading_segment_started({Mref, Reply} = M, S)  ->
-    ?dbg(srv, "s_reading_segment_started: Got event = ~p\n", [M]),
+s_reading_segment_started({Mref, Reply} = _M, S)  ->
+    ?dbg(srv, "s_reading_segment_started: Got event = ~p\n", [_M]),
     case {S#co_session.mref, Reply} of
 	{Mref, {ok, _Value}} ->
 	    %% Atomic
@@ -1047,8 +1047,8 @@ s_block_upload_end_response(timeout, S) ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_reading_block_started({Mref, Reply} = M, S)  ->
-    ?dbg(srv, "s_reading_block_started: Got event = ~p\n", [M]),
+s_reading_block_started({Mref, Reply} = _M, S)  ->
+    ?dbg(srv, "s_reading_block_started: Got event = ~p\n", [_M]),
     case {S#co_session.mref, Reply} of
 	{Mref, {ok, _Value}} ->
 	    %% Atomic
@@ -1308,8 +1308,8 @@ s_block_download_end(timeout, S) ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_writing_block_started({Mref, Reply} = M, S)  ->
-    ?dbg(srv, "s_writing_block_started: Got event = ~p\n", [M]),
+s_writing_block_started({Mref, Reply} = _M, S)  ->
+    ?dbg(srv, "s_writing_block_started: Got event = ~p\n", [_M]),
     case {S#co_session.mref, Reply} of
 	{Mref, {ok, _Ref, _WriteSze}} ->
 	    erlang:demonitor(Mref, [flush]),
