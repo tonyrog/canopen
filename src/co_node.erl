@@ -537,6 +537,10 @@ handle_call({xnot_subscribers}, _From, Ctx)  ->
     Subs = subscribers(Ctx#co_ctx.xnot_table),
     {reply, Subs, Ctx};
 
+handle_call({set_error,Error,Code}, _From, Ctx) ->
+    Ctx1 = set_error(Error,Code,Ctx),
+    {reply, ok, Ctx1};
+
 handle_call({dump, Qualifier}, _From, Ctx) ->
     io:format("   NAME: ~p\n", [Ctx#co_ctx.name]),
     print_nodeid(" NODEID:", Ctx#co_ctx.nodeid),
@@ -636,6 +640,7 @@ handle_call({dump, Qualifier}, _From, Ctx) ->
     io:format("  DEBUG: ~p\n", [get(dbg)]),
     {reply, ok, Ctx};
 
+%% FIXME: this can be done with sys:get_status(Pid)!
 handle_call(loop_data, _From, Ctx) ->
     io:format("  LoopData: ~p\n", [Ctx]),
     {reply, ok, Ctx};
@@ -2603,8 +2608,8 @@ stop_timer(TimerRef) ->
 time_of_day() ->
     now_to_time_of_day(now()).
 
-set_time_of_day(Time) ->
-    ?dbg(node, "set_time_of_day: ~p", [Time]),
+set_time_of_day(_Time) ->
+    ?dbg(node, "set_time_of_day: ~p", [_Time]),
     ok.
 
 now_to_time_of_day({Sm,S0,Us}) ->

@@ -40,6 +40,7 @@
 -export([delete_object/3, delete_entry/3]).
 -export([set_data/4, set_value/4]).
 -export([data/3, value/3]).
+-export([set_error/3]).
 
 %% CANopen application internal
 -export([add_entry/2, get_entry/2]).
@@ -739,6 +740,18 @@ data(_Identity, Dict, {Ix, Si} = I) when ?is_index(Ix), ?is_subind(Si)  ->
     co_dict:data(Dict, I);
 data(Identity, Dict, Ix) when is_integer(Ix) ->
     data(Identity, Dict, {Ix, 0}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Set error condition and send emergency frame.
+%% @end
+%%--------------------------------------------------------------------
+-spec set_error(Identity::term(),
+		Error::integer(),
+		Code::integer()) -> ok | {error, term()}.
+
+set_error(Identity, Error, Code) ->
+    gen_server:call(identity_to_pid(Identity), {set_error,Error,Code}).
 
 %%--------------------------------------------------------------------
 %%

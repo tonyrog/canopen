@@ -864,7 +864,11 @@ s_block_download_response_last(M, S) when is_record(M, can_frame) ->
 	      AckSeq =:= S#co_session.blkseq ->
 	    S1 = S#co_session { blkseq=0, blksize=BlkSize },
 	    CRC = co_crc:final(S1#co_session.blkcrc),
-	    N   = (7- (S1#co_session.blkbytes rem 7)) rem 7,	    
+	    N   = if S1#co_session.blkbytes =:= 0 ->
+			  7;
+		     true ->
+			  (7- (S1#co_session.blkbytes rem 7)) rem 7
+		  end,
 	    R = ?mk_ccs_block_download_end_request(N,CRC),
 	    send(S1, R),
 	    {next_state, s_block_download_end_response, S1, timeout(S1)};
