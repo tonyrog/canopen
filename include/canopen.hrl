@@ -285,19 +285,6 @@
 -define(SYNC_ID, ?COB_ID(?SYNC, 0)).
 -define(TIME_STAMP_ID, ?COB_ID(?TIME_STAMP, 0)).
 
--define(EMERGENCY_ID(Nid),  ?COB_ID(?EMERGENCY, Nid)).
--define(NODE_GUARD_ID(Nid), ?COB_ID(?NODE_GUARD, Nid)).
--define(PDO1_TX_ID(Nid), ?COB_ID(?PDO1_TX, Nid)).
--define(PDO1_RX_ID(Nid), ?COB_ID(?PDO1_RX, Nid)).
--define(PDO2_TX_ID(Nid), ?COB_ID(?PDO2_TX, Nid)).
--define(PDO2_RX_ID(Nid), ?COB_ID(?PDO2_RX, Nid)).
--define(PDO3_TX_ID(Nid), ?COB_ID(?PDO3_TX, Nid)).
--define(PDO3_RX_ID(Nid), ?COB_ID(?PDO3_RX, Nid)).
--define(PDO4_TX_ID(Nid), ?COB_ID(?PDO4_TX, Nid)).
--define(PDO4_RX_ID(Nid), ?COB_ID(?PDO4_RX, Nid)).
-
--define(SDO_TX_ID(Nid),  ?COB_ID(?SDO_TX, Nid)).
--define(SDO_RX_ID(Nid),  ?COB_ID(?SDO_RX, Nid)).
 
 %%
 %% Node state 
@@ -318,7 +305,8 @@
 	  product  = 0,        %% LSS query / SDO - IDENTITY
 	  revision = 0,        %% LSS query / SDO - IDENTITY
 	  serial   = 0,        %% LSS query / SDO - IDENTITY / DID 
-	  state=?UnknownState
+	  state=?UnknownState,
+	  toggle = 0           %% Expected next toggle
 	 }).
 
 %% COBID=2021 16#7E5 -  Master->Slave 2#1111 1100101
@@ -447,8 +435,8 @@
 	{
 	  src    :: cobid(),       %% Sender COBID
 	  dst    :: cobid(),       %% Receiver COBID
-	  index  :: uint16(),        %% object being transfered 1-16#ffff
-	  subind :: uint8(),        %% sub-index of object 1-16#ff
+	  index  :: uint16(),      %% object being transfered 1-16#ffff
+	  subind :: uint8(),       %% sub-index of object 1-16#ff
 	  data   :: binary(),      %% Data if expedited
 	  exp    :: uint1(),       %% Expedited flag
 	  n      :: uint8(),       %% bytes not used in data section
@@ -492,6 +480,7 @@
 -record(tpdo_ctx,
 	{
 	  nodeid,     %% (Short) CANOpen node id (for SAM-MPDOs)
+	  node_pid,   %% co_node process id
 	  dict,       %% copy of dictionary in co_ctx
 	  tpdo_cache, %% copy of tpdo cache in co_ctx
 	  res_table,  %% copy of reserver table in co_ctx
@@ -528,6 +517,7 @@
 	  toggle,           %% Node guard toggle
 	  node_map,         %% serial to node id mapping
 	  nmt_table,        %% node states,  #nmt_entry {}
+	  nmt_master = false, %% NMT master flag
 	  dict,             %% can dictionary
 	  mpdo_dispatch,    %% MPDO dispatch list 
 	  res_table,        %% dictionary reservations

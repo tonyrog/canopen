@@ -73,6 +73,7 @@
 %%          {nodeid, integer()}       - node id, range: 1 - 16#7e.<br/>
 %%          {xnodeid, integer()}      - extended node id, range: 1 - 16#ffffff.<br/>
 %%          {time_stamp,  timeout()}  - ( 60000 ) in msec. <br/>
+%%          {nmt_master, boolean()}   - ( false )
 %%
 %%            Dictionary options
 %%          {load_last_saved, boolean()} - load last dictionary file. <br/>
@@ -105,6 +106,7 @@
 	{use_serial_as_xnodeid, boolean()} |
 	{nodeid, integer()} | 
 	{xnodeid, integer()} | 
+	{nmt_master, boolean()} | 
 	{load_last_saved, boolean()} | 
 	{dict_file, string()} | 
 	{time_stamp,  timeout()} | 
@@ -217,6 +219,7 @@ verify_option(Option, NewValue)
     end;
 verify_option(Option, NewValue) 
   when Option == use_serial_as_xnodeid;
+       Option == nmt_master;
        Option == use_crc;
        Option == load_last_saved;
        Option == debug;
@@ -1078,10 +1081,9 @@ tpdo_mapping(Offset, TpdoCtx) ->
 			{ok, Data::binary()} |
 			{error, Error::atom()}.
 
-tpdo_data(Index = {Ix, Si}, #tpdo_ctx {res_table = ResTable, dict = Dict, 
-				       tpdo_cache = TpdoCache}) 
+tpdo_data(Index = {Ix, Si}, TpdoCtx) 
   when is_integer(Ix) andalso is_integer(Si) ->
-    co_node:tpdo_data(Index, ResTable, Dict, TpdoCache).
+    co_node:tpdo_data(Index, TpdoCtx).
 
 
 %%--------------------------------------------------------------------

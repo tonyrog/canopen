@@ -291,17 +291,18 @@ s_initial(timeout, S) ->
 			{ok, Buf::term()} |
 			{error, Error::atom()}.
 
-write_begin(S) ->
-    Ctx= S#co_session.ctx,
-    Index = S#co_session.index,
-    SubInd = S#co_session.subind,
+write_begin(_S=#co_session {ctx = Ctx, index = Index, subind = SubInd, node_pid = NodePid}) ->
     case co_api:reserver_with_module(Ctx#sdo_ctx.res_table, Index) of
 	[] ->
 	    ?dbg(srv, "write_begin: No reserver for index ~7.16.0#\n", [Index]),
 	    central_write_begin(Ctx, Index, SubInd);
+	{NodePid, _Mod} when is_pid(NodePid) ->
+	    ?dbg(srv, "write_begin: co_node ~p has reserved index ~7.16.0#\n", 
+		 [NodePid, Index]),
+	    central_write_begin(Ctx, Index, SubInd);
 	{Pid, Mod} when is_pid(Pid) ->
-	    ?dbg(srv, "write_begin: Process ~p has reserved index ~7.16.0#\n", 
-		 [Pid, Index]),
+	    ?dbg(srv, "write_begin: Process ~p, ~p has reserved index ~7.16.0#\n", 
+		 [Pid, Mod, Index]),
 	    app_write_begin(Index, SubInd, Pid, Mod);
 	{dead, _Mod} ->
 	    ?dbg(srv, "write_begin: Reserver process for index ~7.16.0# dead.\n", [Index]),
@@ -309,8 +310,7 @@ write_begin(S) ->
     end.
 
 
-central_write_begin(Ctx, Index, SubInd) ->
-    Dict = Ctx#sdo_ctx.dict,
+central_write_begin(_Ctx=#sdo_ctx {dict = Dict}, Index, SubInd) ->
     case co_dict:lookup_entry(Dict, {Index,SubInd}) of
 	{ok,E} ->
 	    if (E#dict_entry.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
