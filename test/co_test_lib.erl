@@ -19,13 +19,21 @@ start_node(C) ->
     start_node(C, serial()).
 
 start_node(C, Serial) when is_list(C) ->
+    %% From test suite
     DataDir = ?config(data_dir, C),
     Dict = filename:join(DataDir, ?DICT),
-    start_node(Serial, Dict);
+    start_node(Serial, Dict,[]);
 start_node(Serial, Dict) ->
-    start_node(Serial, Dict, 1, 0).
+    %% From co_test.erl
+    start_node(Serial, Dict, 1, 0, []).
+
+start_node(Serial, Dict, Opts) ->
+    start_node(Serial, Dict, 1, 0, Opts).
 
 start_node(Serial, Dict, Port, Ttl) ->
+    start_node(Serial, Dict, Port, Ttl, []).
+
+start_node(Serial, Dict, Port, Ttl, Opts) ->
     can_router:start(),
     can_udp:start(co_test, Port, [{ttl, Ttl}]),
 
@@ -39,13 +47,13 @@ start_node(Serial, Dict, Port, Ttl) ->
 	    do_nothing
     end,
 
-    {ok, Pid} = co_api:start_link(Serial, 
-				   [{use_serial_as_xnodeid, true},
-				    {dict_file, Dict},
-				    {max_blksize, 7},
-				    {vendor,16#2A1},
-	        		    {linked, false},
-				    {debug, true}]),
+    {ok, Pid} = co_api:start_link(Serial, Opts ++
+				      [{use_serial_as_xnodeid, true},
+				       {dict_file, Dict},
+				       {max_blksize, 7},
+				       {vendor,16#2A1},
+				       {linked, false},
+				       {debug, true}]),
     ct:pal("Started co_node ~p, pid = ~p",[integer_to_list(Serial,16), Pid]),
     {ok, Pid}.
 

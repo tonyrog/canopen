@@ -695,7 +695,8 @@ data(Dict, Ix, Si) when ?is_index(Ix), ?is_subind(Si) ->
 %% Get data of existing object in dictionary.
 %% @end
 %%--------------------------------------------------------------------
--spec data(Dict::atom() | integer(), Index::{Ix::integer(), Si::integer()}) ->
+-spec data(Dict::atom() | integer(), 
+	   Index::{Ix::integer(), Si::integer()} | integer()) ->
 		   {ok, Value::term()} | 
 		   {error, Reason::atom()}.
 
@@ -710,7 +711,9 @@ data(Dict, {Ix, Si} = Index) when ?is_index(Ix), ?is_subind(Si) ->
 	    end;
 	_Other ->
 	    i_fail(Dict, Index)
-    end.
+    end;
+data(Dict, Ix) when ?is_index(Ix) ->
+    data(Dict, {Ix, 0}).
  
 %%--------------------------------------------------------------------
 %% @doc
@@ -731,13 +734,16 @@ direct_data(Dict,Ix,Si) when ?is_index(Ix), ?is_subind(Si) ->
 %% Works as data but without access check.
 %% @end
 %%--------------------------------------------------------------------
--spec direct_data(Dict::atom() | integer(), Index::{Ix::integer(), Si::integer()}) ->
+-spec direct_data(Dict::atom() | integer(), 
+		  Index::{Ix::integer(), Si::integer()} | integer()) ->
 			 Data::binary() | 
 			  {error, Reason::atom()}.
 
 direct_data(Dict,{Ix,Si} = Index) when ?is_index(Ix), ?is_subind(Si) ->
-    ets:lookup_element(Dict, Index, #dict_entry.data).
-    
+    ets:lookup_element(Dict, Index, #dict_entry.data);
+direct_data(Dict, Ix) when ?is_index(Ix) ->
+    direct_data(Dict, {Ix, 0}).
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Get value of existing object in dictionary.
@@ -755,7 +761,8 @@ value(Dict, Ix, Si) when ?is_index(Ix), ?is_subind(Si) ->
 %% Get value of existing object in dictionary.
 %% @end
 %%--------------------------------------------------------------------
--spec value(Dict::atom() | integer(), Index::{Ix::integer(), Si::integer()}) ->
+-spec value(Dict::atom() | integer(), 
+	    Index::{Ix::integer(), Si::integer()} | integer()) ->
 		   {ok, Value::term()} | 
 		   {error, Reason::atom()}.
 
@@ -772,7 +779,9 @@ value(Dict, {Ix, Si} = Index) when ?is_index(Ix), ?is_subind(Si) ->
 	    end;
 	_Other ->
 	    i_fail(Dict, Index)
-    end.
+    end;
+value(Dict, Ix) when ?is_index(Ix) ->
+    value(Dict, {Ix, 0}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -793,7 +802,8 @@ direct_value(Dict,Ix,Si) when ?is_index(Ix), ?is_subind(Si) ->
 %% Works as value but without access check.
 %% @end
 %%--------------------------------------------------------------------
--spec direct_value(Dict::atom() | integer(), Index::{Ix::integer(), Si::integer()}) ->
+-spec direct_value(Dict::atom() | integer(), 
+		   Index::{Ix::integer(), Si::integer()} | integer()) ->
 			  Value::term() | 
 			  {error, Reason::atom()}.
 
@@ -805,7 +815,9 @@ direct_value(Dict,{Ix,Si} = Index) when ?is_index(Ix), ?is_subind(Si) ->
 	    Value;
 	_Other ->
 	    i_fail(Dict, Index)
-    end.
+    end;
+direct_value(Dict, Ix) when ?is_index(Ix) ->
+    direct_value(Dict, {Ix, 0}).
     
 %%
 %% Search for dictionary entry when index I is with in range

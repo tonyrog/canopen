@@ -12,3 +12,16 @@
   {entry,4,[{access,ro},{type,unsigned32},{value,16#12345678}]}   %% serial
  ]}.
 
+{object, 16#100C,
+ [{name, "NODE-GUARD-TIME"},
+  {struct, var},{access, rw},{type, unsigned16},
+  {entry,0,[{access,rw},{type,unsigned16},{value,1000}]}
+ ]}.
+
+{object, 16#100D,
+ [{name, "LIFE-TIME-FACTOR"},
+  {struct, var},{access, rw},{type, unsigned8},
+  {entry,0,[{access,rw},{type,unsigned8},{value,10}]}
+ ]}.
+
+

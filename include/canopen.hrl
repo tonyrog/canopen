@@ -515,9 +515,9 @@
 	  serial,           %% string version of node serial number
 	  state,            %% CANopen node state
 	  toggle,           %% Node guard toggle
-	  node_map,         %% serial to node id mapping
-	  nmt_table,        %% node states,  #nmt_entry {}
 	  nmt_master = false, %% NMT master flag
+	  node_guard_timer, %% Node guard supervision of master
+	  node_life_time = 0, %% Node guard supervision of master
 	  dict,             %% can dictionary
 	  mpdo_dispatch,    %% MPDO dispatch list 
 	  res_table,        %% dictionary reservations

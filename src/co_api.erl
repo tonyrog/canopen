@@ -1085,11 +1085,11 @@ notify({nodeid, Nid}, Func, Index, Subind, Data) ->
 			 ok | {error, Error::atom()}.
 		  
 
-notify_from(Identity={xnodeid, XNid}, Func, Index, Subind, Data) ->
+notify_from(Identity={xnodeid, XNid}, Func, Index, Subind, Data) when is_atom(Func) ->
     notify_from(Identity,?XCOB_ID(co_lib:encode_func(Func), XNid),Index,Subind,Data);
-notify_from(Identity={nodeid, Nid}, Func, Index, Subind, Data) ->
+notify_from(Identity={nodeid, Nid}, Func, Index, Subind, Data) when is_atom(Func)->
     notify_from(Identity,?COB_ID(co_lib:encode_func(Func), Nid),Index,Subind,Data);
-notify_from(Identity,CobId,Index,Subind,Data) ->
+notify_from(Identity,CobId,Index,Subind,Data) when is_integer(CobId) ->
     co_node:notify_from(identity_to_pid(Identity),CobId,Index,Subind,Data).
 
 

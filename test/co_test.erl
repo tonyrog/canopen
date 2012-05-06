@@ -5,15 +5,26 @@
 
 -module(co_test).
 
--export([run/1, run/3, run_mgr/0, run_mgr/2, halt/1, halt_mgr/0, load/1]).
+-export([run/1, run/3, run/2, run/4, 
+	 run_mgr/0, run_mgr/2, 
+	 run_nmt/1,
+	 halt/1, 
+	 halt_mgr/0, 
+	 load/1]).
 
 run(Serial) ->
-    Dict = filename:join(code:priv_dir(canopen), "default.dict"),
-    co_test_lib:start_node(Serial, Dict).
+    run(Serial, []).
 
 run(Serial, Port, Ttl) ->
+    run(Serial, Port, Ttl, []).
+
+run(Serial, Opts) ->
     Dict = filename:join(code:priv_dir(canopen), "default.dict"),
-    co_test_lib:start_node(Serial, Dict, Port, Ttl).
+    co_test_lib:start_node(Serial, Dict, Opts).
+
+run(Serial, Port, Ttl, Opts) ->
+    Dict = filename:join(code:priv_dir(canopen), "default.dict"),
+    co_test_lib:start_node(Serial, Dict, Port, Ttl, Opts).
 
 halt(Serial) ->
     co_test_lib:stop_node(Serial).
@@ -32,6 +43,9 @@ halt_mgr() ->
     co_proc:stop(),
     can_udp:stop(co_test),
     can_router:stop().
+
+run_nmt(Serial) ->
+    run(Serial, [{nmt_master, true}]).
 
 load(Serial) ->
     co_api:load_dict(Serial, "/Users/malotte/erlang/canopen/test/co_tpdo_SUITE_data/test.dict").

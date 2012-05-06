@@ -155,6 +155,11 @@ init_per_testcase(_TestCase, Config) ->
     ok = co_test_app:debug(RPid, true),
     timer:sleep(100),
 
+    %% Redo mapping, i.e. calls to tpdo_callback
+    ok = co_api:state(?RPDO_NODE, preoperational),
+    ok = co_api:state(?RPDO_NODE, operational),
+    ct:pal("Changed state to operational", []),    
+    timer:sleep(100),
     [{tpdo_app, TPid}, {rpdo_app,  RPid} | Config].
 
 

@@ -206,6 +206,7 @@ init({Serial, NodeName, Opts} = Args) ->
       vendor = proplists:get_value(vendor,Opts,0),
       serial = Serial,
       state  = ?Initialisation,
+      nmt_master = proplists:get_value(nmt_master,Opts,false),
       sub_table = SubTable,
       res_table = ResTable,
       xnot_table = XNotTable,
@@ -231,7 +232,7 @@ init({Serial, NodeName, Opts} = Args) ->
 			Ctx) of
 	{ok, Ctx1} ->
 	    process_flag(trap_exit, true),
-	    if ShortNodeId =:= 0 ->
+	    if ShortNodeId =:= 0 -> %% CANopen manager
 		    {ok, Ctx1#co_ctx { state = ?Operational }};
 	       true ->
 		    {ok, reset_application(Ctx1)}
@@ -271,20 +272,43 @@ initialization(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
     error_logger:info_msg("Node '~s' id=~w,~w initialization\n",
 	      [Name, XNodeId, SNodeId]),
     %% ??
-    if XNodeId =/= undefined ->
-	    can:send(#can_frame { id = ?XCOB_ID(?NODE_GUARD,add_xflag(XNodeId)),
-				  len = 1, data = <<0>> });
-       true ->
-	    do_nothing
-    end,
-    if SNodeId =/= undefined ->
-	    can:send(#can_frame { id = ?COB_ID(?NODE_GUARD,SNodeId),
-				  len = 1, data = <<0>> });
-       true ->
-	    do_nothing
-    end,
-	   
-    Ctx#co_ctx { state = ?PreOperational }.
+    Ctx1 = activate_node_guard(Ctx), 
+    Ctx1#co_ctx { state = ?PreOperational }.
+
+activate_node_guard(Ctx=#co_ctx {nmt_master = true, name = _Name}) ->
+    ?dbg(node, "~s: activate_node_guard: nmt master, node guarding "
+	 "handled by nmt master process.", [_Name]),
+    activate_nmt(Ctx),
+    Ctx;
+activate_node_guard(Ctx=#co_ctx {dict = Dict, name = _Name}) ->
+    case co_dict:value(Dict, ?IX_GUARD_TIME) of
+	{ok, NodeGuardTime} ->
+	    case co_dict:value(Dict, ?IX_LIFE_TIME_FACTOR) of
+		{ok, LifeTimeFactor} ->
+		    case NodeGuardTime * LifeTimeFactor of
+			0 -> 
+			    ?dbg(node, "~s: activate_node_guard: no node guarding.", 
+				 [_Name]),
+			    Ctx; %% No node guarding
+			NodeLifeTime -> 
+			    {ok, TRef} = 
+				timer:send_after(NodeLifeTime, node_guard_timeout),
+			    ?dbg(node, "~s: activate_node_guard time ~p", 
+				 [_Name,NodeLifeTime]),
+			    Ctx#co_ctx {node_guard_timer = TRef, 
+					node_life_time = NodeLifeTime}
+		    end;
+		_NotFound2 ->
+		    ?dbg(node, "~s: activate_node_guard: no life_time_factor", 
+			 [_Name]),
+		    Ctx
+	    end;
+	_NotFound1 ->
+	    ?dbg(node, "~s: activate_node_guard: no node_guard_time", [_Name]),
+	    Ctx
+    end.
+			    
+		    
 
 
 %%--------------------------------------------------------------------
@@ -813,6 +837,12 @@ handle_info({timeout,Ref,time_stamp}, Ctx)
     Ctx1 = Ctx#co_ctx { time_stamp_tmr = start_timer(Ctx#co_ctx.time_stamp_time, time_stamp) },
     {noreply, Ctx1};
 
+handle_info(node_guard_timeout, Ctx=#co_ctx {name=_Name}) ->
+    ?dbg(node, "~s: handle_info: node_guard timeout received", [_Name]),
+    error_logger:error_msg("Node guard timeout, check NMT master.\n"),
+    %% Start again ??
+    {noreply, Ctx};
+
 handle_info({rc_reset, Pid}, Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
     ?dbg(node, "~s: handle_info: rc_reset for process ~p received",  [_Name, Pid]),
     case lists:keysearch(Pid, #tpdo.pid, TList) of
@@ -1273,16 +1303,27 @@ handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId, name=_Name})
 
 
 handle_node_guard(Frame=#can_frame {id = Id}, 
-		  Ctx=#co_ctx {state = State, toggle = Toggle, 
-			       nmt_master = false, name=_Name}) 
+		  Ctx=#co_ctx {state = State, toggle = Toggle, nmt_master = false, 
+			       node_guard_timer = Timer, node_life_time = NLT,
+			       name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
     ?dbg(node, "~s: handle_node_guard: request ~w", [_Name,Frame]),
     Data = State bor Toggle,
-    can:send(#can_frame { id = Id,
-			  len = 1,
-			  data = <<Data>> }),
+    %% Reply
+    can:send_from(self(), #can_frame { id = Id, len = 1, data = <<Data>> }),
     NewToggle = Toggle bxor 16#80,
-    Ctx#co_ctx { toggle = NewToggle };
+    %% Reset NMT master supervision timer
+    if Timer =/= undefined ->
+	    timer:cancel(Timer);
+       true -> 
+	    do_nothing
+    end,
+    if NLT =/= 0 ->
+	    {ok, TRef} = timer:send_after(NLT, node_guard_timeout),
+	    Ctx#co_ctx { toggle = NewToggle, node_guard_timer = TRef};
+       true ->
+	    Ctx#co_ctx { toggle = NewToggle}
+    end;
 handle_node_guard(Frame, Ctx=#co_ctx {nmt_master = true, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
     ?dbg(node, "~s: handle_node_guard: request ~w", [_Name,Frame]),
@@ -1579,11 +1620,13 @@ handle_tpdo_process(T=#tpdo {pid = _Pid, offset = _Offset}, _Reason,
 
 
 
-activate_nmt(Ctx) ->
-    co_nmt:start_link([]),
+activate_nmt(Ctx=#co_ctx {serial = Serial, name = _Name}) ->
+    ?dbg(node, "~s: activate_nmt", [_Name]),
+    co_nmt:start_link([{serial, Serial}]),
     Ctx.
 
-deactivate_nmt(Ctx) ->
+deactivate_nmt(Ctx=#co_ctx {name = _Name}) ->
+    ?dbg(node, "~s: deactivate_nmt", [_Name]),
     co_nmt:stop(),
     Ctx.
 
