@@ -743,7 +743,7 @@ do_notify(Nid, Func,Index,SubInd, Value, Mgr) ->
 	    try co_codec:encode(Tv, {Type, 32}) of
 		Data ->
 		    ?dbg(mgr,"do_notify: ~w ~w ~.16.0#:~w ~w\n", [Nid,Func,Ti,Tsi,Data]),
-		    co_api:notify({xnodeid,Nid}, Func,Ti,Tsi,Data)
+		    co_api:notify_from({xnodeid,Nid}, Func,Ti,Tsi,Data)
 	    catch error:_Reason ->
 		    ?dbg(mgr,"do_notify: encode failed ~w ~w ~.16.0#~w ~w, reason ~p\n", 
 			      [Nid, Func, Index, SubInd, Value, _Reason])

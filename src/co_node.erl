@@ -28,6 +28,7 @@
 
 %% Application interface
 -export([notify/4]). %% To send MPOs
+-export([notify_from/5]). %% To send MPOs
 -export([subscribers/2]).
 -export([reserver_with_module/2]).
 -export([tpdo_mapping/2, 
@@ -44,7 +45,7 @@
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Send notification (from CobId). <br/>
+%% Send notification. <br/>
 %% Executing in calling process context.<br/>
 %%
 %% @end
@@ -60,6 +61,26 @@ notify(CobId,Index,Subind,Data)
     ?dbg(node, "notify: Sending frame ~p from CobId = ~.16#, CanId = ~.16#)",
 	 [Frame, CobId, FrameID]),
     can:send(Frame).
+
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Send notification but not to (own) Node. <br/>
+%% Executing in calling process context.<br/>
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec notify_from(NodePid::pid(),CobId::integer(), Ix::integer(), Si::integer(), Data::binary()) -> 
+		    ok | {error, Error::atom()}.
+
+notify_from(NodePid, CobId,Index,Subind,Data)
+  when ?is_index(Index), ?is_subind(Subind), is_binary(Data) ->
+    FrameID = ?COBID_TO_CANID(CobId),
+    Frame = #can_frame { id=FrameID, len=0, 
+			 data=(<<16#80,Index:16/little,Subind:8,Data:4/binary>>) },
+    ?dbg(node, "notify: Sending frame ~p from CobId = ~.16#, CanId = ~.16#)",
+	 [Frame, CobId, FrameID]),
+    can:send_from(NodePid, Frame).
 
 
 %%--------------------------------------------------------------------
@@ -185,8 +206,6 @@ init({Serial, NodeName, Opts} = Args) ->
       vendor = proplists:get_value(vendor,Opts,0),
       serial = Serial,
       state  = ?Initialisation,
-      node_map = ets:new(co_node_map, [{keypos,1}]),
-      nmt_table = ets:new(co_nmt_table, [{keypos,#nmt_entry.id}]),
       sub_table = SubTable,
       res_table = ResTable,
       xnot_table = XNotTable,
@@ -552,23 +571,6 @@ handle_call({dump, Qualifier}, _From, Ctx) ->
     io:format(" SERIAL: ~10.16.0#\n", [Ctx#co_ctx.serial]),
     io:format("  STATE: ~s\n", [co_format:state(Ctx#co_ctx.state)]),
 
-    io:format("---- NMT TABLE ----\n"),
-    ets:foldl(
-      fun(E,_) ->
-	      io:format("  ID: ~w\n", 
-			[E#nmt_entry.id]),
-	      io:format("    VENDOR: ~10.16.0#\n", 
-			[E#nmt_entry.vendor]),
-	      io:format("    SERIAL: ~10.16.0#\n", 
-			[E#nmt_entry.serial]),
-	      io:format("     STATE: ~s\n", 
-			[co_format:state(E#nmt_entry.state)])
-      end, ok, Ctx#co_ctx.nmt_table),
-    io:format("---- NODE MAP TABLE ----\n"),
-    ets:foldl(
-      fun({Sn,NodeId},_) ->
-	      io:format("~10.16.0# => ~w\n", [Sn, NodeId])
-      end, ok, Ctx#co_ctx.node_map),
     io:format("---- COB TABLE ----\n"),
     ets:foldl(
       fun({CobId, X},_) ->
@@ -1216,7 +1218,7 @@ handle_can(Frame, Ctx=#co_ctx {state = State, name = _Name}) ->
 	{node_guard, NodeId} -> handle_node_guard(Frame, NodeId, Ctx);
 	{rpdo,Offset} -> handle_rpdo(Frame, Offset, CobId, Ctx);
 	{sdo_tx,Rx} ->
-	    if State=:= ?Operational; 
+	    if State =:= ?Operational; 
 	       State =:= ?PreOperational ->	    
 		    handle_sdo_tx(Frame, CobId, Rx, Ctx);
 	       true ->
@@ -1271,7 +1273,8 @@ handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId, name=_Name})
 
 
 handle_node_guard(Frame=#can_frame {id = Id}, 
-		  Ctx=#co_ctx {state = State, toggle = Toggle, name=_Name}) 
+		  Ctx=#co_ctx {state = State, toggle = Toggle, 
+			       nmt_master = false, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
     ?dbg(node, "~s: handle_node_guard: request ~w", [_Name,Frame]),
     Data = State bor Toggle,
@@ -1279,7 +1282,14 @@ handle_node_guard(Frame=#can_frame {id = Id},
 			  len = 1,
 			  data = <<Data>> }),
     NewToggle = Toggle bxor 16#80,
-    Ctx#co_ctx { toggle = NewToggle }.
+    Ctx#co_ctx { toggle = NewToggle };
+handle_node_guard(Frame, Ctx=#co_ctx {nmt_master = true, name=_Name}) 
+  when ?is_can_frame_rtr(Frame) ->
+    ?dbg(node, "~s: handle_node_guard: request ~w", [_Name,Frame]),
+    %% Node is nmt master and should NOT receive node_guard request
+    error_logger:error_msg("Illegal NMT confiuration, receiving node_guard "
+			   " request even though being NMT master\n"),
+    Ctx.
 
 handle_node_guard(_Frame, _NodeId, Ctx=#co_ctx {nmt_master = false, name = _Name}) ->
     ?dbg(node, "~s: handle_node_guard: reply ~w from ~p", [_Name, _Frame, _NodeId]),
@@ -1288,20 +1298,8 @@ handle_node_guard(_Frame, _NodeId, Ctx=#co_ctx {nmt_master = false, name = _Name
 handle_node_guard(Frame, NodeId, Ctx=#co_ctx {nmt_master = true, name = _Name}) 
   when Frame#can_frame.len >= 1 ->
     ?dbg(node, "~s: handle_node_guard: reply ~w", [_Name,Frame]),
-    case Frame#can_frame.data of
-	<<Toggle:1, State:7, _/binary>> ->
-	    case node_guard_toggle(NodeId, Toggle, Ctx) of
-		ok ->
-		    update_nmt_entry(NodeId, [{state,State}], Ctx);
-		nok ->
-		    %% Send error ??
-		    error_logger:error_msg("Node ~p answered node gouard with "
-					   "wrong toggle ~p", [NodeId, Toggle]),
-		    Ctx
-	    end;
-	_ ->
-	    Ctx
-    end.
+    gen_server:cast(co_nmt_master, {node_guard_reply, NodeId, Frame}),
+    Ctx.
 
 %%
 %% LSS
@@ -1346,37 +1344,54 @@ handle_emcy(_Frame, Ctx) ->
 %%
 %% Recive PDO - unpack into the dictionary
 %%
-handle_rpdo(Frame, Offset, _CobId, Ctx) ->
+handle_rpdo(Frame, Offset, _CobId, 
+	    Ctx=#co_ctx {state = ?Operational, name = _Name}) ->
     ?dbg(node, "~s: handle_rpdo: offset = ~p, frame = ~w", 
-	 [Ctx#co_ctx.name, Offset, Frame]),
-    rpdo_unpack(?IX_RPDO_MAPPING_FIRST + Offset, Frame#can_frame.data, Ctx).
+	 [_Name, Offset, Frame]),
+    rpdo_unpack(?IX_RPDO_MAPPING_FIRST + Offset, Frame#can_frame.data, Ctx);
+handle_rpdo(Frame, Offset, _CobId, Ctx=#co_ctx {state = State, name = _Name}) ->
+    ?dbg(node, "~s: handle_rpdo: offset = ~p, frame = ~w, state ~p", 
+	 [_Name, Offset, Frame, State]),
+    error_logger:warning_msg("Received pdo in state ~p, ignoring\n", [State]),
+    Ctx.
 
 %% CLIENT side:
 %% SDO tx - here we receive can_node response
 %% FIXME: conditional compile this
 %%
-handle_sdo_tx(Frame, Tx, Rx, Ctx) ->
+handle_sdo_tx(Frame, Tx, Rx, Ctx=#co_ctx {state = State, name = _Name}) 
+  when State == ?Operational;
+       State == ?PreOperational ->
     ?dbg(node, "~s: handle_sdo_tx: src=~p, ~s",
 	      [Ctx#co_ctx.name, Tx,
 	       co_format:format_sdo(co_sdo:decode_tx(Frame#can_frame.data))]),
     ID = {Tx,Rx},
-    ?dbg(node, "~s: handle_sdo_tx: session id=~p", [Ctx#co_ctx.name, ID]),
+    ?dbg(node, "~s: handle_sdo_tx: session id=~p", [_Name, ID]),
     Sessions = Ctx#co_ctx.sdo_list,
     case lists:keysearch(ID,#sdo.id,Sessions) of
 	{value, S} ->
 	    gen_fsm:send_event(S#sdo.pid, Frame),
 	    Ctx;
 	false ->
-	    ?dbg(node, "~s: handle_sdo_tx: session not found", [Ctx#co_ctx.name]),
+	    ?dbg(node, "~s: handle_sdo_tx: session not found", [_Name]),
 	    %% no such session active
 	    Ctx
-    end.
+    end;
+handle_sdo_tx(Frame, Tx, _Rx, Ctx=#co_ctx {state = State, name = _Name}) ->
+    ?dbg(node, "~s: handle_sdo_tx: src=~p, ~s",
+	      [Ctx#co_ctx.name, Tx,
+	       co_format:format_sdo(co_sdo:decode_tx(Frame#can_frame.data))]),
+    error_logger:warning_msg("Received sdo in state ~p, ignoring\n", [State]),
+    Ctx.
+
 
 %% SERVER side
 %% SDO rx - here we receive client requests
 %% FIXME: conditional compile this
 %%
-handle_sdo_rx(Frame, Rx, Tx, Ctx=#co_ctx {name = _Name}) ->
+handle_sdo_rx(Frame, Rx, Tx, Ctx=#co_ctx {state = State, name = _Name})
+  when State == ?Operational;
+       State == ?PreOperational ->
     ?dbg(node, "~s: handle_sdo_rx: ~s", 
 	      [_Name,co_format:format_sdo(co_sdo:decode_rx(Frame#can_frame.data))]),
     ID = {Rx,Tx},
@@ -1404,9 +1419,14 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx=#co_ctx {name = _Name}) ->
 		    S = #sdo { id=ID, pid=Pid, mon=Mon },
 		    Ctx#co_ctx { sdo_list = [S|Sessions]}
 	    end
-    end.
+    end;
+handle_sdo_rx(Frame, _Rx, _Tx, Ctx=#co_ctx {state = State, name = _Name}) ->
+    ?dbg(node, "~s: handle_sdo_rx: ~s", 
+	      [_Name,co_format:format_sdo(co_sdo:decode_rx(Frame#can_frame.data))]),
+    error_logger:warning_msg("Received sdo in state ~p, ignoring\n", [State]),
+    Ctx.
 
-handle_mpdo(Frame, CobId, Ctx=#co_ctx {name = _Name}) ->
+handle_mpdo(Frame, CobId, Ctx=#co_ctx {state = ?Operational, name = _Name}) ->
     case Frame#can_frame.data of
 	%% Test if MPDO
 	<<F:1, Addr:7, Ix:16/little, Si:8, Data:4/binary>> ->
@@ -1421,12 +1441,12 @@ handle_mpdo(Frame, CobId, Ctx=#co_ctx {name = _Name}) ->
 		    extended_notify(Ctx, Ix, Frame);
 		{1, _OtherNid} ->
 		    %% DAM-MPDO, destination is some other node
-		    ?dbg(node, "~s: handle_can: DAM-MPDO: destination is "
+		    ?dbg(node, "~s: handle_mpdo: DAM-MPDO: destination is "
 			 "other node = ~.16.0#", [_Name, _OtherNid]),
 		    Ctx;
 		{0, 0} ->
 		    %% Reserved
-		    ?dbg(node, "~s: handle_can: SAM-MPDO: Addr = 0, reserved "
+		    ?dbg(node, "~s: handle_mpdo: SAM-MPDO: Addr = 0, reserved "
 			 "Frame = ~w", [_Name, Frame]),
 		    Ctx;
 		{0, SourceNid} ->
@@ -1436,7 +1456,10 @@ handle_mpdo(Frame, CobId, Ctx=#co_ctx {name = _Name}) ->
 	    ?dbg(node, "~s: handle_can: frame not handled: Frame = ~w", 
 		 [_Name, Frame]),
 	    Ctx
-    end.
+    end;
+handle_mpdo(_Frame, _CobId, Ctx=#co_ctx {state = State, name = _Name}) ->
+    error_logger:warning_msg("Received pdo in state ~p, ignoring\n", [State]),
+    Ctx.
 
 handle_sam_mpdo(Ctx=#co_ctx {mpdo_dispatch = MpdoDispatch, name = _Name}, 
 		SourceNid, {SourceIx, SourceSi}, Data ) ->
@@ -1557,56 +1580,13 @@ handle_tpdo_process(T=#tpdo {pid = _Pid, offset = _Offset}, _Reason,
 
 
 activate_nmt(Ctx) ->
+    co_nmt:start_link([]),
     Ctx.
+
 deactivate_nmt(Ctx) ->
+    co_nmt:stop(),
     Ctx.
 
-%%
-%% NMT requests (call from within node process)
-%%
-set_node_state(Ctx, NodeId, State) ->
-    update_nmt_entry(NodeId, [{state,State}], Ctx).
-
-do_node_guard(Ctx, 0) ->
-    foreach(
-      fun(I) ->
-	      update_nmt_entry(I, [{state,?UnknownState}], Ctx)
-      end,
-      lists:seq(0, 127)),
-    send_nmt_node_guard(0),
-    Ctx;
-do_node_guard(Ctx, I) when I > 0, I =< 127 ->
-    update_nmt_entry(I, [{state,?UnknownState}], Ctx),
-    send_nmt_node_guard(I),
-    Ctx.
-
-
-send_nmt_state_change(NodeId, Cs) ->
-    can:send(#can_frame { id = ?NMT_ID,
-			  len = 2,
-			  data = <<Cs:8, NodeId:8>>}).
-
-send_nmt_node_guard(NodeId) ->
-    ID = ?COB_ID(?NODE_GUARD,NodeId) bor ?CAN_RTR_FLAG,
-    can:send(#can_frame { id = ID,
-			  len = 0, data = <<>>}).
-
-send_x_node_guard(NodeId, Cmd, Ctx) ->
-    Crc = co_crc:checksum(<<(Ctx#co_ctx.serial):32/little>>),
-    Data = <<Cmd:8, (Ctx#co_ctx.serial):32/little, Crc:16/little,
-	     (Ctx#co_ctx.state):8>>,
-    can:send(#can_frame { id = ?COB_ID(?NODE_GUARD,NodeId),
-			  len = 8, data = Data}),
-    Ctx.
-
-%% lookup / create nmt entry
-lookup_nmt_entry(NodeId, Ctx) ->
-    case ets:lookup(Ctx#co_ctx.nmt_table, NodeId) of
-	[] ->
-	    #nmt_entry { id = NodeId };
-	[E] ->
-	    E
-    end.
 
 broadcast_state(State, #co_ctx {state = State, name = _Name}) ->
     %% No change
@@ -2220,58 +2200,6 @@ lookup_cobid(CobId, Ctx) ->
 	    end
     end.
 
-%%
-%% Update the Node map table (Serial => NodeId)
-%%  Check if nmt entry for node id has a consistent Serial
-%%  if not then remove bad mapping
-%%
-update_node_map(NodeId, Serial, Ctx) ->
-    case ets:lookup(Ctx#co_ctx.nmt_table, NodeId) of
-	[E] when E#nmt_entry.serial =/= Serial ->
-	    %% remove old mapping
-	    ets:delete(Ctx#co_ctx.node_map, E#nmt_entry.serial),
-	    %% update new mapping
-	    update_nmt_entry(NodeId, [{serial,Serial}], Ctx);
-	_ ->
-	    ok
-    end,
-    ets:insert(Ctx#co_ctx.node_map, {Serial,NodeId}),
-    Ctx.
-    
-%%    
-%% Update the NMT entry (NodeId => #nmt_entry { serial, vendor ... })
-%%
-update_nmt_entry(NodeId, Opts, Ctx) ->
-    E = lookup_nmt_entry(NodeId, Ctx),
-    E1 = update_nmt_entry(Opts, E),
-    ets:insert(Ctx#co_ctx.nmt_table, E1),
-    Ctx.
-
-
-update_nmt_entry([{Key,Value}|Kvs],E) when is_record(E, nmt_entry) ->
-    E1 = update_nmt_value(Key, Value,E),
-    update_nmt_entry(Kvs,E1);
-update_nmt_entry([], E) ->
-    E#nmt_entry { time=now() }.
-
-update_nmt_value(Key,Value,E) when is_record(E, nmt_entry) ->
-    case Key of
-	id       -> E#nmt_entry { time=Value};
-	vendor   -> E#nmt_entry { vendor=Value};
-	product  -> E#nmt_entry { product=Value};
-	revision -> E#nmt_entry { revision=Value};
-	serial   -> E#nmt_entry { serial=Value};
-	state    -> E#nmt_entry { state=Value}
-    end.
-
-node_guard_toggle(NodeId, Toggle, Ctx) ->   
-    E = lookup_nmt_entry(NodeId, Ctx),
-    if E#nmt_entry.toggle == Toggle ->
-	    ets:insert(Ctx#co_ctx.nmt_table, E#nmt_entry {toggle = Toggle bxor 16#80}),
-	    ok;
-       true ->
-	    nok
-    end.
 %%
 %% 
 %%

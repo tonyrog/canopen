@@ -36,6 +36,7 @@
 -export([all_reservers/1, reserver/2]).
 -export([object_event/2, pdo_event/2, dam_mpdo_event/3]).
 -export([notify/3, notify/4, notify/5]). %% To send MPOs
+-export([notify_from/5]). %% To send MPOs
 -export([add_object/4, add_entry/3]).
 -export([delete_object/3, delete_entry/3]).
 -export([set_data/4, set_value/4]).
@@ -58,6 +59,14 @@
 -export([state/2]).
 
 -define(CO_NODE, co_node).
+
+-type node_identity()::
+	{name, NodeName::atom()} |
+	{nodeid, ShortNodeId::integer()} |
+	{xnodeid, ExtNodeId::integer()} |
+	integer() | %% Serial
+	pid().
+
 
 %%====================================================================
 %% API
@@ -256,7 +265,7 @@ verify_option(Option, _NewValue) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec stop(Identity::term()) -> ok | {error, Reason::atom()}.
+-spec stop(Identity::node_identity()) -> ok | {error, Reason::atom()}.
 				  
 stop(Identity) ->
     gen_server:call(identity_to_pid(Identity), stop).
@@ -267,7 +276,7 @@ stop(Identity) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec alive(Identity::term()) -> Reply::boolean().
+-spec alive(Identity::node_identity()) -> Reply::boolean().
 				  
 alive(Identity) ->
     is_process_alive(identity_to_pid(Identity)).
@@ -278,7 +287,7 @@ alive(Identity) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get_option(Identity::term(), Option::atom()) -> 
+-spec get_option(Identity::node_identity(), Option::atom()) -> 
 			{Option::atom(), Value::term()} | 
 			{error, Reason::string()}.
 
@@ -291,7 +300,7 @@ get_option(Identity, Option) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec set_option(Identity::term(), Option::atom(), NewValue::term()) -> 
+-spec set_option(Identity::node_identity(), Option::atom(), NewValue::term()) -> 
 			ok | {error, Reason::string()}.
 
 set_option(Identity, Option, NewValue) ->
@@ -311,7 +320,7 @@ set_option(Identity, Option, NewValue) ->
 %%
 %% @end
 %%-------------------------------------------------------------------
--spec load_dict(Identity::term()) -> 
+-spec load_dict(Identity::node_identity()) -> 
 		       ok | {error, Error::atom()}.
 
 load_dict(Identity) ->
@@ -324,7 +333,7 @@ load_dict(Identity) ->
 %%
 %% @end
 %%-------------------------------------------------------------------
--spec load_dict(Identity::term(), File::string()) -> 
+-spec load_dict(Identity::node_identity(), File::string()) -> 
 		       ok | {error, Error::atom()}.
 
 load_dict(Identity, File) ->
@@ -337,7 +346,7 @@ load_dict(Identity, File) ->
 %%
 %% @end
 %%-------------------------------------------------------------------
--spec save_dict(Identity::term()) -> 
+-spec save_dict(Identity::node_identity()) -> 
 		       ok | {error, Error::atom()}.
 
 save_dict(Identity) ->
@@ -350,7 +359,7 @@ save_dict(Identity) ->
 %%
 %% @end
 %%-------------------------------------------------------------------
--spec save_dict(Identity::term(), File::string()) -> 
+-spec save_dict(Identity::node_identity(), File::string()) -> 
 		       ok | {error, Error::atom()}.
 
 save_dict(Identity, File) ->
@@ -364,7 +373,7 @@ save_dict(Identity, File) ->
 %% can store its object in it if it wants, using the co_dict API.
 %% @end
 %%--------------------------------------------------------------------
--spec attach(Identity::term()) -> 
+-spec attach(Identity::node_identity()) -> 
 		    {ok, DictRef::term()} | 
 		    {error, Error::atom()}.
 
@@ -377,7 +386,7 @@ attach(Identity) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec detach(Identity::term()) -> ok | {error, Error::atom()}.
+-spec detach(Identity::node_identity()) -> ok | {error, Error::atom()}.
 
 detach(Identity) ->
     gen_server:call(identity_to_pid(Identity), {detach, self()}).
@@ -389,8 +398,8 @@ detach(Identity) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec subscribe(Identity::term(), Index::integer() | 
-					  list(Index::integer())) -> 
+-spec subscribe(Identity::node_identity(), 
+		Index::integer() |  list(Index::integer())) -> 
 		       ok | {error, Error::atom()}.
 
 subscribe(Identity, Ix) ->
@@ -403,8 +412,8 @@ subscribe(Identity, Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec unsubscribe(Identity::term(), Index::integer() | 
-					    list(Index::integer())) -> 
+-spec unsubscribe(Identity::node_identity(), 
+		  Index::integer() | list(Index::integer())) -> 
 		       ok | {error, Error::atom()}.
 unsubscribe(Identity, Ix) ->
     gen_server:call(identity_to_pid(Identity), {unsubscribe, Ix, self()}).
@@ -416,7 +425,7 @@ unsubscribe(Identity, Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec extended_notify_subscribe(Identity::term(), 
+-spec extended_notify_subscribe(Identity::node_identity(), 
 				Index::integer() | 
 				       list(Index::integer())) -> 
 		       ok | {error, Error::atom()}.
@@ -431,8 +440,8 @@ extended_notify_subscribe(Identity, Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec extended_notify_unsubscribe(Identity::term(), Index::integer() | 
-					    list(Index::integer())) -> 
+-spec extended_notify_unsubscribe(Identity::node_identity(), 
+				  Index::integer() | list(Index::integer())) -> 
 		       ok | {error, Error::atom()}.
 extended_notify_unsubscribe(Identity, Ix) ->
     gen_server:call(identity_to_pid(Identity), {xnot_unsubscribe, Ix, self()}).
@@ -444,7 +453,7 @@ extended_notify_unsubscribe(Identity, Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec my_subscriptions(Identity::term(), Pid::pid()) -> 
+-spec my_subscriptions(Identity::node_identity(), Pid::pid()) -> 
 			      list(Index::integer()) | 
 			      {error, Error::atom()}.
 my_subscriptions(Identity, Pid) ->
@@ -458,7 +467,7 @@ my_subscriptions(Identity, Pid) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec my_subscriptions(Identity::term()) -> 
+-spec my_subscriptions(Identity::node_identity()) -> 
 			      list(Index::integer()) | 
 			      {error, Error::atom()}.
 my_subscriptions(Identity) ->
@@ -472,7 +481,7 @@ my_subscriptions(Identity) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec all_subscribers(Identity::term()) -> 
+-spec all_subscribers(Identity::node_identity()) -> 
 			     list(Pid::pid()) | 
 			     {error, Error::atom()}.
 all_subscribers(Identity) ->
@@ -484,7 +493,7 @@ all_subscribers(Identity) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec all_subscribers(Identity::term(), Ix::integer()) ->
+-spec all_subscribers(Identity::node_identity(), Ix::integer()) ->
 			     list(Pid::pid()) | 
 			     {error, Error::atom()}.
 
@@ -499,7 +508,7 @@ all_subscribers(Identity, Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec reserve(Identity::term(), Index::integer(), Module::atom()) -> 
+-spec reserve(Identity::node_identity(), Index::integer(), Module::atom()) -> 
 		     ok | {error, Error::atom()}.
 
 reserve(Identity, Ix, Module) ->
@@ -512,7 +521,7 @@ reserve(Identity, Ix, Module) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec unreserve(Identity::term(), Index::integer()) -> 
+-spec unreserve(Identity::node_identity(), Index::integer()) -> 
 		       ok | {error, Error::atom()}.
 unreserve(Identity, Ix) ->
     gen_server:call(identity_to_pid(Identity), {unreserve, Ix, self()}).
@@ -523,7 +532,7 @@ unreserve(Identity, Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec my_reservations(Identity::term(), Pid::pid()) -> 
+-spec my_reservations(Identity::node_identity(), Pid::pid()) -> 
 			     list(Index::integer()) | 
 			     {error, Error::atom()}.
 
@@ -536,7 +545,7 @@ my_reservations(Identity, Pid) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec my_reservations(Identity::term()) ->
+-spec my_reservations(Identity::node_identity()) ->
 			     list(Index::integer()) | 
 			     {error, Error::atom()}.
 
@@ -549,7 +558,7 @@ my_reservations(Identity) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec all_reservers(Identity::term()) ->
+-spec all_reservers(Identity::node_identity()) ->
 			   list(Pid::pid()) | {error, Error::atom()}.
 
 all_reservers(Identity) ->
@@ -561,7 +570,7 @@ all_reservers(Identity) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec reserver(Identity::term(), Ix::integer()) ->
+-spec reserver(Identity::node_identity(), Ix::integer()) ->
 		      list(Pid::pid()) | {error, Error::atom()}.
 
 reserver(Identity, Ix) ->
@@ -574,7 +583,7 @@ reserver(Identity, Ix) ->
 %% co_sdo_cli_fsm.erl.
 %% @end
 %%--------------------------------------------------------------------
--spec object_event(Identity::term(), Index::{Ix::integer(), Si::integer()}) ->
+-spec object_event(Identity::node_identity(), Index::{Ix::integer(), Si::integer()}) ->
 			  ok | {error, Error::atom()}.
 
 object_event(CoNodePid, Index) 
@@ -628,7 +637,10 @@ dam_mpdo_event(_Identity, _CobId, _DestinationNode) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec add_object(Identity::term(), Dict::term(), Object::#dict_object{}, list(Entry::#dict_entry{})) ->
+-spec add_object(Identity::node_identity(), 
+		 Dict::term(), 
+		 Object::#dict_object{}, 
+		 list(Entry::#dict_entry{})) ->
 			ok | {error, badarg}.
 
 add_object(Identity, Dict, Object, Es) when is_record(Object, dict_object) ->
@@ -642,7 +654,9 @@ add_object(Identity, Dict, Object, Es) when is_record(Object, dict_object) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec add_entry(Identity::term(), Dict::term(), Entry::#dict_entry{}) ->
+-spec add_entry(Identity::node_identity(), 
+		Dict::term(), 
+		Entry::#dict_entry{}) ->
 		       ok | {error, badarg}.
 
 add_entry(Identity, Dict, Entry) when is_record(Entry, dict_entry) ->
@@ -656,7 +670,7 @@ add_entry(Identity, Dict, Entry) when is_record(Entry, dict_entry) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec delete_object(Identity::term(), Dict::term(), Index::integer()) ->
+-spec delete_object(Identity::node_identity(), Dict::term(), Index::integer()) ->
 			ok | {error, badarg}.
 
 delete_object(Identity, Dict, Ix) when ?is_index(Ix) ->
@@ -670,7 +684,7 @@ delete_object(Identity, Dict, Ix) when ?is_index(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec delete_entry(Identity::term(), Dict::term(), 
+-spec delete_entry(Identity::node_identity(), Dict::term(), 
 		   Index::integer() | {integer(), integer()}) ->
 		       ok | {error, badarg}.
 
@@ -684,7 +698,7 @@ delete_entry(Identity, Dict, Ix) when ?is_index(Ix) ->
 %% Sets {Ix, Si} to Value.
 %% @end
 %%--------------------------------------------------------------------
--spec set_value(Identity::term(), Dict::term(), 
+-spec set_value(Identity::node_identity(), Dict::term(), 
 		Index::{Ix::integer(), Si::integer()} |integer(), 
 		Value::term()) -> 
 		       ok | {error, Error::atom()}.
@@ -701,7 +715,7 @@ set_value(Identity, Dict, Ix, Value) when is_integer(Ix) ->
 %% Sets {Ix, Si} to Data.
 %% @end
 %%--------------------------------------------------------------------
--spec set_data(Identity::term(), Dict::term(), 
+-spec set_data(Identity::node_identity(), Dict::term(), 
 	       Index::{Ix::integer(), Si::integer()} |integer(), 
 	       Data::binary()) -> 
 		      ok | {error, Error::atom()}.
@@ -719,7 +733,7 @@ set_data(Identity, Dict, Ix, Data) when is_integer(Ix), is_binary(Data) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec value(Identity::term(), Dict::term(), 
+-spec value(Identity::node_identity(), Dict::term(), 
 	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
 		   Value::term() | {error, Error::atom()}.
 
@@ -735,7 +749,7 @@ value(Identity, Dict, Ix) when is_integer(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec data(Identity::term(), Dict::term(), 
+-spec data(Identity::node_identity(), Dict::term(), 
 	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
 		   Data::term() | {error, Error::atom()}.
 
@@ -749,7 +763,7 @@ data(Identity, Dict, Ix) when is_integer(Ix) ->
 %% Set error condition and send emergency frame.
 %% @end
 %%--------------------------------------------------------------------
--spec set_error(Identity::term(),
+-spec set_error(Identity::node_identity(),
 		Error::integer(),
 		Code::integer()) -> ok | {error, term()}.
 
@@ -768,7 +782,9 @@ set_error(Identity, Error, Code) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec add_object(Identity::term(), Object::#dict_object{}, list(Entry::#dict_entry{})) -> 
+-spec add_object(Identity::node_identity(), 
+		 Object::#dict_object{}, 
+		 list(Entry::#dict_entry{})) -> 
 		       ok | {error, Error::atom()}.
 
 add_object(Identity, Object, Es) when is_record(Object, dict_object) ->
@@ -780,7 +796,7 @@ add_object(Identity, Object, Es) when is_record(Object, dict_object) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec add_entry(Identity::term(), Entry::#dict_entry{}) -> 
+-spec add_entry(Identity::node_identity(), Entry::#dict_entry{}) -> 
 		       ok | {error, Error::atom()}.
 
 add_entry(Identity, Ent) ->
@@ -792,7 +808,8 @@ add_entry(Identity, Ent) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get_entry(Identity::term(), {Index::integer(), SubIndex::integer()}) -> 
+-spec get_entry(Identity::node_identity(), 
+		{Index::integer(), SubIndex::integer()}) -> 
 		       ok | {error, Error::atom()}.
 
 get_entry(Identity, Index) ->
@@ -804,7 +821,7 @@ get_entry(Identity, Index) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get_object(Identity::term(), Index::integer()) -> 
+-spec get_object(Identity::node_identity(), Index::integer()) -> 
 		       ok | {error, Error::atom()}.
 
 get_object(Identity, Ix) ->
@@ -815,7 +832,7 @@ get_object(Identity, Ix) ->
 %% Sets {Ix, Si} to Value.
 %% @end
 %%--------------------------------------------------------------------
--spec set_value(Identity::term(), 
+-spec set_value(Identity::node_identity(), 
 		Index::{Ix::integer(), Si::integer()} |integer(), 
 		Value::term()) -> 
 		       ok | {error, Error::atom()}.
@@ -832,8 +849,8 @@ set_value(Identity, Ix, Value) when is_integer(Ix) ->
 %% Sets {Ix, Si} to Data.
 %% @end
 %%--------------------------------------------------------------------
--spec set_data(Identity::term(), 
-	       Index::{Ix::integer(), Si::integer()} |integer(), 
+-spec set_data(Identity::node_identity(), 
+	       Index::{Ix::integer(), Si::integer()} | integer(), 
 	       Data::binary()) -> 
 		      ok | {error, Error::atom()}.
 
@@ -851,7 +868,7 @@ set_data(Identity, Ix, Data) when is_integer(Ix), is_binary(Data) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec value(Identity::term(), 
+-spec value(Identity::node_identity(), 
 	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
 		   Value::term() | {error, Error::atom()}.
 
@@ -867,7 +884,7 @@ value(Identity, Ix) when is_integer(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec data(Identity::term(), 
+-spec data(Identity::node_identity(), 
 	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
 		   Data::term() | {error, Error::atom()}.
 
@@ -882,7 +899,8 @@ data(Identity, Ix) when is_integer(Ix) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec store(Identity::term() | atom(), Cobid::integer(), 
+-spec store(Identity::node_identity(),
+	    Cobid::integer(), 
 	    Index::integer(), SubInd::integer(), 
 	    TransferMode:: block | segment,
 	    Term::{data, binary()} | {app, Pid::pid(), Module::atom()}) ->
@@ -893,8 +911,7 @@ store(Identity, COBID, IX, SI, TransferMode, Term)
     ?dbg(node, "store: Identity = ~p, CobId = ~.16#, Ix = ~4.16.0B, Si = ~p, " ++
 	     "Mode = ~p, Term = ~p", 
 	 [Identity, COBID, IX, SI, TransferMode, Term]),
-    Pid = identity_to_pid(Identity),
-    gen_server:call(Pid, {store,TransferMode,COBID,IX,SI,Term}).
+    gen_server:call(identity_to_pid(Identity), {store,TransferMode,COBID,IX,SI,Term}).
 
 
 %%--------------------------------------------------------------------
@@ -903,7 +920,8 @@ store(Identity, COBID, IX, SI, TransferMode, Term)
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec fetch(Identity::term() | atom(), Cobid::integer(), 
+-spec fetch(Identity::node_identity(), 
+	    Cobid::integer(), 
 	    Index::integer(), SubInd::integer(),
  	    TransferMode:: block | segment,
 	    Term::data | {app, Pid::pid(), Module::atom()}) ->
@@ -921,7 +939,7 @@ fetch(Identity, COBID, IX, SI, TransferMode, Term)
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec dump(Identity::term()) -> ok | {error, Error::atom()}.
+-spec dump(Identity::node_identity()) -> ok | {error, Error::atom()}.
 
 dump(Identity) ->
     dump(Identity, all).
@@ -932,7 +950,7 @@ dump(Identity) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec dump(Identity::term(), Qualifier::all | no_dict) -> 
+-spec dump(Identity::node_identity(), Qualifier::all | no_dict) -> 
 		  ok | {error, Error::atom()}.
 
 dump(Identity, Qualifier) 
@@ -946,7 +964,7 @@ dump(Identity, Qualifier)
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec loop_data(Identity::term()) -> ok | {error, Error::atom()}.
+-spec loop_data(Identity::node_identity()) -> ok | {error, Error::atom()}.
 
 loop_data(Identity) ->
     gen_server:call(identity_to_pid(Identity), loop_data).
@@ -957,7 +975,8 @@ loop_data(Identity) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec state(Identity::term(), State::operational | preoperational | stopped) -> 
+-spec state(Identity::node_identity(), 
+	    State::operational | preoperational | stopped) -> 
 		   ok | {error, Error::atom()}.
 
 state(Identity, operational) ->
@@ -972,7 +991,7 @@ state(Identity, stopped) ->
 %% Cache {Ix, Si} Data or encoded Value truncated to 64 bits.
 %% @end
 %%--------------------------------------------------------------------
--spec tpdo_set(Identity::term(), 
+-spec tpdo_set(Identity::node_identity(), 
 	       Index::{Ix::integer(), Si::integer()} | integer(), 
 	       Data::binary() | {Value::term(), Type::term()},
 	       Mode:: append | overwrite) -> 
@@ -1003,7 +1022,7 @@ tpdo_set(Identity, Ix, Term, Mode)
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Send notification (from CobId). <br/>
+%% Send notification. <br/>
 %% SubInd is set to 0.<br/>
 %% Executing in calling process context.<br/>
 %%
@@ -1017,7 +1036,7 @@ notify(CobId,Index,Value) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Send notification (from CobId). <br/>
+%% Send notification. <br/>
 %% Executing in calling process context.<br/>
 %%
 %% @end
@@ -1030,7 +1049,7 @@ notify(CobId,Index,Subind,Data) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Send notification (from NodeId). <br/>
+%% Send notification. <br/>
 %% Executing in calling process context.<br/>
 %%
 %% @end
@@ -1043,6 +1062,36 @@ notify({xnodeid, XNid}, Func, Index, Subind, Data) ->
     notify(?XCOB_ID(co_lib:encode_func(Func), XNid),Index,Subind,Data);
 notify({nodeid, Nid}, Func, Index, Subind, Data) ->
     notify(?COB_ID(co_lib:encode_func(Func), Nid),Index,Subind,Data).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Send notification but not to (own) Node. <br/>
+%% Note that there are two possible ways of using this function:
+%% Either with NodeIdentity and CobId OR with NodeIdentity of a type
+%% holding the NodeId (short or extended) and the FunctionCode.<br/>
+%% Executing in calling process context.<br/>
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec notify_from(NodeIdentity::node_identity(),
+		  CobId::integer(),
+		  Ix::integer(), Si::integer(), 
+		  Data::binary()) -> 
+			 ok | {error, Error::atom()};
+		 (NodeIdentity::{xnodeid, XNid::integer()} | {nodeid, Nid::integer()},
+		  Func::atom(), 
+		  Ix::integer(), Si::integer(), 
+		  Data::binary()) -> 
+			 ok | {error, Error::atom()}.
+		  
+
+notify_from(Identity={xnodeid, XNid}, Func, Index, Subind, Data) ->
+    notify_from(Identity,?XCOB_ID(co_lib:encode_func(Func), XNid),Index,Subind,Data);
+notify_from(Identity={nodeid, Nid}, Func, Index, Subind, Data) ->
+    notify_from(Identity,?COB_ID(co_lib:encode_func(Func), Nid),Index,Subind,Data);
+notify_from(Identity,CobId,Index,Subind,Data) ->
+    co_node:notify_from(identity_to_pid(Identity),CobId,Index,Subind,Data).
+
 
 %%--------------------------------------------------------------------
 %% @doc
