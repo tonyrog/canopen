@@ -44,9 +44,23 @@
 -record(ctx, 
 	{
 	  serial,
+	  node_pid,
 	  nmt_table,  %% 
 	  node_map    %% ??
 	 }).
+
+-record(nmt_entry,
+	{
+	  id,                  %% node id (key)
+	  guard_time = 0,
+	  life_factor = 0,
+	  guard_timer,
+	  life_timer,
+	  com_status = ok,
+	  node_state=?PreOperational,
+	  toggle = 0           %% Expected next toggle
+	 }).
+
 
 %%%===================================================================
 %%% API
@@ -110,22 +124,22 @@ alive() ->
 %% Adds slave to supervise.
 %% @end
 %%--------------------------------------------------------------------
--spec add_slave(NodeId::integer()) ->
+-spec add_slave(SlaveId::integer()) ->
     ok | {error, Reason::term()}.
 
-add_slave(NodeId) when is_integer(NodeId) ->
-    gen_server:call(?NMT_MASTER, {add_slave, NodeId}).
+add_slave(SlaveId) when is_integer(SlaveId) ->
+    gen_server:call(?NMT_MASTER, {add_slave, SlaveId}).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Remove slave from supervision.
 %% @end
 %%--------------------------------------------------------------------
--spec remove_slave(NodeId::integer()) ->
+-spec remove_slave(SlaveId::integer()) ->
     ok | {error, Reason::term()}.
 
-remove_slave(NodeId) when is_integer(NodeId) ->
-    gen_server:call(?NMT_MASTER, {remove_slave, NodeId}).
+remove_slave(SlaveId) when is_integer(SlaveId) ->
+    gen_server:call(?NMT_MASTER, {remove_slave, SlaveId}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -187,13 +201,19 @@ init(Args) ->
     error_logger:info_msg("~p: init: args = ~p, pid = ~p\n", 
 			  [?MODULE, Args, self()]),
 
-    case proplists:get_value(serial, Args) of
-	undefined ->
-	    {error, no_serial};
-	Serial ->
-	    NMT = ets:new(co_nmt_table, [protected, named_table, ordered_set]),
+    %% Trace output enable/disable
+    put(dbg, proplists:get_value(debug,Args,false)), 
+
+    case proplists:get_value(node_pid, Args) of
+	NodePid when is_pid(NodePid) ->
+	    %% Manager needed
+	    co_mgr:start([{debug, get(dbg)}]),
+	    NMT = ets:new(co_nmt_table, [{keypos,#nmt_entry.id},
+					 protected, named_table, ordered_set]),
 	    MAP = ets:new(co_node_map, []),
-	    {ok, #ctx {serial = Serial, nmt_table = NMT, node_map = MAP}}
+	    {ok, #ctx {node_pid = NodePid, nmt_table = NMT, node_map = MAP}};
+	_NotPid ->
+	    {error, no_co_node}
     end.
 
 %%--------------------------------------------------------------------
@@ -204,8 +224,8 @@ init(Args) ->
 %% @end
 %%--------------------------------------------------------------------
 -type call_request()::
-	{add_slave, NodeId::integer()} |
-	{remove_slave, NodeId::integer()} |
+	{add_slave, SlaveId::integer()} |
+	{remove_slave, SlaveId::integer()} |
 	save |
 	load |
 	{debug, TrueOrFalse::boolean()} |
@@ -216,19 +236,19 @@ init(Args) ->
 			 {reply, Reply::term(), Ctx::#ctx{}} |
 			 {stop, Reason::term(), Reply::term(), Ctx::#ctx{}}.
 
-handle_call({add_slave, NodeId}, _From, Ctx=#ctx {nmt_table = NmtTable}) ->
-    ?dbg(nmt, "handle_call: add_slave ~.16#", [NodeId]),
-    case ets:lookup(NmtTable, NodeId) of
+handle_call({add_slave, SlaveId}, _From, Ctx=#ctx {nmt_table = NmtTable}) ->
+    ?dbg(nmt, "handle_call: add_slave ~.16#", [SlaveId]),
+    case ets:lookup(NmtTable, SlaveId) of
 	[_Slave] -> ok; %% already supervised
-	[] -> add_slave(NodeId, Ctx)
+	[] -> add_slave(SlaveId, Ctx)
     end,
     {reply, ok, Ctx};
 
-handle_call({remove_slave, NodeId}, _From, Ctx=#ctx {nmt_table = NmtTable}) ->
-    ?dbg(nmt, "handle_call: remove_slave ~.16#", [NodeId]),
-    case ets:lookup(NmtTable, NodeId) of
+handle_call({remove_slave, SlaveId}, _From, Ctx=#ctx {nmt_table = NmtTable}) ->
+    ?dbg(nmt, "handle_call: remove_slave ~.16#", [SlaveId]),
+    case ets:lookup(NmtTable, SlaveId) of
 	[] -> ok; %% not supervised
-	[_Slave] -> ets:delete(NmtTable,NodeId)
+	[Slave] -> remove_slave(Slave, Ctx)
     end,
     {reply, ok, Ctx};
 
@@ -273,19 +293,15 @@ handle_call(dump, _From, Ctx) ->
     io:format("---- NMT TABLE ----\n"),
     ets:foldl(
       fun(E,_) ->
-	      io:format("  ID: ~w\n", 
+	      io:format("  ID: ~.16#\n", 
 			[E#nmt_entry.id]),
-	      io:format("    VENDOR: ~10.16.0#\n", 
-			[E#nmt_entry.vendor]),
-	      io:format("    SERIAL: ~10.16.0#\n", 
-			[E#nmt_entry.serial]),
 	      io:format("     STATE: ~s\n", 
-			[co_format:state(E#nmt_entry.state)])
+			[co_format:state(E#nmt_entry.node_state)])
       end, ok, Ctx#ctx.nmt_table),
     io:format("---- NODE MAP TABLE ----\n"),
     ets:foldl(
-      fun({Sn,NodeId},_) ->
-	      io:format("~10.16.0# => ~w\n", [Sn, NodeId])
+      fun({Sn,SlaveId},_) ->
+	      io:format("~10.16.0# => ~w\n", [Sn, SlaveId])
       end, ok, Ctx#ctx.node_map),
    {reply, ok, Ctx};
 
@@ -304,27 +320,26 @@ handle_call(_Call, _From, Ctx) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec handle_cast(Msg::term(), Ctx::#ctx{}) -> 
+-type msg()::
+	{node_guard_reply, SlaveId::integer(), Frame::#can_frame{}} | 
+	term().
+
+-spec handle_cast(Msg::msg(), Ctx::#ctx{}) -> 
 			 {noreply, Ctx::#ctx{}}.
 
-handle_cast({node_guard_reply, NodeId, Frame}, Ctx) 
+handle_cast({node_guard_reply, SlaveId, Frame}, Ctx) 
   when Frame#can_frame.len >= 1 ->
     ?dbg(nmt, "handle_cast: node_guard_reply ~w", [Frame]),
     case Frame#can_frame.data of
 	<<Toggle:1, State:7, _/binary>> ->
-	    case node_guard_toggle(NodeId, Toggle, Ctx) of
-		ok ->
-		    update_nmt_entry(NodeId, [{state,State}], Ctx);
-		nok ->
-		    %% Send error ??
-		    error_logger:error_msg("Node ~p answered node guard with "
-					   "wrong toggle ~p, ignored.", 
-					   [NodeId, Toggle]),
-		    Ctx
-	    end;
+	    handle_node_guard(SlaveId, State, Toggle, Ctx);
 	_ ->
-	    Ctx
+	    do_nothing
     end,
+    {noreply, Ctx};
+
+handle_cast(_Msg, Ctx) ->
+    ?dbg(?NAME," handle_cast: Unknown message = ~p, ignored. ", [_Msg]),
     {noreply, Ctx}.
 
 
@@ -336,13 +351,42 @@ handle_cast({node_guard_reply, NodeId, Frame}, Ctx)
 %% @end
 %%--------------------------------------------------------------------
 -type info()::
+	{do_node_guard, SlaveId::integer()} |
+	{node_guard_timeout, SlaveId::integer()} | 
 	term().
 
 
 -spec handle_info(Info::info(), Ctx::#ctx{}) -> 
 			 {noreply, Ctx::#ctx{}}.
 
+handle_info({do_node_guard, SlaveId}, 
+	    Ctx=#ctx {nmt_table = NmtTable, node_pid = NodePid}) ->
+    ?dbg(nmt, "handle_info: do_node_guard for ~.16#", [SlaveId]),
+    case ets:lookup(NmtTable, SlaveId) of
+	[] -> 
+	    ?dbg(nmt, "handle_info: do_node_guard, slave not found!", []),
+	    ok;
+	[Slave] -> 
+	    send_node_guard(SlaveId, NodePid),
+	    ets:insert(NmtTable, Slave#nmt_entry {com_status = waiting})
+    end,
+    {noreply, Ctx};
+
+handle_info({node_guard_timeout, SlaveId}, Ctx=#ctx {nmt_table = NmtTable}) ->
+    ?dbg(nmt, "handle_info: node_guard timeout received for ~.16#", [SlaveId]),
+    error_logger:error_msg("Node guard timeout, check NMT slave ~.16#.\n",[SlaveId]),
+    case ets:lookup(NmtTable, SlaveId) of
+	[] -> 
+	    ?dbg(nmt, "handle_info: node_guard_timeout, slave not found!", []),
+	    ok;
+	[Slave] -> 
+	    ets:insert(NmtTable, Slave#nmt_entry {com_status = lost})
+    end,
+    %% Start again ??
+    {noreply, Ctx};
+
 handle_info(_Info, Ctx) ->
+    ?dbg(?NAME," handle_info: Unknown Info ~p, ignored.\n", [_Info]),
     {noreply, Ctx}.
 
 %%--------------------------------------------------------------------
@@ -353,10 +397,13 @@ handle_info(_Info, Ctx) ->
 %% necessary cleaning up. When it returns, the gen_server terminates
 %% with Reason. The return value is ignored.
 %%
-%% @spec terminate(Reason, Ctx) -> void()
 %% @end
 %%--------------------------------------------------------------------
+-spec terminate(Reason::term(), Ctx::#ctx{}) -> 
+		       no_return().
+
 terminate(_Reason, _Ctx) ->
+   ?dbg(node, "terminate: reason ~p, exiting", [_Reason]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -364,9 +411,11 @@ terminate(_Reason, _Ctx) ->
 %% @doc
 %% Convert process ctx when code is changed
 %%
-%% @spec code_change(OldVsn, Ctx, Extra) -> {ok, NewCtx}
 %% @end
 %%--------------------------------------------------------------------
+-spec code_change(OldVsn::term(), Ctx::#ctx{}, Extra::term()) -> 
+			 {ok, NewCtx::#ctx{}}.
+
 code_change(_OldVsn, Ctx, _Extra) ->
     {ok, Ctx}.
 
@@ -374,100 +423,113 @@ code_change(_OldVsn, Ctx, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+add_slave(SlaveId, _Ctx=#ctx {nmt_table = NmtTable}) ->
+    ?dbg(nmt, "add_slave: ~.16#", [SlaveId]),
+    %% get node guard time and life factor
+    %%GuardTime = 1000,
+    %%LifeFactor = 10,
+    {ok, GuardTime} = 
+	co_mgr:fetch(SlaveId, ?IX_GUARD_TIME, segment, {value, ?UNSIGNED16}),
+    {ok, LifeFactor} = 
+	co_mgr:fetch(SlaveId, ?IX_LIFE_TIME_FACTOR, segment, {value, ?UNSIGNED8}),
+    case GuardTime of
+	0 -> 
+	    ?dbg(nmt, "add_slave: no node guarding", []),
+	    ets:insert(NmtTable, #nmt_entry {id = SlaveId});
+	_T ->
+	    ?dbg(nmt, "add_slave: node guarding, ~p * ~p", [GuardTime, LifeFactor]),
+	    Slave = #nmt_entry {id = SlaveId,
+				guard_time = GuardTime,
+				life_factor = LifeFactor},
+				
+	    GTimer = start_guard_timer(Slave),
+	    LTimer = start_life_timer(Slave),
+	    ets:insert(NmtTable, Slave#nmt_entry {guard_timer = GTimer,
+						  life_timer = LTimer,
+						  com_status = ok})
+    end.
 
-add_slave(NodeId, _Ctx=#ctx {nmt_table = NmtTable}) ->
-    %% get node guard time
-    ets:insert(NmtTable, {NodeId}).
+remove_slave(Slave, _Ctx=#ctx {nmt_table = NmtTable}) ->
+    ?dbg(nmt, "remove_slave: ~.16#", [Slave#nmt_entry.id]),
+    cancel_life_timer(Slave),
+    cancel_guard_timer(Slave),
+    ets:delete(NmtTable,Slave).
 
-set_node_state(Ctx, NodeId, State) ->
-    update_nmt_entry(NodeId, [{state,State}], Ctx).
+handle_node_guard(SlaveId, State, Toggle, Ctx=#ctx {nmt_table = NmtTable}) ->
+    ?dbg(nmt, "handle_node_guard: node ~.16#, state ~p, toggle ~p", 
+	 [SlaveId, State, Toggle]),
+    case ets:lookup(NmtTable, SlaveId) of
+	[] -> 
+	    %% First message
+	    ?dbg(nmt, "handle_node_guard: new node, creating entry", []),
+	    if State =/= ?Initialisation ->
+		    error_logger:error_msg("Unexpected state",[]);
+	       true -> ok
+	    end,
+	    add_slave(SlaveId, Ctx);
+	[Slave] -> 
+	    if Slave#nmt_entry.toggle == Toggle andalso
+	       Slave#nmt_entry.node_state == State ->
+		    update_slave(Slave, Toggle, NmtTable);
+	       true ->
+		    ?dbg(nmt, "handle_node_guard: expected state ~p, toggle ~p", 
+			 [Slave#nmt_entry.node_state, Slave#nmt_entry.toggle]),
+		    %% Send error ??
+		    error_logger:error_msg("Node ~p answered node guard with "
+					   "wrong toggle and/or state, ignored.", 
+					   [SlaveId])
+	    end
+    end.
 
-do_node_guard(Ctx, 0) ->
-    lists:foreach(
-      fun(I) ->
-	      update_nmt_entry(I, [{state,?UnknownState}], Ctx)
-      end,
-      lists:seq(0, 127)),
-    send_nmt_node_guard(0),
-    Ctx;
-do_node_guard(Ctx, I) when I > 0, I =< 127 ->
-    update_nmt_entry(I, [{state,?UnknownState}], Ctx),
-    send_nmt_node_guard(I),
-    Ctx.
+
+update_slave(Slave, Toggle, NmtTable) ->
+    %% Restart life timer
+    cancel_life_timer(Slave),
+    NewTimer = start_life_timer(Slave),
+    ets:insert(NmtTable, Slave#nmt_entry {toggle = 1 - Toggle,
+					  life_timer = NewTimer,
+					  com_status = ok}).
+
+start_life_timer(_Slave=#nmt_entry {guard_time = GT, life_factor = LF, id = Id}) ->
+    case GT * LF of
+	0 -> 
+	    undefined; %% No node guarding
+	NLT ->
+	    {ok, TRef} = 
+		timer:send_after(NLT, {node_guard_timeout, Id}),
+	    TRef
+    end.
+
+cancel_life_timer(_Slave=#nmt_entry {life_timer = undefined}) ->
+    do_nothing;
+cancel_life_timer(_Slave=#nmt_entry {life_timer = Timer}) ->
+    timer:cancel(Timer).
+
+start_guard_timer(_Slave=#nmt_entry {guard_time = 0}) ->
+    undefined; %% No node guarding
+start_guard_timer(_Slave=#nmt_entry {guard_time = GT, id = Id}) ->
+    {ok, TRef} = 
+	timer:send_interval(GT, {do_node_guard, Id}),
+    TRef.
+
+cancel_guard_timer(_Slave=#nmt_entry {guard_timer = undefined}) ->
+    do_nothing;
+cancel_guard_timer(_Slave=#nmt_entry {guard_timer = Timer}) ->
+    timer:cancel(Timer).
 
 
-send_nmt_state_change(NodeId, Cs) ->
+send_nmt_state_change(SlaveId, Cs) ->
     can:send(#can_frame { id = ?NMT_ID,
 			  len = 2,
-			  data = <<Cs:8, NodeId:8>>}).
+			  data = <<Cs:8, SlaveId:8>>}).
 
-send_nmt_node_guard(NodeId) ->
-    ID = ?COB_ID(?NODE_GUARD,NodeId) bor ?CAN_RTR_FLAG,
-    can:send(#can_frame { id = ID,
-			  len = 0, data = <<>>}).
+send_node_guard(SlaveId, NodePid) ->
+    ID = ?COB_ID(?NODE_GUARD,SlaveId) bor ?CAN_RTR_FLAG,
+    can:send_from(NodePid, #can_frame { id = ID,
+					len = 0, data = <<>>}).
 
 
-%% lookup / create nmt entry
-lookup_nmt_entry(NodeId, Ctx) ->
-    case ets:lookup(Ctx#ctx.nmt_table, NodeId) of
-	[] ->
-	    #nmt_entry { id = NodeId };
-	[E] ->
-	    E
-    end.
 
-%%
-%% Update the Node map table (Serial => NodeId)
-%%  Check if nmt entry for node id has a consistent Serial
-%%  if not then remove bad mapping
-%%
-update_node_map(NodeId, Serial, Ctx) ->
-    case ets:lookup(Ctx#ctx.nmt_table, NodeId) of
-	[E] when E#nmt_entry.serial =/= Serial ->
-	    %% remove old mapping
-	    ets:delete(Ctx#ctx.node_map, E#nmt_entry.serial),
-	    %% update new mapping
-	    update_nmt_entry(NodeId, [{serial,Serial}], Ctx);
-	_ ->
-	    ok
-    end,
-    ets:insert(Ctx#ctx.node_map, {Serial,NodeId}),
-    Ctx.
     
-%%    
-%% Update the NMT entry (NodeId => #nmt_entry { serial, vendor ... })
-%%
-update_nmt_entry(NodeId, Opts, Ctx) ->
-    E = lookup_nmt_entry(NodeId, Ctx),
-    E1 = update_nmt_entry(Opts, E),
-    ets:insert(Ctx#ctx.nmt_table, E1),
-    Ctx.
-
-
-update_nmt_entry([{Key,Value}|Kvs],E) when is_record(E, nmt_entry) ->
-    E1 = update_nmt_value(Key, Value,E),
-    update_nmt_entry(Kvs,E1);
-update_nmt_entry([], E) ->
-    E#nmt_entry { time=now() }.
-
-update_nmt_value(Key,Value,E) when is_record(E, nmt_entry) ->
-    case Key of
-	id       -> E#nmt_entry { time=Value};
-	vendor   -> E#nmt_entry { vendor=Value};
-	product  -> E#nmt_entry { product=Value};
-	revision -> E#nmt_entry { revision=Value};
-	serial   -> E#nmt_entry { serial=Value};
-	state    -> E#nmt_entry { state=Value}
-    end.
-
-
-node_guard_toggle(NodeId, Toggle, Ctx) ->   
-    E = lookup_nmt_entry(NodeId, Ctx),
-    if E#nmt_entry.toggle == Toggle ->
-	    ets:insert(Ctx#ctx.nmt_table, E#nmt_entry {toggle = Toggle bxor 16#80}),
-	    ok;
-       true ->
-	    nok
-    end.
 
 

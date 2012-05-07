@@ -134,7 +134,7 @@ load(File) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Fetch Data/VAlue from object specified by Index, Subind from remote CANOpen
+%% Fetch Data/Value from object specified by Index, Subind from remote CANOpen
 %% node identified by NodeId.<br/>
 %% TransferMode controls whether block or segment transfer is used between
 %% the CANOpen nodes.<br/>
@@ -191,7 +191,8 @@ fetch(NodeId, Ix, Si, TransferMode, data = Term) ->
 %% See {@link fetch/5}.
 %% @end
 %%--------------------------------------------------------------------
--spec fetch(NodeId::integer(), {Ix::integer(), Si::integer()},
+-spec fetch(NodeId::integer(), 
+	    {Ix::integer(), Si::integer()} | integer(),
 	    TransferMode:: block | segment,
 	    Destination:: {app, Pid::pid(), Mod::atom()} | 
 			  {value, Type::integer()} |
@@ -205,7 +206,11 @@ fetch(NodeId, {Ix, Si}, TransferMode, Term)
   when is_integer(NodeId), 
        is_integer(Ix), 
        is_integer(Si) ->
-fetch(NodeId, Ix, Si, TransferMode, Term).
+    fetch(NodeId, Ix, Si, TransferMode, Term);
+fetch(NodeId, Ix, TransferMode, Term) 
+  when is_integer(NodeId), 
+       is_integer(Ix) ->
+    fetch(NodeId, Ix, 0, TransferMode, Term).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -262,7 +267,8 @@ store(NodeId, Ix, Si, TransferMode, {data, Bin} = Term)
 %% See {@link  store/5}.
 %% @end
 %%--------------------------------------------------------------------
--spec store(NodeId::integer(), {Ix::integer(), Si::integer()},
+-spec store(NodeId::integer(), 
+	    {Ix::integer(), Si::integer()} | integer(),
 	    TransferMode:: block | segment,
 	    Source:: {app, Pid::pid(), Mod::atom()} | 
 		      {value, Value::term(), Type::integer()} |
@@ -274,7 +280,11 @@ store(NodeId, {Ix, Si}, TransferMode,  Term)
   when is_integer(NodeId), 
        is_integer(Ix), 
        is_integer(Si) ->
-store(NodeId, Ix, Si, TransferMode,  Term).
+    store(NodeId, Ix, Si, TransferMode,  Term);
+store(NodeId, Ix, TransferMode,  Term) 
+  when is_integer(NodeId), 
+       is_integer(Ix) ->
+    store(NodeId, Ix, 0, TransferMode,  Term).
 
 %% API used by co_script
 %%--------------------------------------------------------------------

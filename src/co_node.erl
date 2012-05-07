@@ -258,27 +258,35 @@ reg(Term) ->
 %%
 %%
 %%
-reset_application(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
+reset_application(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId}) ->
     error_logger:info_msg("Node '~s' id=~w,~w reset_application\n", 
-	      [Name, XNodeId, SNodeId]),
+	      [_Name, _XNodeId, _SNodeId]),
     reset_communication(Ctx).
 
-reset_communication(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
+reset_communication(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId}) ->
     error_logger:info_msg("Node '~s' id=~w,~w reset_communication\n",
-	      [Name, XNodeId, SNodeId]),
+	      [_Name, _XNodeId, _SNodeId]),
     initialization(Ctx).
 
-initialization(Ctx=#co_ctx {name=Name, nodeid=SNodeId, xnodeid=XNodeId}) ->
+initialization(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId,
+			    nmt_master = NmtMaster}) ->
     error_logger:info_msg("Node '~s' id=~w,~w initialization\n",
-	      [Name, XNodeId, SNodeId]),
-    %% ??
-    Ctx1 = activate_node_guard(Ctx), 
-    Ctx1#co_ctx { state = ?PreOperational }.
+	      [_Name, _XNodeId, _SNodeId]),
+
+    if NmtMaster ->
+	    activate_nmt(Ctx),
+	    Ctx#co_ctx { state = ?Operational }; %% ??
+       true ->
+	    %% NMT slave
+	    Ctx1 = activate_node_guard(Ctx),
+	    send_bootup(Ctx1),
+	    Ctx1#co_ctx { state = ?PreOperational }
+    end.
+    
 
 activate_node_guard(Ctx=#co_ctx {nmt_master = true, name = _Name}) ->
     ?dbg(node, "~s: activate_node_guard: nmt master, node guarding "
 	 "handled by nmt master process.", [_Name]),
-    activate_nmt(Ctx),
     Ctx;
 activate_node_guard(Ctx=#co_ctx {dict = Dict, name = _Name}) ->
     case co_dict:value(Dict, ?IX_GUARD_TIME) of
@@ -309,6 +317,30 @@ activate_node_guard(Ctx=#co_ctx {dict = Dict, name = _Name}) ->
     end.
 			    
 		    
+send_bootup(Ctx=#co_ctx {name = _Name}) ->
+    ?dbg(node, "~s: send_bootup: nmt slave, sending bootup to master.", [_Name]),
+    %% BootUp uses same CobId as NodeGuard
+    send_node_guard(Ctx, 1, <<0>>).
+
+
+send_node_guard(_Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId, name = _Name}, 
+		Len, Data) ->
+    ?dbg(node, "~s: send_node_guard: nmt slave, sending ~p to master.", [_Name, Data]),
+    if SNodeId =/= undefined ->
+	    CobId = ?COB_ID(?NODE_GUARD,SNodeId),
+	    ?dbg(node, "~s: send_node_guard: nmt slave, cobid ~p.", 
+		 [_Name, CobId]),
+	    can:send_from(self(),
+			  #can_frame { id = CobId,
+				       len = Len, data = Data });
+       XNodeId =/= undefined ->
+	    XCobId = ?XCOB_ID(?NODE_GUARD,add_xflag(XNodeId)),
+	    ?dbg(node, "~s: send_node_guard: nmt slave, xcobid ~p.", 
+		 [_Name, XCobId]),
+	    can:send_from(self(), 
+			  #can_frame { id = XCobId,
+				       len = Len, data = Data })
+    end.
 
 
 %%--------------------------------------------------------------------
@@ -841,7 +873,7 @@ handle_info(node_guard_timeout, Ctx=#co_ctx {name=_Name}) ->
     ?dbg(node, "~s: handle_info: node_guard timeout received", [_Name]),
     error_logger:error_msg("Node guard timeout, check NMT master.\n"),
     %% Start again ??
-    {noreply, Ctx};
+    {noreply, Ctx#co_ctx {node_guard_error = true}};
 
 handle_info({rc_reset, Pid}, Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
     ?dbg(node, "~s: handle_info: rc_reset for process ~p received",  [_Name, Pid]),
@@ -874,6 +906,7 @@ handle_info({'EXIT', Pid, Reason}, Ctx) ->
     case Ctx3 of
 	Ctx ->
 	    %% No 'normal' linked process died, we should termiate ??
+	    %% co_nmt ??
 	    ?dbg(node, "~s: handle_info: linked process ~p died, reason ~p, "
 		 "terminating\n", [Ctx#co_ctx.name, Pid, Reason]),
 	    {stop, Reason, Ctx};
@@ -896,6 +929,12 @@ handle_info(_Info, Ctx) ->
 %% @end
 %%--------------------------------------------------------------------
 terminate(_Reason, Ctx) ->
+    %% If NMT master stop master process
+    if Ctx#co_ctx.nmt_master ->
+	    deactivate_nmt(Ctx);
+       true ->
+	    do_nothing
+    end,
     
     %% Stop all apps ??
     lists:foreach(
@@ -1220,9 +1259,10 @@ set(Func, Ix,Si,ValueOrData,Ctx) ->
 %%
 %% Handle can messages
 %%
-handle_can(Frame, Ctx) when ?is_can_frame_rtr(Frame) ->
+handle_can(Frame, Ctx=#co_ctx {name = _Name}) 
+  when ?is_can_frame_rtr(Frame) ->
     CobId = ?CANID_TO_COBID(Frame#can_frame.id),
-    ?dbg(node, "~s: handle_can: (rtr) CobId=~8.16.0B", [Ctx#co_ctx.name, CobId]),
+    ?dbg(node, "~s: handle_can: (rtr) CobId=~8.16.0B", [_Name, CobId]),
     case lookup_cobid(CobId, Ctx) of
 	nmt  -> Ctx;
 	node_guard -> handle_node_guard(Frame, Ctx);
@@ -1233,6 +1273,8 @@ handle_can(Frame, Ctx) when ?is_can_frame_rtr(Frame) ->
 		    co_tpdo:rtr(T#tpdo.pid),
 		    Ctx;
 		_ -> 
+		    ?dbg(node, "~s: handle_can: frame not handled: Frame = ~w", 
+			 [_Name, Frame]),
 		    Ctx
 	    end
     end;
@@ -1302,27 +1344,35 @@ handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId, name=_Name})
     end.
 
 
-handle_node_guard(Frame=#can_frame {id = Id}, 
+handle_node_guard(Frame, 
 		  Ctx=#co_ctx {state = State, toggle = Toggle, nmt_master = false, 
 			       node_guard_timer = Timer, node_life_time = NLT,
-			       name=_Name}) 
+			       node_guard_error = NgError, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
     ?dbg(node, "~s: handle_node_guard: request ~w", [_Name,Frame]),
-    Data = State bor Toggle,
-    %% Reply
-    can:send_from(self(), #can_frame { id = Id, len = 1, data = <<Data>> }),
-    NewToggle = Toggle bxor 16#80,
     %% Reset NMT master supervision timer
     if Timer =/= undefined ->
 	    timer:cancel(Timer);
        true -> 
 	    do_nothing
     end,
+    %% If NMT supervision has been down resend bootup ?? Toggle ??
+    if NgError ->
+	    send_bootup(Ctx);
+       true ->
+	    do_nothing
+    end,
+    %% Reply
+    Data = State bor Toggle,
+    send_node_guard(Ctx, 1, <<Data:8>>),
+    NewToggle = Toggle bxor 16#80,
+    %% Restart NMT master supervision
     if NLT =/= 0 ->
 	    {ok, TRef} = timer:send_after(NLT, node_guard_timeout),
-	    Ctx#co_ctx { toggle = NewToggle, node_guard_timer = TRef};
+	    Ctx#co_ctx { toggle = NewToggle, node_guard_error = false, 
+			 node_guard_timer = TRef};
        true ->
-	    Ctx#co_ctx { toggle = NewToggle}
+	    Ctx#co_ctx { toggle = NewToggle, node_guard_error = false}
     end;
 handle_node_guard(Frame, Ctx=#co_ctx {nmt_master = true, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
@@ -1494,7 +1544,7 @@ handle_mpdo(Frame, CobId, Ctx=#co_ctx {state = ?Operational, name = _Name}) ->
 		    handle_sam_mpdo(Ctx, SourceNid, {Ix, Si}, Data)
 	    end;
 	_Other ->
-	    ?dbg(node, "~s: handle_can: frame not handled: Frame = ~w", 
+	    ?dbg(node, "~s: handle_mpdo: frame not handled: Frame = ~w", 
 		 [_Name, Frame]),
 	    Ctx
     end;
@@ -1622,7 +1672,7 @@ handle_tpdo_process(T=#tpdo {pid = _Pid, offset = _Offset}, _Reason,
 
 activate_nmt(Ctx=#co_ctx {serial = Serial, name = _Name}) ->
     ?dbg(node, "~s: activate_nmt", [_Name]),
-    co_nmt:start_link([{serial, Serial}]),
+    co_nmt:start_link([{serial, Serial},{node_pid, self()},{debug, get(dbg)}]),
     Ctx.
 
 deactivate_nmt(Ctx=#co_ctx {name = _Name}) ->

@@ -296,19 +296,6 @@
 -define(UnknownState,    16#0F).
 -define(LssTimingDelay,  16#10).  %% ?
 
--record(nmt_entry,
-	{
-	  id,                  %% node id (key)
-	  time,                %% time last updated
-	  %% identity
-	  vendor   = 0,        %% LSS query / SDO - IDENTITY
-	  product  = 0,        %% LSS query / SDO - IDENTITY
-	  revision = 0,        %% LSS query / SDO - IDENTITY
-	  serial   = 0,        %% LSS query / SDO - IDENTITY / DID 
-	  state=?UnknownState,
-	  toggle = 0           %% Expected next toggle
-	 }).
-
 %% COBID=2021 16#7E5 -  Master->Slave 2#1111 1100101
 -define(LssSwitchModeGlbal,     16#04).
 -define(LssSelectVendor,        16#64).
@@ -508,16 +495,22 @@
 %% Node context
 -record(co_ctx,
 	{
+	  %% ID
 	  nodeid,           %% can bus id
 	  xnodeid,          %% extended can bus id
 	  name,             %% node (process) name
 	  vendor,           %% CANopen vendor code
 	  serial,           %% string version of node serial number
+
+	  %% NMT
 	  state,            %% CANopen node state
 	  toggle,           %% Node guard toggle
 	  nmt_master = false, %% NMT master flag
 	  node_guard_timer, %% Node guard supervision of master
+	  node_guard_error = false, %% Lost contact with NMT master
 	  node_life_time = 0, %% Node guard supervision of master
+
+	  %% Object dict handling
 	  dict,             %% can dictionary
 	  mpdo_dispatch,    %% MPDO dispatch list 
 	  res_table,        %% dictionary reservations
@@ -533,6 +526,8 @@
 	  data,             %% application data?
 	  sdo,              %% sdo context
 	  sdo_list=[],      %% [#sdo{}]
+
+	  %% SYNC
 	  sync_tmr = false, %% TimerRef
 	  sync_time = 0,    %% Sync timer value (ms) should be us
 	  sync_id,          %% COBID

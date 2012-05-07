@@ -7,7 +7,7 @@
 
 -export([run/1, run/3, run/2, run/4, 
 	 run_mgr/0, run_mgr/2, 
-	 run_nmt/1,
+	 run_nmt/1, run_nmt/3,
 	 halt/1, 
 	 halt_mgr/0, 
 	 load/1]).
@@ -46,6 +46,9 @@ halt_mgr() ->
 
 run_nmt(Serial) ->
     run(Serial, [{nmt_master, true}]).
+
+run_nmt(Serial, Port, Ttl) ->
+    run(Serial, Port, Ttl, [{nmt_master, true}]).
 
 load(Serial) ->
     co_api:load_dict(Serial, "/Users/malotte/erlang/canopen/test/co_tpdo_SUITE_data/test.dict").
