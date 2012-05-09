@@ -224,7 +224,7 @@ os_command_slow(Config) ->
     verify_result(16#ff, Result),
 
     %% Wait for command to be executed
-    timer:sleep(2000),
+    timer:sleep(3000),
     
     Result1 = get_result(Config),
     ct:pal("Result ~p", [Result1]),

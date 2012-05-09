@@ -345,10 +345,10 @@ handle_cast({node_guard_reply, SlaveId, Frame}, Ctx)
 handle_cast({supervision, Supervision}, Ctx=#ctx {supervision = Supervision}) ->
     ?dbg(?NAME," handle_cast: supervision ~p, no change.", [Supervision]),
     {noreply, Ctx};
-handle_cast({supervision, New}, Ctx=#ctx {supervision = Old}) ->
-    ?dbg(?NAME," handle_cast: supervision ~p.", [New]),
+handle_cast({supervision, New}, Ctx=#ctx {supervision = _Old}) ->
+    ?dbg(?NAME," handle_cast: supervision ~p -> ~p.", [_Old, New]),
     %% Activate/deactivate .. or handle in co_node ??
-    {noreply, Ctx#co_ctx.sdo#sdo_ctx {supervison = New}};
+    {noreply, Ctx#ctx {supervision = New}};
 handle_cast(_Msg, Ctx) ->
     ?dbg(?NAME," handle_cast: Unknown message = ~p, ignored. ", [_Msg]),
     {noreply, Ctx}.
