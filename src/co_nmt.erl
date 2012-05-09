@@ -45,7 +45,8 @@
 	{
 	  serial,
 	  node_pid,
-	  nmt_table,  %% 
+	  supervision = none, %% Type of supervision
+	  nmt_table,  %% Table of NMT slaves
 	  node_map    %% ??
 	 }).
 
@@ -208,10 +209,12 @@ init(Args) ->
 	NodePid when is_pid(NodePid) ->
 	    %% Manager needed
 	    co_mgr:start([{debug, get(dbg)}]),
+	    Supervision = proplists:get_value(supervision, Args, none),
 	    NMT = ets:new(co_nmt_table, [{keypos,#nmt_entry.id},
 					 protected, named_table, ordered_set]),
 	    MAP = ets:new(co_node_map, []),
-	    {ok, #ctx {node_pid = NodePid, nmt_table = NMT, node_map = MAP}};
+	    {ok, #ctx {node_pid = NodePid, supervision = Supervision,
+		       nmt_table = NMT, node_map = MAP}};
 	_NotPid ->
 	    {error, no_co_node}
     end.
@@ -322,6 +325,7 @@ handle_call(_Call, _From, Ctx) ->
 %%--------------------------------------------------------------------
 -type msg()::
 	{node_guard_reply, SlaveId::integer(), Frame::#can_frame{}} | 
+	{supervision, node_guard | heartbeat | none} | 
 	term().
 
 -spec handle_cast(Msg::msg(), Ctx::#ctx{}) -> 
@@ -338,6 +342,13 @@ handle_cast({node_guard_reply, SlaveId, Frame}, Ctx)
     end,
     {noreply, Ctx};
 
+handle_cast({supervision, Supervision}, Ctx=#ctx {supervision = Supervision}) ->
+    ?dbg(?NAME," handle_cast: supervision ~p, no change.", [Supervision]),
+    {noreply, Ctx};
+handle_cast({supervision, New}, Ctx=#ctx {supervision = Old}) ->
+    ?dbg(?NAME," handle_cast: supervision ~p.", [New]),
+    %% Activate/deactivate .. or handle in co_node ??
+    {noreply, Ctx#co_ctx.sdo#sdo_ctx {supervison = New}};
 handle_cast(_Msg, Ctx) ->
     ?dbg(?NAME," handle_cast: Unknown message = ~p, ignored. ", [_Msg]),
     {noreply, Ctx}.
@@ -403,7 +414,8 @@ handle_info(_Info, Ctx) ->
 		       no_return().
 
 terminate(_Reason, _Ctx) ->
-   ?dbg(node, "terminate: reason ~p, exiting", [_Reason]),
+    ?dbg(node, "terminate: reason ~p, exiting", [_Reason]),
+    co_mgr:stop(),
     ok.
 
 %%--------------------------------------------------------------------
@@ -423,15 +435,26 @@ code_change(_OldVsn, Ctx, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+add_slave(SlaveId, _Ctx=#ctx {supervision = none, nmt_table = NmtTable}) ->
+    ?dbg(nmt, "add_slave: ~.16#", [SlaveId]),
+    ?dbg(nmt, "add_slave: no supervision", []),
+    ets:insert(NmtTable, #nmt_entry {id = SlaveId});
+
 add_slave(SlaveId, _Ctx=#ctx {nmt_table = NmtTable}) ->
     ?dbg(nmt, "add_slave: ~.16#", [SlaveId]),
     %% get node guard time and life factor
     %%GuardTime = 1000,
     %%LifeFactor = 10,
+    NodeId = if ?is_nodeid_extended(SlaveId) ->
+		     {xnodeid, SlaveId};
+		?is_nodeid(SlaveId) ->
+		     {nodeid, SlaveId}
+	     end,
+
     {ok, GuardTime} = 
-	co_mgr:fetch(SlaveId, ?IX_GUARD_TIME, segment, {value, ?UNSIGNED16}),
+	co_mgr:fetch(NodeId, ?IX_GUARD_TIME, segment, {value, ?UNSIGNED16}),
     {ok, LifeFactor} = 
-	co_mgr:fetch(SlaveId, ?IX_LIFE_TIME_FACTOR, segment, {value, ?UNSIGNED8}),
+	co_mgr:fetch(NodeId, ?IX_LIFE_TIME_FACTOR, segment, {value, ?UNSIGNED8}),
     case GuardTime of
 	0 -> 
 	    ?dbg(nmt, "add_slave: no node guarding", []),
@@ -455,7 +478,8 @@ remove_slave(Slave, _Ctx=#ctx {nmt_table = NmtTable}) ->
     cancel_guard_timer(Slave),
     ets:delete(NmtTable,Slave).
 
-handle_node_guard(SlaveId, State, Toggle, Ctx=#ctx {nmt_table = NmtTable}) ->
+handle_node_guard(SlaveId, State, Toggle, 
+		  Ctx=#ctx {supervision = Supervision, nmt_table = NmtTable}) ->
     ?dbg(nmt, "handle_node_guard: node ~.16#, state ~p, toggle ~p", 
 	 [SlaveId, State, Toggle]),
     case ets:lookup(NmtTable, SlaveId) of
@@ -467,7 +491,7 @@ handle_node_guard(SlaveId, State, Toggle, Ctx=#ctx {nmt_table = NmtTable}) ->
 	       true -> ok
 	    end,
 	    add_slave(SlaveId, Ctx);
-	[Slave] -> 
+	[Slave] when Supervision == node_guard -> 
 	    if Slave#nmt_entry.toggle == Toggle andalso
 	       Slave#nmt_entry.node_state == State ->
 		    update_slave(Slave, Toggle, NmtTable);
@@ -478,7 +502,10 @@ handle_node_guard(SlaveId, State, Toggle, Ctx=#ctx {nmt_table = NmtTable}) ->
 		    error_logger:error_msg("Node ~p answered node guard with "
 					   "wrong toggle and/or state, ignored.", 
 					   [SlaveId])
-	    end
+	    end;
+	[_Slave] when Supervision == none -> 
+	    ?dbg(nmt, "handle_node_guard: no supervision", []),
+	    ok
     end.
 
 
@@ -519,14 +546,21 @@ cancel_guard_timer(_Slave=#nmt_entry {guard_timer = Timer}) ->
 
 
 send_nmt_state_change(SlaveId, Cs) ->
-    can:send(#can_frame { id = ?NMT_ID,
+    can:send(#can_frame { id = ?COBID_TO_CANID(?NMT_ID),
 			  len = 2,
 			  data = <<Cs:8, SlaveId:8>>}).
 
 send_node_guard(SlaveId, NodePid) ->
-    ID = ?COB_ID(?NODE_GUARD,SlaveId) bor ?CAN_RTR_FLAG,
-    can:send_from(NodePid, #can_frame { id = ID,
-					len = 0, data = <<>>}).
+    ?dbg(nmt, "send_node_guard: slave ~.16#", [SlaveId]),
+    Id = 
+	if ?is_nodeid_extended(SlaveId) ->
+		?COBID_TO_CANID(?XCOB_ID(?NODE_GUARD,SlaveId)) 
+		    bor ?CAN_RTR_FLAG;
+	   ?is_nodeid(SlaveId) ->
+		?COBID_TO_CANID(?COB_ID(?NODE_GUARD,SlaveId)) 
+		    bor ?CAN_RTR_FLAG
+	end,
+    can:send_from(NodePid, #can_frame { id = Id, len = 0, data = <<>>}).
 
 
 

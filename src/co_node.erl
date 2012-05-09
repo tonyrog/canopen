@@ -207,6 +207,7 @@ init({Serial, NodeName, Opts} = Args) ->
       serial = Serial,
       state  = ?Initialisation,
       nmt_master = proplists:get_value(nmt_master,Opts,false),
+      supervision = proplists:get_value(supervision,Opts,none),
       sub_table = SubTable,
       res_table = ResTable,
       xnot_table = XNotTable,
@@ -269,18 +270,20 @@ reset_communication(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId})
     initialization(Ctx).
 
 initialization(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId,
-			    nmt_master = NmtMaster}) ->
+			    nmt_master = NmtMaster, supervision = Supervision}) ->
     error_logger:info_msg("Node '~s' id=~w,~w initialization\n",
 	      [_Name, _XNodeId, _SNodeId]),
 
     if NmtMaster ->
 	    activate_nmt(Ctx),
 	    Ctx#co_ctx { state = ?Operational }; %% ??
-       true ->
+       Supervision == node_guard ->
 	    %% NMT slave
 	    Ctx1 = activate_node_guard(Ctx),
 	    send_bootup(Ctx1),
-	    Ctx1#co_ctx { state = ?PreOperational }
+	    Ctx1#co_ctx { state = ?PreOperational };
+       true ->
+	    Ctx#co_ctx { state = ?PreOperational }
     end.
     
 
@@ -331,14 +334,14 @@ send_node_guard(_Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId, name = _Name},
 	    ?dbg(node, "~s: send_node_guard: nmt slave, cobid ~p.", 
 		 [_Name, CobId]),
 	    can:send_from(self(),
-			  #can_frame { id = CobId,
+			  #can_frame { id = ?COBID_TO_CANID(CobId),
 				       len = Len, data = Data });
        XNodeId =/= undefined ->
-	    XCobId = ?XCOB_ID(?NODE_GUARD,add_xflag(XNodeId)),
+	    XCobId = ?XCOB_ID(?NODE_GUARD,co_lib:add_xflag(XNodeId)),
 	    ?dbg(node, "~s: send_node_guard: nmt slave, xcobid ~p.", 
 		 [_Name, XCobId]),
 	    can:send_from(self(), 
-			  #can_frame { id = XCobId,
+			  #can_frame { id = ?COBID_TO_CANID(XCobId),
 				       len = Len, data = Data })
     end.
 
@@ -391,11 +394,14 @@ handle_call({tpdo_set,I,Value,Mode}, _From, Ctx) ->
     {Reply,Ctx1} = tpdo_set(I,Value,Mode,Ctx),
     {reply, Reply, Ctx1};
 
-handle_call({Action,Mode,NodeId,Ix,Si,Term}, From, 
+handle_call({Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term}, From, 
 	    Ctx=#co_ctx {name = _Name, sdo_list = Sessions, sdo = SdoCtx}) 
   when Action == store;
        Action == fetch ->
-    Nid = complete_nodeid(NodeId),
+    Nid = case TypeOfNode of
+	      nodeid -> NodeId;
+	      xnodeid -> co_lib:add_xflag(NodeId)
+	  end,
     case lookup_sdo_server(Nid,Ctx) of
 	ID={Tx,Rx} ->
 	    ?dbg(node, "~s: ~p: ID = ~p", [_Name,Action,ID]),
@@ -712,6 +718,7 @@ handle_call({option, Option}, _From, Ctx) ->
 		nodeid -> {Option, Ctx#co_ctx.nodeid};
 		xnodeid -> {Option, Ctx#co_ctx.xnodeid};
 		nmt_master -> {Option, Ctx#co_ctx.nmt_master};
+		supervision -> {Option, Ctx#co_ctx.supervision};
 		id -> if Ctx#co_ctx.nodeid =/= undefined ->
 			      {nodeid, Ctx#co_ctx.nodeid};
 			 true ->
@@ -754,6 +761,16 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
 				  _NoChange -> do_nothing
 			      end,
 			      Ctx#co_ctx {nmt_master = NewValue};
+
+		supervision -> OldValue = Ctx#co_ctx.supervision,
+			       if NewValue =/= OldValue andalso
+				  Ctx#co_ctx.nmt_master == true ->
+				       gen_server:cast(co_nmt_master,
+						       {supervision, NewValue});
+				  true ->
+				       do_nothing
+			       end,
+			       Ctx#co_ctx {supervision = NewValue};
 
 		debug -> put(dbg, NewValue),
 			 Ctx#co_ctx.sdo#sdo_ctx {debug = NewValue};
@@ -1015,7 +1032,7 @@ create_dict() ->
 %%
 create_cob_table(ExtNid, ShortNid) ->
     T = ets:new(co_cob_table, [public]),
-    add_to_cob_table(T, xnodeid, add_xflag(ExtNid)),
+    add_to_cob_table(T, xnodeid, co_lib:add_xflag(ExtNid)),
     add_to_cob_table(T, nodeid, ShortNid),
     T.
 
@@ -1047,7 +1064,7 @@ delete_from_cob_table(_T, _NidType, undefined) ->
     ok;
 delete_from_cob_table(T, xnodeid, Nid)
   when Nid =/= undefined ->
-    ExtNid = add_xflag(Nid),
+    ExtNid = co_lib:add_xflag(Nid),
     XSDORx = ?XCOB_ID(?SDO_RX,ExtNid),
     XSDOTx = ?XCOB_ID(?SDO_TX,ExtNid),
     ets:delete(T, XSDORx),
@@ -1266,19 +1283,22 @@ handle_can(Frame, Ctx=#co_ctx {name = _Name})
     case lookup_cobid(CobId, Ctx) of
 	nmt  -> Ctx;
 	node_guard -> handle_node_guard(Frame, Ctx);
-
-	_Other ->
+	undefined ->
 	    case lists:keysearch(CobId, #tpdo.cob_id, Ctx#co_ctx.tpdo_list) of
 		{value, T} ->
 		    co_tpdo:rtr(T#tpdo.pid),
 		    Ctx;
 		_ -> 
-		    ?dbg(node, "~s: handle_can: frame not handled: Frame = ~w", 
-			 [_Name, Frame]),
+		    ?dbg(node, "~s: handle_can: frame ~w, cobid undefined not "
+			 "handled", [_Name, Frame]),
 		    Ctx
-	    end
+	    end;
+	_Other ->
+	    ?dbg(node, "~s: handle_can: frame ~w, cobid ~w not handled", 
+		 [_Name, Frame, _Other]),
+	    Ctx
     end;
-handle_can(Frame, Ctx=#co_ctx {state = State, name = _Name}) ->
+handle_can(Frame, Ctx=#co_ctx {state = _State, name = _Name}) ->
     CobId = ?CANID_TO_COBID(Frame#can_frame.id),
     ?dbg(node, "~s: handle_can: CobId=~8.16.0B", [_Name, CobId]),
     case lookup_cobid(CobId, Ctx) of
@@ -1289,22 +1309,13 @@ handle_can(Frame, Ctx=#co_ctx {state = State, name = _Name}) ->
 	time_stamp -> handle_time_stamp(Frame, Ctx);
 	{node_guard, NodeId} -> handle_node_guard(Frame, NodeId, Ctx);
 	{rpdo,Offset} -> handle_rpdo(Frame, Offset, CobId, Ctx);
-	{sdo_tx,Rx} ->
-	    if State =:= ?Operational; 
-	       State =:= ?PreOperational ->	    
-		    handle_sdo_tx(Frame, CobId, Rx, Ctx);
-	       true ->
-		    Ctx
-	    end;
-	{sdo_rx,Tx} ->
-	    if State=:= ?Operational; 
-	       State =:= ?PreOperational ->	    
-		    handle_sdo_rx(Frame, CobId, Tx, Ctx);
-	       true ->
-		    Ctx
-	    end;
-	_AssumedMpdo ->
-	    handle_mpdo(Frame, CobId, Ctx) 
+	{sdo_tx,Rx} -> handle_sdo_tx(Frame, CobId, Rx, Ctx);
+	{sdo_rx,Tx} -> handle_sdo_rx(Frame, CobId, Tx, Ctx);
+	{sdo_rx, not_receiver, _Tx} -> 
+	    ?dbg(node, "~s: handle_can: sdo_rx frame ~w to ~.16# ignored", 
+		 [_Name, Frame, _Tx]),
+	    Ctx; %% ignored
+	_AssumedMpdo -> handle_mpdo(Frame, CobId, Ctx) 
     end.
 
 
@@ -1315,7 +1326,7 @@ handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId, name=_Name})
   when M#can_frame.len >= 2 ->
     ?dbg(node, "~s: handle_nmt: ~p", [_Name, M]),
     <<NodeId,Cs,_/binary>> = M#can_frame.data,
-    XNid = add_xflag(XNodeId),
+    XNid = co_lib:add_xflag(XNodeId),
     if NodeId == 0; 
        NodeId == XNid; 
        NodeId == SNodeId ->
@@ -1670,9 +1681,12 @@ handle_tpdo_process(T=#tpdo {pid = _Pid, offset = _Offset}, _Reason,
 
 
 
-activate_nmt(Ctx=#co_ctx {serial = Serial, name = _Name}) ->
+activate_nmt(Ctx=#co_ctx {serial = Serial, supervision = Sup, name = _Name}) ->
     ?dbg(node, "~s: activate_nmt", [_Name]),
-    co_nmt:start_link([{serial, Serial},{node_pid, self()},{debug, get(dbg)}]),
+    co_nmt:start_link([{serial, Serial},
+		       {node_pid, self()},
+		       {supervision, Sup},
+		       {debug, get(dbg)}]),
     Ctx.
 
 deactivate_nmt(Ctx=#co_ctx {name = _Name}) ->
@@ -2267,7 +2281,7 @@ lookup_sdo_server(Nid, _Ctx=#co_ctx {name = _Name}) ->
 	    {Tx,Rx};
        true ->
 	    ?dbg(node, "~s: lookup_sdo_server: Nid  ~12.16.0# "
-		 "neither extended or short ???", [_Name, Nid]),
+		 "neither extended nor short ???", [_Name, Nid]),
 	    undefined
     end.
 
@@ -2283,8 +2297,14 @@ lookup_cobid(CobId, Ctx) ->
 	       ?FUNCTION_CODE(CobId) =:= ?SDO_TX ->
 		    {sdo_tx, ?COB_ID(?SDO_RX, ?NODE_ID(CobId))};
 	       ?is_cobid_extended(CobId) andalso 
+	       ?XFUNCTION_CODE(CobId) =:= ?SDO_RX ->
+		    {sdo_rx, not_receiver, ?XCOB_ID(?SDO_RX, ?XNODE_ID(CobId))};
+	       ?is_not_cobid_extended(CobId) andalso
+	       ?FUNCTION_CODE(CobId) =:= ?SDO_RX ->
+		    {sdo_rx, not_receiver, ?COB_ID(?SDO_RX, ?NODE_ID(CobId))};
+	       ?is_cobid_extended(CobId) andalso 
 	       ?XFUNCTION_CODE(CobId) =:= ?NODE_GUARD ->
-		    {node_guard, ?XNODE_ID(CobId)};
+		    {node_guard, co_lib:add_xflag(?XNODE_ID(CobId))};
 	       ?is_not_cobid_extended(CobId) andalso
 	       ?FUNCTION_CODE(CobId) =:= ?NODE_GUARD ->
 		    {node_guard, ?NODE_ID(CobId)};
@@ -2591,20 +2611,6 @@ rpdo_value_app({Ix,Si}, Data, {Pid, Mod}, Ctx) ->
 	    ?dbg(node,"Failed starting set session, reason ~p", [_Reason]),
 	    Ctx
     end.
-
-add_xflag(undefined) ->
-    undefined;
-add_xflag(NodeId) ->
-    NodeId bor ?COBID_ENTRY_EXTENDED.
-
-complete_nodeid(NodeId) ->
-    if ?is_nodeid(NodeId) ->
-	    %% Not extended
-	    NodeId;
-       true ->
-	    add_xflag(NodeId)
-    end.
-    
 
 
 %% Set error code - and send the emergency object (if defined)

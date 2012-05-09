@@ -504,6 +504,7 @@
 
 	  %% NMT
 	  state,            %% CANopen node state
+	  supervision = none, %% Type of supervision
 	  toggle,           %% Node guard toggle
 	  nmt_master = false, %% NMT master flag
 	  node_guard_timer, %% Node guard supervision of master

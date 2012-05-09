@@ -83,6 +83,7 @@
 %%          {xnodeid, integer()}      - extended node id, range: 1 - 16#ffffff.<br/>
 %%          {time_stamp,  timeout()}  - ( 60000 ) in msec. <br/>
 %%          {nmt_master, boolean()}   - ( false )
+%%          {supervision, node_guard | heartbeat | none}   - ( none )
 %%
 %%            Dictionary options
 %%          {load_last_saved, boolean()} - load last dictionary file. <br/>
@@ -111,11 +112,13 @@
 %%         
 %% @end
 %%--------------------------------------------------------------------
+-type supervision():: node_guard | heartbeat | none.
 -type option()::
 	{use_serial_as_xnodeid, boolean()} |
 	{nodeid, integer()} | 
 	{xnodeid, integer()} | 
 	{nmt_master, boolean()} | 
+	{supervision, supervision()} | 
 	{load_last_saved, boolean()} | 
 	{dict_file, string()} | 
 	{time_stamp,  timeout()} | 
@@ -194,6 +197,16 @@ verify_option(Option, NewValue)
        true ->
 	    {error, "Option " ++ atom_to_list(Option) ++ 
 		 " can only be set to a positive integer value."}
+    end;
+verify_option(supervision, NewValue) 
+  when is_atom(NewValue) ->
+    if NewValue == node_guard orelse NewValue == none ->
+	    ok;
+       NewValue == heartbeat ->
+	    {error, "heartbeat not implemented yet"};
+       true ->
+	    {error, "Option supervision " 
+	     " can only be set to node_guard heartbeat or none."}
     end;
 verify_option(Option, NewValue) 
   when Option == pst ->
@@ -900,18 +913,19 @@ data(Identity, Ix) when is_integer(Ix) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec store(Identity::node_identity(),
-	    Cobid::integer(), 
+	    {TypeOfNid::nodeid | xnodeid, Nid::integer()},
 	    Index::integer(), SubInd::integer(), 
 	    TransferMode:: block | segment,
 	    Term::{data, binary()} | {app, Pid::pid(), Module::atom()}) ->
 		   ok | {error, Error::atom()}.
 
-store(Identity, COBID, IX, SI, TransferMode, Term) 
+store(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, TransferMode, Term) 
   when ?is_index(IX), ?is_subind(SI) ->
-    ?dbg(node, "store: Identity = ~p, CobId = ~.16#, Ix = ~4.16.0B, Si = ~p, " ++
-	     "Mode = ~p, Term = ~p", 
-	 [Identity, COBID, IX, SI, TransferMode, Term]),
-    gen_server:call(identity_to_pid(Identity), {store,TransferMode,COBID,IX,SI,Term}).
+    ?dbg(node, "store: Identity = ~p, NodeId = {~p, ~.16#}, " ++
+	     "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p", 
+	 [Identity, _TypeOfNid, _Nid, IX, SI, TransferMode, Term]),
+    gen_server:call(identity_to_pid(Identity), 
+		    {store,TransferMode,NodeId,IX,SI,Term}).
 
 
 %%--------------------------------------------------------------------
@@ -921,16 +935,20 @@ store(Identity, COBID, IX, SI, TransferMode, Term)
 %% @end
 %%--------------------------------------------------------------------
 -spec fetch(Identity::node_identity(), 
-	    Cobid::integer(), 
+	    {TypeOfNid::nodeid | xnodeid, Nid::integer()},
 	    Index::integer(), SubInd::integer(),
  	    TransferMode:: block | segment,
 	    Term::data | {app, Pid::pid(), Module::atom()}) ->
 		   ok | {ok, Data::binary()} | {error, Error::atom()}.
 
 
-fetch(Identity, COBID, IX, SI, TransferMode, Term)
+fetch(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, TransferMode, Term)
   when ?is_index(IX), ?is_subind(SI) ->
-    gen_server:call(identity_to_pid(Identity), {fetch,TransferMode,COBID,IX,SI,Term}).
+    ?dbg(node, "fetch: Identity = ~p, NodeId = {~p, ~.16#}, " ++
+	     "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p", 
+	 [Identity, _TypeOfNid, _Nid, IX, SI, TransferMode, Term]),
+    gen_server:call(identity_to_pid(Identity), 
+		    {fetch,TransferMode,NodeId,IX,SI,Term}).
 
 
 %%--------------------------------------------------------------------
@@ -1059,7 +1077,8 @@ notify(CobId,Index,Subind,Data) ->
 		    ok | {error, Error::atom()}.
 
 notify({xnodeid, XNid}, Func, Index, Subind, Data) ->
-    notify(?XCOB_ID(co_lib:encode_func(Func), XNid),Index,Subind,Data);
+    notify(?XCOB_ID(co_lib:encode_func(Func), co_lib:add_xflag(XNid)),
+	   Index,Subind,Data);
 notify({nodeid, Nid}, Func, Index, Subind, Data) ->
     notify(?COB_ID(co_lib:encode_func(Func), Nid),Index,Subind,Data).
 
@@ -1086,8 +1105,15 @@ notify({nodeid, Nid}, Func, Index, Subind, Data) ->
 		  
 
 notify_from(Identity={xnodeid, XNid}, Func, Index, Subind, Data) when is_atom(Func) ->
-    notify_from(Identity,?XCOB_ID(co_lib:encode_func(Func), XNid),Index,Subind,Data);
+    ?dbg(node, "notify_from: NodeId = {xnodeid, ~.16#}, Func = ~p, " ++
+	     "Ix = ~4.16.0B, Si = ~p, Data = ~w", 
+	 [XNid, Func, Index, Subind, Data]),
+    notify_from(Identity,?XCOB_ID(co_lib:encode_func(Func), co_lib:add_xflag(XNid)),
+		Index,Subind,Data);
 notify_from(Identity={nodeid, Nid}, Func, Index, Subind, Data) when is_atom(Func)->
+    ?dbg(node, "notify_from: NodeId = {nodeid, ~.16#}, Func = ~p, " ++
+	     "Ix = ~4.16.0B, Si = ~p, Data = ~p", 
+	 [Nid, Func, Index, Subind, Data]),
     notify_from(Identity,?COB_ID(co_lib:encode_func(Func), Nid),Index,Subind,Data);
 notify_from(Identity,CobId,Index,Subind,Data) when is_integer(CobId) ->
     co_node:notify_from(identity_to_pid(Identity),CobId,Index,Subind,Data).

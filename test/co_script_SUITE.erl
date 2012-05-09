@@ -202,24 +202,24 @@ verify_def_file(File) ->
 %%--------------------------------------------------------------------
 fetch_store(_Config) ->
     %% Fetch
-    CTS = co_mgr:client_fetch(co_lib:serial_to_xnodeid(serial()),
+    CTS = co_mgr:client_fetch({xnodeid, co_lib:serial_to_xnodeid(serial())},
 			      cobid_time_stamp, 0),
 
     %% Change
     NewCTS = CTS + 1,
-    ok = co_mgr:client_store(co_lib:serial_to_xnodeid(serial()),
+    ok = co_mgr:client_store({xnodeid, co_lib:serial_to_xnodeid(serial())},
 			     cobid_time_stamp, 0, NewCTS),
 
     %% Verify change
-    NewCTS = co_mgr:client_fetch(co_lib:serial_to_xnodeid(serial()),
+    NewCTS = co_mgr:client_fetch({xnodeid, co_lib:serial_to_xnodeid(serial())},
 				 cobid_time_stamp, 0),
 
     %% Restore
-    ok = co_mgr:client_store(co_lib:serial_to_xnodeid(serial()),
+    ok = co_mgr:client_store({xnodeid, co_lib:serial_to_xnodeid(serial())},
 			     cobid_time_stamp, 0, CTS),
 
     %% Verify restore
-    CTS	= co_mgr:client_fetch(co_lib:serial_to_xnodeid(serial()),
+    CTS	= co_mgr:client_fetch({xnodeid, co_lib:serial_to_xnodeid(serial())},
 				cobid_time_stamp, 0),
 
     ok.

@@ -481,8 +481,7 @@ fetch(Config, {{Index, _T, _M, SrvValue}, CliValue}, BlockOrSegment) ->
     ok.
 
 xnodeid() ->
-    {xnodeid, NodeId} = co_api:get_option(serial(), xnodeid),
-    NodeId.
+    co_api:get_option(serial(), xnodeid).
 
 store_cmd(Config, {Ix, Si}, BlockOrSegment) -> 
     co_mgr:store(xnodeid(), Ix, Si, BlockOrSegment, 

@@ -18,6 +18,7 @@
 -export([serial_to_nodeid/1]).
 -export([cobid_to_nodeid/1]).
 -export([cobid/2]).
+-export([add_xflag/1]).
 -export([encode_type/1]).
 -export([encode_struct/1]).
 -export([encode_access/1]).
@@ -118,6 +119,17 @@ cobid(F, NodeId) when is_atom(F), is_integer(NodeId)->
        true ->
 	    erlang:error(badarg)
     end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Combine nodeid with extentded flag.
+%% @end
+%%--------------------------------------------------------------------
+add_xflag(NodeId) when is_integer(NodeId) ->
+    NodeId bor ?COBID_ENTRY_EXTENDED;
+add_xflag(NodeId) ->
+    NodeId.
+
 
 %%--------------------------------------------------------------------
 %% @doc

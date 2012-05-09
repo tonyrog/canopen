@@ -147,7 +147,8 @@ load(File) ->
 %% </ul>
 %% @end
 %%--------------------------------------------------------------------
--spec fetch(NodeId::integer(), Ix::integer(), Si::integer(),
+-spec fetch({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
+	    Ix::integer(), Si::integer(),
 	    TransferMode:: block | segment,
 	    Destination:: {app, Pid::pid(), Mod::atom()} | 
 			  {value, Type::integer()} |
@@ -157,8 +158,8 @@ load(File) ->
 		   {ok, Data::binary()} |
 		   {error, Reason::atom()}.
 		   
-fetch(NodeId, Ix, Si, TransferMode, {app, Pid, Mod} = Term) 
-  when is_integer(NodeId), 
+fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {app, Pid, Mod} = Term) 
+  when is_integer(Nid), 
        is_integer(Ix), 
        is_integer(Si), 
        is_pid(Pid),
@@ -167,10 +168,14 @@ fetch(NodeId, Ix, Si, TransferMode, {app, Pid, Mod} = Term)
 	undefined -> {error, non_existing_application};
 	_Info -> co_api:fetch(?MGR_NODE, NodeId, Ix, Si, TransferMode, Term)
     end;
-fetch(NodeId, Ix, Si, TransferMode, {value, Type}) when is_atom(Type) ->
+fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {value, Type}) 
+  when is_integer(Nid), 
+       is_integer(Ix), 
+       is_integer(Si), 
+       is_atom(Type) ->
     fetch(NodeId, Ix, Si, TransferMode, {value, co_lib:encode_type(Type)}); 
-fetch(NodeId, Ix, Si, TransferMode, {value, Type}) 
-  when is_integer(NodeId), 
+fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {value, Type}) 
+  when is_integer(Nid), 
        is_integer(Ix), 
        is_integer(Si), 
        is_integer(Type) ->
@@ -183,7 +188,10 @@ fetch(NodeId, Ix, Si, TransferMode, {value, Type})
 	    end;
 	Error -> Error
     end;
-fetch(NodeId, Ix, Si, TransferMode, data = Term) ->
+fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, data = Term)  
+  when is_integer(Nid), 
+       is_integer(Ix), 
+       is_integer(Si) ->
     co_api:fetch(?MGR_NODE, NodeId, Ix, Si, TransferMode, Term).
 
 %%--------------------------------------------------------------------
@@ -191,7 +199,7 @@ fetch(NodeId, Ix, Si, TransferMode, data = Term) ->
 %% See {@link fetch/5}.
 %% @end
 %%--------------------------------------------------------------------
--spec fetch(NodeId::integer(), 
+-spec fetch({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
 	    {Ix::integer(), Si::integer()} | integer(),
 	    TransferMode:: block | segment,
 	    Destination:: {app, Pid::pid(), Mod::atom()} | 
@@ -202,13 +210,13 @@ fetch(NodeId, Ix, Si, TransferMode, data = Term) ->
 		   {ok, Data::binary()} |
 		   {error, Reason::atom()}.
 		   
-fetch(NodeId, {Ix, Si}, TransferMode, Term) 
-  when is_integer(NodeId), 
+fetch(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode, Term) 
+  when is_integer(Nid), 
        is_integer(Ix), 
        is_integer(Si) ->
     fetch(NodeId, Ix, Si, TransferMode, Term);
-fetch(NodeId, Ix, TransferMode, Term) 
-  when is_integer(NodeId), 
+fetch(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode, Term) 
+  when is_integer(Nid), 
        is_integer(Ix) ->
     fetch(NodeId, Ix, 0, TransferMode, Term).
 
@@ -228,7 +236,8 @@ fetch(NodeId, Ix, TransferMode, Term)
 %% </ul>
 %% @end
 %%--------------------------------------------------------------------
--spec store(NodeId::integer(), Ix::integer(), Si::integer(),
+-spec store({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
+	    Ix::integer(), Si::integer(),
 	    TransferMode:: block | segment,
 	    Source:: {app, Pid::pid(), Mod::atom()} | 
 		      {value, Value::term(), Type::integer()} |
@@ -236,8 +245,8 @@ fetch(NodeId, Ix, TransferMode, Term)
 		   ok | 
 		   {error, Reason::atom()}.
 
-store(NodeId, Ix, Si, TransferMode, {app, Pid, Mod} = Term) 
-  when is_integer(NodeId), 
+store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {app, Pid, Mod} = Term) 
+  when is_integer(Nid), 
        is_integer(Ix), 
        is_integer(Si), 
        is_pid(Pid),
@@ -246,17 +255,21 @@ store(NodeId, Ix, Si, TransferMode, {app, Pid, Mod} = Term)
 	undefined -> {error, non_existing_application};
 	_Info -> co_api:store(?MGR_NODE, NodeId, Ix, Si, TransferMode, Term)
     end;
-store(NodeId, Ix, Si, TransferMode, {value, Value, Type}) when is_atom(Type) ->
+store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {value, Value, Type}) 
+  when is_integer(Nid), 
+       is_integer(Ix), 
+       is_integer(Si), 
+       is_atom(Type) ->
  store(NodeId, Ix, Si, TransferMode, {value, Value, co_lib:encode_type(Type)});
-store(NodeId, Ix, Si, TransferMode, {value, Value, Type}) 
-  when is_integer(NodeId), 
+store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {value, Value, Type}) 
+  when is_integer(Nid), 
        is_integer(Ix), 
        is_integer(Si), 
        is_integer(Type) ->
     co_api:store(?MGR_NODE, NodeId, Ix, Si, TransferMode, 
 		  {data, co_codec:encode(Value, Type)});
-store(NodeId, Ix, Si, TransferMode, {data, Bin} = Term)
-  when is_integer(NodeId), 
+store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {data, Bin} = Term)
+  when is_integer(Nid), 
        is_integer(Ix), 
        is_integer(Si), 
        is_binary(Bin) ->
@@ -267,7 +280,7 @@ store(NodeId, Ix, Si, TransferMode, {data, Bin} = Term)
 %% See {@link  store/5}.
 %% @end
 %%--------------------------------------------------------------------
--spec store(NodeId::integer(), 
+-spec store({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
 	    {Ix::integer(), Si::integer()} | integer(),
 	    TransferMode:: block | segment,
 	    Source:: {app, Pid::pid(), Mod::atom()} | 
@@ -276,13 +289,13 @@ store(NodeId, Ix, Si, TransferMode, {data, Bin} = Term)
 		   ok | 
 		   {error, Reason::atom()}.
 
-store(NodeId, {Ix, Si}, TransferMode,  Term) 
-  when is_integer(NodeId), 
+store(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode,  Term) 
+  when is_integer(Nid), 
        is_integer(Ix), 
        is_integer(Si) ->
     store(NodeId, Ix, Si, TransferMode,  Term);
-store(NodeId, Ix, TransferMode,  Term) 
-  when is_integer(NodeId), 
+store(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode,  Term) 
+  when is_integer(Nid), 
        is_integer(Ix) ->
     store(NodeId, Ix, 0, TransferMode,  Term).
 
@@ -306,12 +319,15 @@ client_require(Mod)
 %% Set the default nodeid - for short interface.
 %% @end
 %%--------------------------------------------------------------------
--spec client_set_nid(Nid::integer()) ->
+-spec client_set_nid({TypeOfNid::nodeid | xnodeid, Nid::integer()}) ->
 			    ok | {error, Reason::term()}.
 
-client_set_nid(Nid) 
+client_set_nid({xnodeid,Nid} = NodeId) 
   when is_integer(Nid) andalso Nid < 2#1000000000000000000000000 -> %% Max 24 bit
-    gen_server:call(?CO_MGR, {set_nid, Nid}).
+    gen_server:call(?CO_MGR, {set_nid, NodeId});
+client_set_nid({nodeid,Nid} = NodeId) 
+  when is_integer(Nid) andalso Nid < 127 -> 
+    gen_server:call(?CO_MGR, {set_nid, NodeId}).
 
 
 %%--------------------------------------------------------------------
@@ -335,7 +351,7 @@ client_set_mode(Mode)
 %% for Index and SubInd.
 %% @end
 %%--------------------------------------------------------------------
--spec client_store(NodeId::integer(), 
+-spec client_store({TypeOfNid::nodeid | xnodeid, Nid::integer()},
 		   Index::integer() | atom(), 
 		   SubInd::integer() | atom(), 
 		   Value::term()) ->
@@ -381,7 +397,7 @@ client_store(Index, Value) ->
 %% for Index and SubInd.
 %% @end
 %%--------------------------------------------------------------------
--spec client_fetch(NodeId::integer(), 
+-spec client_fetch({TypeOfNid::nodeid | xnodeid, Nid::integer()},
 		   Index::integer() | atom(),
 		   SubInd::integer() | atom()) -> 
 			  Value::term() | {error, Reason::term()}.
@@ -421,7 +437,7 @@ client_fetch(Index)  ->
 %% See {@link co_api:notify/4}.
 %% @end
 %%--------------------------------------------------------------------
--spec client_notify(NodeId::integer(),
+-spec client_notify({TypeOfNid::nodeid | xnodeid, Nid::integer()},
 		    Func::atom(),
 		    Index::integer() | atom(),
 		    SubInd::integer() | atom(), 
@@ -512,8 +528,14 @@ init(Opts) ->
 %%--------------------------------------------------------------------
 -type call_request()::
 	stop |
-	{setnid, Nid::integer()} |
+	{setnid, {TypeOfNid::nodeid | xnodeid, Nid::integer()}} |
 	{setmode, Mode:: block | segment} |
+	{store, {TypeOfNid::nodeid | xnodeid, Nid::integer()},
+	 Ix::integer(), Si::integer(), Value::term()} |
+	{store, Ix::integer(), Si::integer(), Value::term()} |
+	{fetch, {TypeOfNid::nodeid | xnodeid, Nid::integer()},
+	 Ix::integer(), Si::integer()} |
+	{fetch, Ix::integer(), Si::integer()} |
 	{debug, TrueOrFalse::boolean()} |
 	{loop_data, Qual:: all | no_ctx}.
 
@@ -569,7 +591,12 @@ handle_call(_Request, _From, Mgr) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec handle_cast(Msg::term(), Mgr::#mgr{}) -> 
+-type cast_msg()::
+	{notify, {TypeOfNid::nodeid | xnodeid, Nid::integer()},
+	 Func::atom(), Ix::integer(), Si::integer(), Value::term()} |
+	{notify, Func::atom(), Ix::integer(), Si::integer(), Value::term()}.
+
+-spec handle_cast(Msg::cast_msg(), Mgr::#mgr{}) -> 
 			 {noreply, Mgr::#mgr{}} |
 			 {noreply, Mgr::#mgr{}, Timeout::timeout()} |
 			 {stop, Reason::term(), Mgr::#mgr{}}.
@@ -753,7 +780,7 @@ do_notify(Nid, Func,Index,SubInd, Value, Mgr) ->
 	    try co_codec:encode(Tv, {Type, 32}) of
 		Data ->
 		    ?dbg(mgr,"do_notify: ~w ~w ~.16.0#:~w ~w\n", [Nid,Func,Ti,Tsi,Data]),
-		    co_api:notify_from({xnodeid,Nid}, Func,Ti,Tsi,Data)
+		    co_api:notify_from(Nid,Func,Ti,Tsi,Data)
 	    catch error:_Reason ->
 		    ?dbg(mgr,"do_notify: encode failed ~w ~w ~.16.0#~w ~w, reason ~p\n", 
 			      [Nid, Func, Index, SubInd, Value, _Reason])
