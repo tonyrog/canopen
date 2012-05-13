@@ -49,10 +49,12 @@ run_master(Serial) ->
     run(Serial, [{nmt_master, true}, {supervision, node_guard}]).
 
 run_master(Serial, Port, Ttl) ->
-    run(Serial, Port, Ttl, [{nmt_master, true}, {supervision, node_guard}]).
+    run(Serial, Port, Ttl, [{nmt_master, true}, {supervision, node_guard}]),
+    co_api:set_option(0,debug,false),
+    co_api:set_option(Serial,debug,false).
 
 run_slave(Serial) ->
-    run(Serial, [{supervision, node_guard}]).
+    run(Serial, [{supervision, node_guard}, {nodeid, Serial band 16#7f}]).
 
 run_slave(Serial, Port, Ttl) ->
     run(Serial, Port, Ttl, [{supervision, node_guard}]).

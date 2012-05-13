@@ -24,10 +24,12 @@
 -export([encode_access/1]).
 -export([encode_func/1]).
 -export([encode_transmission/1]).
+-export([encode_nmt_command/1]).
 -export([decode_type/1]).
 -export([decode_struct/1]).
 -export([decode_access/1]).
 -export([decode_transmission/1]).
+-export([decode_nmt_command/1]).
 -export([load_definition/1,load_definition/2]).
 -export([object/2]).
 -export([entry/2,entry/3]).
@@ -423,6 +425,35 @@ encode_func(emergency) -> ?EMERGENCY;
 encode_func(F) when F >= 0, F < 15 -> F;
 encode_func(_) -> erlang:error(badarg).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Encode nmt commands.
+%% @end
+%%--------------------------------------------------------------------
+-spec encode_nmt_command(Cmd::atom() | integer()) -> CmdCode::integer().
+
+encode_nmt_command(start) -> ?NMT_START_REMOTE_NODE;
+encode_nmt_command(stop) -> ?NMT_STOP_REMOTE_NODE;
+encode_nmt_command(enter_pre_op) -> ?NMT_ENTER_PRE_OPERATIONAL;
+encode_nmt_command(reset) -> ?NMT_RESET_NODE;
+encode_nmt_command(reset_com) -> ?NMT_RESET_COMMUNICATION;
+encode_nmt_command(Cmd) when is_integer(Cmd) -> Cmd; %% ??
+encode_nmt_command(_) -> erlang:error(badarg).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Encode nmt commands.
+%% @end
+%%--------------------------------------------------------------------
+-spec decode_nmt_command(Cmd::integer()) -> 
+				 CmdCode::atom().
+
+decode_nmt_command(?NMT_START_REMOTE_NODE) -> start;
+decode_nmt_command(?NMT_STOP_REMOTE_NODE) -> stop;
+decode_nmt_command(?NMT_ENTER_PRE_OPERATIONAL) -> enter_pre_op;
+decode_nmt_command(?NMT_RESET_NODE) -> reset;
+decode_nmt_command(?NMT_RESET_COMMUNICATION) -> reset_com;
+decode_nmt_command(_) -> erlang:error(badarg).
 
 -record(def_mod,
 	{

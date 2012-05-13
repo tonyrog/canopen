@@ -61,9 +61,8 @@
 -define(CO_NODE, co_node).
 
 -type node_identity()::
+	NodeId::node_id() |
 	{name, NodeName::atom()} |
-	{nodeid, ShortNodeId::integer()} |
-	{xnodeid, ExtNodeId::integer()} |
 	integer() | %% Serial
 	pid().
 

@@ -2290,24 +2290,30 @@ lookup_cobid(CobId, Ctx) ->
 	[{_,Entry}] -> 
 	    Entry;
 	[] -> 
-	    if ?is_cobid_extended(CobId) andalso 
+	    if %% Sdo tx, start session
+	       ?is_cobid_extended(CobId) andalso 
 	       ?XFUNCTION_CODE(CobId) =:= ?SDO_TX ->
 		    {sdo_tx, ?XCOB_ID(?SDO_RX, ?XNODE_ID(CobId))};
 	       ?is_not_cobid_extended(CobId) andalso
 	       ?FUNCTION_CODE(CobId) =:= ?SDO_TX ->
 		    {sdo_tx, ?COB_ID(?SDO_RX, ?NODE_ID(CobId))};
+
+	       %% Sdo rx to other node, ignore
 	       ?is_cobid_extended(CobId) andalso 
 	       ?XFUNCTION_CODE(CobId) =:= ?SDO_RX ->
 		    {sdo_rx, not_receiver, ?XCOB_ID(?SDO_RX, ?XNODE_ID(CobId))};
 	       ?is_not_cobid_extended(CobId) andalso
 	       ?FUNCTION_CODE(CobId) =:= ?SDO_RX ->
 		    {sdo_rx, not_receiver, ?COB_ID(?SDO_RX, ?NODE_ID(CobId))};
+
+	       %% Node guard -> nmt master
 	       ?is_cobid_extended(CobId) andalso 
 	       ?XFUNCTION_CODE(CobId) =:= ?NODE_GUARD ->
-		    {node_guard, co_lib:add_xflag(?XNODE_ID(CobId))};
+		    {node_guard, {xnodeid, ?XNODE_ID(CobId)}};
 	       ?is_not_cobid_extended(CobId) andalso
 	       ?FUNCTION_CODE(CobId) =:= ?NODE_GUARD ->
-		    {node_guard, ?NODE_ID(CobId)};
+		    {node_guard, {nodeid, ?NODE_ID(CobId)}};
+
 	       true ->
 		    undefined
 	    end

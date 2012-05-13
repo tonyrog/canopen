@@ -26,15 +26,6 @@
 %% @doc
 %%  Returns list of tuples to set default properties
 %%  for the suite.
-%%
-%% Function: suite() -> Info
-%%
-%% Info = [tuple()]
-%%   List of key/value pairs.
-%%
-%% Note: The suite/0 function is only meant to be used to return
-%% default data values, not perform any other operations.
-%%
 %% @spec suite() -> Info
 %% @end
 %%--------------------------------------------------------------------
@@ -49,14 +40,6 @@ suite() ->
 %% @doc
 %%  Returns the list of groups and test cases that
 %%  are to be executed.
-%%
-%% GroupsAndTestCases = [{group,GroupName} | TestCase]
-%% GroupName = atom()
-%%   Name of a test case group.
-%% TestCase = atom()
-%%   Name of a test case.
-%% Reason = term()
-%%   The reason for skipping all groups and test cases.
 %%
 %% @spec all() -> GroupsAndTestCases | {skip,Reason}
 %% @end
@@ -79,14 +62,6 @@ all() ->
 %% @doc
 %% Initialization before the whole suite
 %%
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding the test case configuration.
-%% Reason = term()
-%%   The reason for skipping the suite.
-%%
-%% Note: This function is free to add any key/value pairs to the Config
-%% variable, but should NOT alter/remove any existing entries.
-%%
 %% @spec init_per_suite(Config0) ->
 %%               Config1 | {skip,Reason} | {skip_and_save,Reason,Config1}
 %% @end
@@ -99,9 +74,6 @@ init_per_suite(Config) ->
 %% @doc
 %% Cleanup after the whole suite
 %%
-%% Config - [tuple()]
-%%   A list of key/value pairs, holding the test case configuration.
-%%
 %% @spec end_per_suite(Config) -> _
 %% @end
 %%--------------------------------------------------------------------
@@ -113,16 +85,6 @@ end_per_suite(Config) ->
 %%--------------------------------------------------------------------
 %% @doc
 %% Initialization before each test case
-%%
-%% TestCase - atom()
-%%   Name of the test case that is about to be run.
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding the test case configuration.
-%% Reason = term()
-%%   The reason for skipping the test case.
-%%
-%% Note: This function is free to add any key/value pairs to the Config
-%% variable, but should NOT alter/remove any existing entries.
 %%
 %% @spec init_per_testcase(TestCase, Config0) ->
 %%               Config1 | {skip,Reason} | {skip_and_save,Reason,Config1}
@@ -143,11 +105,6 @@ init_per_testcase(_TestCase, Config) ->
 %%--------------------------------------------------------------------
 %% @doc
 %% Cleanup after each test case
-%%
-%% TestCase - atom()
-%%   Name of the test case that is finished.
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding the test case configuration.
 %%
 %% @spec end_per_testcase(TestCase, Config0) ->
 %%               void() | {save_config,Config1} | {fail,Reason}
@@ -171,12 +128,13 @@ end_per_testcase(_TestCase, _Config) ->
 %%--------------------------------------------------------------------
 
 %%--------------------------------------------------------------------
-%% @spec start_of_co_node(Config) -> ok 
 %% @doc 
 %% Dummy testcase verifying that the co_node is up and running.
 %% The real start is done in init_per_suite.
 %% @end
 %%--------------------------------------------------------------------
+-spec start_of_co_node(Config::list(tuple())) -> ok.
+
 start_of_co_node(_Config) -> 
     ct:pal("Node up and running"),
     timer:sleep(1000),
@@ -254,11 +212,12 @@ unknown_option(_Config) ->
     ok.
 
 %%--------------------------------------------------------------------
-%% @spec unknown_option(Config) -> ok 
 %% @doc 
 %% Change nodeid options.
 %% @end
 %%--------------------------------------------------------------------
+-spec nodeid_changes(Config::list(tuple())) -> ok.
+
 nodeid_changes(_Config) ->
     
     set_option({nodeid, 7}),
@@ -290,11 +249,12 @@ nodeid_changes(_Config) ->
     
 
 %%--------------------------------------------------------------------
-%% @spec restore_dict(Config) -> ok 
 %% @doc 
 %% Verifies that a saved dict can be restored.
 %% @end
 %%--------------------------------------------------------------------
+-spec restore_dict(Config::list(tuple())) -> ok.
+
 restore_dict(_Config) ->
     {Index, NewValue, _Type} = ct:get_config(dict_index),
     {ok, OldValue} = co_api:value(serial(), Index),
@@ -312,11 +272,12 @@ restore_dict(_Config) ->
 
 
 %%--------------------------------------------------------------------
-%% @spec save_and_load(Config) -> ok 
 %% @doc 
 %% Saves and loads a dict using SDO:s.
 %% @end
 %%--------------------------------------------------------------------
+-spec save_and_load(Config::list(tuple())) -> ok.
+
 save_and_load(Config) ->
     {Index, NewValue, _Type} = ct:get_config(dict_index),
     {ok, OldValue} = co_api:value(serial(), Index),
@@ -341,11 +302,12 @@ save_and_load(Config) ->
     ok.
 
 %%--------------------------------------------------------------------
-%% @spec save_and_load_nok(Config) -> ok 
 %% @doc 
 %% Verifies that load and save only works with correct values
 %% @end
 %%--------------------------------------------------------------------
+-spec save_and_load_nok(Config::list(tuple())) -> ok.
+
 save_and_load_nok(Config) ->
 
     "cocli: error: set failed: local control error\r\n" = 
@@ -361,11 +323,12 @@ save_and_load_nok(Config) ->
     ok.
 
 %%--------------------------------------------------------------------
-%% @spec start_stop_of_app(Config) -> ok 
 %% @doc 
 %% Verifies start and stop of an app connecting to the co_node.
 %% @end
 %%--------------------------------------------------------------------
+-spec start_stop_app(Config::list(tuple())) -> ok.
+
 start_stop_app(_Config) ->
     {ok, _Pid} = co_test_app:start(serial(), app_dict()),
     timer:sleep(1000),
@@ -379,12 +342,13 @@ start_stop_app(_Config) ->
 
 
 %%--------------------------------------------------------------------
-%% @spec break(Config) -> ok 
 %% @doc 
 %% Dummy test case to have a test environment running.
 %% Stores Config in ets table.
 %% @end
 %%--------------------------------------------------------------------
+-spec break(Config::list(tuple())) -> ok.
+
 break(Config) ->
     ets:new(config, [set, public, named_table]),
     ets:insert(config, Config),

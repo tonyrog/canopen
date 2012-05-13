@@ -235,3 +235,7 @@
 	}).
 
 -endif.
+
+-type node_id()::
+	{nodeid, ShortNodeId::integer()} |
+	{xnodeid, ExtNodeId::integer()}.	
