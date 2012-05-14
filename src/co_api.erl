@@ -81,7 +81,7 @@
 %%          {nodeid, integer()}       - node id, range: 1 - 16#7e.<br/>
 %%          {xnodeid, integer()}      - extended node id, range: 1 - 16#ffffff.<br/>
 %%          {time_stamp,  timeout()}  - ( 60000 ) in msec. <br/>
-%%          {nmt_master, boolean()}   - ( false )
+%%          {nmt_role, nmt_role()}        - ( autonomous ) slave/master/autonomous
 %%          {supervision, node_guard | heartbeat | none}   - ( none )
 %%
 %%            Dictionary options
@@ -116,7 +116,7 @@
 	{use_serial_as_xnodeid, boolean()} |
 	{nodeid, integer()} | 
 	{xnodeid, integer()} | 
-	{nmt_master, boolean()} | 
+	{nmt_role, nmt_role()} | 
 	{supervision, supervision()} | 
 	{load_last_saved, boolean()} | 
 	{dict_file, string()} | 
@@ -197,16 +197,22 @@ verify_option(Option, NewValue)
 	    {error, "Option " ++ atom_to_list(Option) ++ 
 		 " can only be set to a positive integer value."}
     end;
+verify_option(nmt_role, NewValue) 
+  when NewValue == slave;
+       NewValue == master;
+       NewValue == autonomous ->
+    ok;
+verify_option(nmt_role, _NewValue) ->
+    {error, "Option nmt_role can only be set to slave/master/autonomous."};
 verify_option(supervision, NewValue) 
-  when is_atom(NewValue) ->
-    if NewValue == node_guard orelse NewValue == none ->
-	    ok;
-       NewValue == heartbeat ->
-	    {error, "heartbeat not implemented yet"};
-       true ->
-	    {error, "Option supervision " 
-	     " can only be set to node_guard heartbeat or none."}
-    end;
+  when NewValue == node_guard;
+       NewValue == none ->
+    ok;
+verify_option(supervision, NewValue) 
+  when NewValue == heartbeat ->
+    {error, "heartbeat not implemented yet"};
+verify_option(supervision, _NewValue) ->
+    {error, "Option supervision can only be set to node_guard/heartbeat/none."};
 verify_option(Option, NewValue) 
   when Option == pst ->
     if is_integer(NewValue) andalso NewValue >= 0 ->
@@ -240,7 +246,6 @@ verify_option(Option, NewValue)
     end;
 verify_option(Option, NewValue) 
   when Option == use_serial_as_xnodeid;
-       Option == nmt_master;
        Option == use_crc;
        Option == load_last_saved;
        Option == debug;

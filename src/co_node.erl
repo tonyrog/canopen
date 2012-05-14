@@ -206,7 +206,7 @@ init({Serial, NodeName, Opts} = Args) ->
       vendor = proplists:get_value(vendor,Opts,0),
       serial = Serial,
       state  = ?Initialisation,
-      nmt_master = proplists:get_value(nmt_master,Opts,false),
+      nmt_role = proplists:get_value(nmt_role,Opts,autonomous),
       supervision = proplists:get_value(supervision,Opts,none),
       sub_table = SubTable,
       res_table = ResTable,
@@ -270,28 +270,35 @@ reset_communication(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId})
     initialization(Ctx).
 
 initialization(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId,
-			    nmt_master = NmtMaster, supervision = Supervision}) ->
+			    nmt_role = NmtRole, supervision = Supervision}) ->
     error_logger:info_msg("Node '~s' id=~w,~w initialization\n",
 	      [_Name, _XNodeId, _SNodeId]),
 
-    if NmtMaster ->
+    if NmtRole == master ->
 	    activate_nmt(Ctx),
-	    Ctx#co_ctx { state = ?Operational }; %% ??
-       Supervision == node_guard ->
-	    %% NMT slave
-	    Ctx1 = activate_node_guard(Ctx),
-	    send_bootup(Ctx1),
-	    Ctx1#co_ctx { state = ?PreOperational };
+	    Ctx#co_ctx {state = ?Operational}; %% ??
+       NmtRole == slave ->
+	    send_bootup(Ctx),
+	    if Supervision == node_guard ->
+		    activate_node_guard(Ctx#co_ctx {state = ?PreOperational});
+	       %% Add heartbeat
+	       true ->
+		    Ctx#co_ctx {state = ?PreOperational}
+	    end;
        true ->
-	    Ctx#co_ctx { state = ?PreOperational }
+	    Ctx#co_ctx {state = ?PreOperational}
     end.
     
 
-activate_node_guard(Ctx=#co_ctx {nmt_master = true, name = _Name}) ->
+activate_node_guard(Ctx=#co_ctx {nmt_role = autonomous, name = _Name}) ->
+    ?dbg(node, "~s: activate_node_guard: autonomous, no node guarding.", [_Name]),
+    Ctx;
+activate_node_guard(Ctx=#co_ctx {nmt_role = master, name = _Name}) ->
     ?dbg(node, "~s: activate_node_guard: nmt master, node guarding "
 	 "handled by nmt master process.", [_Name]),
     Ctx;
-activate_node_guard(Ctx=#co_ctx {dict = Dict, name = _Name}) ->
+activate_node_guard(Ctx=#co_ctx {nmt_role = slave, dict = Dict, name = _Name}) ->
+    ?dbg(node, "~s: activate_node_guard: nmt slave.", [_Name]),
     case co_dict:value(Dict, ?IX_GUARD_TIME) of
 	{ok, NodeGuardTime} ->
 	    case co_dict:value(Dict, ?IX_LIFE_TIME_FACTOR) of
@@ -319,7 +326,14 @@ activate_node_guard(Ctx=#co_ctx {dict = Dict, name = _Name}) ->
 	    Ctx
     end.
 			    
-		    
+deactivate_node_guard(Ctx=#co_ctx {node_guard_timer = undefined}) ->		    
+    %% Do nothing
+    Ctx;
+deactivate_node_guard(Ctx=#co_ctx {node_guard_timer = TRef}) ->		    
+    timer:cancel(TRef),
+    Ctx#co_ctx {node_guard_timer = undefined}.
+
+
 send_bootup(Ctx=#co_ctx {name = _Name}) ->
     ?dbg(node, "~s: send_bootup: nmt slave, sending bootup to master.", [_Name]),
     %% BootUp uses same CobId as NodeGuard
@@ -717,7 +731,7 @@ handle_call({option, Option}, _From, Ctx) ->
 		name -> {Option, Ctx#co_ctx.name};
 		nodeid -> {Option, Ctx#co_ctx.nodeid};
 		xnodeid -> {Option, Ctx#co_ctx.xnodeid};
-		nmt_master -> {Option, Ctx#co_ctx.nmt_master};
+		nmt_role -> {Option, Ctx#co_ctx.nmt_role};
 		supervision -> {Option, Ctx#co_ctx.supervision};
 		id -> if Ctx#co_ctx.nodeid =/= undefined ->
 			      {nodeid, Ctx#co_ctx.nodeid};
@@ -754,24 +768,6 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
 		atomic_limit -> Ctx#co_ctx.sdo#sdo_ctx {atomic_limit = NewValue};
 		time_stamp -> Ctx#co_ctx {time_stamp_time = NewValue};
 
-		nmt_master -> OldValue = Ctx#co_ctx.nmt_master,
-			      case {NewValue, OldValue} of
-				  {true, false} -> activate_nmt(Ctx);
-				  {false, true} -> deactivate_nmt(Ctx);
-				  _NoChange -> do_nothing
-			      end,
-			      Ctx#co_ctx {nmt_master = NewValue};
-
-		supervision -> OldValue = Ctx#co_ctx.supervision,
-			       if NewValue =/= OldValue andalso
-				  Ctx#co_ctx.nmt_master == true ->
-				       gen_server:cast(co_nmt_master,
-						       {supervision, NewValue});
-				  true ->
-				       do_nothing
-			       end,
-			       Ctx#co_ctx {supervision = NewValue};
-
 		debug -> put(dbg, NewValue),
 			 Ctx#co_ctx.sdo#sdo_ctx {debug = NewValue};
 
@@ -784,7 +780,12 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
 		      NodeIdChange == nodeid;
 		      NodeIdChange == xnodeid;
 		      NodeIdChange == use_serial_as_xnodeid -> 
-		    change_nodeid(Option, NewValue, Ctx);
+		    nodeid_change(NodeIdChange, NewValue, Ctx);
+
+		NmtChange when
+		      NmtChange == nmt_role;
+		      NmtChange == supervision ->
+		    nmt_change(NmtChange, NewValue, Ctx);
 
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
 	    end,
@@ -947,7 +948,7 @@ handle_info(_Info, Ctx) ->
 %%--------------------------------------------------------------------
 terminate(_Reason, Ctx) ->
     %% If NMT master stop master process
-    if Ctx#co_ctx.nmt_master ->
+    if Ctx#co_ctx.nmt_role == master ->
 	    deactivate_nmt(Ctx);
        true ->
 	    do_nothing
@@ -1085,36 +1086,103 @@ delete_from_cob_table(T, nodeid, ShortNid)
 	 [ShortNid,SDORx,SDOTx]).
 
 
-change_nodeid(xnodeid, NewXNid, Ctx=#co_ctx {xnodeid = NewXNid}) ->
+nodeid_change(xnodeid, NewXNid, Ctx=#co_ctx {xnodeid = NewXNid}) ->
     %% No change
     Ctx;
-change_nodeid(xnodeid, undefined, _Ctx=#co_ctx {nodeid = undefined}) -> 
+nodeid_change(xnodeid, undefined, _Ctx=#co_ctx {nodeid = undefined}) -> 
     {error, "Not possible to remove last nodeid"};
-change_nodeid(xnodeid, NewNid, Ctx=#co_ctx {xnodeid = OldNid}) ->
+nodeid_change(xnodeid, NewNid, Ctx=#co_ctx {xnodeid = OldNid}) ->
     execute_change(xnodeid, NewNid, OldNid, Ctx),
     Ctx#co_ctx {xnodeid = NewNid};
-change_nodeid(nodeid, NewNid, Ctx=#co_ctx {nodeid = NewNid}) ->
+nodeid_change(nodeid, NewNid, Ctx=#co_ctx {nodeid = NewNid}) ->
     %% No change
     Ctx;
-change_nodeid(nodeid, undefined, _Ctx=#co_ctx {xnodeid = undefined}) -> 
+nodeid_change(nodeid, undefined, _Ctx=#co_ctx {xnodeid = undefined}) -> 
     {error, "Not possible to remove last nodeid"};
-change_nodeid(nodeid, 0, _Ctx) ->
+nodeid_change(nodeid, 0, _Ctx) ->
     {error, "NodeId 0 is reserved for the CANopen manager co_mgr."};
-change_nodeid(nodeid, NewNid, Ctx=#co_ctx {nodeid = OldNid}) ->
+nodeid_change(nodeid, NewNid, Ctx=#co_ctx {nodeid = OldNid}) ->
     execute_change(nodeid, NewNid, OldNid, Ctx),
     Ctx#co_ctx {nodeid = NewNid};
-change_nodeid(use_serial_as_xnodeid, true, Ctx=#co_ctx {serial = Serial}) ->
+nodeid_change(use_serial_as_xnodeid, true, Ctx=#co_ctx {serial = Serial}) ->
     NewXNid = co_lib:serial_to_xnodeid(Serial),
-    change_nodeid(xnodeid, NewXNid, Ctx);
-change_nodeid(use_serial_as_xnodeid, false, Ctx) ->
+    nodeid_change(xnodeid, NewXNid, Ctx);
+nodeid_change(use_serial_as_xnodeid, false, Ctx) ->
     case  calc_use_serial(Ctx) of
 	true ->
 	    %% Serial was used as extended node id
-	    change_nodeid(xnodeid, undefined, Ctx);
+	    nodeid_change(xnodeid, undefined, Ctx);
 	false ->
 	    %% Serial was NOT used as nodeid so flag was already false
 	    Ctx
     end.
+
+%% ROLE
+%% No change
+nmt_change(nmt_role, NewRole, Ctx=#co_ctx {nmt_role = NewRole}) ->
+    Ctx;
+%% autonomous to master
+nmt_change(nmt_role, master, Ctx=#co_ctx {nmt_role = autonomous}) ->
+    activate_nmt(Ctx#co_ctx {nmt_role = master});
+%% slave to master
+nmt_change(nmt_role, master, 
+	   Ctx=#co_ctx {nmt_role = slave, supervision = node_guard}) ->
+    activate_nmt(deactivate_node_guard(Ctx#co_ctx {nmt_role = master}));
+nmt_change(nmt_role, master, 
+	   Ctx=#co_ctx {nmt_role = slave, supervision = heartbeat}) ->
+    %% Deactivate heartbeat ??
+    activate_nmt(Ctx#co_ctx {nmt_role = master});
+nmt_change(nmt_role, master, 
+	   Ctx=#co_ctx {nmt_role = slave, supervision = none}) ->
+    activate_nmt(Ctx#co_ctx {nmt_role = master});
+%% master to slave
+nmt_change(nmt_role, slave, 
+	   Ctx=#co_ctx {nmt_role = master, supervision = node_guard}) ->
+    activate_node_guard(deactivate_nmt(Ctx#co_ctx {nmt_role = slave}));
+nmt_change(nmt_role, slave, 
+	   Ctx=#co_ctx {nmt_role = master, supervision = heartbeat}) ->
+    %% Activate heartbeat ??
+    deactivate_nmt(Ctx#co_ctx {nmt_role = slave});
+nmt_change(nmt_role, slave, 
+	   Ctx=#co_ctx {nmt_role = master, supervision = none}) ->
+    deactivate_nmt(Ctx#co_ctx {nmt_role = slave});
+%% master to autonomous
+nmt_change(nmt_role, autonomous, Ctx=#co_ctx {nmt_role = master}) ->
+    deactivate_nmt(Ctx#co_ctx {nmt_role = autonomous});
+%% SUPERVISION
+%%  No change
+nmt_change(supervision, NewValue, Ctx=#co_ctx {supervision = NewValue}) ->
+    Ctx;
+%% to heartbeart not implemented
+nmt_change(supervision, heartbeat, 
+	   _Ctx=#co_ctx {supervision = _OldValue, nmt_role = slave}) ->
+    %% To be implemented ??
+    {error, not_implemented};
+%% supervision change when master handled by master ??
+nmt_change(supervision, NewValue, 
+	   Ctx=#co_ctx {supervision = _OldValue, nmt_role = master}) ->		
+    gen_server:cast(co_nmt_master, {supervision, NewValue}),
+    Ctx#co_ctx {supervision = NewValue}; 
+%% supervision change when autonomous ignored ??
+nmt_change(supervision, NewValue, Ctx=#co_ctx {nmt_role = autonomous}) ->
+    Ctx#co_ctx {supervision = NewValue};
+%% to node_guard when slave
+nmt_change(supervision, node_guard, 
+	   Ctx=#co_ctx {supervision = none, nmt_role = slave}) ->	
+    activate_node_guard(Ctx#co_ctx {supervision = node_guard});
+nmt_change(supervision, node_guard, 
+	   Ctx=#co_ctx {supervision = heartbeat, nmt_role = slave}) ->	
+    %% Deactivate heartbeat ??
+    Ctx#co_ctx {supervision = node_guard};
+%% to none  when slave
+nmt_change(supervision, none, 
+	   Ctx=#co_ctx {supervision = node_guard, nmt_role = slave}) ->
+    deactivate_node_guard(Ctx#co_ctx {supervision = none});
+nmt_change(supervision, none, 
+	   Ctx=#co_ctx {supervision = heartbeat, nmt_role = slave}) ->
+    %% Deactivate heartbeat ??
+    Ctx#co_ctx {supervision = none}.
+
 
 execute_change(NidType, NewNid, OldNid, Ctx=#co_ctx { cob_table = T}) ->  
     ?dbg(node, "execute_change: NidType = ~p, OldNid = ~p, NewNid = ~p", 
@@ -1322,13 +1390,23 @@ handle_can(Frame, Ctx=#co_ctx {state = _State, name = _Name}) ->
 %%
 %% NMT 
 %%
-handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId, name=_Name}) 
-  when M#can_frame.len >= 2 ->
-    ?dbg(node, "~s: handle_nmt: ~p", [_Name, M]),
+handle_nmt(M, Ctx=#co_ctx {nmt_role = autonomous, name=_Name}) ->
+    <<_NodeId,_Cs,_/binary>> = M#can_frame.data,
+    ?dbg(node, "~s: handle_nmt: node is autonomous, nmt command ~p to ~p ignored. ",
+	 [_Name, co_lib:decode_nmt_command(_Cs), _NodeId]),
+    Ctx;
+handle_nmt(M, Ctx=#co_ctx {nodeid=undefined, nmt_role = slave, name=_Name}) ->
+    <<_NodeId,_Cs,_/binary>> = M#can_frame.data,
+    ?dbg(node, "~s: handle_nmt: node has no short id, no nmt possible. "
+	 "Command ~p is for node ~p",
+	 [_Name, co_lib:decode_nmt_command(_Cs), _NodeId]),
+    Ctx;
+handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, nmt_role = slave, name=_Name}) 
+  when M#can_frame.len >= 2 andalso SNodeId =/= undefined ->
     <<NodeId,Cs,_/binary>> = M#can_frame.data,
-    XNid = co_lib:add_xflag(XNodeId),
+    ?dbg(node, "~s: handle_nmt: slave ~p, command ~p", 
+	 [_Name, NodeId, co_lib:decode_nmt_command(Cs)]),
     if NodeId == 0; 
-       NodeId == XNid; 
        NodeId == SNodeId ->
 	    case Cs of
 		?NMT_RESET_NODE ->
@@ -1352,11 +1430,21 @@ handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId, name=_Name})
        true ->
 	    %% not for me
 	    Ctx
-    end.
+    end;
+handle_nmt(M, Ctx=#co_ctx {nmt_role = master, name=_Name}) ->
+    <<_NodeId,_Cs,_/binary>> = M#can_frame.data,
+    ?dbg(node, "~s: handle_nmt: node is nmt master, no nmt command possible. "
+	 "Command ~p is for node ~p",
+	 [_Name, co_lib:decode_nmt_command(_Cs), _NodeId]),
+    Ctx.
+    
 
-
+handle_node_guard(_Frame, Ctx=#co_ctx {nmt_role = autonomous, name=_Name}) ->
+    ?dbg(node, "~s: handle_node_guard: node is autonomous, "
+	 "node_guard request ~w  ignored. ",[_Name, _Frame]),
+    Ctx;
 handle_node_guard(Frame, 
-		  Ctx=#co_ctx {state = State, toggle = Toggle, nmt_master = false, 
+		  Ctx=#co_ctx {state = State, toggle = Toggle, nmt_role = slave, 
 			       node_guard_timer = Timer, node_life_time = NLT,
 			       node_guard_error = NgError, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
@@ -1385,7 +1473,7 @@ handle_node_guard(Frame,
        true ->
 	    Ctx#co_ctx { toggle = NewToggle, node_guard_error = false}
     end;
-handle_node_guard(Frame, Ctx=#co_ctx {nmt_master = true, name=_Name}) 
+handle_node_guard(Frame, Ctx=#co_ctx {nmt_role = master, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
     ?dbg(node, "~s: handle_node_guard: request ~w", [_Name,Frame]),
     %% Node is nmt master and should NOT receive node_guard request
@@ -1393,14 +1481,14 @@ handle_node_guard(Frame, Ctx=#co_ctx {nmt_master = true, name=_Name})
 			   " request even though being NMT master\n"),
     Ctx.
 
-handle_node_guard(_Frame, _NodeId, Ctx=#co_ctx {nmt_master = false, name = _Name}) ->
-    ?dbg(node, "~s: handle_node_guard: reply ~w from ~p", [_Name, _Frame, _NodeId]),
-    ?dbg(node, "~s: not nmt master, ignored", [_Name]),
-    Ctx;
-handle_node_guard(Frame, NodeId, Ctx=#co_ctx {nmt_master = true, name = _Name}) 
+handle_node_guard(Frame, NodeId, Ctx=#co_ctx {nmt_role = master, name = _Name}) 
   when Frame#can_frame.len >= 1 ->
     ?dbg(node, "~s: handle_node_guard: reply ~w", [_Name,Frame]),
     gen_server:cast(co_nmt_master, {node_guard_reply, NodeId, Frame}),
+    Ctx;
+handle_node_guard(_Frame, _NodeId, Ctx=#co_ctx {name = _Name}) ->
+    ?dbg(node, "~s: handle_node_guard: reply ~w from ~p", [_Name, _Frame, _NodeId]),
+    ?dbg(node, "~s: not nmt master, ignored", [_Name]),
     Ctx.
 
 %%

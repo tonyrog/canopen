@@ -6,6 +6,7 @@ MODULES = \
 	co_test \
 	co_test_lib \
 	co_node_SUITE \
+	co_nmt_SUITE \
 	co_os_SUITE \
 	co_proc_SUITE \
 	co_script_SUITE \

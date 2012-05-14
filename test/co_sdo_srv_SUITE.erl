@@ -111,6 +111,7 @@ all() ->
 %% @end
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
+    co_test_lib:start_system(),
     co_test_lib:start_node(Config),
     Config.
 
@@ -126,6 +127,7 @@ init_per_suite(Config) ->
 %%--------------------------------------------------------------------
 end_per_suite(Config) ->
     co_test_lib:stop_node(Config),
+    co_test_lib:stop_system(),
     ok.
 
 %%--------------------------------------------------------------------

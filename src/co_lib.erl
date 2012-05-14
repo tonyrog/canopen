@@ -453,7 +453,7 @@ decode_nmt_command(?NMT_STOP_REMOTE_NODE) -> stop;
 decode_nmt_command(?NMT_ENTER_PRE_OPERATIONAL) -> enter_pre_op;
 decode_nmt_command(?NMT_RESET_NODE) -> reset;
 decode_nmt_command(?NMT_RESET_COMMUNICATION) -> reset_com;
-decode_nmt_command(_) -> erlang:error(badarg).
+decode_nmt_command(Other) -> Other.
 
 -record(def_mod,
 	{

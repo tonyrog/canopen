@@ -84,6 +84,7 @@ all() ->
 %%--------------------------------------------------------------------
 init_per_suite(Config) ->
     put(dbg,true), %% Enable trace
+    co_test_lib:start_system(),
     co_test_lib:start_node(Config),
     {ok, _Mgr} = co_mgr:start([{linked, false}, {debug, true}]),
     ct:pal("Started co_mgr"),
@@ -102,6 +103,7 @@ init_per_suite(Config) ->
 end_per_suite(Config) ->
     co_mgr:stop(),
     co_test_lib:stop_node(Config),
+    co_test_lib:stop_system(),
     ok.
 
 %%--------------------------------------------------------------------

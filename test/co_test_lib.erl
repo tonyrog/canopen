@@ -15,31 +15,40 @@
 
 -define(DICT, "test.dict").
 
+
+start_system() ->
+    start_system(2,0).
+
+start_system(_C) ->
+    start_system(2,0).
+
+start_system(Port, Ttl) ->
+    can_udp:start(co_test, Port, [{ttl, Ttl}]),
+    {ok, PPid} = co_proc:start_link([{linked, false}]),
+    ct:pal("Started co_proc ~p",[PPid]).
+
+stop_system() ->
+    co_proc:stop(),
+    can_udp:stop(co_test),
+    can_router:stop().
+
 start_node(C) ->
+    %% From test suite
     start_node(C, serial()).
 
+start_node(C, Opts) when is_list (Opts) andalso is_list(Opts) ->
+    %% From test suite
+    start_node(C, serial(), Opts);
 start_node(C, Serial) when is_list(C) ->
+    %% From test suite
+    start_node(C, Serial, []).
+
+start_node(C, Serial, Opts) when is_list(C) andalso is_list(Opts) ->
     %% From test suite
     DataDir = ?config(data_dir, C),
     Dict = filename:join(DataDir, ?DICT),
-    start_node(Serial, Dict,[]);
-start_node(Serial, Dict) ->
-    %% From co_test.erl
-    start_node(Serial, Dict, 1, 0, []).
-
+    start_node(Serial, Dict, Opts);
 start_node(Serial, Dict, Opts) ->
-    start_node(Serial, Dict, 1, 0, Opts).
-
-start_node(Serial, Dict, Port, Ttl) ->
-    start_node(Serial, Dict, Port, Ttl, []).
-
-start_node(Serial, Dict, Port, Ttl, Opts) ->
-    can_router:start(),
-    can_udp:start(co_test, Port, [{ttl, Ttl}]),
-
-    {ok, PPid} = co_proc:start_link([{linked, false}]),
-    ct:pal("Started co_proc ~p",[PPid]),
-
     try co_api:alive(Serial) of
 	true -> co_api:stop(Serial); %% Clean up failed ??
 	false -> do_nothing
@@ -61,10 +70,7 @@ start_node(Serial, Dict, Port, Ttl, Opts) ->
 stop_node(Config) when is_list(Config) ->
     stop_node(serial());
 stop_node(Serial) ->
-    co_api:stop(Serial),
-    co_proc:stop(),
-    can_udp:stop(co_test),
-    can_router:stop().
+    co_api:stop(Serial).
 
 
 load_dict(C) ->
@@ -210,7 +216,7 @@ full_index({_Ix, _Si} = I) ->
 cocli(C) ->
     DataDir = ?config(data_dir, C),
     %% Harcoded to use port +1 as in co_node.erl
-    filename:join(DataDir, ct:get_config(cocli)) ++ " -i 1".
+    filename:join(DataDir, ct:get_config(cocli)) ++ " -i 2".
 
 type(T) -> co_lib:encode_type(T).
 

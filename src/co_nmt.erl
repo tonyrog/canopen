@@ -411,9 +411,16 @@ handle_cast({node_guard_reply, SlaveId, Frame}, Ctx)
 handle_cast({supervision, Supervision}, Ctx=#ctx {supervision = Supervision}) ->
     ?dbg(?NAME," handle_cast: supervision ~p, no change.", [Supervision]),
     {noreply, Ctx};
-handle_cast({supervision, New}, Ctx=#ctx {supervision = _Old}) ->
-    ?dbg(?NAME," handle_cast: supervision ~p -> ~p.", [_Old, New]),
+handle_cast({supervision, heartbeat}, Ctx) ->
+    ?dbg(?NAME," handle_cast: heartbeat not implemented, setting to none.", []),
+    handle_cast({supervison, none}, Ctx);
+handle_cast({supervision, New}, Ctx=#ctx {supervision = Old}) ->
+    ?dbg(?NAME," handle_cast: supervision ~p -> ~p.", [Old, New]),
     %% Activate/deactivate .. or handle in co_node ??
+    case {New, Old} of
+	{node_guard, _Other} -> activate_node_guard(Ctx);
+	{_Other, node_guard} -> deactivate_node_guard(Ctx)
+    end,
     {noreply, Ctx#ctx {supervision = New}};
 handle_cast(_Msg, Ctx) ->
     ?dbg(?NAME," handle_cast: Unknown message = ~p, ignored. ", [_Msg]),
@@ -505,40 +512,90 @@ code_change(_OldVsn, Ctx, _Extra) ->
 %%%===================================================================
 
 add_slave(SlaveId = {_Flag, _NodeId}, 
-	  _Ctx=#ctx {supervision = none, nmt_table = NmtTable}) ->
+	  Ctx=#ctx {supervision = Supervision, nmt_table = NmtTable}) ->
     ?dbg(nmt, "add_slave: {~p, ~.16#}", [_Flag, _NodeId]),
-    ?dbg(nmt, "add_slave: no supervision", []),
-    ets:insert(NmtTable, #nmt_entry {id = SlaveId});
-
-add_slave(SlaveId = {_Flag, _NodeId}, _Ctx=#ctx {nmt_table = NmtTable}) ->
-    ?dbg(nmt, "add_slave:  for {~p, ~.16#}", [_Flag, _NodeId]),
-    %% get node guard time and life factor
-    {ok, GuardTime} = 
-	co_mgr:fetch(SlaveId, ?IX_GUARD_TIME, segment, {value, ?UNSIGNED16}),
-    {ok, LifeFactor} = 
-	co_mgr:fetch(SlaveId, ?IX_LIFE_TIME_FACTOR, segment, {value, ?UNSIGNED8}),
-    case GuardTime of
-	0 -> 
-	    ?dbg(nmt, "add_slave: no node guarding", []),
-	    ets:insert(NmtTable, #nmt_entry {id = SlaveId});
-	_T ->
-	    ?dbg(nmt, "add_slave: node guarding, ~p * ~p", [GuardTime, LifeFactor]),
-	    Slave = #nmt_entry {id = SlaveId,
-				guard_time = GuardTime,
-				life_factor = LifeFactor},
-				
-	    GTimer = start_guard_timer(Slave),
-	    LTimer = start_life_timer(Slave),
-	    ets:insert(NmtTable, Slave#nmt_entry {guard_timer = GTimer,
-						  life_timer = LTimer,
-						  com_status = ok})
+    Slave = #nmt_entry {id = SlaveId},
+    ets:insert(NmtTable, Slave),
+    case Supervision of
+	none ->
+	    ?dbg(nmt, "add_slave: no supervision", []),
+	    ok;
+	node_guard ->
+	    activate_node_guard(Slave, Ctx);
+	heartbeat ->
+	    %% To be implemented 
+	    ?dbg(nmt, "add_slave: heartbeat not implemented yet", []),
+	    ok
     end.
 
-remove_slave(Slave = {_Flag, _NodeId}, _Ctx=#ctx {nmt_table = NmtTable}) ->
+activate_node_guard(Slave=#nmt_entry {id = SlaveId}, 
+		    _Ctx=#ctx {nmt_table = NmtTable}) ->
+    ?dbg(nmt, "activate_node_guard: slave ~p.", [SlaveId]),
+    %% get node guard time and life factor
+    {GuardTime, LifeFactor} = slave_guard_time(SlaveId),
+    case GuardTime of
+	undefined ->
+	    ?dbg(nmt, "activate_node_guard: slave not reachable", []),
+	    error_logger:error_msg("New slave ~p guard time could not be fetched. "
+				   "No supervision possible",
+				   [SlaveId]),
+	    ok; %% ???
+	0 -> 
+	    ?dbg(nmt, "activate_node_guard: guard time = 0, no node guarding", []);
+	_T ->
+	    ?dbg(nmt, "activate_node_guard: node guarding, ~p * ~p", 
+		 [GuardTime, LifeFactor]),
+	    NewSlave = Slave#nmt_entry {guard_time = GuardTime,
+					life_factor = LifeFactor},
+	    GTimer = start_guard_timer(NewSlave),
+	    LTimer = start_life_timer(NewSlave),
+	    ets:insert(NmtTable, NewSlave#nmt_entry {guard_timer = GTimer,
+						     life_timer = LTimer,
+						     com_status = ok})
+    end.
+
+slave_guard_time(SlaveId) ->
+    case co_mgr:fetch(SlaveId, ?IX_GUARD_TIME, segment, 
+		      {value, ?UNSIGNED16}) of
+	    {ok, GuardTime} ->
+	    case co_mgr:fetch(SlaveId, ?IX_LIFE_TIME_FACTOR, segment, 
+			      {value, ?UNSIGNED8}) of
+		
+		{ok, LifeFactor} ->
+		    {GuardTime, LifeFactor};
+		{error, _Error} ->
+		    ?dbg(nmt, "slave_guard_time: fetch life factor failed, reason", 
+			 [_Error]),
+		    {undefined, undefined} 
+	    end;
+	_Error ->
+	    ?dbg(nmt, "slave_guard_time: fetch guard time failed, reason", 
+		 [_Error]),
+	    {undefined, undefined} 
+    end.
+
+
+remove_slave(Slave = {_Flag, _NodeId}, 
+	     Ctx=#ctx {supervision = Supervision, nmt_table = NmtTable}) ->
     ?dbg(nmt, "remove_slave: {~p, ~.16#}", [_Flag, _NodeId]),
+    case Supervision of 
+	none ->
+	    ok;
+	node_guard ->
+	    deactivate_node_guard(Slave, Ctx);
+	heartbeat ->
+	    %% To be implemented
+	    ok
+    end,
+    ets:delete(NmtTable,Slave).
+
+deactivate_node_guard(Slave=#nmt_entry {id = SlaveId}, 
+		      _Ctx=#ctx {nmt_table = NmtTable}) ->
+    ?dbg(nmt, "deactivate_node_guard: slave ~p.", [SlaveId]),
     cancel_life_timer(Slave),
     cancel_guard_timer(Slave),
-    ets:delete(NmtTable,Slave).
+    ets:insert(NmtTable, Slave#nmt_entry {guard_timer = undefined, 
+					  life_timer = undefined}).
 
 send_to_slave(Slave=#nmt_entry {id = SlaveId}, Cmd, _Ctx=#ctx {nmt_table = NmtTable}) ->
     case send_nmt(SlaveId, co_lib:encode_nmt_command(Cmd)) of
@@ -549,10 +606,23 @@ send_to_slave(Slave=#nmt_entry {id = SlaveId}, Cmd, _Ctx=#ctx {nmt_table = NmtTa
 	    Error
     end.
 
-send_all(Cmd, Ctx) ->
-    ets:foldl(fun(Slave) ->
-		      send_to_slave(Slave, Cmd, Ctx)
+send_all(Cmd, Ctx=#ctx {nmt_table = NmtTable}) ->
+    ets:foldl(fun(Slave,[]) ->
+		      send_to_slave(Slave, Cmd, Ctx),
+		      []
 	      end, [], NmtTable).
+
+update_slave_state(Slave, start, NmtTable) ->
+    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?Operational});
+update_slave_state(Slave, stop, NmtTable) ->
+    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?Stopped});
+update_slave_state(Slave, enter_pre_op, NmtTable) ->
+    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?PreOperational});
+update_slave_state(Slave, reset, NmtTable) ->
+    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?PreOperational});
+update_slave_state(Slave, reset_com, NmtTable) ->
+    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?PreOperational}).
+
 
 handle_node_guard(SlaveId = {_Flag, _NodeId}, State, Toggle, 
 		  Ctx=#ctx {supervision = Supervision, nmt_table = NmtTable}) ->
@@ -563,7 +633,8 @@ handle_node_guard(SlaveId = {_Flag, _NodeId}, State, Toggle,
 	    %% First message
 	    ?dbg(nmt, "handle_node_guard: new node, creating entry", []),
 	    if State =/= ?Initialisation ->
-		    error_logger:error_msg("Unexpected state",[]);
+		    error_logger:error_msg("Slave ~p has unexpected state ~p",
+					   [SlaveId, co_lib:decode_nmt_state(State)]);
 	       true -> ok
 	    end,
 	    add_slave(SlaveId, Ctx);
@@ -589,18 +660,19 @@ handle_node_guard(SlaveId = {_Flag, _NodeId}, State, Toggle,
 	    ok
     end.
 
-
-update_slave_state(Slave, start, NmtTable) ->
-    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?Operational});
-update_slave_state(Slave, stop, NmtTable) ->
-    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?Stopped});
-update_slave_state(Slave, enter_pre_op, NmtTable) ->
-    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?PreOperational});
-update_slave_state(Slave, reset, NmtTable) ->
-    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?PreOperational});
-update_slave_state(Slave, reset_com, NmtTable) ->
-    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?PreOperational}).
-
+activate_node_guard(Ctx=#ctx {nmt_table = NmtTable}) ->
+    ?dbg(nmt, "activate_node_guard: ", []),
+    ets:foldl(fun(Slave=#nmt_entry {id = _SlaveId},[]) ->
+		      ?dbg(nmt, "activate_node_guard: slave ~p.", [_SlaveId]),
+		      activate_node_guard(Slave, Ctx),
+		      []
+	      end, [], NmtTable).
+    
+deactivate_node_guard(Ctx=#ctx {nmt_table = NmtTable}) ->
+    ets:foldl(fun(Slave,[]) ->
+		      deactivate_node_guard(Slave, Ctx),
+		      []
+	      end, [], NmtTable).
 
 start_life_timer(_Slave=#nmt_entry {guard_time = GT, life_factor = LF, id = Id}) ->
     case GT * LF of

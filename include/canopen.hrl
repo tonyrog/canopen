@@ -401,6 +401,8 @@
 -type uint16() :: non_neg_integer().
 -type uint32() :: non_neg_integer().
 
+-type nmt_role() :: slave | master | autonomous.
+
 %% SDO configuration parameters
 -record(sdo_ctx,
 	{
@@ -506,7 +508,7 @@
 	  state,            %% CANopen node state
 	  supervision = none, %% Type of supervision
 	  toggle,           %% Node guard toggle
-	  nmt_master = false, %% NMT master flag
+	  nmt_role = autonomous, %% NMT role (master/slav/autonomous)
 	  node_guard_timer, %% Node guard supervision of master
 	  node_guard_error = false, %% Lost contact with NMT master
 	  node_life_time = 0, %% Node guard supervision of master

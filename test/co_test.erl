@@ -21,23 +21,27 @@ run(Serial, Port, Ttl) ->
 
 run(Serial, Opts) ->
     Dict = filename:join(code:priv_dir(canopen), "default.dict"),
+    co_test_lib:start_system(),
     co_test_lib:start_node(Serial, Dict, Opts).
 
 run(Serial, Port, Ttl, Opts) ->
     Dict = filename:join(code:priv_dir(canopen), "default.dict"),
-    co_test_lib:start_node(Serial, Dict, Port, Ttl, Opts).
+    co_test_lib:start_system(Port, Ttl),
+    co_test_lib:start_node(Serial, Dict, Opts).
 
 halt(Serial) ->
-    co_test_lib:stop_node(Serial).
+    co_test_lib:stop_node(Serial),
+    co_test_lib:stop_system().
+
 
 run_mgr() ->
     run_mgr(1, 0).
 
 run_mgr(Port, Ttl) ->
-    can_router:start(),
     can_udp:start(co_test, Port, [{ttl, Ttl}]),
     co_proc:start_link([{linked, false}]),
-    co_mgr:start([{linked, false}, {debug, true}]).
+    co_mgr:start([{linked, false}, 
+		  {debug, true}]).
 
 halt_mgr() ->
     co_mgr:stop(),
@@ -46,15 +50,19 @@ halt_mgr() ->
     can_router:stop().
 
 run_master(Serial) ->
-    run(Serial, [{nmt_master, true}, {supervision, node_guard}]).
+    run(Serial, [{nmt_role, master}, 
+		 {supervision, node_guard}]).
 
 run_master(Serial, Port, Ttl) ->
-    run(Serial, Port, Ttl, [{nmt_master, true}, {supervision, node_guard}]),
+    run(Serial, Port, Ttl, [{nmt_role, master}, 
+			    {supervision, node_guard}]),
     co_api:set_option(0,debug,false),
     co_api:set_option(Serial,debug,false).
 
 run_slave(Serial) ->
-    run(Serial, [{supervision, node_guard}, {nodeid, Serial band 16#7f}]).
+    run(Serial, [{nmt_role, slave}, 
+		 {supervision, node_guard}, 
+		 {nodeid, Serial band 16#7f}]).
 
 run_slave(Serial, Port, Ttl) ->
     run(Serial, Port, Ttl, [{supervision, node_guard}]).
