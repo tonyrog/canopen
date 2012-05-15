@@ -219,7 +219,8 @@ init({Serial, NodeName, Opts} = Args) ->
       cob_table = CobTable,
       app_list = [],
       tpdo_list = [],
-      toggle = 0,
+      toggle = 0, 
+      xtoggle = 0,
       data = [],
       sdo  = SdoCtx,
       sdo_list = [],
@@ -285,7 +286,9 @@ initialization(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId,
 	       true ->
 		    Ctx#co_ctx {state = ?PreOperational}
 	    end;
-       true ->
+       NmtRole == autonomous ->
+	    %% ??
+	    send_bootup(Ctx),
 	    Ctx#co_ctx {state = ?PreOperational}
     end.
     
@@ -309,8 +312,8 @@ activate_node_guard(Ctx=#co_ctx {nmt_role = slave, dict = Dict, name = _Name}) -
 				 [_Name]),
 			    Ctx; %% No node guarding
 			NodeLifeTime -> 
-			    {ok, TRef} = 
-				timer:send_after(NodeLifeTime, node_guard_timeout),
+			    TRef = erlang:send_after(NodeLifeTime, self(), 
+						    node_guard_timeout),
 			    ?dbg(node, "~s: activate_node_guard time ~p", 
 				 [_Name,NodeLifeTime]),
 			    Ctx#co_ctx {node_guard_timer = TRef, 
@@ -330,34 +333,35 @@ deactivate_node_guard(Ctx=#co_ctx {node_guard_timer = undefined}) ->
     %% Do nothing
     Ctx;
 deactivate_node_guard(Ctx=#co_ctx {node_guard_timer = TRef}) ->		    
-    timer:cancel(TRef),
+    erlang:cancel_timer(TRef),
     Ctx#co_ctx {node_guard_timer = undefined}.
 
+send_bootup(_Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId, name = _Name}) ->
+    send_bootup({nodeid, SNodeId}),
+    send_bootup({xnodeid, XNodeId});
 
-send_bootup(Ctx=#co_ctx {name = _Name}) ->
-    ?dbg(node, "~s: send_bootup: nmt slave, sending bootup to master.", [_Name]),
-    %% BootUp uses same CobId as NodeGuard
-    send_node_guard(Ctx, 1, <<0>>).
+send_bootup({_TypeOfNid, undefined}) ->
+    ?dbg(node, "~p: send_bootup: ~p not defined, no bootup sent.", 
+	 [self(), _TypeOfNid]),
+    ok;
+send_bootup(NodeId) ->
+    ?dbg(node, "~p: send_bootup: nmt slave, sending bootup to master.", [self()]),
+    %% Bootup uses same CobId as NodeGuard
+    send_node_guard(NodeId, 1, <<0>>).
 
-
-send_node_guard(_Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId, name = _Name}, 
-		Len, Data) ->
-    ?dbg(node, "~s: send_node_guard: nmt slave, sending ~p to master.", [_Name, Data]),
-    if SNodeId =/= undefined ->
-	    CobId = ?COB_ID(?NODE_GUARD,SNodeId),
-	    ?dbg(node, "~s: send_node_guard: nmt slave, cobid ~p.", 
-		 [_Name, CobId]),
-	    can:send_from(self(),
-			  #can_frame { id = ?COBID_TO_CANID(CobId),
+send_node_guard({nodeid, SNodeId} = _S, Len, Data) ->
+    ?dbg(node, "~p: send_node_guard: nmt slave, sending ~p to master.", [_S, Data]),
+    CobId = ?COB_ID(?NODE_GUARD,SNodeId),
+    ?dbg(node, "~p: send_node_guard: nmt slave, cobid ~p.", [self(), CobId]),
+    can:send_from(self(), #can_frame { id = ?COBID_TO_CANID(CobId),
 				       len = Len, data = Data });
-       XNodeId =/= undefined ->
-	    XCobId = ?XCOB_ID(?NODE_GUARD,co_lib:add_xflag(XNodeId)),
-	    ?dbg(node, "~s: send_node_guard: nmt slave, xcobid ~p.", 
-		 [_Name, XCobId]),
-	    can:send_from(self(), 
-			  #can_frame { id = ?COBID_TO_CANID(XCobId),
-				       len = Len, data = Data })
-    end.
+send_node_guard({xnodeid, XNodeId} = _X, Len, Data) ->
+    ?dbg(node, "~p: send_node_guard: nmt slave, sending ~p to master.", [_X, Data]),
+    XCobId = ?XCOB_ID(?NODE_GUARD,co_lib:add_xflag(XNodeId)),
+    ?dbg(node, "~p: send_node_guard: nmt slave, xcobid ~p.", [_X, XCobId]),
+    can:send_from(self(), #can_frame { id = ?COBID_TO_CANID(XCobId),
+				       len = Len, data = Data }).
+
 
 
 %%--------------------------------------------------------------------
@@ -800,6 +804,9 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
 handle_call(stop, _From, Ctx) ->
     {stop, normal, ok, Ctx};
 
+handle_call(state, _From, Ctx=#co_ctx {state = State}) ->
+    {reply, State, Ctx};
+
 handle_call({state, State}, _From, Ctx) ->
     broadcast_state(State, Ctx),
     {reply, ok, Ctx#co_ctx {state = State}};
@@ -1046,7 +1053,7 @@ add_to_cob_table(T, xnodeid, ExtNid)
     ets:insert(T, {XSDORx, {sdo_rx, XSDOTx}}),
     ets:insert(T, {XSDOTx, {sdo_tx, XSDORx}}),
     ets:insert(T, {?XCOB_ID(?NMT, 0), nmt}),
-    ets:insert(T, {?XCOB_ID(?NODE_GUARD,ExtNid), node_guard}),
+    ets:insert(T, {?XCOB_ID(?NODE_GUARD,ExtNid), {node_guard, {xnodeid, ExtNid}}}),
     ?dbg(node, "add_to_cob_table: XNid=~w, XSDORx=~w, XSDOTx=~w", 
 	 [ExtNid,XSDORx,XSDOTx]);
 add_to_cob_table(T, nodeid, ShortNid) 
@@ -1057,7 +1064,7 @@ add_to_cob_table(T, nodeid, ShortNid)
     ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
     ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
     ets:insert(T, {?COB_ID(?NMT, 0), nmt}),
-    ets:insert(T, {?COB_ID(?NODE_GUARD,ShortNid), node_guard}),
+    ets:insert(T, {?COB_ID(?NODE_GUARD,ShortNid), {node_guard, {nodeid, ShortNid}}}),
     ?dbg(node, "add_to_cob_table: SDORx=~w, SDOTx=~w", [SDORx,SDOTx]).
 
 
@@ -1184,13 +1191,14 @@ nmt_change(supervision, none,
     Ctx#co_ctx {supervision = none}.
 
 
-execute_change(NidType, NewNid, OldNid, Ctx=#co_ctx { cob_table = T}) ->  
+execute_change(NidType, NewNid, OldNid, Ctx=#co_ctx {cob_table = T}) ->  
     ?dbg(node, "execute_change: NidType = ~p, OldNid = ~p, NewNid = ~p", 
 	 [NidType, OldNid, NewNid]),
     delete_from_cob_table(T, NidType, OldNid),
     co_proc:unreg({NidType, OldNid}),
     add_to_cob_table(T, NidType, NewNid),
     reg({NidType, NewNid}),
+    send_bootup({NidType, NewNid}),
     send_to_apps({nodeid_change, NidType, OldNid, NewNid}, Ctx),
     send_to_tpdos({nodeid_change, NidType, OldNid, NewNid}, Ctx).
     
@@ -1350,7 +1358,7 @@ handle_can(Frame, Ctx=#co_ctx {name = _Name})
     ?dbg(node, "~s: handle_can: (rtr) CobId=~8.16.0B", [_Name, CobId]),
     case lookup_cobid(CobId, Ctx) of
 	nmt  -> Ctx;
-	node_guard -> handle_node_guard(Frame, Ctx);
+	{node_guard, NodeId} -> handle_node_guard_rtr(Frame, NodeId, Ctx);
 	undefined ->
 	    case lists:keysearch(CobId, #tpdo.cob_id, Ctx#co_ctx.tpdo_list) of
 		{value, T} ->
@@ -1403,7 +1411,7 @@ handle_nmt(M, Ctx=#co_ctx {nodeid=undefined, nmt_role = slave, name=_Name}) ->
     Ctx;
 handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, nmt_role = slave, name=_Name}) 
   when M#can_frame.len >= 2 andalso SNodeId =/= undefined ->
-    <<NodeId,Cs,_/binary>> = M#can_frame.data,
+    <<Cs,NodeId,_/binary>> = M#can_frame.data,
     ?dbg(node, "~s: handle_nmt: slave ~p, command ~p", 
 	 [_Name, NodeId, co_lib:decode_nmt_command(Cs)]),
     if NodeId == 0; 
@@ -1439,19 +1447,16 @@ handle_nmt(M, Ctx=#co_ctx {nmt_role = master, name=_Name}) ->
     Ctx.
     
 
-handle_node_guard(_Frame, Ctx=#co_ctx {nmt_role = autonomous, name=_Name}) ->
-    ?dbg(node, "~s: handle_node_guard: node is autonomous, "
-	 "node_guard request ~w  ignored. ",[_Name, _Frame]),
-    Ctx;
-handle_node_guard(Frame, 
-		  Ctx=#co_ctx {state = State, toggle = Toggle, nmt_role = slave, 
+handle_node_guard_rtr(Frame, NodeId = {TypeOfNid, _Nid},
+		  Ctx=#co_ctx {state = State, nmt_role = slave, 
+			       toggle = Toggle, xtoggle = XToggle,
 			       node_guard_timer = Timer, node_life_time = NLT,
 			       node_guard_error = NgError, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
-    ?dbg(node, "~s: handle_node_guard: request ~w", [_Name,Frame]),
+    ?dbg(node, "~s: handle_node_guard: node ~p request ~w", [_Name,NodeId,Frame]),
     %% Reset NMT master supervision timer
     if Timer =/= undefined ->
-	    timer:cancel(Timer);
+	    erlang:cancel_timer(Timer);
        true -> 
 	    do_nothing
     end,
@@ -1462,18 +1467,29 @@ handle_node_guard(Frame,
 	    do_nothing
     end,
     %% Reply
-    Data = State bor Toggle,
-    send_node_guard(Ctx, 1, <<Data:8>>),
-    NewToggle = Toggle bxor 16#80,
+    ?dbg(node, "~s: handle_node_guard: toggle ~p, xtoggle ~p", [_Name,Toggle,XToggle]),
+    {Data, NewToggle, NewXToggle} = if TypeOfNid == nodeid ->
+					    {<<Toggle:1, State:7>>, 1 - Toggle, XToggle};
+				       TypeOfNid == xnodeid ->
+					    {<<XToggle:1, State:7>>, Toggle, 1 - XToggle}
+				    end,
+    send_node_guard(NodeId, 1, Data),
     %% Restart NMT master supervision
-    if NLT =/= 0 ->
-	    {ok, TRef} = timer:send_after(NLT, node_guard_timeout),
-	    Ctx#co_ctx { toggle = NewToggle, node_guard_error = false, 
-			 node_guard_timer = TRef};
-       true ->
-	    Ctx#co_ctx { toggle = NewToggle, node_guard_error = false}
-    end;
-handle_node_guard(Frame, Ctx=#co_ctx {nmt_role = master, name=_Name}) 
+    NewTimer = if NLT =/= 0 ->
+		       erlang:send_after(NLT, self(), node_guard_timeout);
+		  true ->
+		       undefined
+	       end,
+    Ctx#co_ctx {toggle = NewToggle, xtoggle = NewXToggle,
+		node_guard_error = false, node_guard_timer = NewTimer};
+
+handle_node_guard_rtr(_Frame, _NodeId, 
+		      Ctx=#co_ctx {nmt_role = autonomous, name=_Name}) ->
+    ?dbg(node, "~s: handle_node_guard: node is autonomous, "
+	 "node_guard request ~w  ignored. ",[_Name, _Frame]),
+    Ctx;
+handle_node_guard_rtr(Frame, _NodeId, 
+		      Ctx=#co_ctx {nmt_role = master, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
     ?dbg(node, "~s: handle_node_guard: request ~w", [_Name,Frame]),
     %% Node is nmt master and should NOT receive node_guard request
@@ -2105,7 +2121,7 @@ restart_tpdo(T=#tpdo {offset = Offset, rc = RC},
 		    Mon = erlang:monitor(process, Pid),
 		    
 		    %% If process still ok after 1 min, reset counter
-		    timer:send_after(60 * 1000,  {rc_reset, Pid}),
+		    erlang:send_after(60 * 1000,  self(), {rc_reset, Pid}),
 
 		    T#tpdo {pid = Pid, mon = Mon, rc = RC+1}
 	    end

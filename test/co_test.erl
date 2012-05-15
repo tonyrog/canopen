@@ -50,19 +50,18 @@ halt_mgr() ->
     can_router:stop().
 
 run_master(Serial) ->
-    run(Serial, [{nmt_role, master}, 
-		 {supervision, node_guard}]).
+    run_master(Serial, 2, 0).
 
 run_master(Serial, Port, Ttl) ->
     run(Serial, Port, Ttl, [{nmt_role, master}, 
 			    {supervision, node_guard}]),
-    co_api:set_option(0,debug,false),
-    co_api:set_option(Serial,debug,false).
+    co_nmt:debug(true).
 
 run_slave(Serial) ->
     run(Serial, [{nmt_role, slave}, 
 		 {supervision, node_guard}, 
-		 {nodeid, Serial band 16#7f}]).
+		 {nodeid, co_lib:serial_to_nodeid(Serial)},
+		 {debug, true}]).
 
 run_slave(Serial, Port, Ttl) ->
     run(Serial, Port, Ttl, [{supervision, node_guard}]).

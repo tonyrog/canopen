@@ -190,7 +190,7 @@ set_options_nok(_Config) ->
 	       {xnodeid, 16#ffffffff, 
 		"Option xnodeid can only be set to an integer value between 0 and 16777215 (0 - 16#ffffff) or undefined."},
 	       {nodeid, 177,
-	       "Option nodeid can only be set to an integer between 0 and 126 (0 - 16#fe) or undefined."},
+	       "Option nodeid can only be set to an integer between 0 and 126 (0 - 16#7e) or undefined."},
 	       {nodeid, 0, 
 		"NodeId 0 is reserved for the CANopen manager co_mgr."}],
 

@@ -507,7 +507,8 @@
 	  %% NMT
 	  state,            %% CANopen node state
 	  supervision = none, %% Type of supervision
-	  toggle,           %% Node guard toggle
+	  toggle = 0,       %% Node guard toggle for nodeid
+	  xtoggle = 0,      %% Node guard toggle for xnodeid
 	  nmt_role = autonomous, %% NMT role (master/slav/autonomous)
 	  node_guard_timer, %% Node guard supervision of master
 	  node_guard_error = false, %% Lost contact with NMT master

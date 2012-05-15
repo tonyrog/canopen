@@ -56,7 +56,7 @@
 
 %% Test interface
 -export([dump/1, dump/2, loop_data/1]).
--export([state/2]).
+-export([state/1, state/2]).
 
 -define(CO_NODE, co_node).
 
@@ -229,7 +229,7 @@ verify_option(Option, NewValue)
 	    ok;
        true ->
 	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to an integer between 0 and 126 (0 - 16#fe)"
+		 " can only be set to an integer between 0 and 126 (0 - 16#7e)"
 	         " or undefined."}
     end;
 verify_option(Option, NewValue) 
@@ -990,6 +990,18 @@ dump(Identity, Qualifier)
 
 loop_data(Identity) ->
     gen_server:call(identity_to_pid(Identity), loop_data).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Gets the co_nodes state.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec state(Identity::node_identity()) -> 
+		   State::atom() | {error, Error::atom()}.
+
+state(Identity) ->
+    gen_server:call(identity_to_pid(Identity), state).
 
 %%--------------------------------------------------------------------
 %% @doc

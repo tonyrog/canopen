@@ -41,13 +41,13 @@ start_node(C, Opts) when is_list (Opts) andalso is_list(Opts) ->
     start_node(C, serial(), Opts);
 start_node(C, Serial) when is_list(C) ->
     %% From test suite
-    start_node(C, Serial, []).
+    start_node(C, Serial, [{debug, true}]).
 
 start_node(C, Serial, Opts) when is_list(C) andalso is_list(Opts) ->
     %% From test suite
     DataDir = ?config(data_dir, C),
     Dict = filename:join(DataDir, ?DICT),
-    start_node(Serial, Dict, Opts);
+    start_node(Serial, Dict, [{debug, true} | Opts]);
 start_node(Serial, Dict, Opts) ->
     try co_api:alive(Serial) of
 	true -> co_api:stop(Serial); %% Clean up failed ??
@@ -61,8 +61,7 @@ start_node(Serial, Dict, Opts) ->
 				       {dict_file, Dict},
 				       {max_blksize, 7},
 				       {vendor,16#2A1},
-				       {linked, false},
-				       {debug, true}]),
+				       {linked, false}]),
     ct:pal("Started co_node ~p, pid = ~p",[integer_to_list(Serial,16), Pid]),
     {ok, Pid}.
 
