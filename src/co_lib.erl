@@ -45,6 +45,8 @@
 -export([decode_struct/1]).
 -export([decode_access/1]).
 -export([decode_transmission/1]).
+-export([decode_category/1]).
+-export([decode_pdo_mapping/1]).
 -export([decode_nmt_command/1]).
 -export([load_definition/1,load_definition/2]).
 -export([object/2]).
@@ -981,11 +983,11 @@ value_range(integer48) -> {-16#800000000000,16#7fffffffffff};
 value_range(integer56) -> {-16#80000000000000,16#7fffffffffffff};
 value_range(integer64) -> {-16#8000000000000000,16#7fffffffffffffff}.
 
-
-verify_range(Value,Min,Max) when Value >= Min, Value =< Max ->
-    true;
-verify_range(Value,Min,Max) -> 
-    erlang:error({value_out_of_range,Value,Min,Max}).
+%% To be used ??
+%% verify_range(Value,Min,Max) when Value >= Min, Value =< Max ->
+%%     true;
+%% verify_range(Value,Min,Max) -> 
+%%     erlang:error({value_out_of_range,Value,Min,Max}).
 
 verify_value(real64, Value) when is_float(Value) -> true;
 verify_value(real32, Value) when is_float(Value) -> true;  %% fixme
@@ -1187,12 +1189,13 @@ match_index(Index, {From,To,Step}) when Index >= From, Index =< To, (Index-From)
 match_index(_, _) -> false.
 
 %% Convert index to offset idx
-object_idx(Index, Index) -> 
-    1;
-object_idx(Index, {From,To}) when Index >= From, Index =< To ->
-    (Index - From)+1;
-object_idx(Index, {From,To,Step}) when Index >= From, Index =< To, (Index-From) rem Step == 0 ->
-    (Index - From)+1.
+%% To be used ??
+%% object_idx(Index, Index) -> 
+%%     1;
+%% object_idx(Index, {From,To}) when Index >= From, Index =< To ->
+%%     (Index - From)+1;
+%% object_idx(Index, {From,To,Step}) when Index >= From, Index =< To, (Index-From) rem Step == 0 ->
+%%     (Index - From)+1.
 
 
 find_in_mods(Key, Pos, [{_ModName, DMod}|DMods]) ->

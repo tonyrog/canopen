@@ -76,13 +76,6 @@
 
 -define(CO_NODE, co_node).
 
--type node_identity()::
-	NodeId::node_id() |
-	{name, NodeName::atom()} |
-	integer() | %% Serial
-	pid().
-
-
 %%====================================================================
 %% API
 %%====================================================================
@@ -155,7 +148,7 @@
 start_link(S, Opts) ->
     %% Trace output enable/disable
     put(dbg, proplists:get_value(debug,Opts,false)), 
-    ?dbg(node, "start_link: Serial = ~p, Opts = ~p", [S, Opts]),
+    ?dbg(node, "start_link: Serial = ~.16#, Opts = ~p", [S, Opts]),
 
     F =	case proplists:get_value(linked,Opts,true) of
 	    true -> start_link;

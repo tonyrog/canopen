@@ -255,3 +255,10 @@
 -type node_id()::
 	{nodeid, ShortNodeId::integer()} |
 	{xnodeid, ExtNodeId::integer()}.	
+
+-type node_identity()::
+	NodeId::node_id() |
+	{name, NodeName::atom()} |
+	integer() | %% Serial
+	pid().
+

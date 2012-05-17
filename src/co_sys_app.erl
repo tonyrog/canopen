@@ -65,7 +65,7 @@
 -record(loop_data,
 	{
 	  state           ::atom(),
-	  co_node         ::atom()     %% Name of co_node
+	  co_node         ::node_identity()     %% Identity of co_node
 	}).
 
 
@@ -74,24 +74,24 @@
 %% Starts the server.
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(CoSerial::integer()) -> 
+-spec start_link(CoNode::node_identity()) -> 
 		   {ok, Pid::pid()} | 
 		   ignore | 
 		   {error, Error::atom()}.
 
-start_link(CoSerial) ->
-    gen_server:start_link({local, name(CoSerial)}, ?MODULE, CoSerial,[]).
+start_link(CoNode) ->
+    gen_server:start_link({local, name(CoNode)}, ?MODULE, CoNode,[]).
 	
 %%--------------------------------------------------------------------
 %% @doc
 %% Stops the server.
 %% @end
 %%--------------------------------------------------------------------
--spec stop(CoSerial::integer()) -> ok | 
+-spec stop(CoNode::node_identity()) -> ok | 
 		{error, Error::atom()}.
 
-stop(CoSerial) ->
-    case whereis(name(CoSerial)) of
+stop(CoNode) ->
+    case whereis(name(CoNode)) of
 	undefined -> do_nothing;
 	Pid -> gen_server:call(Pid, stop)
     end.
@@ -209,13 +209,13 @@ loop_data(Pid) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec init(CoSerial::term()) -> {ok, LoopData::#loop_data{}}.
+-spec init(CoNode::node_identity()) -> {ok, LoopData::#loop_data{}}.
 
-init(CoSerial) ->
-    {ok, _Dict} = co_api:attach(CoSerial),
-    co_api:reserve(CoSerial, ?IX_STORE_PARAMETERS, ?MODULE),
-    co_api:reserve(CoSerial, ?IX_RESTORE_DEFAULT_PARAMETERS, ?MODULE),
-    {ok, #loop_data {state=running, co_node = CoSerial}}.
+init(CoNode) ->
+    {ok, _Dict} = co_api:attach(CoNode),
+    co_api:reserve(CoNode, ?IX_STORE_PARAMETERS, ?MODULE),
+    co_api:reserve(CoNode, ?IX_RESTORE_DEFAULT_PARAMETERS, ?MODULE),
+    {ok, #loop_data {state=running, co_node = CoNode}}.
 
 
 %%--------------------------------------------------------------------
@@ -395,6 +395,8 @@ code_change(_OldVsn, LoopData, _Extra) ->
 %%%===================================================================
 %%% Support functions
 %%%===================================================================
-name(CoSerial) ->
-    list_to_atom(atom_to_list(?MODULE) ++ integer_to_list(CoSerial,16)).
+name(CoNode) when is_integer(CoNode) ->
+    list_to_atom(atom_to_list(?MODULE) ++ integer_to_list(CoNode,16));
+name({name, CoNode}) when is_atom(CoNode)->
+    list_to_atom(atom_to_list(?MODULE) ++ atom_to_list(CoNode)).
 

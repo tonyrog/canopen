@@ -845,48 +845,52 @@ direct_value(Dict, Ix) when ?is_index(Ix) ->
 %%
 %% FIXME: check if a match spec is better
 %%
-find_object(Dict, I, J, S, Vf) 
-  when ?is_index(I), ?is_index(J), I =< J, ?is_subind(S) ->
-    if S == 0 ->
-	    match_entry_s(Dict,first_object(Dict, I),J,0,Vf);
-       true ->
-	    case ets:next(Dict,{I,S-1}) of
-		{I,S} ->  %% found it
-		    match_entry_s(Dict, I, J, S, Vf);
-		{I,_} ->  %% not found but object exist
-		    match_entry_s(Dict,next_object(Dict,I,J),J,S,Vf);
-		{N,_} ->
-		    match_entry_s(Dict,N,J,S,Vf);
-		'$end_of_table' ->
-		    {error, ?abort_no_such_object}
-	    end
-    end.
+%% To be used ??
+%% find_object(Dict, I, J, S, Vf) 
+%%   when ?is_index(I), ?is_index(J), I =< J, ?is_subind(S) ->
+%%     if S == 0 ->
+%% 	    match_entry_s(Dict,first_object(Dict, I),J,0,Vf);
+%%        true ->
+%% 	    case ets:next(Dict,{I,S-1}) of
+%% 		{I,S} ->  %% found it
+%% 		    match_entry_s(Dict, I, J, S, Vf);
+%% 		{I,_} ->  %% not found but object exist
+%% 		    match_entry_s(Dict,next_object(Dict,I,J),J,S,Vf);
+%% 		{N,_} ->
+%% 		    match_entry_s(Dict,N,J,S,Vf);
+%% 		'$end_of_table' ->
+%% 		    {error, ?abort_no_such_object}
+%% 	    end
+%%     end.
+
+
 %%
 %% Find I where value({I,S}) =:= V
 %%   return {ok,I} if found
 %%          {error,no_such_object}  otherwise
 %%
-match_entry_s(_Dict, I, J,_S,_Vf) when I > J; I =:= '$end_of_table' ->
-    {error,?abort_no_such_object};
-match_entry_s(Dict, I, J, S, Vf) ->
-    case ets:lookup(Dict,{I,S}) of
-	[E] ->
-	    {Value, _Rest} = co_codec:decode(E#dict_entry.data, E#dict_entry.type),
-	    case Value of 
-		Vf ->
-		    {ok,I};
-		V when is_function(Vf) ->
-		    case Vf(V) of
-			true -> {ok,I};
-			false ->
-			    match_entry_s(Dict,next_object(Dict,I,J),J,S,Vf)
-		    end;
-		_ ->
-		    match_entry_s(Dict,next_object(Dict,I,J),J,S,Vf)
-	    end;
-	_Other ->
-	    match_entry_s(Dict,next_object(Dict,I,J),J,S,Vf)
-    end.
+%% To be used ??
+%% match_entry_s(_Dict, I, J,_S,_Vf) when I > J; I =:= '$end_of_table' ->
+%%     {error,?abort_no_such_object};
+%% match_entry_s(Dict, I, J, S, Vf) ->
+%%     case ets:lookup(Dict,{I,S}) of
+%% 	[E] ->
+%% 	    {Value, _Rest} = co_codec:decode(E#dict_entry.data, E#dict_entry.type),
+%% 	    case Value of 
+%% 		Vf ->
+%% 		    {ok,I};
+%% 		V when is_function(Vf) ->
+%% 		    case Vf(V) of
+%% 			true -> {ok,I};
+%% 			false ->
+%% 			    match_entry_s(Dict,next_object(Dict,I,J),J,S,Vf)
+%% 		    end;
+%% 		_ ->
+%% 		    match_entry_s(Dict,next_object(Dict,I,J),J,S,Vf)
+%% 	    end;
+%% 	_Other ->
+%% 	    match_entry_s(Dict,next_object(Dict,I,J),J,S,Vf)
+%%     end.
 
 
 %%
@@ -907,16 +911,18 @@ first_object(Dict, Ix) when ?is_index(Ix) ->
 %%
 %% Find last object with index Jx where Jx >= Ix
 %%
-last_object(Dict) ->
-    last_object(Dict, 16#ffff).
+%% To be used ??
+%% last_object(Dict) ->
+%%     last_object(Dict, 16#ffff).
 
-last_object(Dict, Ix) when ?is_index(Ix) ->
-    case ets:prev(Dict,Ix+1) of
-	Jx when is_integer(Jx), Jx =< Ix ->
-	    Jx;
-	_ ->
-	    '$end_of_table'
-    end.
+%% last_object(Dict, Ix) when ?is_index(Ix) ->
+%%     case ets:prev(Dict,Ix+1) of
+%% 	Jx when is_integer(Jx), Jx =< Ix ->
+%% 	    Jx;
+%% 	_ ->
+%% 	    '$end_of_table'
+%%     end.
+
 %%
 %% Find next object in dictionary after Ix when Ix <= Jx
 %%
@@ -933,16 +939,17 @@ next_object(Dict, Ix, Jx) when ?is_index(Ix), ?is_index(Jx) ->
 %%
 %% Find prev object in dictionary after Ix when Ix >= Jx
 %%
-prev_object(Dict, Ix) ->
-    prev_object(Dict, Ix, 0).
+%% To be used ??
+%% prev_object(Dict, Ix) ->
+%%     prev_object(Dict, Ix, 0).
 
-prev_object(Dict, Ix, Jx) when ?is_index(Ix), ?is_index(Jx) ->
-    case ets:prev(Dict,Ix) of
-	Kx when is_integer(Kx), Kx >= Jx ->
-	    Kx;
-	_ -> 
-	    '$end_of_table'
-    end.
+%% prev_object(Dict, Ix, Jx) when ?is_index(Ix), ?is_index(Jx) ->
+%%     case ets:prev(Dict,Ix) of
+%% 	Kx when is_integer(Kx), Kx >= Jx ->
+%% 	    Kx;
+%% 	_ -> 
+%% 	    '$end_of_table'
+%%     end.
 
 %%
 %% Determine the correct error response when a

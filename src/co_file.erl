@@ -60,20 +60,6 @@ load(File) ->
 	    Error
     end.
 
-fold(Fun, Acc, File) ->
-    case load(File) of
-	{ok,Os} ->
-	    fold_objects(Fun, Acc, Os);
-	Error ->
-	    Error
-    end.
-
-%% Add objects and entries
-fold_objects(Fun, Acc, [Obj={O,_}|Os]) when is_record(O, dict_object) ->
-    Acc1 = Fun(Obj, Acc),
-    fold_objects(Fun, Acc1, Os);
-fold_objects(_Fun, Acc, []) ->
-    Acc.
 
 %% @private
 load_objects([{object,Index,Options}|Es],Os) 
@@ -383,4 +369,20 @@ nodeid({extended,ID}) when ID > 0, ID =< 16#1FFFFFF ->
     ID bor ?COBID_ENTRY_EXTENDED;
 nodeid(_) ->
     erlang:error(badarg).
+
+%% fold(Fun, Acc, File) ->
+%%     case load(File) of
+%% 	{ok,Os} ->
+%% 	    fold_objects(Fun, Acc, Os);
+%% 	Error ->
+%% 	    Error
+%%     end.
+
+%% %% Add objects and entries
+%% fold_objects(Fun, Acc, [Obj={O,_}|Os]) when is_record(O, dict_object) ->
+%%     Acc1 = Fun(Obj, Acc),
+%%     fold_objects(Fun, Acc1, Os);
+%% fold_objects(_Fun, Acc, []) ->
+%%     Acc.
+
 

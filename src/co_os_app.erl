@@ -14,7 +14,7 @@
 %%% KIND, either express or implied.
 %%%
 %%%---- END COPYRIGHT ----------------------------------------------------------
-%%-------------------------------------------------------------------
+%%------------------------------------------------------------------------------
 %% @author Malotte W Lönne <malotte@malotte.net>
 %% @copyright (C) 2012, Tony Rogvall
 %% @doc
@@ -26,7 +26,7 @@
 %% File: co_os_app.erl<br/>
 %% Created: December 2011 by Malotte W Lönne
 %% @end
-%%===================================================================
+%%------------------------------------------------------------------------------
 -module(co_os_app).
 -include_lib("canopen/include/canopen.hrl").
 -include("co_app.hrl").
@@ -76,7 +76,7 @@
 	  status = 0       ::integer(),  %% Subindex 2
 	  reply =""        ::string(),   %% Subindex 3
 	  exec_pid         ::pid(),      %% Pid of process executing command
-	  co_node          ::atom(),     %% Name of co_node
+	  co_node          ::node_identity(),  %% Identity of co_node
 	  ref              ::reference(),%% Reference for communication with session
 	  read_buf = (<<>>)::binary()    %% Tmp buffer when uploading reply
 	}).
@@ -87,26 +87,26 @@
 %% Starts the server.
 %% @end
 %%--------------------------------------------------------------------
--spec start_link(CoSerial::integer()) -> 
+-spec start_link(CoNode::node_identity()) -> 
 		   {ok, Pid::pid()} | 
 		   ignore | 
 		   {error, Error::atom()}.
 
-start_link(CoSerial) ->
-    gen_server:start_link({local,  name(CoSerial)}, ?MODULE, CoSerial,[]).
+start_link(CoNode) ->
+    gen_server:start_link({local,  name(CoNode)}, ?MODULE, CoNode,[]).
 	
 %%--------------------------------------------------------------------
 %% @doc
 %% Stops the server.
 %% @end
 %%--------------------------------------------------------------------
--spec stop(CoSerial::integer()) -> ok | 
+-spec stop(CoNode::node_identity()) -> ok | 
 		{error, Error::atom()}.
 
 stop(Pid) when is_pid(Pid)->
     gen_server:call(Pid, stop);
-stop(CoSerial) ->
-    case whereis(name(CoSerial)) of
+stop(CoNode) ->
+    case whereis(name(CoNode)) of
 	undefined -> do_nothing;
 	Pid -> gen_server:call(Pid, stop)
     end.
@@ -116,13 +116,13 @@ stop(CoSerial) ->
 %% Starts the server.
 %% @end
 %%--------------------------------------------------------------------
--spec start(CoSerial::integer()) -> 
+-spec start(CoNode::node_identity()) -> 
 		   {ok, Pid::pid()} | 
 		   ignore | 
 		   {error, Error::atom()}.
 
-start(CoSerial) ->
-    gen_server:start({local,  name(CoSerial)}, ?MODULE, CoSerial,[]).
+start(CoNode) ->
+    gen_server:start({local,  name(CoNode)}, ?MODULE, CoNode,[]).
 	
 %%--------------------------------------------------------------------
 %%% CAllbacks for co_app and co_stream_app behavious
@@ -293,13 +293,13 @@ loop_data(Pid) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec init(CoSerial::term()) -> {ok, LoopData::#loop_data{}}.
+-spec init(CoNode::node_identity()) -> {ok, LoopData::#loop_data{}}.
 
-init(CoSerial) ->
+init(CoNode) ->
     process_flag(trap_exit, true),
-    {ok, _Dict} = co_api:attach(CoSerial),
-    co_api:reserve(CoSerial, ?IX_OS_COMMAND, ?MODULE),
-    {ok, #loop_data {state=init, co_node = CoSerial}}.
+    {ok, _Dict} = co_api:attach(CoNode),
+    co_api:reserve(CoNode, ?IX_OS_COMMAND, ?MODULE),
+    {ok, #loop_data {state=init, co_node=CoNode}}.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -600,6 +600,8 @@ code_change(_OldVsn, LoopData, _Extra) ->
 %%%===================================================================
 %%% Support functions
 %%%===================================================================
-name(CoSerial) ->
-    list_to_atom(atom_to_list(?MODULE) ++ integer_to_list(CoSerial,16)).
+name(CoNode) when is_integer(CoNode) ->
+    list_to_atom(atom_to_list(?MODULE) ++ integer_to_list(CoNode,16));
+name({name, CoNode}) when is_atom(CoNode)->
+    list_to_atom(atom_to_list(?MODULE) ++ atom_to_list(CoNode)).
 

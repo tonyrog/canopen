@@ -35,7 +35,6 @@
 -export([start/0, start/1, stop/0]).
 -export([fetch/5,fetch/4]).
 -export([store/5,store/4]).
--export([load/1]).
 
 %% api when using definition files
 -export([client_require/1]).
@@ -139,14 +138,6 @@ stop() ->
 	    {error, no_manager_running}
     end.
     
-%%--------------------------------------------------------------------
-%% @doc
-%% Loads object dictionary from file to the manager.
-%% @end
-%%--------------------------------------------------------------------
--spec load(File::string()) -> ok | {error, Reason::atom()}.
-load(File) ->
-    co_api:load_dict(?CO_MGR, File).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -926,7 +917,7 @@ context(Nid, Mgr) ->
     end.
 
 
-format_value(Value, Type, DCtx) ->
+format_value(Value, Type, _DCtx) ->
    ?dbg(mgr,"format_value: Formatting ~p, type ~p", [Value, Type]),
     case Type of
 	boolean    -> ite(Value==0, "false", "true");
@@ -940,26 +931,6 @@ format_value(Value, Type, DCtx) ->
 	integer24 -> signed(Value, 16#7fffff);
 	integer32 -> signed(Value, 16#7fffffff);
 
-	{enum,Type1,EId} ->
-	    case co_lib:enum_by_id(EId, DCtx) of
-		{ok,Enums} ->
-		    case lists:keysearch(Value, 2, Enums) of
-			false ->
-			    format_value(Value, Type1, DCtx);
-			{value,{Key,_}} ->
-			    atom_to_list(Key)
-		    end;
-		{error, _E} ->
-		    format_value(Value, Type1, DCtx)
-	    end;
-	{bitfield,Type1,EId} ->
-	    case co_lib:enum_by_id(EId, DCtx) of
-		{ok,Enums} ->
-		    Fields = bitfield(Value, Enums),
-		    io_lib:format("~p", [Fields]);
-		{error, _E} ->
-		    format_value(Value, Type1, DCtx)
-	    end;
 	_ ->
 	    %% integer_to_list(Value)
 	    Value
@@ -968,19 +939,43 @@ format_value(Value, Type, DCtx) ->
 ite(true,Then,_Else) -> Then;
 ite(false,_Then,Else) -> Else.
 
-bitfield(Value,Enums) ->
-    bitfield(Value,Enums,[]).
+%% To be done ??
+%% output_value(Value, Type, DCtx) ->
+%%     case Type of
+%% 	{enum,Type1,EId} ->
+%% 	    case co_lib:enum_by_id(EId, DCtx) of
+%% 		{ok,Enums} ->
+%% 		    case lists:keysearch(Value, 2, Enums) of
+%% 			false ->
+%% 			    format_value(Value, Type1, DCtx);
+%% 			{value,{Key,_}} ->
+%% 			    atom_to_list(Key)
+%% 		    end;
+%% 		{error, _E} ->
+%% 		    format_value(Value, Type1, DCtx)
+%% 	    end;
+%% 	{bitfield,Type1,EId} ->
+%% 	    case co_lib:enum_by_id(EId, DCtx) of
+%% 		{ok,Enums} ->
+%% 		    Fields = bitfield(Value, Enums),
+%% 		    io_lib:format("~p", [Fields]);
+%% 		{error, _E} ->
+%% 		    format_value(Value, Type1, DCtx)
+%% 	    end.
 
-bitfield(0,_,Acc) ->
-    Acc;
-bitfield(Value,[{Key,Val}|Enums],Acc) ->
-    if (Val band Value) == Val ->
-	    bitfield(Value band (bnot Val), Enums, [Key|Acc]);
-       true ->
-	    bitfield(Value, Enums, Acc)
-    end;
-bitfield(_, [], Acc) ->
-    Acc.
+%% bitfield(Value,Enums) ->
+%%     bitfield(Value,Enums,[]).
+
+%% bitfield(0,_,Acc) ->
+%%     Acc;
+%% bitfield(Value,[{Key,Val}|Enums],Acc) ->
+%%     if (Val band Value) == Val ->
+%% 	    bitfield(Value band (bnot Val), Enums, [Key|Acc]);
+%%        true ->
+%% 	    bitfield(Value, Enums, Acc)
+%%     end;
+%% bitfield(_, [], Acc) ->
+%%     Acc.
 
 
 unsigned(V, Mask) ->

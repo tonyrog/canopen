@@ -68,15 +68,13 @@
 
 -record(ctx, 
 	{
-	  serial,
-	  node_pid,
+	  node_pid,           %% Pid of co_node
 	  supervision = none, %% Type of supervision
 	  subscribers = [],   %% Receives error notifications
-	  nmt_table,  %% Table of NMT slaves
-	  node_map    %% ??
+	  nmt_table           %% Table of NMT slaves
 	 }).
 
--record(nmt_entry,
+-record(nmt_slave,
 	{
 	  id,                  %% node id (key)
 	  guard_time = 0,
@@ -347,11 +345,14 @@ init(Args) ->
 	    %% Manager needed
 	    co_mgr:start([{debug, get(dbg)}]),
 	    Supervision = proplists:get_value(supervision, Args, none),
-	    NMT = ets:new(co_nmt_table, [{keypos,#nmt_entry.id},
+	    NMT = ets:new(co_nmt_table, [{keypos,#nmt_slave.id},
 					 protected, named_table, ordered_set]),
-	    MAP = ets:new(co_node_map, []),
-	    {ok, #ctx {node_pid = NodePid, supervision = Supervision,
-		       nmt_table = NMT, node_map = MAP}};
+	    Ctx = #ctx {node_pid = NodePid, 
+			supervision = Supervision,
+			nmt_table = NMT},
+	    %% Load conf if it exists
+	    load_conf(Ctx),
+	    {ok, Ctx};
 	_NotPid ->
 	    {error, no_co_node}
     end.
@@ -381,7 +382,7 @@ init(Args) ->
 handle_call(slaves, _From, Ctx=#ctx {nmt_table = NmtTable}) ->
     ?dbg(nmt, "handle_call: slaves", []),
     SlaveList = 
-	ets:select(NmtTable, [{#nmt_entry{id='$1', 
+	ets:select(NmtTable, [{#nmt_slave{id='$1', 
 					  node_state = '$2', 
 					  com_status='$3', 
 					  _='_'},
@@ -403,16 +404,21 @@ handle_call({send_all, Cmd}, _From, Ctx) ->
 
 handle_call({subscribe, Pid}, _From, Ctx=#ctx {subscribers = SubList}) ->
     ?dbg(nmt, "handle_call: subscribe ~p", [Pid]),
-    %% Monitor subscribers ??
-    {reply, ok, Ctx#ctx {subscribers = lists:usort([Pid | SubList])}};
+    case lists:keymember(Pid, 1, SubList) of
+	true ->
+	    {reply, ok, Ctx};
+	false ->
+	    Mon = erlang:monitor(process, Pid),
+	    {reply, ok, Ctx#ctx {subscribers = [{Pid, Mon} | SubList]}}
+    end;
 
 handle_call({unsubscribe, Pid}, _From, Ctx=#ctx {subscribers = SubList}) ->
     ?dbg(nmt, "handle_call: unsubscribe ~p", [Pid]),
-    {reply, ok, Ctx#ctx {subscribers = lists:delete(Pid,SubList)}};
+    {reply, ok, Ctx#ctx {subscribers = lists:keydelete(Pid,1,SubList)}};
 
 handle_call(subscribers, _From, Ctx=#ctx {subscribers = SubList}) ->
     ?dbg(nmt, "handle_call: subscribers", []),
-    {reply, {ok, SubList}, Ctx};
+    {reply, {ok, [Sub || {Sub, _Mon} <- SubList]}, Ctx};
 
 handle_call({add_slave, SlaveId = {_Flag, _NodeId}}, _From, 
 	    Ctx=#ctx {nmt_table = NmtTable}) ->
@@ -445,25 +451,10 @@ handle_call(save, _From, Ctx=#ctx {nmt_table = NmtTable}) ->
 	    {reply, Error, Ctx}
     end;
 	
-handle_call(load, _From, Ctx=#ctx {nmt_table = NmtTable}) ->
-    File = filename:join(code:priv_dir(canopen), ?NMT_CONF),
-    ?dbg(nmt, "handle_call: load nmt configuration from ~p", [File]),
-    case filelib:is_regular(File) of
-	true ->
-	    case file:consult(File) of
-		{ok, [List]} ->
-		    ?dbg(nmt, "handle_call: loading list ~p", [List]),
-		    try ets:insert(NmtTable, List) of
-			true -> {reply, ok, Ctx}
-		    catch
-			error:Reason -> {reply, {error, Reason}, Ctx}
-		    end;
-		Error ->
-		    {reply, Error, Ctx}
-	    end;
-	false ->
-	    {reply, {error, no_nmt_conf_exists}, Ctx}
-    end;
+handle_call(load, _From, Ctx) ->
+    ?dbg(nmt, "handle_call: load nmt configuration.", []),
+    Reply = load_conf(Ctx),
+    {reply, Reply, Ctx};
 
 handle_call({debug, TrueOrFalse}, _From, Ctx) ->
     put(dbg, TrueOrFalse),
@@ -472,17 +463,14 @@ handle_call({debug, TrueOrFalse}, _From, Ctx) ->
 handle_call(dump, _From, Ctx) ->
     io:format("---- NMT TABLE ----\n"),
     ets:foldl(
-      fun(E=#nmt_entry {id = {Flag, NodeId}},_) ->
+      fun(E=#nmt_slave {id = {Flag, NodeId}},_) ->
 	      io:format("  ID: {~p,~.16#}\n", 
 			[Flag, NodeId]),
 	      io:format("     STATE: ~s\n", 
-			[co_format:state(E#nmt_entry.node_state)])
+			[co_format:state(E#nmt_slave.node_state)]),
+	      io:format("COM STATUS: ~p\n", 
+			[E#nmt_slave.com_status])
       end, ok, Ctx#ctx.nmt_table),
-    io:format("---- NODE MAP TABLE ----\n"),
-    ets:foldl(
-      fun({Sn,SlaveId},_) ->
-	      io:format("~10.16.0# => ~w\n", [Sn, SlaveId])
-      end, ok, Ctx#ctx.node_map),
    {reply, ok, Ctx};
 
 handle_call(stop, _From, Ctx) ->
@@ -563,12 +551,12 @@ handle_info({do_node_guard, SlaveId = {_Flag, _NodeId}},
 	    ok;
 	[Slave] -> 
 	    send_node_guard(SlaveId, NodePid),
-	    TRef = erlang:send_after(Slave#nmt_entry.guard_time, self(), 
+	    TRef = erlang:send_after(Slave#nmt_slave.guard_time, self(), 
 				     {do_node_guard, SlaveId}),
-	    NewComStatus = if Slave#nmt_entry.com_status == lost -> lost;
+	    NewComStatus = if Slave#nmt_slave.com_status == lost -> lost;
 			      true -> waiting
 			   end,
-	    ets:insert(NmtTable, Slave#nmt_entry {com_status = NewComStatus,
+	    ets:insert(NmtTable, Slave#nmt_slave {com_status = NewComStatus,
 						  guard_timer = TRef})
     end,
     {noreply, Ctx};
@@ -585,10 +573,16 @@ handle_info({node_guard_timeout, SlaveId = {_Flag, _NodeId}},
 	    error_logger:error_msg("Node guard timeout, check NMT slave {~p,~.16#}\n", 
 			   [_Flag, _NodeId]),
 	    inform_subscribers({lost_contact, SlaveId}, Ctx),
-	    ets:insert(NmtTable, Slave#nmt_entry {com_status = lost})
+	    ets:insert(NmtTable, Slave#nmt_slave {com_status = lost})
     end,
     %% Start again ??
     {noreply, Ctx};
+
+handle_info({'DOWN',_Ref,process,Pid,_Reason}, 
+	    Ctx=#ctx {subscribers = SubList}) ->
+    ?dbg(nmt, "handle_info: DOWN for subscriber process ~p received, "
+	 "reason ~p", [Pid, _Reason]),
+    {noreply, Ctx#ctx {subscribers = lists:keydelete(Pid,1,SubList)}};
 
 handle_info(_Info, Ctx) ->
     ?dbg(?NAME," handle_info: Unknown Info ~p, ignored.\n", [_Info]),
@@ -629,10 +623,30 @@ code_change(_OldVsn, Ctx, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
+load_conf(_Ctx=#ctx {nmt_table = NmtTable}) ->
+    File = filename:join(code:priv_dir(canopen), ?NMT_CONF),
+    ?dbg(nmt, "load_conf: load nmt configuration from ~p", [File]),
+    case filelib:is_regular(File) of
+	true ->
+	    case file:consult(File) of
+		{ok, [List]} ->
+		    ?dbg(nmt, "handle_call: loading list ~p", [List]),
+		    try ets:insert(NmtTable, List) of
+			true -> ok
+		    catch
+			error:Reason -> {error, Reason}
+		    end;
+		Error ->
+		    Error
+	    end;
+	false ->
+	    {error, no_nmt_conf_exists}
+    end.
+
 add_slave(SlaveId = {_Flag, _NodeId}, 
 	  Ctx=#ctx {supervision = Supervision, nmt_table = NmtTable}) ->
     ?dbg(nmt, "add_slave: {~p, ~.16#}", [_Flag, _NodeId]),
-    Slave = #nmt_entry {id = SlaveId},
+    Slave = #nmt_slave {id = SlaveId},
     ets:insert(NmtTable, Slave),
     case Supervision of
 	none ->
@@ -646,7 +660,7 @@ add_slave(SlaveId = {_Flag, _NodeId},
 	    ok
     end.
 
-activate_node_guard(Slave=#nmt_entry {id = SlaveId}, 
+activate_node_guard(Slave=#nmt_slave {id = SlaveId}, 
 		    Ctx=#ctx {nmt_table = NmtTable}) ->
     ?dbg(nmt, "activate_node_guard: slave ~p.", [SlaveId]),
     %% get node guard time and life factor
@@ -654,21 +668,21 @@ activate_node_guard(Slave=#nmt_entry {id = SlaveId},
     case GuardTime of
 	undefined ->
 	    ?dbg(nmt, "activate_node_guard: slave not reachable", []),
-	    error_logger:error_msg("New slave ~p guard time could not be fetched. "
-				   "No supervision possible.\n",
-				   [SlaveId]),
-	    inform_subscribers({slave_not_reachable, SlaveId}, Ctx),
-	    ets:insert(NmtTable, Slave#nmt_entry {com_status = lost}); %% ???
+	    error_logger:error_msg(
+	      "New slave ~p guard time could not be fetched. "
+	      "No supervision possible.\n", [SlaveId]),
+	    inform_subscribers({slave_not_supervisable, SlaveId}, Ctx),
+	    ets:insert(NmtTable, Slave#nmt_slave {com_status = lost}); %% ???
 	0 -> 
 	    ?dbg(nmt, "activate_node_guard: guard time = 0, no node guarding", []);
 	_T ->
 	    ?dbg(nmt, "activate_node_guard: node guarding, ~p * ~p", 
 		 [GuardTime, LifeFactor]),
-	    NewSlave = Slave#nmt_entry {guard_time = GuardTime,
+	    NewSlave = Slave#nmt_slave {guard_time = GuardTime,
 					life_factor = LifeFactor},
 	    GTimer = start_guard_timer(NewSlave),
 	    LTimer = start_life_timer(NewSlave),
-	    ets:insert(NmtTable, NewSlave#nmt_entry {guard_timer = GTimer,
+	    ets:insert(NmtTable, NewSlave#nmt_slave {guard_timer = GTimer,
 						     life_timer = LTimer,
 						     com_status = ok})
     end.
@@ -694,7 +708,7 @@ slave_guard_time(SlaveId) ->
     end.
 
 
-remove_slave(Slave=#nmt_entry {id = SlaveId = {_Flag, _NodeId}},
+remove_slave(Slave=#nmt_slave {id = SlaveId = {_Flag, _NodeId}},
 	     Ctx=#ctx {supervision = Supervision, nmt_table = NmtTable}) ->
     ?dbg(nmt, "remove_slave: {~p, ~.16#}", [_Flag, _NodeId]),
     case Supervision of 
@@ -708,15 +722,15 @@ remove_slave(Slave=#nmt_entry {id = SlaveId = {_Flag, _NodeId}},
     end,
     ets:delete(NmtTable,SlaveId).
 
-deactivate_node_guard(Slave=#nmt_entry {id = SlaveId}, 
+deactivate_node_guard(Slave=#nmt_slave {id = SlaveId}, 
 		      _Ctx=#ctx {nmt_table = NmtTable}) ->
     ?dbg(nmt, "deactivate_node_guard: slave ~p.", [SlaveId]),
     cancel_life_timer(Slave),
     cancel_guard_timer(Slave),
-    ets:insert(NmtTable, Slave#nmt_entry {guard_timer = undefined, 
+    ets:insert(NmtTable, Slave#nmt_slave {guard_timer = undefined, 
 					  life_timer = undefined}).
 
-send_to_slave(Slave=#nmt_entry {id = SlaveId}, Cmd, _Ctx=#ctx {nmt_table = NmtTable}) ->
+send_to_slave(Slave=#nmt_slave {id = SlaveId}, Cmd, _Ctx=#ctx {nmt_table = NmtTable}) ->
     case send_nmt(SlaveId, co_lib:encode_nmt_command(Cmd)) of
 	ok ->
 	    update_slave_state(Slave, Cmd, NmtTable),
@@ -732,18 +746,18 @@ send_all(Cmd, Ctx=#ctx {nmt_table = NmtTable}) ->
 	      end, [], NmtTable).
 
 update_slave_state(Slave, start, NmtTable) ->
-    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?Operational});
+    ets:insert(NmtTable, Slave#nmt_slave {node_state = ?Operational});
 update_slave_state(Slave, stop, NmtTable) ->
-    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?Stopped});
+    ets:insert(NmtTable, Slave#nmt_slave {node_state = ?Stopped});
 update_slave_state(Slave, enter_pre_op, NmtTable) ->
-    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?PreOperational});
+    ets:insert(NmtTable, Slave#nmt_slave {node_state = ?PreOperational});
 update_slave_state(Slave, reset, NmtTable) ->
-    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?PreOperational});
+    ets:insert(NmtTable, Slave#nmt_slave {node_state = ?PreOperational});
 update_slave_state(Slave, reset_com, NmtTable) ->
-    ets:insert(NmtTable, Slave#nmt_entry {node_state = ?PreOperational}).
+    ets:insert(NmtTable, Slave#nmt_slave {node_state = ?PreOperational}).
 
 inform_subscribers(Msg, _Ctx=#ctx {subscribers = SubList}) ->
-    lists:foreach(fun(Sub) -> Sub ! Msg  end,  SubList).
+    lists:foreach(fun({Sub, _Mon}) -> Sub ! Msg  end,  SubList).
 
 
 handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle, 
@@ -755,35 +769,38 @@ handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle,
 	    %% First message
 	    ?dbg(nmt, "handle_node_guard: new node, creating entry", []),
 	    if State =/= ?Initialisation ->
-		    error_logger:error_msg("Slave ~p has unexpected state ~p\n",
-					   [SlaveId, co_lib:decode_nmt_state(State)]),	    
+		    error_logger:error_msg(
+		      "Slave ~p has unexpected state ~s\n",
+		      [SlaveId, co_format:state(State)]),	    
 		    inform_subscribers({wrong_slave_state, SlaveId, State}, Ctx);
 	       true -> ok
 	    end,
 	    add_slave(SlaveId, Ctx);
 	[Slave] when Supervision == node_guard -> 
-	    if Slave#nmt_entry.toggle == Toggle andalso
-	       Slave#nmt_entry.node_state == State ->
+	    if Slave#nmt_slave.toggle == Toggle andalso
+	       Slave#nmt_slave.node_state == State ->
 		    node_guard_ok(Slave, Toggle, State, NmtTable);
 
-	       Slave#nmt_entry.node_state =/= State ->
+	       Slave#nmt_slave.node_state =/= State ->
 		    %% This can be because it is a node with both
 		    %% short and extended node id and co_nmt only knows
 		    %% about state change of short node id.
 		    ?dbg(nmt, "handle_node_guard: expected state ~p", 
-			 [Slave#nmt_entry.node_state]),
+			 [Slave#nmt_slave.node_state]),
 		    %% Send error ??
-		    error_logger:warning_msg("Node {~p, ~.16#} answered node guard "
-					   "with unexpected state ~p, updating.\n", 
+		    error_logger:warning_msg(
+		      "Node {~p, ~.16#} answered node guard "
+		      "with unexpected state ~p, updating.\n", 
 					   [Flag, NodeId, State]),
 		    node_guard_ok(Slave, Toggle, State, NmtTable);
 
-	       Slave#nmt_entry.toggle =/= Toggle ->
+	       Slave#nmt_slave.toggle =/= Toggle ->
 		    ?dbg(nmt, "handle_node_guard: expected toggle ~p", 
-			 [Slave#nmt_entry.toggle]),
+			 [Slave#nmt_slave.toggle]),
 		    %% Send error ??
-		    error_logger:error_msg("Node {~p, ~.16#} answered node guard "
-					   "with wrong toggle, ignored.\n", 
+		    error_logger:error_msg(
+		      "Node {~p, ~.16#} answered node guard "
+		      "with wrong toggle, ignored.\n", 
 					   [Flag, NodeId])
 	    end;
 	[_Slave] when Supervision == none -> 
@@ -795,14 +812,14 @@ node_guard_ok(Slave, Toggle, State, NmtTable) ->
     %% Restart life timer
     cancel_life_timer(Slave),
     NewTimer = start_life_timer(Slave),
-    ets:insert(NmtTable, Slave#nmt_entry {toggle = 1 - Toggle,
+    ets:insert(NmtTable, Slave#nmt_slave {toggle = 1 - Toggle,
 					  node_state = State,
 					  life_timer = NewTimer,
 					  com_status = ok}).
 
 activate_node_guard(Ctx=#ctx {nmt_table = NmtTable}) ->
     ?dbg(nmt, "activate_node_guard: ", []),
-    ets:foldl(fun(Slave=#nmt_entry {id = _SlaveId},[]) ->
+    ets:foldl(fun(Slave=#nmt_slave {id = _SlaveId},[]) ->
 		      ?dbg(nmt, "activate_node_guard: slave ~p.", [_SlaveId]),
 		      activate_node_guard(Slave, Ctx),
 		      []
@@ -814,7 +831,7 @@ deactivate_node_guard(Ctx=#ctx {nmt_table = NmtTable}) ->
 		      []
 	      end, [], NmtTable).
 
-start_life_timer(_Slave=#nmt_entry {guard_time = GT, life_factor = LF, id = Id}) ->
+start_life_timer(_Slave=#nmt_slave {guard_time = GT, life_factor = LF, id = Id}) ->
     case GT * LF of
 	0 -> 
 	    undefined; %% No node guarding
@@ -822,20 +839,20 @@ start_life_timer(_Slave=#nmt_entry {guard_time = GT, life_factor = LF, id = Id})
 	    erlang:send_after(NLT, self(), {node_guard_timeout, Id})
     end.
 
-cancel_life_timer(_Slave=#nmt_entry {life_timer = undefined}) ->
+cancel_life_timer(_Slave=#nmt_slave {life_timer = undefined}) ->
     do_nothing;
-cancel_life_timer(_Slave=#nmt_entry {life_timer = Timer}) ->
+cancel_life_timer(_Slave=#nmt_slave {life_timer = Timer}) ->
     erlang:cancel_timer(Timer).
 
-start_guard_timer(_Slave=#nmt_entry {guard_time = 0}) ->
+start_guard_timer(_Slave=#nmt_slave {guard_time = 0}) ->
     undefined; %% No node guarding
-start_guard_timer(_Slave=#nmt_entry {guard_time = GT, id = Id}) ->
+start_guard_timer(_Slave=#nmt_slave {guard_time = GT, id = Id}) ->
     erlang:send_after(GT, self(), {do_node_guard, Id}).
 
 
-cancel_guard_timer(_Slave=#nmt_entry {guard_timer = undefined}) ->
+cancel_guard_timer(_Slave=#nmt_slave {guard_timer = undefined}) ->
     do_nothing;
-cancel_guard_timer(_Slave=#nmt_entry {guard_timer = Timer}) ->
+cancel_guard_timer(_Slave=#nmt_slave {guard_timer = Timer}) ->
     erlang:cancel_timer(Timer).
 
 

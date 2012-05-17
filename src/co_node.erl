@@ -174,8 +174,10 @@ reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
 		  {stop, Reason::term()}.
 
 
-init({Serial, NodeName, Opts} = Args) ->
-    error_logger:info_msg("~p: init: args = ~p,\n pid = ~p\n", [?MODULE, Args, self()]),
+init({Serial, NodeName, Opts}) ->
+    error_logger:info_msg("~p: init: serial = ~.16#, name = ~p, opts = ~p\n "
+			  "pid = ~p\n", 
+			  [?MODULE, Serial, NodeName, Opts, self()]),
 
     %% Trace output enable/disable
     put(dbg, proplists:get_value(debug,Opts,false)), 
@@ -352,10 +354,11 @@ deactivate_node_guard(Ctx=#co_ctx {node_guard_timer = TRef}) ->
     erlang:cancel_timer(TRef),
     Ctx#co_ctx {node_guard_timer = undefined}.
 
-send_bootup(_Ctx=#co_ctx {nodeid=SNodeId, xnodeid=XNodeId, name = _Name}) ->
-    send_bootup({nodeid, SNodeId}),
+%% If ShortNodeId defined use it, otherwise XNodeId
+send_bootup(_Ctx=#co_ctx {nodeid=undefined, xnodeid=XNodeId, name = _Name}) ->
     send_bootup({xnodeid, XNodeId});
-
+send_bootup(_Ctx=#co_ctx {nodeid=SNodeId, name = _Name}) ->
+    send_bootup({nodeid, SNodeId});
 send_bootup({_TypeOfNid, undefined}) ->
     ?dbg(node, "~p: send_bootup: ~p not defined, no bootup sent.", 
 	 [self(), _TypeOfNid]),
@@ -794,6 +797,7 @@ handle_call({option, Option, NewValue}, _From, Ctx) ->
 		name -> OldName = Ctx#co_ctx.name,
 			co_proc:unreg({name, OldName}),			
 			co_proc:reg({name, NewValue}),
+			send_to_apps({name_change, OldName, NewValue}, Ctx),
 			Ctx#co_ctx {name = NewValue}; 
 
 		NodeIdChange when
@@ -912,8 +916,8 @@ handle_info({timeout,Ref,time_stamp}, Ctx)
 
 handle_info(node_guard_timeout, Ctx=#co_ctx {name=_Name}) ->
     ?dbg(node, "~s: handle_info: node_guard timeout received", [_Name]),
+    send_to_apps(lost_nmt_master_contact, Ctx),
     error_logger:error_msg("Node guard timeout, check NMT master.\n"),
-    %% Start again ??
     {noreply, Ctx#co_ctx {node_guard_error = true}};
 
 handle_info({rc_reset, Pid}, Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
@@ -1114,8 +1118,14 @@ nodeid_change(xnodeid, NewXNid, Ctx=#co_ctx {xnodeid = NewXNid}) ->
     Ctx;
 nodeid_change(xnodeid, undefined, _Ctx=#co_ctx {nodeid = undefined}) -> 
     {error, "Not possible to remove last nodeid"};
-nodeid_change(xnodeid, NewNid, Ctx=#co_ctx {xnodeid = OldNid}) ->
+nodeid_change(xnodeid, NewNid, Ctx=#co_ctx {xnodeid = OldNid, nodeid = SNid}) ->
     execute_change(xnodeid, NewNid, OldNid, Ctx),
+    if SNid == undefined ->
+	    send_bootup({xnodeid, NewNid});
+       true ->
+	    %% Using SNid for supervision
+	    do_nothing
+    end,
     Ctx#co_ctx {xnodeid = NewNid};
 nodeid_change(nodeid, NewNid, Ctx=#co_ctx {nodeid = NewNid}) ->
     %% No change
@@ -1126,6 +1136,7 @@ nodeid_change(nodeid, 0, _Ctx) ->
     {error, "NodeId 0 is reserved for the CANopen manager co_mgr."};
 nodeid_change(nodeid, NewNid, Ctx=#co_ctx {nodeid = OldNid}) ->
     execute_change(nodeid, NewNid, OldNid, Ctx),
+    send_bootup({nodeid, NewNid}),
     Ctx#co_ctx {nodeid = NewNid};
 nodeid_change(use_serial_as_xnodeid, true, Ctx=#co_ctx {serial = Serial}) ->
     NewXNid = co_lib:serial_to_xnodeid(Serial),
@@ -1214,7 +1225,6 @@ execute_change(NidType, NewNid, OldNid, Ctx=#co_ctx {cob_table = T}) ->
     co_proc:unreg({NidType, OldNid}),
     add_to_cob_table(T, NidType, NewNid),
     reg({NidType, NewNid}),
-    send_bootup({NidType, NewNid}),
     send_to_apps({nodeid_change, NidType, OldNid, NewNid}, Ctx),
     send_to_tpdos({nodeid_change, NidType, OldNid, NewNid}, Ctx).
     
@@ -1455,7 +1465,7 @@ handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, nmt_role = slave, name=_Name})
 	    %% not for me
 	    Ctx
     end;
-handle_nmt(M, Ctx=#co_ctx {nmt_role = master, name=_Name}) ->
+handle_nmt(M, Ctx=#co_ctx {nmt_role = master, name = _Name}) ->
     <<_NodeId,_Cs,_/binary>> = M#can_frame.data,
     ?dbg(node, "~s: handle_nmt: node is nmt master, no nmt command possible. "
 	 "Command ~p is for node ~p",
@@ -1478,6 +1488,7 @@ handle_node_guard_rtr(Frame, NodeId = {TypeOfNid, _Nid},
     end,
     %% If NMT supervision has been down resend bootup ?? Toggle ??
     if NgError ->
+	    send_to_apps(found_nmt_master_contact, Ctx),
 	    send_bootup(Ctx);
        true ->
 	    do_nothing
@@ -2825,8 +2836,9 @@ now_to_time_of_day({Sm,S0,Us}) ->
     Days = D + (?DAYS_FROM_0_TO_1970 - ?DAYS_FROM_0_TO_1984),
     #time_of_day { ms = Ms, days = Days }.
 
-time_of_day_to_now(T) when is_record(T, time_of_day)  ->
-    D = T#time_of_day.days + (?DAYS_FROM_0_TO_1984-?DAYS_FROM_0_TO_1970),
-    Sec = D*?SECS_PER_DAY + (T#time_of_day.ms div 1000),
-    USec = (T#time_of_day.ms rem 1000)*1000,
-    {Sec div 1000000, Sec rem 1000000, USec}.
+%% To be used ??
+%% time_of_day_to_now(T) when is_record(T, time_of_day)  ->
+%%     D = T#time_of_day.days + (?DAYS_FROM_0_TO_1984-?DAYS_FROM_0_TO_1970),
+%%     Sec = D*?SECS_PER_DAY + (T#time_of_day.ms div 1000),
+%%     USec = (T#time_of_day.ms rem 1000)*1000,
+%%     {Sec div 1000000, Sec rem 1000000, USec}.
