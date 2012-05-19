@@ -567,6 +567,17 @@ handle_info({'EXIT', _Pid, _Reason}, LoopData) ->
 	 [_Pid, _Reason]),
     {noreply, LoopData};
 
+handle_info({name_change, OldName, NewName}, 
+	    LoopData=#loop_data {co_node = {name, OldName}}) ->
+   ?dbg(?NAME, "handle_info: co_node name change from ~p to ~p.", 
+	 [OldName, NewName]),
+    {noreply, LoopData#loop_data {co_node = {name, NewName}}};
+
+handle_info({name_change, _OldName, _NewName}, LoopData) ->
+   ?dbg(?NAME, "handle_info: co_node name change from ~p to ~p, ignored.", 
+	 [_OldName, _NewName]),
+    {noreply, LoopData};
+
 handle_info(_Info, LoopData) ->
     ?dbg(?NAME," handle_info: Unknown Info ~p\n", [_Info]),
     {noreply, LoopData}.

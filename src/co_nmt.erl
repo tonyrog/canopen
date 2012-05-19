@@ -387,7 +387,7 @@ handle_call(slaves, _From, Ctx=#ctx {nmt_table = NmtTable}) ->
 					  com_status='$3', 
 					  _='_'},
 			       [],[{{'$1','$2','$3'}}]}]),
-    {reply, {ok, SlaveList}, Ctx};
+    {reply, SlaveList, Ctx};
 handle_call({send_slave, SlaveId = {_Flag, _NodeId}, Cmd}, _From, 
 	    Ctx=#ctx {nmt_table = NmtTable}) ->
     ?dbg(nmt, "handle_call: send_slave {~p,~.16#} ~p", [_Flag, _NodeId, Cmd]),
@@ -424,7 +424,7 @@ handle_call({add_slave, SlaveId = {_Flag, _NodeId}}, _From,
 	    Ctx=#ctx {nmt_table = NmtTable}) ->
     ?dbg(nmt, "handle_call: add_slave {~p,~.16#}", [_Flag, _NodeId]),
     case ets:lookup(NmtTable, SlaveId) of
-	[_Slave] -> ok; %% already supervised
+	[_Slave] -> ok; %% already handled
 	[] -> add_slave(SlaveId, Ctx)
     end,
     {reply, ok, Ctx};
@@ -433,7 +433,7 @@ handle_call({remove_slave, SlaveId = {_Flag, _NodeId}}, _From,
 	    Ctx=#ctx {nmt_table = NmtTable}) ->
     ?dbg(nmt, "handle_call: remove_slave {~p,~.16#}", [_Flag, _NodeId]),
     case ets:lookup(NmtTable, SlaveId) of
-	[] -> ok; %% not supervised
+	[] -> ok; %% not handled
 	[Slave] -> remove_slave(Slave, Ctx)
     end,
     {reply, ok, Ctx};
@@ -658,7 +658,9 @@ add_slave(SlaveId = {_Flag, _NodeId},
 	    %% To be implemented 
 	    ?dbg(nmt, "add_slave: heartbeat not implemented yet", []),
 	    ok
-    end.
+    end,
+    send_to_slave(Slave, start, Ctx).
+    
 
 activate_node_guard(Slave=#nmt_slave {id = SlaveId}, 
 		    Ctx=#ctx {nmt_table = NmtTable}) ->
@@ -768,7 +770,7 @@ handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle,
 	[] -> 
 	    %% First message
 	    ?dbg(nmt, "handle_node_guard: new node, creating entry", []),
-	    if State =/= ?Initialisation ->
+	    if State =/= ?Initialisation -> %% bootup
 		    error_logger:error_msg(
 		      "Slave ~p has unexpected state ~s\n",
 		      [SlaveId, co_format:state(State)]),	    
