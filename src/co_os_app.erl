@@ -297,9 +297,10 @@ loop_data(Pid) ->
 
 init(CoNode) ->
     process_flag(trap_exit, true),
+    CoName = {name, _Name} = co_api:get_option(CoNode, name),
     {ok, _Dict} = co_api:attach(CoNode),
     co_api:reserve(CoNode, ?IX_OS_COMMAND, ?MODULE),
-    {ok, #loop_data {state=init, co_node=CoNode}}.
+    {ok, #loop_data {state=init, co_node=CoName}}.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -505,6 +506,7 @@ handle_stop(LoopData) ->
 %%--------------------------------------------------------------------
 -type cast_msg()::
 	{abort, Ref::reference(), Reason::atom()} |
+	{name_change, OldName::atom(), NewName::atom()} |
 	term().
 
 -spec handle_cast(Msg::cast_msg(), LoopData::#loop_data{}) ->
@@ -521,6 +523,18 @@ handle_cast({abort, Ref, _Reason}, LoopData) ->
 					   ref = undefined,
 					   command = "", status = 0, reply = ""}}
      end;
+
+handle_cast({name_change, OldName, NewName}, 
+	    LoopData=#loop_data {co_node = {name, OldName}}) ->
+   ?dbg(?NAME, "handle_cast: co_node name change from ~p to ~p.", 
+	 [OldName, NewName]),
+    {noreply, LoopData#loop_data {co_node = {name, NewName}}};
+
+handle_cast({name_change, _OldName, _NewName}, LoopData) ->
+   ?dbg(?NAME, "handle_cast: co_node name change from ~p to ~p, ignored.", 
+	 [_OldName, _NewName]),
+    {noreply, LoopData};
+
 handle_cast(_Msg, LoopData) ->
     ?dbg(?NAME," handle_cast: Message = ~p. ", [_Msg]),
     {noreply, LoopData}.
@@ -565,17 +579,6 @@ handle_info({'EXIT', _Pid, _Reason}, LoopData) ->
     %% Other process terminated
    ?dbg(?NAME, "handle_info: unexpected EXIT for process ~p received, reason ~p", 
 	 [_Pid, _Reason]),
-    {noreply, LoopData};
-
-handle_info({name_change, OldName, NewName}, 
-	    LoopData=#loop_data {co_node = {name, OldName}}) ->
-   ?dbg(?NAME, "handle_info: co_node name change from ~p to ~p.", 
-	 [OldName, NewName]),
-    {noreply, LoopData#loop_data {co_node = {name, NewName}}};
-
-handle_info({name_change, _OldName, _NewName}, LoopData) ->
-   ?dbg(?NAME, "handle_info: co_node name change from ~p to ~p, ignored.", 
-	 [_OldName, _NewName]),
     {noreply, LoopData};
 
 handle_info(_Info, LoopData) ->

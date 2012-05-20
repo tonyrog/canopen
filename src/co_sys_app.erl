@@ -212,10 +212,11 @@ loop_data(Pid) ->
 -spec init(CoNode::node_identity()) -> {ok, LoopData::#loop_data{}}.
 
 init(CoNode) ->
+    CoName = {name, _Name} = co_api:get_option(CoNode, name),
     {ok, _Dict} = co_api:attach(CoNode),
     co_api:reserve(CoNode, ?IX_STORE_PARAMETERS, ?MODULE),
     co_api:reserve(CoNode, ?IX_RESTORE_DEFAULT_PARAMETERS, ?MODULE),
-    {ok, #loop_data {state=running, co_node = CoNode}}.
+    {ok, #loop_data {state=running, co_node = CoName}}.
 
 
 %%--------------------------------------------------------------------
@@ -345,6 +346,17 @@ handle_stop(LoopData=#loop_data {co_node = CoNode}) ->
 			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
 			 {stop, Reason::atom(), LoopData::#loop_data{}}.
 			 
+handle_cast({name_change, OldName, NewName}, 
+	    LoopData=#loop_data {co_node = {name, OldName}}) ->
+   ?dbg(?NAME, "handle_cast: co_node name change from ~p to ~p.", 
+	 [OldName, NewName]),
+    {noreply, LoopData#loop_data {co_node = {name, NewName}}};
+
+handle_cast({name_change, _OldName, _NewName}, LoopData) ->
+   ?dbg(?NAME, "handle_cast: co_node name change from ~p to ~p, ignored.", 
+	 [_OldName, _NewName]),
+    {noreply, LoopData};
+
 handle_cast(_Msg, LoopData) ->
     ?dbg(?NAME," handle_cast: Message = ~p. ", [_Msg]),
     {noreply, LoopData}.
@@ -360,17 +372,6 @@ handle_cast(_Msg, LoopData) ->
 			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
 			 {stop, Reason::atom(), LoopData::#loop_data{}}.
 			 
-handle_info({name_change, OldName, NewName}, 
-	    LoopData=#loop_data {co_node = {name, OldName}}) ->
-   ?dbg(?NAME, "handle_info: co_node name change from ~p to ~p.", 
-	 [OldName, NewName]),
-    {noreply, LoopData#loop_data {co_node = {name, NewName}}};
-
-handle_info({name_change, _OldName, _NewName}, LoopData) ->
-   ?dbg(?NAME, "handle_info: co_node name change from ~p to ~p, ignored.", 
-	 [_OldName, _NewName]),
-    {noreply, LoopData};
-
 handle_info(_Info, LoopData) ->
     ?dbg(?NAME," handle_info: Unknown Info ~p", [_Info]),
     {noreply, LoopData}.
