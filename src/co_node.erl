@@ -307,7 +307,7 @@ initialization(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId,
        NmtRole == autonomous ->
 	    %% ??
 	    send_bootup(Ctx),
-	    Ctx#co_ctx {state = ?PreOperational}
+	    Ctx#co_ctx {state = ?Operational}
     end.
     
 
