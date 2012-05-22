@@ -74,7 +74,7 @@ start_node(Serial, Dict, Opts) ->
 
     {ok, Pid} = co_api:start_link(Serial, Opts ++
 				      [{use_serial_as_xnodeid, true},
-				       {dict_file, Dict},
+				       {dict, Dict},
 				       {max_blksize, 7},
 				       {vendor,16#2A1},
 				       {linked, false}]),
@@ -85,8 +85,12 @@ start_node(Serial, Dict, Opts) ->
 stop_node(Config) when is_list(Config) ->
     stop_node(serial());
 stop_node(Serial) ->
-    co_api:stop(Serial).
-
+    case whereis(list_to_atom(co_lib:serial_to_string(Serial))) of
+	Pid when is_pid(Pid) ->
+	    co_api:stop(Pid);
+	undefined ->
+	    ok
+    end.
 
 load_dict(C) ->
     load_dict(C, serial()).

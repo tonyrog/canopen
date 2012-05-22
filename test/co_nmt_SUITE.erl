@@ -150,10 +150,12 @@ init_per_group(GroupName, Config)
   when GroupName == nmt_commands->
     ct:pal("TestGroup: ~p", [GroupName]),
     co_nmt:remove_slave(xslave_id()),
+    co_nmt:remove_slave(slave_id()),
     [] = co_nmt:slaves(),
     co_test_lib:start_node(Config, 
 			   ?SLAVE_NODE,
 			   [{nmt_role, slave},
+			    {supervision, none},
 			    slave_id()]),
     Config;
 init_per_group(GroupName, Config) ->
@@ -176,7 +178,14 @@ init_per_group(GroupName, Config) ->
 			   {save_config, Config1::list(tuple())}.
 
 end_per_group(nmt_commands, _Config) ->
+    co_nmt:remove_slave(slave_id()),
     co_test_lib:stop_node(?SLAVE_NODE),
+    ok;
+end_per_group(node_guard, _Config) ->
+    ok = co_api:set_option(serial(), supervision, none),
+    {supervision, none} = co_api:get_option(serial(), supervision),
+    co_test_lib:stop_node(?SLAVE_NODE),
+    co_nmt:remove_slave(xslave_id()),
     co_nmt:remove_slave(slave_id()),
     ok;
 end_per_group(handle_slave, _Config) ->

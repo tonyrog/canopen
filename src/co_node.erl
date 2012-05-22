@@ -53,7 +53,8 @@
 
 -import(lists, [foreach/2, reverse/1, seq/2, map/2, foldl/3]).
 
--define(LAST_SAVED_FILE, "last.dict").
+-define(LAST_SAVED_DICT, "last.dict").
+-define(DEFAULT_DICT, "default.dict").
 
 %%====================================================================
 %% API
@@ -247,9 +248,7 @@ init({Serial, NodeName, Opts}) ->
 
     can_router:attach(),
 
-    case load_dict_init(proplists:get_value(dict_file, Opts), 
-			proplists:get_value(load_last_saved, Opts, true), 
-			Ctx) of
+    case load_dict_init(proplists:get_value(dict, Opts, saved), Ctx) of
 	{ok, Ctx1} ->
 	    process_flag(trap_exit, true),
 	    if ShortNodeId =:= 0 -> %% CANopen manager
@@ -501,7 +500,7 @@ handle_call({get_object,Index}, _From, Ctx) ->
 
 handle_call(load_dict, From, Ctx=#co_ctx {serial = Serial}) ->
     File = filename:join(code:priv_dir(canopen), 
-			 co_lib:serial_to_string(Serial) ++ ?LAST_SAVED_FILE),
+			 co_lib:serial_to_string(Serial) ++ ?LAST_SAVED_DICT),
     handle_call({load_dict, File}, From, Ctx);
 handle_call({load_dict, File}, _From, Ctx) ->
     ?dbg(node, "~s: handle_call: load_dict, file = ~p", [Ctx#co_ctx.name, File]),    
@@ -516,7 +515,7 @@ handle_call({load_dict, File}, _From, Ctx) ->
 
 handle_call(save_dict, From, Ctx=#co_ctx {serial = Serial}) ->
     File = filename:join(code:priv_dir(canopen), 
-			 co_lib:serial_to_string(Serial) ++ ?LAST_SAVED_FILE),
+			 co_lib:serial_to_string(Serial) ++ ?LAST_SAVED_DICT),
     handle_call({save_dict, File}, From, Ctx);
 handle_call({save_dict, File}, _From, Ctx=#co_ctx {dict = Dict}) ->
     ?dbg(node, "~s: handle_call: save_dict, file = ~p", [Ctx#co_ctx.name, File]),    
@@ -1268,26 +1267,41 @@ create_sub_table() ->
 %%    IX_SDO_CLIENT_FIRST - IX_SDO_CLIENT_LAST =>  cob_table
 %%    IX_RPDO_PARAM_FIRST - IX_RPDO_PARAM_LAST =>  cob_table
 %% 
-load_dict_init(undefined, true, Ctx=#co_ctx {serial = Serial}) ->
-    File = filename:join(code:priv_dir(canopen), 
-			 co_lib:serial_to_string(Serial) ++ ?LAST_SAVED_FILE),
-    case filelib:is_regular(File) of
-	true -> load_dict_init(File, true, Ctx);
-	false -> {ok, Ctx}
-    end;
-load_dict_init(undefined, false, Ctx) ->
-    %% ??
+load_dict_init(none, Ctx) ->
     {ok, Ctx};
-load_dict_init(File, _Flag, Ctx) when is_list(File) ->
+load_dict_init(default, Ctx=#co_ctx {serial = Serial}) ->
+    File = filename:join(code:priv_dir(canopen), ?DEFAULT_DICT),
+    case filelib:is_regular(File) of
+	true -> load_dict_internal(File, Ctx);
+	false -> {error, no_dict_available}
+    end;
+load_dict_init(saved, Ctx=#co_ctx {serial = Serial}) ->
+    File = filename:join(code:priv_dir(canopen), 
+			 co_lib:serial_to_string(Serial) ++ ?LAST_SAVED_DICT),
+    case filelib:is_regular(File) of
+	true -> 
+	    load_dict_internal(File, Ctx);
+	false -> 
+	    error_logger:error_msg("No saved dictionary found, using default\n"),
+	    load_dict_init(default, Ctx)
+    end;
+load_dict_init(File, Ctx) when is_list(File) ->
     load_dict_internal(filename:join(code:priv_dir(canopen), File), Ctx); 
-load_dict_init(File, _Flag, Ctx) when is_atom(File) ->
+load_dict_init(File, Ctx) when is_atom(File) ->
     load_dict_internal(filename:join(code:priv_dir(canopen), atom_to_list(File)), Ctx). 
 
-load_dict_internal(File, Ctx=#co_ctx {dict = Dict, name = _Name}) ->
-    ?dbg(node, "~s: load_dict_internal: Loading file = ~p", 
-	 [_Name, File]),
+load_dict_internal(File, Ctx=#co_ctx {name = _Name}) ->
+    ?dbg(node, "~s: load_dict_internal: Loading file = ~p", [_Name, File]),
+    case filelib:is_regular(File) of
+	true -> load_dict_internal1(File, Ctx);
+	false -> {error, no_dict_available}
+    end.
+
+    
+load_dict_internal1(File, Ctx=#co_ctx {dict = Dict, name = _Name}) ->
     try co_file:load(File) of
 	{ok,Os} ->
+	    ?dbg(node, "~s: load_dict_internal1: Loaded file = ~p", [_Name, File]),
 	    %% Install all objects
 	    ChangedIxs =
 		foldl(
@@ -1474,7 +1488,8 @@ handle_nmt(M, Ctx=#co_ctx {nmt_role = master, name = _Name}) ->
     
 
 handle_node_guard_rtr(Frame, NodeId = {TypeOfNid, _Nid},
-		  Ctx=#co_ctx {state = State, nmt_role = slave, 
+		  Ctx=#co_ctx {state = State, 
+			       nmt_role = slave, supervision = node_guard,
 			       toggle = Toggle, xtoggle = XToggle,
 			       node_guard_timer = Timer, node_life_time = NLT,
 			       node_guard_error = NgError, name=_Name}) 
@@ -1510,6 +1525,12 @@ handle_node_guard_rtr(Frame, NodeId = {TypeOfNid, _Nid},
     Ctx#co_ctx {toggle = NewToggle, xtoggle = NewXToggle,
 		node_guard_error = false, node_guard_timer = NewTimer};
 
+handle_node_guard_rtr(_Frame, _NodeId, 
+		      Ctx=#co_ctx {supervision = Super, name=_Name}) 
+  when Super == none orelse Super == hearbeat ->
+    ?dbg(node, "~s: handle_node_guard: node has supervision ~p, "
+	 "node_guard request ~w  ignored. ",[_Name, Super, _Frame]),
+    Ctx;
 handle_node_guard_rtr(_Frame, _NodeId, 
 		      Ctx=#co_ctx {nmt_role = autonomous, name=_Name}) ->
     ?dbg(node, "~s: handle_node_guard: node is autonomous, "

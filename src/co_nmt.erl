@@ -543,7 +543,7 @@ handle_cast(_Msg, Ctx) ->
 			 {noreply, Ctx::#ctx{}}.
 
 handle_info({do_node_guard, SlaveId = {_Flag, _NodeId}}, 
-	    Ctx=#ctx {nmt_table = NmtTable, node_pid = NodePid}) ->
+	    Ctx=#ctx {nmt_table = NmtTable, node_pid = NodePid, supervision = node_guard}) ->
     ?dbg(nmt, "handle_info: do_node_guard for {~p,~.16#}", [_Flag, _NodeId]),
     case ets:lookup(NmtTable, SlaveId) of
 	[] -> 
@@ -561,9 +561,13 @@ handle_info({do_node_guard, SlaveId = {_Flag, _NodeId}},
     end,
     {noreply, Ctx};
 
+handle_info({do_node_guard, _SlaveId}, Ctx) ->
+    ?dbg(nmt, "handle_info: do_node_guard, supervision disabled", []),
+    {noreply, Ctx};
+
 handle_info({node_guard_timeout, SlaveId = {_Flag, _NodeId}}, 
-	    Ctx=#ctx {nmt_table = NmtTable}) ->
-    ?dbg(nmt, "handle_info: node_guard timeout received for {~p,~.16#}", 
+	    Ctx=#ctx {nmt_table = NmtTable, supervision = node_guard}) ->
+    ?dbg(nmt, "handle_info: node_guard_timeout received for {~p,~.16#}", 
 	 [_Flag, _NodeId]),
     case ets:lookup(NmtTable, SlaveId) of
 	[] -> 
@@ -576,6 +580,10 @@ handle_info({node_guard_timeout, SlaveId = {_Flag, _NodeId}},
 	    ets:insert(NmtTable, Slave#nmt_slave {com_status = lost})
     end,
     %% Start again ??
+    {noreply, Ctx};
+
+handle_info({node_guard_timeout, _SlaveId}, Ctx) ->
+    ?dbg(nmt, "handle_info: node_guard_timeout, supervision disabled", []),
     {noreply, Ctx};
 
 handle_info({'DOWN',_Ref,process,Pid,_Reason}, 
