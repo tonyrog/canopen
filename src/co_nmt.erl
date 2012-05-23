@@ -549,11 +549,15 @@ handle_info({do_node_guard, SlaveId = {_Flag, _NodeId}},
 	[] -> 
 	    ?dbg(nmt, "handle_info: do_node_guard, slave not found!", []),
 	    ok;
-	[Slave] -> 
+	[Slave=#nmt_slave {guard_time = GT, com_status = Status}] -> 
+	    ?dbg(nmt, "handle_info: do_node_guard, slave guard time ~p", [GT]),
 	    send_node_guard(SlaveId, NodePid),
-	    TRef = erlang:send_after(Slave#nmt_slave.guard_time, self(), 
-				     {do_node_guard, SlaveId}),
-	    NewComStatus = if Slave#nmt_slave.com_status == lost -> lost;
+	    TRef = if GT =/= 0 ->
+			   erlang:send_after(GT, self(), {do_node_guard, SlaveId});
+		      true ->
+			   undefined
+		   end,
+	    NewComStatus = if Status == lost -> lost;
 			      true -> waiting
 			   end,
 	    ets:insert(NmtTable, Slave#nmt_slave {com_status = NewComStatus,
@@ -655,19 +659,19 @@ add_slave(SlaveId = {_Flag, _NodeId},
 	  Ctx=#ctx {supervision = Supervision, nmt_table = NmtTable}) ->
     ?dbg(nmt, "add_slave: {~p, ~.16#}", [_Flag, _NodeId]),
     Slave = #nmt_slave {id = SlaveId},
-    ets:insert(NmtTable, Slave),
-    case Supervision of
-	none ->
-	    ?dbg(nmt, "add_slave: no supervision", []),
-	    ok;
-	node_guard ->
-	    activate_node_guard(Slave, Ctx);
-	heartbeat ->
-	    %% To be implemented 
-	    ?dbg(nmt, "add_slave: heartbeat not implemented yet", []),
-	    ok
+    NewSlave = case Supervision of
+		   none ->
+		       ?dbg(nmt, "add_slave: no supervision", []),
+		       Slave;
+		   node_guard ->
+		       activate_node_guard(Slave, Ctx);
+		   heartbeat ->
+		       %% To be implemented 
+		       ?dbg(nmt, "add_slave: heartbeat not implemented yet", []),
+		       Slave
     end,
-    send_to_slave(Slave, start, Ctx).
+    ets:insert(NmtTable, NewSlave),
+    send_to_slave(NewSlave, start, Ctx).
     
 
 activate_node_guard(Slave=#nmt_slave {id = SlaveId}, 
@@ -682,9 +686,10 @@ activate_node_guard(Slave=#nmt_slave {id = SlaveId},
 	      "New slave ~p guard time could not be fetched. "
 	      "No supervision possible.\n", [SlaveId]),
 	    inform_subscribers({slave_not_supervisable, SlaveId}, Ctx),
-	    ets:insert(NmtTable, Slave#nmt_slave {com_status = lost}); %% ???
+	    Slave#nmt_slave {com_status = lost}; %% ???
 	0 -> 
-	    ?dbg(nmt, "activate_node_guard: guard time = 0, no node guarding", []);
+	    ?dbg(nmt, "activate_node_guard: guard time = 0, no node guarding", []),
+	    Slave#nmt_slave {com_status = ok};
 	_T ->
 	    ?dbg(nmt, "activate_node_guard: node guarding, ~p * ~p", 
 		 [GuardTime, LifeFactor]),
@@ -692,9 +697,9 @@ activate_node_guard(Slave=#nmt_slave {id = SlaveId},
 					life_factor = LifeFactor},
 	    GTimer = start_guard_timer(NewSlave),
 	    LTimer = start_life_timer(NewSlave),
-	    ets:insert(NmtTable, NewSlave#nmt_slave {guard_timer = GTimer,
-						     life_timer = LTimer,
-						     com_status = ok})
+	    NewSlave#nmt_slave {guard_timer = GTimer,
+				life_timer = LTimer,
+				com_status = ok}
     end.
 
 slave_guard_time(SlaveId) ->
@@ -740,7 +745,8 @@ deactivate_node_guard(Slave=#nmt_slave {id = SlaveId},
     ets:insert(NmtTable, Slave#nmt_slave {guard_timer = undefined, 
 					  life_timer = undefined}).
 
-send_to_slave(Slave=#nmt_slave {id = SlaveId}, Cmd, _Ctx=#ctx {nmt_table = NmtTable}) ->
+send_to_slave(Slave=#nmt_slave {id = SlaveId}, Cmd, 
+	      _Ctx=#ctx {nmt_table = NmtTable}) ->
     case send_nmt(SlaveId, co_lib:encode_nmt_command(Cmd)) of
 	ok ->
 	    update_slave_state(Slave, Cmd, NmtTable),

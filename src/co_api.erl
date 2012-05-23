@@ -200,7 +200,7 @@ name(Opts, Serial) ->
 verify_option(name, NewValue) 
   when is_list(NewValue) orelse is_atom(NewValue) ->
     ok;
-verify_option(name, NewValue) ->
+verify_option(name, _NewValue) ->
     {error, "Option name can only be set to a string or an atom."};
 verify_option(nodeid, NewValue) 
   when is_integer(NewValue) andalso NewValue >= 0 andalso NewValue < 127 ->
@@ -208,7 +208,7 @@ verify_option(nodeid, NewValue)
 verify_option(nodeid, NewValue) 
   when NewValue == undefined ->
     ok;
-verify_option(nodeid, NewValue) ->
+verify_option(nodeid, _NewValue) ->
     {error, "Option nodeid can only be set to an integer between 0 and "
      "126 (0 - 16#7e) or undefined."};
 verify_option(xnodeid, NewValue) 
@@ -218,7 +218,7 @@ verify_option(xnodeid, NewValue)
 verify_option(xnodeid, NewValue) 
   when NewValue =:= undefined ->
     ok;
-verify_option(xnodeid, NewValue) ->
+verify_option(xnodeid, _NewValue) ->
     {error, "Option xnodeid can only be set to an integer value between "
      "0 and 16777215 (0 - 16#ffffff) or undefined."};
 verify_option(dict, NewValue) 
@@ -229,7 +229,7 @@ verify_option(dict, NewValue)
 verify_option(dict, NewValue) 
   when is_list(NewValue) ->
     ok;
-verify_option(dict, NewValue) ->
+verify_option(dict, _NewValue) ->
     {error, "Option dict can only be set to a string or an atom."};
 verify_option(nmt_role, NewValue) 
   when NewValue == slave;
@@ -250,7 +250,7 @@ verify_option(supervision, _NewValue) ->
 verify_option(pst, NewValue) 
   when is_integer(NewValue) andalso NewValue >= 0 ->
     ok;
-verify_option(pst, NewValue) ->
+verify_option(pst, _NewValue) ->
     {error, "Option pst can only be set to a positive integer value or zero."};
 verify_option(Option, NewValue) 
   when Option == vendor;

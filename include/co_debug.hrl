@@ -15,7 +15,7 @@
 %%%
 %%%---- END COPYRIGHT ----------------------------------------------------------
 %%%-------------------------------------------------------------------
-%%% @author Malotte W LÃ¶nne <malotte@malotte.net>
+%%% @author Malotte W Lönne <malotte@malotte.net>
 %%% @copyright (C) 2011, Tony Rogvall
 %%% @doc
 %%%    Defines for debugging.
@@ -29,7 +29,8 @@
 -define(dbg(Tag, Format, Args),
 	case get(dbg) of
 	    true ->
-		io:format("~p: ~p: " ++ Format ++ "\n", [self(), ?MODULE] ++ Args);
+		io:format("~p: ~p: ~p: " ++ Format ++ "\n", 
+			  [now(), self(), ?MODULE] ++ Args);
 	    _ ->
 		ok
 	end).

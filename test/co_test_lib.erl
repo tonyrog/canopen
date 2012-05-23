@@ -79,6 +79,7 @@ start_node(Serial, Dict, Opts) ->
 				       {vendor,16#2A1},
 				       {linked, false}]),
     ct:pal("Started co_node ~p, pid = ~p",[integer_to_list(Serial,16), Pid]),
+    co_api:save_dict(Serial),
     {ok, Pid}.
 
 

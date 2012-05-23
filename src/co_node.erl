@@ -1269,7 +1269,7 @@ create_sub_table() ->
 %% 
 load_dict_init(none, Ctx) ->
     {ok, Ctx};
-load_dict_init(default, Ctx=#co_ctx {serial = Serial}) ->
+load_dict_init(default, Ctx) ->
     File = filename:join(code:priv_dir(canopen), ?DEFAULT_DICT),
     case filelib:is_regular(File) of
 	true -> load_dict_internal(File, Ctx);
@@ -1494,7 +1494,8 @@ handle_node_guard_rtr(Frame, NodeId = {TypeOfNid, _Nid},
 			       node_guard_timer = Timer, node_life_time = NLT,
 			       node_guard_error = NgError, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
-    ?dbg(node, "~s: handle_node_guard: node ~p request ~w", [_Name,NodeId,Frame]),
+    ?dbg(node, "~s: handle_node_guard: node ~p request ~w, now ~p", 
+	 [_Name,NodeId,Frame, now()]),
     %% Reset NMT master supervision timer
     if Timer =/= undefined ->
 	    erlang:cancel_timer(Timer);
