@@ -71,9 +71,22 @@ Stop:
 
 ### Release
 
-To generate a proper release follow the instructions in [Release Handling](https://github.com/basho/rebar/wiki/Release-handling).
+To generate a proper release follow the instructions in [Release Handling](https://github.com/basho/rebar/wiki/Release-handling) or look in the [Rebar tutorial](http://www.metabrew.com/article/erlang-rebar-tutorial-generating-releases-upgrades).
 
-You have to update the file "canopen/rel/files/sys.config" with your own settings <b> before </b> the last step, 
+<b>Before</b> the last step you have to update the file "canopen/rel/files/sys.config" with your own settings.
+You probably also have to update "canopen/rel/reltool.config" with the correct path to your application (normally "{lib_dirs, ["../.."]}") and all apps you need.
+```
+       {app, sasl,   [{incl_cond, include}]},
+       {app, stdlib, [{incl_cond, include}]},
+       {app, kernel, [{incl_cond, include}]},
+       {app, sl, [{incl_cond, include}]},
+       {app, eapi, [{incl_cond, include}]},
+       {app, can, [{incl_cond, include}]},
+       {app, canopen, [{incl_cond, include}]}
+```
+
+
+And then you run: 
 ```
 $ rebar generate
 ```
