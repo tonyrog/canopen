@@ -954,10 +954,10 @@ handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle,
 		      [Flag, NodeId])
 	    end
     end;
-handle_node_guard(_SlaveId = {Flag, NodeId}, State, Toggle, _Ctx) ->
+handle_node_guard(_SlaveId = {_Flag, _NodeId}, _State, _Toggle, _Ctx) ->
     ?dbg(nmt, "handle_node_guard: node {~p, ~.16#}, state ~p, toggle ~p"
 	 "node guarding not active, ignoring",
-	 [Flag, NodeId, State, Toggle]),
+	 [_Flag, _NodeId, _State, _Toggle]),
     ok.
 
 node_guard_ok(Slave, Toggle, State, NmtTable) ->
@@ -1008,9 +1008,9 @@ handle_heartbeat(SlaveId = {Flag, NodeId}, State,
 		    heartbeat_ok(Slave, State, NmtTable)
 	    end
     end;
-handle_heartbeat(_SlaveId = {Flag, NodeId}, State, _Ctx) ->
+handle_heartbeat(_SlaveId = {_Flag, _NodeId}, _State, _Ctx) ->
     ?dbg(nmt, "handle_heartbeat: node {~p, ~.16#}, state ~p"
-	 "heartbeat not active, ignoring", [Flag, NodeId, State]),
+	 "heartbeat not active, ignoring", [_Flag, _NodeId, _State]),
     ok.
 
 
