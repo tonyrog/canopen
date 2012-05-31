@@ -73,6 +73,7 @@
 %% Test interface
 -export([dump/1, dump/2, loop_data/1]).
 -export([state/1, state/2]).
+-export([dict/1]).
 
 -define(CO_NODE, co_node).
 
@@ -93,10 +94,15 @@
 %%          {nmt_role, nmt_role()}        - ( autonomous ) slave/master/autonomous
 %%          {supervision, node_guard | heartbeat | none}   - ( none )
 %%
-%%            Dictionary options
-%%          {load_last_saved, boolean()} - load last dictionary file. <br/>
-%%          {dict_file, string()}     - non default dictionary file to load,
-%%                                      overrides load_last_saved. <br/>
+%%            Dictionary option
+%%          {dict, none | default | saved | string()} - ( saved )
+%%                                      Controls wich dict that will be loaded
+%%                                      at start. 
+%%                                      default means the dictionary included 
+%%                                      in the delivery.
+%%                                      saved means the dictonary last saved by the
+%%                                      save/0 function. If none exist default will
+%%                                      be used.
 %%
 %%            SDO transfer options
 %%          {sdo_timeout, timeout()}  - ( 1000 ) in msec. <br/>
@@ -121,14 +127,14 @@
 %% @end
 %%--------------------------------------------------------------------
 -type supervision():: node_guard | heartbeat | none.
+-type obj_dict():: none | default | saved | string().
 -type option()::
 	{use_serial_as_xnodeid, boolean()} |
 	{nodeid, integer()} | 
 	{xnodeid, integer()} | 
 	{nmt_role, nmt_role()} | 
 	{supervision, supervision()} | 
-	{load_last_saved, boolean()} | 
-	{dict_file, string()} | 
+	{dict, obj_dict()} | 
 	{time_stamp,  timeout()} | 
 	{sdo_timeout, timeout()} | 
 	{blk_timeout, timeout()} | 
@@ -192,6 +198,59 @@ name(Opts, Serial) ->
 	    list_to_atom(co_lib:serial_to_string(Serial))
     end.
 
+verify_option(name, NewValue) 
+  when is_list(NewValue) orelse is_atom(NewValue) ->
+    ok;
+verify_option(name, _NewValue) ->
+    {error, "Option name can only be set to a string or an atom."};
+verify_option(nodeid, NewValue) 
+  when is_integer(NewValue) andalso NewValue >= 0 andalso NewValue < 127 ->
+    ok;
+verify_option(nodeid, NewValue) 
+  when NewValue == undefined ->
+    ok;
+verify_option(nodeid, _NewValue) ->
+    {error, "Option nodeid can only be set to an integer between 0 and "
+     "126 (0 - 16#7e) or undefined."};
+verify_option(xnodeid, NewValue) 
+  when is_integer(NewValue) andalso NewValue > 0
+       andalso NewValue < 2#1000000000000000000000000 -> %% Max 24 bits
+    ok;
+verify_option(xnodeid, NewValue) 
+  when NewValue =:= undefined ->
+    ok;
+verify_option(xnodeid, _NewValue) ->
+    {error, "Option xnodeid can only be set to an integer value between "
+     "0 and 16777215 (0 - 16#ffffff) or undefined."};
+verify_option(dict, NewValue) 
+  when NewValue == none orelse
+       NewValue == saved orelse
+       NewValue == default ->
+    ok;
+verify_option(dict, NewValue) 
+  when is_list(NewValue) ->
+    ok;
+verify_option(dict, _NewValue) ->
+    {error, "Option dict can only be set to a string or an atom."};
+verify_option(nmt_role, NewValue) 
+  when NewValue == slave;
+       NewValue == master;
+       NewValue == autonomous ->
+    ok;
+verify_option(nmt_role, _NewValue) ->
+    {error, "Option nmt_role can only be set to slave/master/autonomous."};
+verify_option(supervision, NewValue) 
+  when NewValue == node_guard;
+       NewValue == heartbeat;
+       NewValue == none ->
+    ok;
+verify_option(supervision, _NewValue) ->
+    {error, "Option supervision can only be set to node_guard/heartbeat/none."};
+verify_option(pst, NewValue) 
+  when is_integer(NewValue) andalso NewValue >= 0 ->
+    ok;
+verify_option(pst, _NewValue) ->
+    {error, "Option pst can only be set to a positive integer value or zero."};
 verify_option(Option, NewValue) 
   when Option == vendor;
        Option == max_blksize;
@@ -205,53 +264,6 @@ verify_option(Option, NewValue)
        true ->
 	    {error, "Option " ++ atom_to_list(Option) ++ 
 		 " can only be set to a positive integer value."}
-    end;
-verify_option(nmt_role, NewValue) 
-  when NewValue == slave;
-       NewValue == master;
-       NewValue == autonomous ->
-    ok;
-verify_option(nmt_role, _NewValue) ->
-    {error, "Option nmt_role can only be set to slave/master/autonomous."};
-verify_option(supervision, NewValue) 
-  when NewValue == node_guard;
-       NewValue == none ->
-    ok;
-verify_option(supervision, NewValue) 
-  when NewValue == heartbeat ->
-    {error, "heartbeat not implemented yet"};
-verify_option(supervision, _NewValue) ->
-    {error, "Option supervision can only be set to node_guard/heartbeat/none."};
-verify_option(Option, NewValue) 
-  when Option == pst ->
-    if is_integer(NewValue) andalso NewValue >= 0 ->
-	    ok;
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to a positive integer value or zero."}
-    end;
-verify_option(Option, NewValue) 
-  when Option == nodeid ->
-    if is_integer(NewValue) andalso NewValue >= 0 andalso NewValue < 127->
-	    ok;
-       NewValue =:= undefined ->
-	    ok;
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to an integer between 0 and 126 (0 - 16#7e)"
-	         " or undefined."}
-    end;
-verify_option(Option, NewValue) 
-  when Option == xnodeid ->
-    if is_integer(NewValue) andalso NewValue > 0
-       andalso NewValue < 2#1000000000000000000000000 -> %% Max 24 bits
-	    ok;
-       NewValue =:= undefined ->
-	    ok;
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to an integer value between 0 and 16777215 (0 - 16#ffffff)"
-	         " or undefined."}
     end;
 verify_option(Option, NewValue) 
   when Option == use_serial_as_xnodeid;
@@ -272,15 +284,6 @@ verify_option(Option, NewValue)
        true ->
 	    {error, "Option " ++ atom_to_list(Option) ++ 
 		 " can only be set to a float value between 0 and 1."}
-    end;
-verify_option(Option, NewValue) 
-  when Option == name;
-       Option == dict_file ->
-    if is_list(NewValue) orelse is_atom(NewValue)->
-	    ok;
-       true ->
-	    {error, "Option " ++ atom_to_list(Option) ++ 
-		 " can only be set to a string or an atom."}
     end;
 verify_option(Option, _NewValue) ->
     {error, "Option " ++ atom_to_list(Option) ++ " unknown."}.
@@ -761,7 +764,7 @@ set_data(Identity, Dict, Ix, Data) when is_integer(Ix), is_binary(Data) ->
 %%--------------------------------------------------------------------
 -spec value(Identity::node_identity(), Dict::term(), 
 	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
-		   Value::term() | {error, Error::atom()}.
+		   {ok, Value::term()} | {error, Error::atom()}.
 
 value(_Identity, Dict, {Ix, Si} = I) when ?is_index(Ix), ?is_subind(Si)  ->
     co_dict:value(Dict, I);
@@ -777,7 +780,7 @@ value(Identity, Dict, Ix) when is_integer(Ix) ->
 %%--------------------------------------------------------------------
 -spec data(Identity::node_identity(), Dict::term(), 
 	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
-		   Data::term() | {error, Error::atom()}.
+		   {ok, Data::term()} | {error, Error::atom()}.
 
 data(_Identity, Dict, {Ix, Si} = I) when ?is_index(Ix), ?is_subind(Si)  ->
     co_dict:data(Dict, I);
@@ -1014,7 +1017,7 @@ state(Identity) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Sets the co_nodes state.
+%% Sets the co_node's state.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -1028,6 +1031,18 @@ state(Identity, preoperational) ->
     gen_server:call(identity_to_pid(Identity), {state, ?PreOperational});
 state(Identity, stopped) ->
     gen_server:call(identity_to_pid(Identity), {state, ?Stopped}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Gets the co_node's dict
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec dict(Identity::node_identity()) -> 
+		  Dict::dict() | {error, Error::atom()}.
+
+dict(Identity) ->
+    gen_server:call(identity_to_pid(Identity), dict).
 
 %%--------------------------------------------------------------------
 %% @doc

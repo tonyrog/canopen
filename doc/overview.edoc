@@ -1,68 +1,49 @@
 @author  Tony Rogvall <tony@rogvall.se>
+@author  Malotte W Lönne <malotte@malotte.net>
 @version 1.0
 @title Erlang CANopen stack
 @doc CANopen is an industry standard for managing small embedded nodes
 in a CAN network.
 
 
-See  <a href="http://www.canopensolutions.com/index.html">Canopen</a> for a detailed description of CANopen.
+See  <a href="http://www.canopensolutions.com/index.html" target="_blank">Canopen</a> for a detailed description of CANopen.
 
-== Architecture ==
+== Installation ==
+Installation is described in the canopen README at github:
+<a href="http://github.com/tonyrog/canopen" target="_blank">README</a>
+
+== General ==
 
 The heart of our CANopen implementation is a CoNode. It listens to the CAN bus and acts when a relevant CAN frame is received.<br/>
 It has an object dictionary where objects can be stored, deleted and updated.<br/>
 The initial dictionary is loaded from a file given as an argument at start up.<br/>
-If TPDOs are defined in the dictionary separate TPDO processes are started to handle these.<br/>
-It starts SDO session processes when receiving SDO frames.
-
-=== Process structure ===
-<img src="../doc/canopen_process_structure.jpg"> </img>
 
 The CoNode is prepared to handle:
 <ul>
 <li> SDOs - A sdo session process is started to handle the request.</li>
+<li> TPDOs - If TPDOs are defined in the dictionary separate TPDO processes are started to handle these.</li>
 <li> RPDOs - The RPDO is unpacked and the affected objects updated.</li>
 <li> DAM-MPDOs - Notifying subscribing applications. </li>
-<li> NMT requests - Executes state changs etc.</li>
+<li> SAM-MPDOs - Notifying subscribing applications. </li>
+<li> NMT requests - Execute state changes.</li>
+<li> NODE GUARD - Supervision based on GuardTime and LifeFactor defined in dictionary.</li>
 <li> SYNC pulses - Forwards them to connected TPDO processes.</li>
 <li> EMERGENCY requests - Not supported yet.</li>
 <li> TIME STAMPS - Not supported yet.</li>
-<li> NODE GUARD ?? </li>
 <li> LSS requests - Not supported yet.</li>
 </ul>
+
+=== Applications ===
+The application interface is described in a User's Guide found at the canopen wiki on github:
+<a href="http://github.com/tonyrog/canopen/wiki/howto_write_canopen_app" target="_blank">How to write a CANopen application</a>
 
 === Manager ===
 If you need a CANopen manager you can use the co_mgr interface, see {@link co_mgr}. It will start a CoNode with NodeId 0.
 
-=== Applications ===
-Applications can attach to the CoNode and and reserve or subscribe to indexes in the object dictionary. <br/>
-<b>Reserve</b> means that any upload or download requests and notifications connected to that index will be relayed to the application. The CoNode itself does not keep track of these objects. It is however possible for the application to store it in the CoNode dictionary.<br/>
-<b>Subscribe</b> means that notifications will be relayed to the application. The application will also be notified if the index is handled by the CoNode (included in the co_nodes dictionary) and it's value has been changed.<br/>
-When reserving/subscribing to an index a Module parameter is included. <br/><br/>
-There is also a possibility for applications to receive an 'extended' notification comprising of the whole CAN frame. This is achieved via the extended_notification_subscription. Note that it is then necessary for the application to interpret the CANOpen part, no decoding etc will be done by the CoNode. 
+== Implementation ==
 
-
-==== SDO interface ====
-When an SDO upload/download request is received the function <code>Module:index_specification()</code> is called. The call should return a record of type <code>indec_spec</code> that holds information needed for the data transfer between the co_node and the application. Among these is whether the object value should be transferred atomically, that is once completely, or streamed, that is partitioned. You can also here supply a Module parameter meaning that function calls to that module should be used instead of generic gen_server:call.<br/>
-Note that when using <b>atomic</b> the value is decoded, whereas when using <b>streamed</b> the value is still a binary since it normally isn't possible to decode it until the complete value is available. <br/> 
-
-This gives the below transfer possibilities:
-<ul>
-<li><b>atomic</b> - the clauses <code>handle_call({get, ..})</code> (for upload) and <code>handle_call({set, ..})</code> (for download) must exist.</li>
-<li><b>streamed</b> - the clauses <code>handle_call({read_begin, ..})</code> and <code>handle_call({read, ..})</code> (for upload) and <code>handle_call({write_begin, ..})</code> and <code>handle_call({write, ..})</code> (for download) must exist. A clause <code>handle_call({abort, ..})</code> is also needed in case the transfer must be aborted.</li>
-<li><b>{atomic, Module}</b> - the functions <code>Module:get()</code> (for upload) and <code>Module:set()</code> (for download) will be called.</li>
-<li><b>{streamed, Module}</b> - the functions <code>Module:read_begin()</code> and <code>Module:read()</code> (for upload) and <code>Module:write_begin()</code> and <code>Module:write()</code> (for download) will be called. A function <code>abort())</code> is also needed in case the transfer must be aborted.</li>
-</ul>
-
-There are two behaviours defined for the above:
-<ul>
-<li>co_app - For applications using the {Module, atomic} transfer mode. See {@link co_app}.</li>
-<li>co_stream_app - For applications using the {Module, streamed} transfer mode. See {@link co_stream_app}.</li>
-</ul>
-
-==== TPDO interface ====
-When an application has reserved an index that is included in a TPDO the TPDO process informs the application with an index_in_tpdo message. I.e. such an application must implement <code>handle_call({index_in_tpdo, ..})</code>
-This means it should call <code>co_api:tpdo_set()</code> as soon as the value of the given index is changed. It is god practise for the application to call this immediately upon getting the <code>index_in_tpdo</code> message to replace the default value stored in the co_node with the current value. <br/>
+=== Process structure ===
+<img src="../doc/canopen_process_structure.jpg"> </img>
 
 === Modules ===
 ====Header files ====
@@ -79,6 +60,7 @@ This means it should call <code>co_api:tpdo_set()</code> as soon as the value of
 <li> co_api - Interface to the CANopen node (co_node).</li>
 <li> co_node - CANopen node. Processes CANopen frames.</li>
 <li> co_mgr - CANopen manager interface. </li>
+<li> co_nmt - Implements an NMT master if a node is configured to be that.</li>
 <li> co_os_app - Application that implements support for OS_COMMAD, index 16#1023 </li>
 <li> co_file - Loads symbolic entries from a file. </li>
 <li> co_dict - Accesses the CANopen internal object dictionary. </li>

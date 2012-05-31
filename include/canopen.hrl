@@ -529,6 +529,8 @@
 	  node_guard_timer, %% Node guard supervision of master
 	  node_guard_error = false, %% Lost contact with NMT master
 	  node_life_time = 0, %% Node guard supervision of master
+	  heartbeat_time = 0, %% Heartbeat producer time
+	  heartbeat_timer,  %% Heartbeat supervision
 
 	  %% Object dict handling
 	  dict,             %% can dictionary
