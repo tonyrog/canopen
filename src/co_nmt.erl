@@ -722,9 +722,9 @@ remove_slave(Slave=#nmt_slave {id = SlaveId = {_Flag, _NodeId}},
     end,
     ets:delete(NmtTable,SlaveId).
 
-deactivate_node_guard(Slave=#nmt_slave {id = SlaveId}, 
+deactivate_node_guard(Slave=#nmt_slave {id = _SlaveId}, 
 		      _Ctx=#ctx {nmt_table = NmtTable}) ->
-    ?dbg(nmt, "deactivate_node_guard: slave ~p.", [SlaveId]),
+    ?dbg(nmt, "deactivate_node_guard: slave ~p.", [_SlaveId]),
     cancel_life_timer(Slave),
     cancel_guard_timer(Slave),
     ets:insert(NmtTable, Slave#nmt_slave {guard_timer = undefined, 
@@ -860,8 +860,8 @@ send_nmt(_SlaveId = {xnodeid, _NodeId}, _Cmd) ->
      ?dbg(nmt, "send_nmt: can not send ~p to xnodeid slave ~.16#", 
 	  [_Cmd, _NodeId]),
        {error, xnodeid_not_possible};
-send_nmt(_SlaveId = {Flag, NodeId}, Cmd) ->
-    ?dbg(nmt, "send_nmt: slave {~p, ~.16#}, ~p", [Flag, NodeId, Cmd]),
+send_nmt(_SlaveId = {_Flag, NodeId}, Cmd) ->
+    ?dbg(nmt, "send_nmt: slave {~p, ~.16#}, ~p", [_Flag, NodeId, Cmd]),
     can:send(#can_frame { id = ?COBID_TO_CANID(?NMT_ID),
 			  len = 2,
 			  data = <<Cmd:8, NodeId:8>>}).

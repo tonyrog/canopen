@@ -685,7 +685,7 @@
 -define(IX_RESTORE_DEFAULT_PARAMETERS, 16#1011).
 -define(SI_RESTORE_ALL, 1).
 -define(SI_RESTORE_COM, 2).
--define(SI_SRETORE_APP, 3).
+-define(SI_RESTORE_APP, 3).
 
 -define(IX_COB_ID_TIME_STAMP,          16#1012).
 -define(IX_HIGHRES_TIME_STAMP,         16#1013).
