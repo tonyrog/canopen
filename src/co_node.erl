@@ -296,16 +296,18 @@ initialization(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId,
 	    activate_nmt(Ctx),
 	    Ctx#co_ctx {state = ?Operational}; %% ??
        NmtRole == slave ->
-	    send_bootup(Ctx),
+	    Ctx1 = Ctx#co_ctx {state = ?PreOperational},
+	    send_bootup(id(Ctx1)),
 	    if Supervision == node_guard ->
-		    activate_node_guard(Ctx#co_ctx {state = ?PreOperational});
-	       %% Add heartbeat
+		    activate_node_guard(Ctx1);
+	       Supervision == heartbeat ->
+		    activate_heartbeat(Ctx1);
 	       true ->
-		    Ctx#co_ctx {state = ?PreOperational}
+		    Ctx1
 	    end;
        NmtRole == autonomous ->
 	    %% ??
-	    send_bootup(Ctx),
+	    send_bootup(id(Ctx)),
 	    Ctx#co_ctx {state = ?Operational}
     end.
     
@@ -329,11 +331,11 @@ activate_node_guard(Ctx=#co_ctx {nmt_role = slave, dict = Dict, name = _Name}) -
 				 [_Name]),
 			    Ctx; %% No node guarding
 			NodeLifeTime -> 
-			    TRef = erlang:send_after(NodeLifeTime, self(), 
+			    Timer = erlang:send_after(NodeLifeTime, self(), 
 						    node_guard_timeout),
 			    ?dbg(node, "~s: activate_node_guard time ~p", 
 				 [_Name,NodeLifeTime]),
-			    Ctx#co_ctx {node_guard_timer = TRef, 
+			    Ctx#co_ctx {node_guard_timer = Timer, 
 					node_life_time = NodeLifeTime}
 		    end;
 		_NotFound2 ->
@@ -349,15 +351,42 @@ activate_node_guard(Ctx=#co_ctx {nmt_role = slave, dict = Dict, name = _Name}) -
 deactivate_node_guard(Ctx=#co_ctx {node_guard_timer = undefined}) ->		    
     %% Do nothing
     Ctx;
-deactivate_node_guard(Ctx=#co_ctx {node_guard_timer = TRef}) ->		    
-    erlang:cancel_timer(TRef),
+deactivate_node_guard(Ctx=#co_ctx {node_guard_timer = Timer}) ->		    
+    erlang:cancel_timer(Timer),
     Ctx#co_ctx {node_guard_timer = undefined}.
 
+activate_heartbeat(Ctx=#co_ctx {nmt_role = autonomous, name = _Name}) ->
+    %% ???
+    ?dbg(node, "~s: activate_heartbeat: autonomous, no heartbeat.", [_Name]),
+    Ctx;
+activate_heartbeat(Ctx=#co_ctx {nmt_role = master, name = _Name}) ->
+    ?dbg(node, "~s: activate_heartbeat: nmt master/heartbeat consumer, heart "
+	 "handled by nmt master process.", [_Name]),
+    Ctx;
+activate_heartbeat(Ctx=#co_ctx {nmt_role = slave, dict = Dict, name = _Name}) ->
+    ?dbg(node, "~s: activate_heartbeat: nmt slave.", [_Name]),
+    case co_dict:value(Dict, ?IX_PRODUCER_HEARTBEAT_TIME) of
+	{ok, 0} ->
+	    ?dbg(node, "~s: activate_heartbeat: no heartbeat.", [_Name]),
+	    Ctx; 
+	{ok, HeartBeatTime} ->
+	    Timer = erlang:send_after(HeartBeatTime, self(), do_heartbeat),
+	    ?dbg(node, "~s: activate_heartbeat time ~p", [_Name,HeartBeatTime]),
+	    Ctx#co_ctx {heartbeat_timer = Timer, 
+			heartbeat_time = HeartBeatTime};
+	_NotFound1 ->
+	    ?dbg(node, "~s: activate_heartbeat: no heartbeat_time", [_Name]),
+	    Ctx
+    end.
+			    
+deactivate_heartbeat(Ctx=#co_ctx {heartbeat_timer = undefined}) ->		    
+    %% Do nothing
+    Ctx;
+deactivate_heartbeat(Ctx=#co_ctx {heartbeat_timer = Timer}) ->		    
+    erlang:cancel_timer(Timer),
+    Ctx#co_ctx {heartbeat_timer = undefined}.
+
 %% If ShortNodeId defined use it, otherwise XNodeId
-send_bootup(_Ctx=#co_ctx {nodeid=undefined, xnodeid=XNodeId, name = _Name}) ->
-    send_bootup({xnodeid, XNodeId});
-send_bootup(_Ctx=#co_ctx {nodeid=SNodeId, name = _Name}) ->
-    send_bootup({nodeid, SNodeId});
 send_bootup({_TypeOfNid, undefined}) ->
     ?dbg(node, "~p: send_bootup: ~p not defined, no bootup sent.", 
 	 [self(), _TypeOfNid]),
@@ -755,11 +784,7 @@ handle_call({option, Option}, _From, Ctx) ->
 		xnodeid -> {Option, Ctx#co_ctx.xnodeid};
 		nmt_role -> {Option, Ctx#co_ctx.nmt_role};
 		supervision -> {Option, Ctx#co_ctx.supervision};
-		id -> if Ctx#co_ctx.nodeid =/= undefined ->
-			      {nodeid, Ctx#co_ctx.nodeid};
-			 true ->
-			      {xnodeid, Ctx#co_ctx.xnodeid}
-		      end;
+		id -> id(Ctx);
 		use_serial_as_xnodeid -> {Option, calc_use_serial(Ctx)};
 		sdo_timeout ->  {Option, Ctx#co_ctx.sdo#sdo_ctx.timeout};
 		blk_timeout -> {Option, Ctx#co_ctx.sdo#sdo_ctx.blk_timeout};
@@ -829,6 +854,9 @@ handle_call(state, _From, Ctx=#co_ctx {state = State}) ->
 handle_call({state, State}, _From, Ctx) ->
     broadcast_state(State, Ctx),
     {reply, ok, Ctx#co_ctx {state = State}};
+
+handle_call(dict, _From, Ctx=#co_ctx {dict = Dict}) ->
+    {reply, Dict, Ctx};
 
 handle_call(_Request, _From, Ctx) ->
     {reply, {error,bad_call}, Ctx}.
@@ -912,6 +940,14 @@ handle_info({timeout,Ref,time_stamp}, Ctx)
     ?dbg(node, "~s: handle_info: Sent time stamp ~p", [Ctx#co_ctx.name, Time]),
     Ctx1 = Ctx#co_ctx { time_stamp_tmr = start_timer(Ctx#co_ctx.time_stamp_time, time_stamp) },
     {noreply, Ctx1};
+
+handle_info(do_heartbeat, 
+	    Ctx=#co_ctx {state = State, heartbeat_time = HeartBeatTime, name=_Name}) ->
+    ?dbg(node, "~s: handle_info: do_heartbeat ", [_Name]),
+    Data = <<0:1, State:7>>,
+    send_node_guard(id(Ctx), 1, Data),
+    Timer = erlang:send_after(HeartBeatTime, self(), do_heartbeat),
+    {noreply, Ctx#co_ctx {heartbeat_timer = Timer}};
 
 handle_info(node_guard_timeout, Ctx=#co_ctx {name=_Name}) ->
     ?dbg(node, "~s: handle_info: node_guard timeout received", [_Name]),
@@ -1072,7 +1108,7 @@ add_to_cob_table(T, xnodeid, ExtNid)
     ets:insert(T, {XSDORx, {sdo_rx, XSDOTx}}),
     ets:insert(T, {XSDOTx, {sdo_tx, XSDORx}}),
     ets:insert(T, {?XCOB_ID(?NMT, 0), nmt}),
-    ets:insert(T, {?XCOB_ID(?NODE_GUARD,ExtNid), {node_guard, {xnodeid, ExtNid}}}),
+    ets:insert(T, {?XCOB_ID(?NODE_GUARD,ExtNid), {supervision, {xnodeid, ExtNid}}}),
     ?dbg(node, "add_to_cob_table: XNid=~w, XSDORx=~w, XSDOTx=~w", 
 	 [ExtNid,XSDORx,XSDOTx]);
 add_to_cob_table(T, nodeid, ShortNid) 
@@ -1083,7 +1119,7 @@ add_to_cob_table(T, nodeid, ShortNid)
     ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
     ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
     ets:insert(T, {?COB_ID(?NMT, 0), nmt}),
-    ets:insert(T, {?COB_ID(?NODE_GUARD,ShortNid), {node_guard, {nodeid, ShortNid}}}),
+    ets:insert(T, {?COB_ID(?NODE_GUARD,ShortNid), {supervision, {nodeid, ShortNid}}}),
     ?dbg(node, "add_to_cob_table: SDORx=~w, SDOTx=~w", [SDORx,SDOTx]).
 
 
@@ -1163,8 +1199,7 @@ nmt_change(nmt_role, master,
     activate_nmt(deactivate_node_guard(Ctx#co_ctx {nmt_role = master}));
 nmt_change(nmt_role, master, 
 	   Ctx=#co_ctx {nmt_role = slave, supervision = heartbeat}) ->
-    %% Deactivate heartbeat ??
-    activate_nmt(Ctx#co_ctx {nmt_role = master});
+    activate_nmt(deactivate_heartbeat(Ctx#co_ctx {nmt_role = master}));
 nmt_change(nmt_role, master, 
 	   Ctx=#co_ctx {nmt_role = slave, supervision = none}) ->
     activate_nmt(Ctx#co_ctx {nmt_role = master});
@@ -1174,8 +1209,7 @@ nmt_change(nmt_role, slave,
     activate_node_guard(deactivate_nmt(Ctx#co_ctx {nmt_role = slave}));
 nmt_change(nmt_role, slave, 
 	   Ctx=#co_ctx {nmt_role = master, supervision = heartbeat}) ->
-    %% Activate heartbeat ??
-    deactivate_nmt(Ctx#co_ctx {nmt_role = slave});
+    activate_heartbeat(deactivate_nmt(Ctx#co_ctx {nmt_role = slave}));
 nmt_change(nmt_role, slave, 
 	   Ctx=#co_ctx {nmt_role = master, supervision = none}) ->
     deactivate_nmt(Ctx#co_ctx {nmt_role = slave});
@@ -1186,11 +1220,13 @@ nmt_change(nmt_role, autonomous, Ctx=#co_ctx {nmt_role = master}) ->
 %%  No change
 nmt_change(supervision, NewValue, Ctx=#co_ctx {supervision = NewValue}) ->
     Ctx;
-%% to heartbeart not implemented
+%% to heartbeart when slave
 nmt_change(supervision, heartbeat, 
-	   _Ctx=#co_ctx {supervision = _OldValue, nmt_role = slave}) ->
-    %% To be implemented ??
-    {error, not_implemented};
+	   Ctx=#co_ctx {supervision = none, nmt_role = slave}) ->
+    activate_heartbeat(Ctx#co_ctx {supervision = heartbeat});
+nmt_change(supervision, heartbeat, 
+	   Ctx=#co_ctx {supervision = node_guard, nmt_role = slave}) ->
+    activate_heartbeat(deactivate_node_guard(Ctx#co_ctx {supervision = heartbeat}));
 %% supervision change when master handled by master ??
 nmt_change(supervision, NewValue, 
 	   Ctx=#co_ctx {supervision = _OldValue, nmt_role = master}) ->		
@@ -1205,16 +1241,14 @@ nmt_change(supervision, node_guard,
     activate_node_guard(Ctx#co_ctx {supervision = node_guard});
 nmt_change(supervision, node_guard, 
 	   Ctx=#co_ctx {supervision = heartbeat, nmt_role = slave}) ->	
-    %% Deactivate heartbeat ??
-    Ctx#co_ctx {supervision = node_guard};
-%% to none  when slave
+    activate_node_guard(deactivate_heartbeat(Ctx#co_ctx {supervision = node_guard}));
+%% to none when slave
 nmt_change(supervision, none, 
 	   Ctx=#co_ctx {supervision = node_guard, nmt_role = slave}) ->
     deactivate_node_guard(Ctx#co_ctx {supervision = none});
 nmt_change(supervision, none, 
 	   Ctx=#co_ctx {supervision = heartbeat, nmt_role = slave}) ->
-    %% Deactivate heartbeat ??
-    Ctx#co_ctx {supervision = none}.
+    deactivate_heartbeat(Ctx#co_ctx {supervision = none}).
 
 
 execute_change(NidType, NewNid, OldNid, Ctx=#co_ctx {cob_table = T}) ->  
@@ -1302,7 +1336,8 @@ load_dict_internal1(File, Ctx=#co_ctx {dict = Dict, name = _Name}) ->
     try co_file:load(File) of
 	{ok,Os} ->
 	    ?dbg(node, "~s: load_dict_internal1: Loaded file = ~p", [_Name, File]),
-	    %% Install all objects
+
+	    %% Install all new/changed objects
 	    ChangedIxs =
 		foldl(
 		  fun({Obj,Es}, OIxs) ->
@@ -1318,9 +1353,12 @@ load_dict_internal1(File, Ctx=#co_ctx {dict = Dict, name = _Name}) ->
 					    EIxs ++ ChangedI
 				    end, [], Es),
 			  ets:insert(Dict, Obj),
+			  %% Only want to know object index of changed entry
 			  {Ixs, _SubIxs} = lists:unzip(ChangedEIxs),
 			  OIxs ++ lists:usort(Ixs)
 		  end, [], Os),
+
+	    %% What about removed entries ???
 
 	    %% Now take action if needed
 	    ?dbg(node, "~s: load_dict_internal: changed entries ~p", 
@@ -1398,7 +1436,7 @@ handle_can(Frame, Ctx=#co_ctx {name = _Name})
     ?dbg(node, "~s: handle_can: (rtr) CobId=~8.16.0B", [_Name, CobId]),
     case lookup_cobid(CobId, Ctx) of
 	nmt  -> Ctx;
-	{node_guard, NodeId} -> handle_node_guard_rtr(Frame, NodeId, Ctx);
+	{supervision, NodeId} -> handle_node_guard(Frame, NodeId, Ctx);
 	undefined ->
 	    case lists:keysearch(CobId, #tpdo.cob_id, Ctx#co_ctx.tpdo_list) of
 		{value, T} ->
@@ -1423,7 +1461,7 @@ handle_can(Frame, Ctx=#co_ctx {state = _State, name = _Name}) ->
 	sync       -> handle_sync(Frame, Ctx);
 	emcy       -> handle_emcy(Frame, Ctx);
 	time_stamp -> handle_time_stamp(Frame, Ctx);
-	{node_guard, NodeId} -> handle_node_guard(Frame, NodeId, Ctx);
+	{supervision, NodeId} -> handle_supervision(Frame, NodeId, Ctx);
 	{rpdo,Offset} -> handle_rpdo(Frame, Offset, CobId, Ctx);
 	{sdo_tx,Rx} -> handle_sdo_tx(Frame, CobId, Rx, Ctx);
 	{sdo_rx,Tx} -> handle_sdo_rx(Frame, CobId, Tx, Ctx);
@@ -1487,7 +1525,7 @@ handle_nmt(M, Ctx=#co_ctx {nmt_role = master, name = _Name}) ->
     Ctx.
     
 
-handle_node_guard_rtr(Frame, NodeId = {TypeOfNid, _Nid},
+handle_node_guard(Frame, NodeId = {TypeOfNid, _Nid},
 		  Ctx=#co_ctx {state = State, 
 			       nmt_role = slave, supervision = node_guard,
 			       toggle = Toggle, xtoggle = XToggle,
@@ -1526,19 +1564,19 @@ handle_node_guard_rtr(Frame, NodeId = {TypeOfNid, _Nid},
     Ctx#co_ctx {toggle = NewToggle, xtoggle = NewXToggle,
 		node_guard_error = false, node_guard_timer = NewTimer};
 
-handle_node_guard_rtr(_Frame, _NodeId, 
-		      Ctx=#co_ctx {supervision = Super, name=_Name}) 
+handle_node_guard(_Frame, _NodeId, 
+		  Ctx=#co_ctx {supervision = Super, name=_Name}) 
   when Super == none orelse Super == hearbeat ->
     ?dbg(node, "~s: handle_node_guard: node has supervision ~p, "
 	 "node_guard request ~w  ignored. ",[_Name, Super, _Frame]),
     Ctx;
-handle_node_guard_rtr(_Frame, _NodeId, 
-		      Ctx=#co_ctx {nmt_role = autonomous, name=_Name}) ->
+handle_node_guard(_Frame, _NodeId, 
+		  Ctx=#co_ctx {nmt_role = autonomous, name=_Name}) ->
     ?dbg(node, "~s: handle_node_guard: node is autonomous, "
 	 "node_guard request ~w  ignored. ",[_Name, _Frame]),
     Ctx;
-handle_node_guard_rtr(Frame, _NodeId, 
-		      Ctx=#co_ctx {nmt_role = master, name=_Name}) 
+handle_node_guard(Frame, _NodeId, 
+		  Ctx=#co_ctx {nmt_role = master, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
     ?dbg(node, "~s: handle_node_guard: request ~w", [_Name,Frame]),
     %% Node is nmt master and should NOT receive node_guard request
@@ -1546,13 +1584,13 @@ handle_node_guard_rtr(Frame, _NodeId,
 			   " request even though being NMT master\n"),
     Ctx.
 
-handle_node_guard(Frame, NodeId, Ctx=#co_ctx {nmt_role = master, name = _Name}) 
+handle_supervision(Frame, NodeId, Ctx=#co_ctx {nmt_role = master, name = _Name}) 
   when Frame#can_frame.len >= 1 ->
-    ?dbg(node, "~s: handle_node_guard: reply ~w", [_Name,Frame]),
-    gen_server:cast(co_nmt_master, {node_guard_reply, NodeId, Frame}),
+    ?dbg(node, "~s: handle_supervision: reply ~w", [_Name,Frame]),
+    gen_server:cast(co_nmt_master, {supervision_frame, NodeId, Frame}),
     Ctx;
-handle_node_guard(_Frame, _NodeId, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg(node, "~s: handle_node_guard: reply ~w from ~p", [_Name, _Frame, _NodeId]),
+handle_supervision(_Frame, _NodeId, Ctx=#co_ctx {name = _Name}) ->
+    ?dbg(node, "~s: handle_supervision: reply ~w from ~p", [_Name, _Frame, _NodeId]),
     ?dbg(node, "~s: not nmt master, ignored", [_Name]),
     Ctx.
 
@@ -1834,10 +1872,10 @@ handle_tpdo_process(T=#tpdo {pid = _Pid, offset = _Offset}, _Reason,
 
 
 
-activate_nmt(Ctx=#co_ctx {serial = Serial, supervision = Sup, name = _Name}) ->
+activate_nmt(Ctx=#co_ctx {supervision = Sup, dict = Dict, name = _Name}) ->
     ?dbg(node, "~s: activate_nmt", [_Name]),
-    co_nmt:start_link([{serial, Serial},
-		       {node_pid, self()},
+    co_nmt:start_link([{node_pid, self()},
+		       {dict, Dict},
 		       {supervision, Sup},
 		       {debug, get(dbg)}]),
     Ctx.
@@ -1906,6 +1944,11 @@ handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
 	    update_time_stamp(Ctx);
 	?IX_COB_ID_EMERGENCY ->
 	    update_emcy(Ctx);
+	_ when I == ?IX_GUARD_TIME orelse I == ?IX_LIFE_TIME_FACTOR ->
+	    update_node_guard(Ctx);
+	_ when I == ?IX_CONSUMER_HEARTBEAT_TIME orelse 
+	       I == ?IX_PRODUCER_HEARTBEAT_TIME ->
+	    update_heartbeat(Ctx, I);
 	_ when I >= ?IX_SDO_SERVER_FIRST, I =< ?IX_SDO_SERVER_LAST ->
 	    case load_sdo_parameter(I, Ctx) of
 		undefined -> Ctx;
@@ -1990,6 +2033,47 @@ handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
 	_ ->
 	    Ctx
     end.
+
+update_node_guard(Ctx=#co_ctx {supervision = S, name = _Name}) 
+  when S == none orelse S == heartbeat ->
+    ?dbg(node, "~s: update_node_guard: no node guarding.", [_Name]),
+    Ctx;
+update_node_guard(Ctx=#co_ctx {nmt_role = autonomous, name = _Name}) ->
+    ?dbg(node, "~s: update_node_guard: autonomous, no node guarding.", [_Name]),
+    Ctx;
+update_node_guard(Ctx=#co_ctx {nmt_role = master, name = _Name}) ->
+    ?dbg(node, "~s: update_node_guard: nmt master, node guarding "
+	 "handled by nmt master process.", [_Name]),
+    Ctx;
+update_node_guard(Ctx=#co_ctx {nmt_role = slave, name = _Name}) ->
+    ?dbg(node, "~s: update_node_guard: nmt slave.", [_Name]),
+    Ctx1 = deactivate_node_guard(Ctx),
+    activate_node_guard(Ctx1).
+
+
+update_heartbeat(Ctx=#co_ctx {supervision = S, name = _Name}, _I) 
+  when S == none orelse S == node_guard ->
+    ?dbg(node, "~s: update_heartbeat: no heartbeat.", [_Name]),
+    Ctx;
+update_heartbeat(Ctx=#co_ctx {nmt_role = autonomous, name = _Name}, _I) ->
+    ?dbg(node, "~s: update_heartbeat: autonomous, no heartbeat.", [_Name]),
+    Ctx;
+update_heartbeat(Ctx=#co_ctx {nmt_role = master, name = _Name}, 
+		 ?IX_CONSUMER_HEARTBEAT_TIME) ->
+    ?dbg(node, "~s: update_heartbeat: nmt master, heartbeat "
+	 "handled by nmt master process.", [_Name]),
+    gen_server:cast(co_nmt_master, heartbeat_change),    
+    Ctx;
+update_heartbeat(Ctx=#co_ctx {nmt_role = slave, name = _Name}, 
+		?IX_PRODUCER_HEARTBEAT_TIME) ->
+    ?dbg(node, "~s: update_heartbeat: nmt slave.", [_Name]),
+    Ctx1 = deactivate_heartbeat(Ctx),
+    activate_heartbeat(Ctx1);
+update_heartbeat(Ctx=#co_ctx {name = _Name}, _I) ->
+    ?dbg(node, "~s: update_heartbeat: no change.", [_Name]),
+    Ctx.
+
+
 
 update_mpdo_disp(Ctx=#co_ctx {dict = Dict, name = _Name}, I) ->
    try co_dict:direct_value(Dict,{I,0}) of
@@ -2462,10 +2546,10 @@ lookup_cobid(CobId, Ctx) ->
 	       %% Node guard -> nmt master
 	       ?is_cobid_extended(CobId) andalso 
 	       ?XFUNCTION_CODE(CobId) =:= ?NODE_GUARD ->
-		    {node_guard, {xnodeid, ?XNODE_ID(CobId)}};
+		    {supervision, {xnodeid, ?XNODE_ID(CobId)}};
 	       ?is_not_cobid_extended(CobId) andalso
 	       ?FUNCTION_CODE(CobId) =:= ?NODE_GUARD ->
-		    {node_guard, {nodeid, ?NODE_ID(CobId)}};
+		    {supervision, {nodeid, ?NODE_ID(CobId)}};
 
 	       true ->
 		    undefined
@@ -2864,3 +2948,9 @@ now_to_time_of_day({Sm,S0,Us}) ->
 %%     Sec = D*?SECS_PER_DAY + (T#time_of_day.ms div 1000),
 %%     USec = (T#time_of_day.ms rem 1000)*1000,
 %%     {Sec div 1000000, Sec rem 1000000, USec}.
+
+%% Use short nodeid if available
+id(_Ctx=#co_ctx {nodeid = NodeId}) when NodeId =/= undefined ->
+    {nodeid, NodeId};
+id(_Ctx=#co_ctx {xnodeid = XNodeId}) when XNodeId =/= undefined ->
+    {xnodeid, XNodeId}.

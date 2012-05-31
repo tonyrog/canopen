@@ -14,6 +14,18 @@
   {entry,0,[{access,rw},{type,unsigned8},{value,5}]}
  ]}.
 
+{object, 16#1016,
+ [{name, "HEARTBEAT-CONS-TIME"},
+  {struct, var},{access, rw},{type, unsigned16},
+  {entry,0,[{access,rw},{type,unsigned32},{value,1}]},
+  {entry,1,[{access,rw},{type,unsigned32},{value,16#D0077700}]} %% For node 16#77
+ ]}.
+
+{object, 16#1017,
+ [{name, "HEARTBEAT-PROD-TIME"},
+  {struct, var},{access, rw},{type, unsigned16},
+  {entry,0,[{access,rw},{type,unsigned16},{value,1000}]}
+ ]}.
 
 {object, 16#1018,
  [{name, "IDENTITY"},

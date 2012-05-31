@@ -68,9 +68,11 @@
 
 -record(ctx, 
 	{
-	  node_pid,           %% Pid of co_node
 	  supervision = none, %% Type of supervision
+	  node_pid,           %% Pid of co_node
+	  dict,               %% co_node dictionary
 	  subscribers = [],   %% Receives error notifications
+	  heartbeat_table,    %% Table of nodes to supervise with heartbeat
 	  nmt_table           %% Table of NMT slaves
 	 }).
 
@@ -79,9 +81,11 @@
 	  id,                  %% node id (key)
 	  guard_time = 0,
 	  life_factor = 0,
+	  heartbeat_time = 0,
 	  guard_timer,
 	  life_timer,
-	  com_status = ok,
+	  heartbeat_timer,
+	  contact = ok,
 	  node_state=?PreOperational,
 	  toggle = 0           %% Expected next toggle
 	 }).
@@ -347,11 +351,21 @@ init(Args) ->
 	    Supervision = proplists:get_value(supervision, Args, none),
 	    NMT = ets:new(co_nmt_table, [{keypos,#nmt_slave.id},
 					 protected, named_table, ordered_set]),
+	    HB =  ets:new(co_hb_table, [{keypos,1}, 
+					protected, named_table, ordered_set]),
 	    Ctx = #ctx {node_pid = NodePid, 
 			supervision = Supervision,
+			heartbeat_table = HB,
 			nmt_table = NMT},
 	    %% Load conf if it exists
 	    load_conf(Ctx),
+
+	    %% Load heartbeat if needed
+	    if Supervision == heartbeat ->
+		    activate_heartbeat(Ctx);
+	       true ->
+		    do_nothing
+	    end,
 	    {ok, Ctx};
 	_NotPid ->
 	    {error, no_co_node}
@@ -365,13 +379,18 @@ init(Args) ->
 %% @end
 %%--------------------------------------------------------------------
 -type call_request()::
+	slaves |
 	{send_all, Cmd::integer()} |
 	{send_slave, SlaveId::node_id(), Cmd::integer()} |
 	{add_slave, SlaveId::node_id()} |
 	{remove_slave, SlaveId::node_id()} |
+	{subscribe, Pid::pid()} |
+	{unsubscribe, Pid::pid()} |
+	subscribers |
 	save |
 	load |
 	{debug, TrueOrFalse::boolean()} |
+	dump |
 	stop.
 
 -spec handle_call(Request::call_request(),
@@ -384,7 +403,7 @@ handle_call(slaves, _From, Ctx=#ctx {nmt_table = NmtTable}) ->
     SlaveList = 
 	ets:select(NmtTable, [{#nmt_slave{id='$1', 
 					  node_state = '$2', 
-					  com_status='$3', 
+					  contact='$3', 
 					  _='_'},
 			       [],[{{'$1','$2','$3'}}]}]),
     {reply, SlaveList, Ctx};
@@ -461,16 +480,26 @@ handle_call({debug, TrueOrFalse}, _From, Ctx) ->
     {reply, ok, Ctx};
 
 handle_call(dump, _From, Ctx) ->
+    io:format("---- NMT Master ----\n"),
+    io:format("Supervision: ~p\n", [Ctx#ctx.supervision]),
+    io:format("CoNode: ~p\n", [Ctx#ctx.node_pid]),
+    io:format("Dict: ~p\n", [Ctx#ctx.dict]),
+    io:format("Subscribers: ~p\n", [Ctx#ctx.subscribers]),
     io:format("---- NMT TABLE ----\n"),
     ets:foldl(
       fun(E=#nmt_slave {id = {Flag, NodeId}},_) ->
-	      io:format("  ID: {~p,~.16#}\n", 
-			[Flag, NodeId]),
+	      io:format("        ID: {~p,~.16#}\n", [Flag, NodeId]),
 	      io:format("     STATE: ~s\n", 
 			[co_format:state(E#nmt_slave.node_state)]),
-	      io:format("COM STATUS: ~p\n", 
-			[E#nmt_slave.com_status])
+	      io:format("COM STATUS: ~p\n", [E#nmt_slave.contact])
       end, ok, Ctx#ctx.nmt_table),
+    io:format("---- Heartbeat TABLE ----\n"),
+    ets:foldl(
+      fun({{Flag, NodeId}, Time},_) ->
+	      io:format("       ID: {~p,~.16#}\n", [Flag, NodeId]),
+	      io:format("     Time: ~p\n", [Time])
+      end, ok, Ctx#ctx.heartbeat_table),
+
    {reply, ok, Ctx};
 
 handle_call(stop, _From, Ctx) ->
@@ -489,16 +518,17 @@ handle_call(_Call, _From, Ctx) ->
 %% @end
 %%--------------------------------------------------------------------
 -type msg()::
-	{node_guard_reply, SlaveId::node_id(), Frame::#can_frame{}} | 
+	{supervision_frame, SlaveId::node_id(), Frame::#can_frame{}} | 
 	{supervision, node_guard | heartbeat | none} | 
 	term().
 
 -spec handle_cast(Msg::msg(), Ctx::#ctx{}) -> 
 			 {noreply, Ctx::#ctx{}}.
 
-handle_cast({node_guard_reply, SlaveId, Frame}, Ctx) 
-  when Frame#can_frame.len >= 1 ->
-    ?dbg(nmt, "handle_cast: node_guard_reply ~w", [Frame]),
+handle_cast({supervision_frame, SlaveId, Frame}, 
+	    Ctx=#ctx {supervision = node_guard})
+  when Frame#can_frame.len == 1 ->
+    ?dbg(nmt, "handle_cast: node_guard reply ~w", [Frame]),
     case Frame#can_frame.data of
 	<<Toggle:1, State:7, _/binary>> ->
 	    handle_node_guard(SlaveId, State, Toggle, Ctx);
@@ -507,20 +537,36 @@ handle_cast({node_guard_reply, SlaveId, Frame}, Ctx)
     end,
     {noreply, Ctx};
 
+handle_cast({supervision_frame, SlaveId, Frame}, 
+	    Ctx=#ctx {supervision = heartbeat}) 
+  when Frame#can_frame.len == 1 ->
+    ?dbg(nmt, "handle_cast: heartbeat ~w", [Frame]),
+    case Frame#can_frame.data of
+	<<0:1, State:7, _/binary>> ->
+	    handle_heartbeat(SlaveId, State, Ctx);
+	_ ->
+	    do_nothing
+    end,
+    {noreply, Ctx};
+
 handle_cast({supervision, Supervision}, Ctx=#ctx {supervision = Supervision}) ->
     ?dbg(?NAME," handle_cast: supervision ~p, no change.", [Supervision]),
     {noreply, Ctx};
-handle_cast({supervision, heartbeat}, Ctx) ->
-    ?dbg(?NAME," handle_cast: heartbeat not implemented, setting to none.", []),
-    handle_cast({supervison, none}, Ctx);
 handle_cast({supervision, New}, Ctx=#ctx {supervision = Old}) ->
     ?dbg(?NAME," handle_cast: supervision ~p -> ~p.", [Old, New]),
     %% Activate/deactivate .. or handle in co_node ??
-    case {New, Old} of
-	{node_guard, _Other} -> activate_node_guard(Ctx);
-	{_Other, node_guard} -> deactivate_node_guard(Ctx)
+    case Old of
+	node_guard -> deactivate_node_guard(Ctx);
+	heartbeat -> deactivate_heartbeat(Ctx);
+	none -> do_nothing
+    end,
+    case New of
+	node_guard -> activate_node_guard(Ctx);
+	heartbeat -> activate_heartbeat(Ctx);
+	none -> do_nothing
     end,
     {noreply, Ctx#ctx {supervision = New}};
+
 handle_cast(_Msg, Ctx) ->
     ?dbg(?NAME," handle_cast: Unknown message = ~p, ignored. ", [_Msg]),
     {noreply, Ctx}.
@@ -536,7 +582,9 @@ handle_cast(_Msg, Ctx) ->
 -type info()::
 	{do_node_guard, SlaveId::integer()} |
 	{node_guard_timeout, SlaveId::integer()} | 
-	term().
+	{heartbeat_timeout, SlaveId::integer()} | 
+	heartbeat_change |
+	{'DOWN',Ref::reference(),process,Pid::pid(),Reason::term()}.
 
 
 -spec handle_info(Info::info(), Ctx::#ctx{}) -> 
@@ -549,7 +597,7 @@ handle_info({do_node_guard, SlaveId = {_Flag, _NodeId}},
 	[] -> 
 	    ?dbg(nmt, "handle_info: do_node_guard, slave not found!", []),
 	    ok;
-	[Slave=#nmt_slave {guard_time = GT, com_status = Status}] -> 
+	[Slave=#nmt_slave {guard_time = GT, contact = Status}] -> 
 	    ?dbg(nmt, "handle_info: do_node_guard, slave guard time ~p", [GT]),
 	    send_node_guard(SlaveId, NodePid),
 	    TRef = if GT =/= 0 ->
@@ -560,7 +608,7 @@ handle_info({do_node_guard, SlaveId = {_Flag, _NodeId}},
 	    NewComStatus = if Status == lost -> lost;
 			      true -> waiting
 			   end,
-	    ets:insert(NmtTable, Slave#nmt_slave {com_status = NewComStatus,
+	    ets:insert(NmtTable, Slave#nmt_slave {contact = NewComStatus,
 						  guard_timer = TRef})
     end,
     {noreply, Ctx};
@@ -581,13 +629,36 @@ handle_info({node_guard_timeout, SlaveId = {_Flag, _NodeId}},
 	    error_logger:error_msg("Node guard timeout, check NMT slave {~p,~.16#}\n", 
 			   [_Flag, _NodeId]),
 	    inform_subscribers({lost_contact, SlaveId}, Ctx),
-	    ets:insert(NmtTable, Slave#nmt_slave {com_status = lost})
+	    ets:insert(NmtTable, Slave#nmt_slave {contact = lost})
     end,
-    %% Start again ??
     {noreply, Ctx};
 
 handle_info({node_guard_timeout, _SlaveId}, Ctx) ->
     ?dbg(nmt, "handle_info: node_guard_timeout, supervision disabled", []),
+    {noreply, Ctx};
+
+handle_info({heartbeat_timeout, SlaveId = {_Flag, _NodeId}}, 
+	    Ctx=#ctx {nmt_table = NmtTable, supervision = heartbeat}) ->
+    ?dbg(nmt, "handle_info: heartbeat_timeout received for {~p,~.16#}", 
+	 [_Flag, _NodeId]),
+    case ets:lookup(NmtTable, SlaveId) of
+	[] -> 
+	    ?dbg(nmt, "handle_info: heartbeat_timeout, slave not found!", []),
+	    ok;
+	[Slave] -> 
+	    error_logger:error_msg("Heartbeat timeout, check NMT slave {~p,~.16#}\n", 
+			   [_Flag, _NodeId]),
+	    inform_subscribers({lost_contact, SlaveId}, Ctx),
+	    ets:insert(NmtTable, Slave#nmt_slave {contact = lost})
+    end,
+
+    {noreply, Ctx};
+
+handle_info(heartbeat_change, Ctx) ->
+    ?dbg(nmt, "handle_info: heartbeat_change received.", []),
+    %% Easy way ...
+    deactivate_heartbeat(Ctx),
+    activate_heartbeat(Ctx),
     {noreply, Ctx};
 
 handle_info({'DOWN',_Ref,process,Pid,_Reason}, 
@@ -655,6 +726,70 @@ load_conf(_Ctx=#ctx {nmt_table = NmtTable}) ->
 	    {error, no_nmt_conf_exists}
     end.
 
+activate_heartbeat(Ctx=#ctx {node_pid = NodePid}) ->
+    case co_api:value(NodePid, {?IX_CONSUMER_HEARTBEAT_TIME, 0}) of
+	{ok, 0} ->
+	    ?dbg(nmt, "activate_heartbeat: no entries in consumer table.", []),
+	    ok;
+	{ok, Number} when is_integer(Number) ->
+	    [activate_heartbeat(N, Ctx) || N <- lists:seq(1, Number)];
+	{error, no_such_object} ->
+	    ?dbg(nmt, "activate_heartbeat: No consumer table.", []),
+	    ok;
+	{error, Error} ->
+	    ?dbg(nmt, "activate_heartbeat: Failed reading consumer table, reason ~p.",
+		 [Error]),
+	    error_logger:error_msg(
+	      "Failed reading hearbeat consumer table, reason ~p, "
+	      "no supervision possible.\n", [Error])
+    end.
+    
+activate_heartbeat(Entry, _Ctx=#ctx {node_pid = NodePid, heartbeat_table = HBTable,
+				     nmt_table = NmtTable}) ->
+    case co_api:data(NodePid, {?IX_CONSUMER_HEARTBEAT_TIME, Entry}) of
+	{ok, Data} when is_binary(Data) ->
+	    <<_Pad:8, NodeId:8, Time:16>> = Data,
+	    ?dbg(nmt, "activate_heartbeat: hearbeat consumer ~.16#, time ~p.",
+		 [NodeId, Time]),
+	    %% Only short nodeid possible for heartbeat
+	    SlaveId = {nodeid, NodeId}, 
+	    ets:insert(HBTable, {SlaveId, Time}),
+	    Slave = case ets:lookup(NmtTable, SlaveId) of
+			[] -> 
+			    %% Unknown slave, create it
+			    #nmt_slave {id = SlaveId, 
+					heartbeat_time = Time,
+					contact = ok};
+			[S] ->
+			    S#nmt_slave {heartbeat_time = Time, 
+					 contact = ok}
+		    end,
+	    Timer = start_heartbeat_timer(Slave),
+	    ets:insert(NmtTable, Slave#nmt_slave {heartbeat_timer = Timer});
+	Error ->
+	    ?dbg(nmt, "activate_heartbeat: Failed reading consumer table, reason ~p.",
+		 [Error]),
+	    error_logger:error_msg(
+	      "Failed reading heartbeat consumer table, subindex ~p, reason ~p, "
+	      "no supervision possible.\n", [Entry, Error])
+    end.
+	    
+deactivate_heartbeat(Ctx=#ctx {heartbeat_table = HbTable}) ->
+    ets:foldl(fun({SlaveId, _Time},[]) ->
+		      deactivate_heartbeat(SlaveId, Ctx),
+		      []
+	      end, [], HbTable),
+    ets:delete_all_objects(HbTable).
+
+deactivate_heartbeat(SlaveId, _Ctx=#ctx {nmt_table = NmtTable}) ->
+    case ets:lookup(NmtTable, SlaveId) of
+	[Slave] ->
+	    cancel_heartbeat_timer(Slave),
+	    ets:insert(NmtTable, Slave#nmt_slave {heartbeat_time = 0});
+	[] ->
+	    ok
+    end.
+
 add_slave(SlaveId = {_Flag, _NodeId}, 
 	  Ctx=#ctx {supervision = Supervision, nmt_table = NmtTable}) ->
     ?dbg(nmt, "add_slave: {~p, ~.16#}", [_Flag, _NodeId]),
@@ -666,16 +801,16 @@ add_slave(SlaveId = {_Flag, _NodeId},
 		   node_guard ->
 		       activate_node_guard(Slave, Ctx);
 		   heartbeat ->
-		       %% To be implemented 
-		       ?dbg(nmt, "add_slave: heartbeat not implemented yet", []),
-		       Slave
-    end,
+		       %% Heartbeat is performed based on dictionary
+		       %% and thus not dynamically changed
+		       %%activate_heartbeat(Slave, Ctx)
+		       Ctx
+	       end,
     ets:insert(NmtTable, NewSlave),
     send_to_slave(NewSlave, start, Ctx).
     
 
-activate_node_guard(Slave=#nmt_slave {id = SlaveId}, 
-		    Ctx=#ctx {nmt_table = NmtTable}) ->
+activate_node_guard(Slave=#nmt_slave {id = SlaveId}, Ctx) ->
     ?dbg(nmt, "activate_node_guard: slave ~p.", [SlaveId]),
     %% get node guard time and life factor
     {GuardTime, LifeFactor} = slave_guard_time(SlaveId),
@@ -686,10 +821,10 @@ activate_node_guard(Slave=#nmt_slave {id = SlaveId},
 	      "New slave ~p guard time could not be fetched. "
 	      "No supervision possible.\n", [SlaveId]),
 	    inform_subscribers({slave_not_supervisable, SlaveId}, Ctx),
-	    Slave#nmt_slave {com_status = lost}; %% ???
+	    Slave#nmt_slave {contact = lost}; %% ???
 	0 -> 
 	    ?dbg(nmt, "activate_node_guard: guard time = 0, no node guarding", []),
-	    Slave#nmt_slave {com_status = ok};
+	    Slave#nmt_slave {contact = ok};
 	_T ->
 	    ?dbg(nmt, "activate_node_guard: node guarding, ~p * ~p", 
 		 [GuardTime, LifeFactor]),
@@ -699,7 +834,7 @@ activate_node_guard(Slave=#nmt_slave {id = SlaveId},
 	    LTimer = start_life_timer(NewSlave),
 	    NewSlave#nmt_slave {guard_timer = GTimer,
 				life_timer = LTimer,
-				com_status = ok}
+				contact = ok}
     end.
 
 slave_guard_time(SlaveId) ->
@@ -721,7 +856,6 @@ slave_guard_time(SlaveId) ->
 		 [_Error]),
 	    {undefined, undefined} 
     end.
-
 
 remove_slave(Slave=#nmt_slave {id = SlaveId = {_Flag, _NodeId}},
 	     Ctx=#ctx {supervision = Supervision, nmt_table = NmtTable}) ->
@@ -777,7 +911,7 @@ inform_subscribers(Msg, _Ctx=#ctx {subscribers = SubList}) ->
 
 
 handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle, 
-		  Ctx=#ctx {supervision = Supervision, nmt_table = NmtTable}) ->
+		  Ctx=#ctx {supervision = node_guard, nmt_table = NmtTable}) ->
     ?dbg(nmt, "handle_node_guard: node {~p, ~.16#}, state ~p, toggle ~p", 
 	 [Flag, NodeId, State, Toggle]),
     case ets:lookup(NmtTable, SlaveId) of
@@ -792,7 +926,7 @@ handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle,
 	       true -> ok
 	    end,
 	    add_slave(SlaveId, Ctx);
-	[Slave] when Supervision == node_guard -> 
+	[Slave] -> 
 	    if Slave#nmt_slave.toggle == Toggle andalso
 	       Slave#nmt_slave.node_state == State ->
 		    node_guard_ok(Slave, Toggle, State, NmtTable);
@@ -807,7 +941,7 @@ handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle,
 		    error_logger:warning_msg(
 		      "Node {~p, ~.16#} answered node guard "
 		      "with unexpected state ~p, updating.\n", 
-					   [Flag, NodeId, State]),
+		      [Flag, NodeId, State]),
 		    node_guard_ok(Slave, Toggle, State, NmtTable);
 
 	       Slave#nmt_slave.toggle =/= Toggle ->
@@ -817,12 +951,14 @@ handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle,
 		    error_logger:error_msg(
 		      "Node {~p, ~.16#} answered node guard "
 		      "with wrong toggle, ignored.\n", 
-					   [Flag, NodeId])
-	    end;
-	[_Slave] when Supervision == none -> 
-	    ?dbg(nmt, "handle_node_guard: no supervision", []),
-	    ok
-    end.
+		      [Flag, NodeId])
+	    end
+    end;
+handle_node_guard(_SlaveId = {Flag, NodeId}, State, Toggle, _Ctx) ->
+    ?dbg(nmt, "handle_node_guard: node {~p, ~.16#}, state ~p, toggle ~p"
+	 "node guarding not active, ignoring",
+	 [Flag, NodeId, State, Toggle]),
+    ok.
 
 node_guard_ok(Slave, Toggle, State, NmtTable) ->
     %% Restart life timer
@@ -831,7 +967,60 @@ node_guard_ok(Slave, Toggle, State, NmtTable) ->
     ets:insert(NmtTable, Slave#nmt_slave {toggle = 1 - Toggle,
 					  node_state = State,
 					  life_timer = NewTimer,
-					  com_status = ok}).
+					  contact = ok}).
+
+handle_heartbeat(SlaveId = {Flag, NodeId}, State, 
+		  _Ctx=#ctx {supervision = heartbeat, heartbeat_table = HbTable,
+			     nmt_table = NmtTable}) ->
+    ?dbg(nmt, "handle_heart: node {~p, ~.16#}, state ~p", [Flag, NodeId, State]),
+    case ets:lookup(HbTable, SlaveId) of
+	[] -> 
+	    ?dbg(nmt, "handle_heartbeat: not supervised node, ignoring", []),
+	    ok;
+	[{SlaveId, Time}] ->
+	    Slave = case ets:lookup(NmtTable, SlaveId) of
+			[] -> 
+			    %% Unknown slave, create it
+			    #nmt_slave {id = SlaveId, 
+					heartbeat_time = Time,
+					contact = ok};
+			[S] ->
+			    S#nmt_slave {heartbeat_time = Time, 
+					 contact = ok}
+		    end,
+
+	    if State == ?Initialisation ->
+		    %% bootup, next state should be pre_op
+		    heartbeat_ok(Slave, ?PreOperational, NmtTable);
+	       Slave#nmt_slave.node_state == State ->
+		    heartbeat_ok(Slave, State, NmtTable);
+	       Slave#nmt_slave.node_state =/= State ->
+		    %% This can be because it is a node with both
+		    %% short and extended node id and co_nmt only knows
+		    %% about state change of short node id.
+		    ?dbg(nmt, "handle_heartbeat: expected state ~p", 
+			 [Slave#nmt_slave.node_state]),
+		    %% Send error ??
+		    error_logger:warning_msg(
+		      "Node {~p, ~.16#} got heartbeat "
+		      "with unexpected state ~p, updating.\n", 
+		      [Flag, NodeId, State]),
+		    heartbeat_ok(Slave, State, NmtTable)
+	    end
+    end;
+handle_heartbeat(_SlaveId = {Flag, NodeId}, State, _Ctx) ->
+    ?dbg(nmt, "handle_heartbeat: node {~p, ~.16#}, state ~p"
+	 "heartbeat not active, ignoring", [Flag, NodeId, State]),
+    ok.
+
+
+heartbeat_ok(Slave, State, NmtTable) ->
+    %% Restart heartbeat timer
+    cancel_heartbeat_timer(Slave),
+    NewTimer = start_heartbeat_timer(Slave),
+    ets:insert(NmtTable, Slave#nmt_slave {node_state = State,
+					  heartbeat_timer = NewTimer,
+					  contact = ok}).
 
 activate_node_guard(Ctx=#ctx {nmt_table = NmtTable}) ->
     ?dbg(nmt, "activate_node_guard: ", []),
@@ -871,6 +1060,16 @@ cancel_guard_timer(_Slave=#nmt_slave {guard_timer = undefined}) ->
 cancel_guard_timer(_Slave=#nmt_slave {guard_timer = Timer}) ->
     erlang:cancel_timer(Timer).
 
+
+start_heartbeat_timer(_Slave=#nmt_slave {heartbeat_time = 0}) ->
+    undefined; %% No heartbeat
+start_heartbeat_timer(_Slave=#nmt_slave {heartbeat_time = HBT, id = Id}) ->
+    erlang:send_after(HBT, self(), {heartbeat_timeout, Id}).
+
+cancel_heartbeat_timer(_Slave=#nmt_slave {heartbeat_timer = undefined}) ->
+    do_nothing;
+cancel_heartbeat_timer(_Slave=#nmt_slave {heartbeat_timer = Timer}) ->
+    erlang:cancel_timer(Timer).
 
 send_nmt(_SlaveId = {xnodeid, _NodeId}, _Cmd) ->
      ?dbg(nmt, "send_nmt: can not send ~p to xnodeid slave ~.16#", 

@@ -73,6 +73,7 @@
 %% Test interface
 -export([dump/1, dump/2, loop_data/1]).
 -export([state/1, state/2]).
+-export([dict/1]).
 
 -define(CO_NODE, co_node).
 
@@ -240,11 +241,9 @@ verify_option(nmt_role, _NewValue) ->
     {error, "Option nmt_role can only be set to slave/master/autonomous."};
 verify_option(supervision, NewValue) 
   when NewValue == node_guard;
+       NewValue == heartbeat;
        NewValue == none ->
     ok;
-verify_option(supervision, NewValue) 
-  when NewValue == heartbeat ->
-    {error, "heartbeat not implemented yet"};
 verify_option(supervision, _NewValue) ->
     {error, "Option supervision can only be set to node_guard/heartbeat/none."};
 verify_option(pst, NewValue) 
@@ -765,7 +764,7 @@ set_data(Identity, Dict, Ix, Data) when is_integer(Ix), is_binary(Data) ->
 %%--------------------------------------------------------------------
 -spec value(Identity::node_identity(), Dict::term(), 
 	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
-		   Value::term() | {error, Error::atom()}.
+		   {ok, Value::term()} | {error, Error::atom()}.
 
 value(_Identity, Dict, {Ix, Si} = I) when ?is_index(Ix), ?is_subind(Si)  ->
     co_dict:value(Dict, I);
@@ -781,7 +780,7 @@ value(Identity, Dict, Ix) when is_integer(Ix) ->
 %%--------------------------------------------------------------------
 -spec data(Identity::node_identity(), Dict::term(), 
 	    Index::{Ix::integer(), Si::integer()} | integer()) -> 
-		   Data::term() | {error, Error::atom()}.
+		   {ok, Data::term()} | {error, Error::atom()}.
 
 data(_Identity, Dict, {Ix, Si} = I) when ?is_index(Ix), ?is_subind(Si)  ->
     co_dict:data(Dict, I);
@@ -1018,7 +1017,7 @@ state(Identity) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Sets the co_nodes state.
+%% Sets the co_node's state.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -1032,6 +1031,18 @@ state(Identity, preoperational) ->
     gen_server:call(identity_to_pid(Identity), {state, ?PreOperational});
 state(Identity, stopped) ->
     gen_server:call(identity_to_pid(Identity), {state, ?Stopped}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Gets the co_node's dict
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec dict(Identity::node_identity()) -> 
+		  Dict::dict() | {error, Error::atom()}.
+
+dict(Identity) ->
+    gen_server:call(identity_to_pid(Identity), dict).
 
 %%--------------------------------------------------------------------
 %% @doc

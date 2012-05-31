@@ -79,6 +79,7 @@ all() ->
      {group, manage_slave},
      start_slave,
      {group, node_guard},
+     {group, heartbeat},
      {group, nmt_commands}].
 %%     break].
 
@@ -104,6 +105,7 @@ groups() ->
      {monitor_subscriber, [sequence], [subscribe, die]},
      {manage_slave, [sequence], [add_slave, remove_slave]},
      {node_guard, [sequence], [activate_node_guard, detect_lost_slave]},
+     {node_guard, [sequence], [activate_heartbeat, detect_lost_slave]},
      {nmt_commands, [sequence], [stop_cmd, enter_pre_op_cmd, start_cmd]}
     ].
 
@@ -146,6 +148,15 @@ end_per_suite(Config) ->
 			    {skip,Reason::term()} | 
 			    {skip_and_save,Reason::term(),Config1::list(tuple())}.
 
+init_per_group(GroupName, Config) 
+  when GroupName == heartbeat->
+    ct:pal("TestGroup: ~p", [GroupName]),
+
+    %% Set heartbeat consumer time for the slave
+    {nodeid, NodeId} = slave_id(),
+    Data = <<0:8, NodeId::8, 2000:16>>,
+    co_api:set_data(serial(), {?IX_CONSUMER_HEARTBEAT_TIME, 0}, Data),
+    Config;
 init_per_group(GroupName, Config) 
   when GroupName == nmt_commands->
     ct:pal("TestGroup: ~p", [GroupName]),
@@ -206,13 +217,22 @@ end_per_group(_GroupName, _Config) ->
 			    {skip_and_save,Reason::term(),Config1::list(tuple())}.
 
 init_per_testcase(TestCase, Config)  
-  when TestCase == start_slave;
-       TestCase == activate_node_guard ->
+  when TestCase == start_slave ->
     ct:pal("TestCase: ~p", [TestCase]),
     co_test_lib:start_node(Config, 
 			   ?SLAVE_NODE,
 			   [{nmt_role, slave}]),
-
+    
+    Config;
+init_per_testcase(TestCase, Config)  
+  when TestCase == activate_node_guard;
+       TestCase == activate_heartbeat ->
+    ct:pal("TestCase: ~p", [TestCase]),
+    co_test_lib:start_node(Config, 
+			   ?SLAVE_NODE,
+			   [{nmt_role, slave},
+			    slave_id()]),
+    ok = co_api:set_option(serial(), xnodeid, undefined),
     Config;
 init_per_testcase(TestCase, Config) ->
     ct:pal("TestCase: ~p", [TestCase]),
@@ -387,9 +407,28 @@ activate_node_guard(_Config) ->
 
     %% Time for node guarding to start
     timer:sleep(500),
-    SlaveId = xslave_id(),
-    %% No short nodeid so slave can not be started by nmt master
-    [{SlaveId, ?PreOperational, ok}] = co_nmt:slaves(),
+    SlaveId = slave_id(),
+    [{SlaveId, ?Operational, ok}] = co_nmt:slaves(),
+
+    ok.
+
+%%--------------------------------------------------------------------
+%% @doc 
+%% Activate heartbeat
+%% @end
+%%--------------------------------------------------------------------
+-spec activate_heartbeat(Config::list(tuple())) -> ok.
+
+activate_heartbeat(_Config) ->
+    ok = co_api:set_option(serial(), supervision, heartbeat),
+    {supervision, heartbeat} = co_api:get_option(serial(), supervision),
+    ok = co_api:set_option(?SLAVE_NODE, supervision, heartbeat),
+    {supervision, heartbeat} = co_api:get_option(?SLAVE_NODE, supervision),
+
+    %% Time for heartbeat to start
+    timer:sleep(500),
+    SlaveId = slave_id(),
+    [{SlaveId, ?Operational, ok}] = co_nmt:slaves(),
 
     ok.
 
@@ -403,7 +442,7 @@ activate_node_guard(_Config) ->
 detect_lost_slave(_Config) ->
     ok = co_nmt:subscribe(),
     co_test_lib:stop_node(?SLAVE_NODE),
-    SlaveId = xslave_id(),
+    SlaveId = slave_id(),
 
     receive 
 	{lost_contact, SlaveId} ->
@@ -415,8 +454,8 @@ detect_lost_slave(_Config) ->
      after 10000 ->
 	    ct:fail("Slave loss not detected")
     end,
-    %% No short nodeid so slave can not be started by nmt master
-    [{SlaveId, ?PreOperational, lost}] = co_nmt:slaves(),    
+
+    [{SlaveId, ?Operational, lost}] = co_nmt:slaves(),    
     ok.
 
 %%--------------------------------------------------------------------
