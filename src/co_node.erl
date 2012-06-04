@@ -1680,7 +1680,7 @@ handle_sdo_tx(Frame, Tx, Rx, Ctx=#co_ctx {state = State, name = _Name})
 handle_sdo_tx(_Frame, _Tx, _Rx, 
 	      Ctx=#co_ctx {state = State, name = _Name}) ->
     ?dbg(node, "~s: handle_sdo_tx: src=~p, ~s",
-	 [Ctx#co_ctx.name, Tx,
+	 [Ctx#co_ctx.name, _Tx,
 	  co_format:format_sdo(co_sdo:decode_tx(_Frame#can_frame.data))]),
     error_logger:warning_msg("Received sdo in state ~p, ignoring\n", [State]),
     Ctx.

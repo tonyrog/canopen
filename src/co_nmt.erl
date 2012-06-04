@@ -923,9 +923,9 @@ inform_subscribers(Msg, _Ctx=#ctx {subscribers = SubList}) ->
     lists:foreach(fun({Sub, _Mon}) -> Sub ! Msg  end,  SubList).
 
 
-handle_bootup(SlaveId = {Flag, NodeId}, 
+handle_bootup(SlaveId = {_Flag, _NodeId}, 
 	      Ctx=#ctx {supervision = none, nmt_table = NmtTable}) ->
-    ?dbg(nmt, "handle_bootup: node {~p, ~.16#}", [Flag, NodeId]),
+    ?dbg(nmt, "handle_bootup: node {~p, ~.16#}", [_Flag, _NodeId]),
     case ets:lookup(NmtTable, SlaveId) of
 	[] -> 
 	    %% First message
