@@ -105,7 +105,7 @@ groups() ->
      {monitor_subscriber, [sequence], [subscribe, die]},
      {manage_slave, [sequence], [add_slave, remove_slave]},
      {node_guard, [sequence], [activate_node_guard, detect_lost_slave]},
-     {node_guard, [sequence], [activate_heartbeat, detect_lost_slave]},
+     {heartbeat, [sequence], [activate_heartbeat, detect_lost_slave]},
      {nmt_commands, [sequence], [stop_cmd, enter_pre_op_cmd, start_cmd]}
     ].
 
@@ -154,8 +154,10 @@ init_per_group(GroupName, Config)
 
     %% Set heartbeat consumer time for the slave
     {nodeid, NodeId} = slave_id(),
-    Data = <<0:8, NodeId::8, 2000:16>>,
-    co_api:set_data(serial(), {?IX_CONSUMER_HEARTBEAT_TIME, 0}, Data),
+    Data = <<0:8, NodeId:8, 2000:16>>,
+    co_api:set_data(serial(), {?IX_CONSUMER_HEARTBEAT_TIME, 1}, Data),
+    co_api:set_value(serial(), {?IX_CONSUMER_HEARTBEAT_TIME, 0}, 1),
+
     Config;
 init_per_group(GroupName, Config) 
   when GroupName == nmt_commands->
@@ -188,6 +190,15 @@ init_per_group(GroupName, Config) ->
 			   no_return() | 
 			   {save_config, Config1::list(tuple())}.
 
+end_per_group(heartbeat, _Config)->
+    ok = co_api:set_option(serial(), supervision, none),
+    {supervision, none} = co_api:get_option(serial(), supervision),
+    co_test_lib:stop_node(?SLAVE_NODE),
+    co_nmt:remove_slave(xslave_id()),
+    co_nmt:remove_slave(slave_id()),
+    %% Remove slave from heartbeat list
+    co_api:set_value(serial(), {?IX_CONSUMER_HEARTBEAT_TIME, 0}, 0),
+    ok;
 end_per_group(nmt_commands, _Config) ->
     co_nmt:remove_slave(slave_id()),
     co_test_lib:stop_node(?SLAVE_NODE),
@@ -232,7 +243,6 @@ init_per_testcase(TestCase, Config)
 			   ?SLAVE_NODE,
 			   [{nmt_role, slave},
 			    slave_id()]),
-    ok = co_api:set_option(serial(), xnodeid, undefined),
     Config;
 init_per_testcase(TestCase, Config) ->
     ct:pal("TestCase: ~p", [TestCase]),

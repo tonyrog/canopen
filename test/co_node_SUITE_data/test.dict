@@ -17,7 +17,7 @@
 {object, 16#1016,
  [{name, "HEARTBEAT-CONS-TIME"},
   {struct, var},{access, rw},{type, unsigned16},
-  {entry,0,[{access,rw},{type,unsigned32},{value,1}]},
+  {entry,0,[{access,rw},{type,unsigned32},{value,0}]}, %% Change when testing
   {entry,1,[{access,rw},{type,unsigned32},{value,16#D0077700}]} %% For node 16#77
  ]}.
 

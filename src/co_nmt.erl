@@ -525,10 +525,11 @@ handle_call(_Call, _From, Ctx) ->
 -spec handle_cast(Msg::msg(), Ctx::#ctx{}) -> 
 			 {noreply, Ctx::#ctx{}}.
 
-handle_cast({supervision_frame, SlaveId, Frame}, 
+handle_cast({supervision_frame, SlaveId = {_Flag, _NodeId}, Frame}, 
 	    Ctx=#ctx {supervision = node_guard})
   when Frame#can_frame.len == 1 ->
-    ?dbg(nmt, "handle_cast: node_guard reply ~w", [Frame]),
+    ?dbg(nmt, "handle_cast: node_guard reply ~w from {~p, ~.16#}", 
+	 [Frame, _Flag, _NodeId]),
     case Frame#can_frame.data of
 	<<Toggle:1, State:7, _/binary>> ->
 	    handle_node_guard(SlaveId, State, Toggle, Ctx);
@@ -537,10 +538,11 @@ handle_cast({supervision_frame, SlaveId, Frame},
     end,
     {noreply, Ctx};
 
-handle_cast({supervision_frame, SlaveId, Frame}, 
+handle_cast({supervision_frame, SlaveId = {_Flag, _NodeId}, Frame}, 
 	    Ctx=#ctx {supervision = heartbeat}) 
   when Frame#can_frame.len == 1 ->
-    ?dbg(nmt, "handle_cast: heartbeat ~w", [Frame]),
+    ?dbg(nmt, "handle_cast: heartbeat ~w from {~p, ~.16#} ", 
+	 [Frame, _Flag, _NodeId]),
     case Frame#can_frame.data of
 	<<0:1, State:7, _/binary>> ->
 	    handle_heartbeat(SlaveId, State, Ctx);
@@ -549,9 +551,20 @@ handle_cast({supervision_frame, SlaveId, Frame},
     end,
     {noreply, Ctx};
 
+handle_cast({supervision_frame, SlaveId = {_Flag, _NodeId}, Frame}, 
+	    Ctx=#ctx {supervision = none}) ->
+    ?dbg(nmt, "handle_cast: supervision frame ~w from {~p, ~.16#} "
+	 "when no supervision, check if bootup", [Frame, _Flag, _NodeId]),
+    case Frame#can_frame.data of
+	<<0>> -> handle_bootup(SlaveId, Ctx);
+	_ -> do_nothing
+    end,
+    {noreply, Ctx};
+    
 handle_cast({supervision, Supervision}, Ctx=#ctx {supervision = Supervision}) ->
     ?dbg(?NAME," handle_cast: supervision ~p, no change.", [Supervision]),
     {noreply, Ctx};
+
 handle_cast({supervision, New}, Ctx=#ctx {supervision = Old}) ->
     ?dbg(?NAME," handle_cast: supervision ~p -> ~p.", [Old, New]),
     %% Activate/deactivate .. or handle in co_node ??
@@ -910,6 +923,21 @@ inform_subscribers(Msg, _Ctx=#ctx {subscribers = SubList}) ->
     lists:foreach(fun({Sub, _Mon}) -> Sub ! Msg  end,  SubList).
 
 
+handle_bootup(SlaveId = {Flag, NodeId}, 
+	      Ctx=#ctx {supervision = none, nmt_table = NmtTable}) ->
+    ?dbg(nmt, "handle_bootup: node {~p, ~.16#}", [Flag, NodeId]),
+    case ets:lookup(NmtTable, SlaveId) of
+	[] -> 
+	    %% First message
+	    ?dbg(nmt, "handle_bootup: new node, creating entry", []),
+	    add_slave(SlaveId, Ctx);
+	[Slave] -> 
+	    %% Slave rebooted
+	    ets:insert(NmtTable, Slave#nmt_slave {node_state = ?PreOperational,
+						  contact = ok})
+    end.
+
+	    
 handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle, 
 		  Ctx=#ctx {supervision = node_guard, nmt_table = NmtTable}) ->
     ?dbg(nmt, "handle_node_guard: node {~p, ~.16#}, state ~p, toggle ~p", 

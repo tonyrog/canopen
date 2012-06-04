@@ -72,7 +72,7 @@ run_master(Serial, Port, Ttl) ->
     run(Serial, Port, Ttl, [{nmt_role, master}, 
 			    {supervision, node_guard}]),
     co_api:load_dict(Serial, 
-		     "/Users/malotte/erlang/canopen/test/co_nmt_SUITE_data/test.dict").
+		     "/Users/malotte/erlang/canopen/test/co_nmt_SUITE_data/test.dict"),
     co_nmt:debug(true).
 
 run_slave(Serial) ->

@@ -280,11 +280,13 @@ reg(Term) ->
 reset_application(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId}) ->
     error_logger:info_msg("Node '~s' id=~w,~w reset_application\n", 
 	      [_Name, _XNodeId, _SNodeId]),
+    send_to_apps(reset_app, Ctx),
     reset_communication(Ctx).
 
 reset_communication(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId}) ->
     error_logger:info_msg("Node '~s' id=~w,~w reset_communication\n",
 	      [_Name, _XNodeId, _SNodeId]),
+    send_to_apps(reset_com, Ctx),
     initialization(Ctx).
 
 initialization(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId,
@@ -292,8 +294,11 @@ initialization(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId,
     error_logger:info_msg("Node '~s' id=~w,~w initialization\n",
 	      [_Name, _XNodeId, _SNodeId]),
 
+    broadcast_state(?PreOperational, Ctx),
+
     if NmtRole == master ->
 	    activate_nmt(Ctx),
+	    broadcast_state(?Operational, Ctx),
 	    Ctx#co_ctx {state = ?Operational}; %% ??
        NmtRole == slave ->
 	    Ctx1 = Ctx#co_ctx {state = ?PreOperational},
@@ -308,6 +313,7 @@ initialization(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId,
        NmtRole == autonomous ->
 	    %% ??
 	    send_bootup(id(Ctx)),
+	    broadcast_state(?Operational, Ctx),
 	    Ctx#co_ctx {state = ?Operational}
     end.
     
