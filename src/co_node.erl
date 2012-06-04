@@ -1648,9 +1648,10 @@ handle_rpdo(Frame, Offset, _CobId,
     ?dbg(node, "~s: handle_rpdo: offset = ~p, frame = ~w", 
 	 [_Name, Offset, Frame]),
     rpdo_unpack(?IX_RPDO_MAPPING_FIRST + Offset, Frame#can_frame.data, Ctx);
-handle_rpdo(Frame, Offset, _CobId, Ctx=#co_ctx {state = State, name = _Name}) ->
+handle_rpdo(_Frame, _Offset, _CobId, 
+	    Ctx=#co_ctx {state = State, name = _Name}) ->
     ?dbg(node, "~s: handle_rpdo: offset = ~p, frame = ~w, state ~p", 
-	 [_Name, Offset, Frame, State]),
+	 [_Name, _Offset, _Frame, State]),
     error_logger:warning_msg("Received pdo in state ~p, ignoring\n", [State]),
     Ctx.
 
@@ -1676,10 +1677,11 @@ handle_sdo_tx(Frame, Tx, Rx, Ctx=#co_ctx {state = State, name = _Name})
 	    %% no such session active
 	    Ctx
     end;
-handle_sdo_tx(Frame, Tx, _Rx, Ctx=#co_ctx {state = State, name = _Name}) ->
+handle_sdo_tx(_Frame, _Tx, _Rx, 
+	      Ctx=#co_ctx {state = State, name = _Name}) ->
     ?dbg(node, "~s: handle_sdo_tx: src=~p, ~s",
-	      [Ctx#co_ctx.name, Tx,
-	       co_format:format_sdo(co_sdo:decode_tx(Frame#can_frame.data))]),
+	 [Ctx#co_ctx.name, Tx,
+	  co_format:format_sdo(co_sdo:decode_tx(_Frame#can_frame.data))]),
     error_logger:warning_msg("Received sdo in state ~p, ignoring\n", [State]),
     Ctx.
 
@@ -1719,9 +1721,10 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx=#co_ctx {state = State, name = _Name})
 		    Ctx#co_ctx { sdo_list = [S|Sessions]}
 	    end
     end;
-handle_sdo_rx(Frame, _Rx, _Tx, Ctx=#co_ctx {state = State, name = _Name}) ->
+handle_sdo_rx(_Frame, _Rx, _Tx, Ctx=#co_ctx {state = State, name = _Name}) ->
     ?dbg(node, "~s: handle_sdo_rx: ~s", 
-	      [_Name,co_format:format_sdo(co_sdo:decode_rx(Frame#can_frame.data))]),
+	      [_Name,co_format:format_sdo(
+		       co_sdo:decode_rx(_Frame#can_frame.data))]),
     error_logger:warning_msg("Received sdo in state ~p, ignoring\n", [State]),
     Ctx.
 

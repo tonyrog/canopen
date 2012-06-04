@@ -884,9 +884,9 @@ remove_slave(Slave=#nmt_slave {id = SlaveId = {_Flag, _NodeId}},
     end,
     ets:delete(NmtTable,SlaveId).
 
-deactivate_node_guard(Slave=#nmt_slave {id = SlaveId}, 
+deactivate_node_guard(Slave=#nmt_slave {id = _SlaveId}, 
 		      _Ctx=#ctx {nmt_table = NmtTable}) ->
-    ?dbg(nmt, "deactivate_node_guard: slave ~p.", [SlaveId]),
+    ?dbg(nmt, "deactivate_node_guard: slave ~p.", [_SlaveId]),
     cancel_life_timer(Slave),
     cancel_guard_timer(Slave),
     ets:insert(NmtTable, Slave#nmt_slave {guard_timer = undefined, 
@@ -982,10 +982,10 @@ handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle,
 		      [Flag, NodeId])
 	    end
     end;
-handle_node_guard(_SlaveId = {Flag, NodeId}, State, Toggle, _Ctx) ->
+handle_node_guard(_SlaveId = {_Flag, _NodeId}, _State, _Toggle, _Ctx) ->
     ?dbg(nmt, "handle_node_guard: node {~p, ~.16#}, state ~p, toggle ~p"
 	 "node guarding not active, ignoring",
-	 [Flag, NodeId, State, Toggle]),
+	 [_Flag, _NodeId, _State, _Toggle]),
     ok.
 
 node_guard_ok(Slave, Toggle, State, NmtTable) ->
@@ -1036,9 +1036,9 @@ handle_heartbeat(SlaveId = {Flag, NodeId}, State,
 		    heartbeat_ok(Slave, State, NmtTable)
 	    end
     end;
-handle_heartbeat(_SlaveId = {Flag, NodeId}, State, _Ctx) ->
+handle_heartbeat(_SlaveId = {_Flag, _NodeId}, _State, _Ctx) ->
     ?dbg(nmt, "handle_heartbeat: node {~p, ~.16#}, state ~p"
-	 "heartbeat not active, ignoring", [Flag, NodeId, State]),
+	 "heartbeat not active, ignoring", [_Flag, _NodeId, _State]),
     ok.
 
 
@@ -1103,8 +1103,8 @@ send_nmt(_SlaveId = {xnodeid, _NodeId}, _Cmd) ->
      ?dbg(nmt, "send_nmt: can not send ~p to xnodeid slave ~.16#", 
 	  [_Cmd, _NodeId]),
        {error, xnodeid_not_possible};
-send_nmt(_SlaveId = {Flag, NodeId}, Cmd) ->
-    ?dbg(nmt, "send_nmt: slave {~p, ~.16#}, ~p", [Flag, NodeId, Cmd]),
+send_nmt(_SlaveId = {_Flag, NodeId}, Cmd) ->
+    ?dbg(nmt, "send_nmt: slave {~p, ~.16#}, ~p", [_Flag, NodeId, Cmd]),
     can:send(#can_frame { id = ?COBID_TO_CANID(?NMT_ID),
 			  len = 2,
 			  data = <<Cmd:8, NodeId:8>>}).
