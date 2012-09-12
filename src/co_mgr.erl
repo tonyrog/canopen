@@ -667,7 +667,7 @@ terminate(_Reason, _Mgr) ->
 	{error, not_found} ->
 	    do_nothing
     end,
-    co_proc:reg(?CO_MGR),
+    co_proc:unreg(?CO_MGR),
     ok.
 
 %%--------------------------------------------------------------------
