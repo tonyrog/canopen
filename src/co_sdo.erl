@@ -252,9 +252,7 @@ decode_abort_code(Code) ->
 	?ABORT_LOCAL_CONTROL_ERROR -> ?abort_local_control_error;
 	?ABORT_LOCAL_STATE_ERROR -> ?abort_local_state_error;
 	?ABORT_DICTIONARY_ERROR -> ?abort_dictionary_error;
-	_ ->
-	    co_log("~p: abort code ~p not defined\n", [self(), Code]),
-	    ?abort_internal_error
+	_AppAbortCode -> Code
     end.
     
 encode_abort_code(Code) when is_integer(Code) ->

@@ -207,6 +207,9 @@
 
 -define(MSG_OUTPUT_VALUE,   16#280D).   %% Current value update
 
+-define(MSG_ECHO_REQUEST,   16#2812).   %% Expect echo reply from matching node
+-define(MSG_ECHO_REPLY,     16#2813).   %% This is the reply
+
 -define(MSG_RESET,          16#28AA).   %%  Reset the node 
 
 %%
@@ -250,8 +253,6 @@
 	  timeout
 	}).
 
--endif.
-
 -type node_id()::
 	{nodeid, ShortNodeId::integer()} |
 	{xnodeid, ExtNodeId::integer()}.	
@@ -261,4 +262,6 @@
 	{name, NodeName::atom()} |
 	integer() | %% Serial
 	pid().
+
+-endif.
 

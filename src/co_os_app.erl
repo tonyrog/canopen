@@ -157,7 +157,8 @@ index_specification(_Pid, {?IX_OS_COMMAND, _SubInd})  ->
     ?dbg(?NAME,"index_specification: Unknown subindex ~.8B \n",[_SubInd]),
     {error, ?abort_no_such_subindex};
 index_specification(_Pid, {_Index, _SubInd})  ->
-    ?dbg(?NAME,"index_specification: Unknown index~.16B:~.8B \n",[_Index, _SubInd]),
+    ?dbg(?NAME,"index_specification: Unknown index~.16B:~.8B \n",
+	 [_Index, _SubInd]),
     {error, ?abort_no_such_object}.
 
 reply_specification({_Index, _SubInd} = I, Type, Access, Mode) ->
@@ -429,11 +430,12 @@ handle_write_i(NewC, true, LoopData) ->
 handle_write_i(NewC, false, LoopData=#loop_data {ref = Ref}) ->
     {reply, {ok, Ref}, LoopData#loop_data {command = NewC}}.
 
-handle_command(LoopData=#loop_data {command = Command}) when is_list(Command) ->
+handle_command(LoopData=#loop_data {command = Command, ref = Ref}) 
+  when is_list(Command) ->
     ?dbg(?NAME," handle_command: command = ~p.\n",[Command]),
     Pid = proc_lib:spawn_link(?MODULE, execute_command, [Command, self()]),
     ?dbg(?NAME," handle_command: spawned = ~p.\n",[Pid]),
-    {reply, ok, LoopData#loop_data {state = executing,
+    {reply, {ok, Ref}, LoopData#loop_data {state = executing,
 				    status = 255, 
 				    reply = "",
 				    exec_pid = Pid}};

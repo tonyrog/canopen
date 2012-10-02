@@ -72,11 +72,15 @@ start_node(Serial, Dict, Opts) ->
 	    do_nothing
     end,
 
+    %% Use seconds as revision
+    {MegaSec, Sec, _MicroSec} = os:timestamp(),
     {ok, Pid} = co_api:start_link(Serial, Opts ++
 				      [{use_serial_as_xnodeid, true},
 				       {dict, Dict},
 				       {max_blksize, 7},
 				       {vendor,16#2A1},
+				       {product, 16#0001},
+				       {revision, MegaSec * 1000000 + Sec},
 				       {linked, false}]),
     ct:pal("Started co_node ~p, pid = ~p",[integer_to_list(Serial,16), Pid]),
     co_api:save_dict(Serial),

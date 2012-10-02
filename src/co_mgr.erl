@@ -210,7 +210,7 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, data = Term)
 	    {Ix::integer(), Si::integer()} | integer(),
 	    TransferMode:: block | segment,
 	    Destination:: {app, Pid::pid(), Mod::atom()} | 
-			  {value, Type::integer()} |
+			  {value, Type::integer() | atom()} |
 			  data) ->
 		   ok | 
 		   {ok, Value::term()} | 
@@ -247,7 +247,7 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode, Term)
 	    Ix::integer(), Si::integer(),
 	    TransferMode:: block | segment,
 	    Source:: {app, Pid::pid(), Mod::atom()} | 
-		      {value, Value::term(), Type::integer()} |
+		      {value, Value::term(), Type::integer() | atom()} |
 		      {data, Bin::binary}) ->
 		   ok | 
 		   {error, Reason::atom()}.
