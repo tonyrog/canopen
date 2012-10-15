@@ -50,7 +50,8 @@
 -export([my_reservations/1, my_reservations/2]).
 -export([all_subscribers/1, all_subscribers/2]).
 -export([all_reservers/1, reserver/2]).
--export([object_event/2, pdo_event/2, dam_mpdo_event/3]).
+-export([object_event/2, session_over/2]). %% Sdo session signals
+-export([pdo_event/2, dam_mpdo_event/3]).
 -export([notify/3, notify/4, notify/5]). %% To send MPOs
 -export([notify_from/5]). %% To send MPOs
 -export([add_object/4, add_entry/3]).
@@ -132,6 +133,9 @@
 	{use_serial_as_xnodeid, boolean()} |
 	{nodeid, integer()} | 
 	{xnodeid, integer()} | 
+	{vendor, integer()} | 
+	{product, integer()} | 
+	{revision, integer()} | 
 	{nmt_role, nmt_role()} | 
 	{supervision, supervision()} | 
 	{dict, obj_dict()} | 
@@ -253,6 +257,8 @@ verify_option(pst, _NewValue) ->
     {error, "Option pst can only be set to a positive integer value or zero."};
 verify_option(Option, NewValue) 
   when Option == vendor;
+       Option == product;
+       Option == revision;
        Option == max_blksize;
        Option == readbufsize;
        Option == time_stamp; 
@@ -623,6 +629,22 @@ object_event(Identity, Index) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% Tells the co_node that a session has finished and should be removed
+%% from the sdo_list. Called by co_sdo_srv_fsm.erl and
+%% co_sdo_cli_fsm.erl.
+%% @end
+%%--------------------------------------------------------------------
+-spec session_over(Identity::node_identity(), Reason::normal | atom()) ->
+			  ok | {error, Error::atom()}.
+
+session_over(CoNodePid, Reason) 
+  when is_pid(CoNodePid) ->
+    gen_server:cast(CoNodePid, {session_over, self(), Reason});
+session_over(Identity, Reason) ->
+    gen_server:cast(identity_to_pid(Identity), {session_over, self(), Reason}).
+
+%%--------------------------------------------------------------------
+%% @doc
 %% Tells the co_node that a PDO should be transmitted.
 %% @end
 %%--------------------------------------------------------------------
@@ -932,7 +954,9 @@ data(Identity, Ix) when is_integer(Ix) ->
 	    {TypeOfNid::nodeid | xnodeid, Nid::integer()},
 	    Index::integer(), SubInd::integer(), 
 	    TransferMode:: block | segment,
-	    Term::{data, binary()} | {app, Pid::pid(), Module::atom()}) ->
+	    Term::{data, binary()} | 
+		  {value, Value::term(), Type::integer() | atom()} |
+		  {app, Pid::pid(), Module::atom()}) ->
 		   ok | {error, Error::atom()}.
 
 store(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, TransferMode, Term) 
@@ -954,7 +978,9 @@ store(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, TransferMode, Term)
 	    {TypeOfNid::nodeid | xnodeid, Nid::integer()},
 	    Index::integer(), SubInd::integer(),
  	    TransferMode:: block | segment,
-	    Term::data | {app, Pid::pid(), Module::atom()}) ->
+	    Term::data | 
+		  {app, Pid::pid(), Module::atom()} |
+		  {value, Type::integer() | atom()}) ->
 		   ok | {ok, Data::binary()} | {error, Error::atom()}.
 
 

@@ -476,9 +476,10 @@
 -record(sdo,
 	{
 	  dest_node,
-	  id,  %% {src,dst}
-	  pid, %% fsm pid
-	  mon  %% fsm monitor
+	  id,             %% {src,dst}
+	  pid,            %% fsm pid
+	  state = active, %% active until session_over is received
+	  mon             %% fsm monitor
 	}).
 
 %% TPDO process context
@@ -518,6 +519,8 @@
 	  xnodeid,          %% extended can bus id
 	  name,             %% node (process) name
 	  vendor,           %% CANopen vendor code
+	  product,          %% CANopen product code
+	  revision,         %% CANopen revision code
 	  serial,           %% string version of node serial number
 
 	  %% NMT
@@ -695,7 +698,12 @@
 -define(IX_INHIBIT_TIME_EMERGENCY,     16#1015).
 -define(IX_CONSUMER_HEARTBEAT_TIME,    16#1016).
 -define(IX_PRODUCER_HEARTBEAT_TIME,    16#1017).
+
 -define(IX_IDENTITY_OBJECT,            16#1018).
+-define(SI_IDENTITY_VENDOR,   1).
+-define(SI_IDENTITY_PRODUCT,  2).
+-define(SI_IDENTITY_REVISION, 3).
+-define(SI_IDENTITY_SERIAL,   4).
 
 -define(IX_STORE_EDS,                  16#1021).
 -define(IX_STORE_EDS_FORMAT,           16#1022).

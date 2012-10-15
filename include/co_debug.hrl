@@ -29,8 +29,8 @@
 -define(dbg(Tag, Format, Args),
 	case get(dbg) of
 	    true ->
-		io:format("~p: ~p: ~p: " ++ Format ++ "\n", 
-			  [now(), self(), ?MODULE] ++ Args);
+		io:format("~s: ~p: ~p: " ++ Format ++ "\n", 
+			  [co_lib:utc_time(), self(), ?MODULE] ++ Args);
 	    _ ->
 		ok
 	end).

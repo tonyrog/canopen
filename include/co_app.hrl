@@ -211,6 +211,7 @@
 
 -define(MSG_BLOCK,          16#2810).   %% Block input from a node (in value)
 -define(MSG_UNBLOCK,        16#2811).   %% Unblock input from a node (in value)
+
 -define(MSG_ECHO_REQUEST,   16#2812).   %% Expect echo reply from matching node
 -define(MSG_ECHO_REPLY,     16#2813).   %% This is the reply
 
@@ -263,8 +264,6 @@
 	  timeout
 	}).
 
--endif.
-
 -type node_id()::
 	{nodeid, ShortNodeId::integer()} |
 	{xnodeid, ExtNodeId::integer()}.	
@@ -274,4 +273,6 @@
 	{name, NodeName::atom()} |
 	integer() | %% Serial
 	pid().
+
+-endif.
 

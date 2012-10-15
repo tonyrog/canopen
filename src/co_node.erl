@@ -222,7 +222,9 @@ init({Serial, NodeName, Opts}) ->
       xnodeid = ExtNodeId,
       nodeid = ShortNodeId,
       name   = NodeName,
-      vendor = proplists:get_value(vendor,Opts,0),
+      vendor = proplists:get_value(vendor,Opts),
+      product = proplists:get_value(product,Opts),
+      revision = proplists:get_value(revision,Opts),
       serial = Serial,
       state  = ?Initialisation,
       nmt_role = proplists:get_value(nmt_role,Opts,autonomous),
@@ -250,17 +252,41 @@ init({Serial, NodeName, Opts}) ->
 
     case load_dict_init(proplists:get_value(dict, Opts, saved), Ctx) of
 	{ok, Ctx1} ->
+	    %% Update dict identity object
+	    ?dbg(node, "~s: init: dict loaded, udating id.",  [NodeName]),
+	    Dict = Ctx1#co_ctx.dict,
+	    update_id(Dict, ?SI_IDENTITY_VENDOR, Ctx1#co_ctx.vendor),
+	    update_id(Dict, ?SI_IDENTITY_PRODUCT, Ctx1#co_ctx.product),
+	    update_id(Dict, ?SI_IDENTITY_REVISION, Ctx1#co_ctx.revision),
+	    update_id(Dict, ?SI_IDENTITY_SERIAL, Ctx1#co_ctx.serial),
+
 	    process_flag(trap_exit, true),
-	    if ShortNodeId =:= 0 -> %% CANopen manager
+
+	    if ShortNodeId =:= 0 -> 
+		    %% CANopen manager
 		    {ok, Ctx1#co_ctx { state = ?Operational }};
 	       true ->
+		    %% Standard node
 		    {ok, reset_application(Ctx1)}
-		end;
+	    end;
+
 	{error, Reason} ->
 	    error_logger:error_msg(" ~p: Loading of dict failed, reason = ~p, "
 				   "exiting.\n", [NodeName, Reason]),
 	    {stop, Reason}
     end.
+
+update_id(_Dict, _Any, undefined) ->
+    ?dbg(node, "~p: update_id: not setting ~.16.0#:~w to undefined.", 
+	 [self(), ?IX_IDENTITY_OBJECT, _Any]),
+    ok;
+update_id(Dict, SubIndex, Value) ->
+    ?dbg(node, "~p: update_id: setting ~.16.0#:~w to ~w.", 
+	 [self(), ?IX_IDENTITY_OBJECT, SubIndex, Value]),
+    ok = co_dict:direct_set_value(Dict, 
+				  ?IX_IDENTITY_OBJECT,
+				  SubIndex,
+				  Value).
 
 nodeids(Serial, Opts) ->
     {proplists:get_value(nodeid,Opts,undefined),
@@ -477,7 +503,13 @@ handle_call({Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term}, From,
 	ID={Tx,Rx} ->
 	    ?dbg(node, "~s: ~p: ID = ~p", [_Name,Action,ID]),
 	    case lists:keyfind(Nid, #sdo.dest_node, Sessions) of
-		false ->
+		_S=#sdo {state = active} ->
+		    ?dbg(node, "~s: ~p: Session already in progress to ~.16.0#", 
+			 [_Name, Action, Nid]),
+		    {reply, {error, session_already_in_progress}, Ctx};
+		_Other ->
+		    %% state = zombie
+		    %% false
 		    %% OK to start new session
 		    case co_sdo_cli_fsm:Action(SdoCtx,Mode,From,Tx,Rx,Ix,Si,Term) of
 			{error, Reason} ->
@@ -491,11 +523,7 @@ handle_call({Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term}, From,
 			    ?dbg(node, "~s: ~p: added session id=~p", 
 				 [_Name, Action, ID]),
 			    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
-		    end;
-		_Found ->
-		    ?dbg(node, "~s: ~p: Session already in progress to ~.16.0#", 
-			 [_Name, Action, Nid]),
-		    {reply, {error, session_already_in_progress}, Ctx}
+		    end
 	    end;
 	undefined ->
 	    ?dbg(node, "~s: ~p: No sdo server found for node ~.16.0#.", 
@@ -503,7 +531,8 @@ handle_call({Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term}, From,
 	    {reply, {error, badarg}, Ctx}
     end;
 
-handle_call({add_object,Object, Es}, _From, Ctx) when is_record(Object, dict_object) ->
+handle_call({add_object,Object, Es}, _From, Ctx) 
+  when is_record(Object, dict_object) ->
     try set_dict_object({Object, Es}, Ctx) of
 	Error = {error,_} ->
 	    {reply, Error, Ctx};
@@ -514,7 +543,8 @@ handle_call({add_object,Object, Es}, _From, Ctx) when is_record(Object, dict_obj
 	    {reply, {error,Reason}, Ctx}
     end;
 
-handle_call({add_entry,Entry}, _From, Ctx) when is_record(Entry, dict_entry) ->
+handle_call({add_entry,Entry}, _From, Ctx) 
+  when is_record(Entry, dict_entry) ->
     try set_dict_entry(Entry, Ctx) of
 	Error = {error,_} ->
 	    {reply, Error, Ctx};
@@ -537,8 +567,8 @@ handle_call(load_dict, From, Ctx=#co_ctx {serial = Serial}) ->
     File = filename:join(code:priv_dir(canopen), 
 			 co_lib:serial_to_string(Serial) ++ ?LAST_SAVED_DICT),
     handle_call({load_dict, File}, From, Ctx);
-handle_call({load_dict, File}, _From, Ctx) ->
-    ?dbg(node, "~s: handle_call: load_dict, file = ~p", [Ctx#co_ctx.name, File]),    
+handle_call({load_dict, File}, _From, Ctx=#co_ctx {name = _Name}) ->
+    ?dbg(node, "~s: handle_call: load_dict, file = ~p", [_Name, File]),    
     case load_dict_internal(File, Ctx) of
 	{ok, Ctx1} ->
 	    %% Inform applications (or only reservers ??)
@@ -552,8 +582,9 @@ handle_call(save_dict, From, Ctx=#co_ctx {serial = Serial}) ->
     File = filename:join(code:priv_dir(canopen), 
 			 co_lib:serial_to_string(Serial) ++ ?LAST_SAVED_DICT),
     handle_call({save_dict, File}, From, Ctx);
-handle_call({save_dict, File}, _From, Ctx=#co_ctx {dict = Dict}) ->
-    ?dbg(node, "~s: handle_call: save_dict, file = ~p", [Ctx#co_ctx.name, File]),    
+handle_call({save_dict, File}, _From, 
+	    Ctx=#co_ctx {dict = Dict, name = _Name}) ->
+    ?dbg(node, "~s: handle_call: save_dict, file = ~p", [_Name, File]),    
     case co_dict:to_file(Dict, File) of
 	ok ->
 	    %% Inform applications (or only reservers ??)
@@ -696,8 +727,8 @@ handle_call({set_error,Error,Code}, _From, Ctx) ->
     Ctx1 = set_error(Error,Code,Ctx),
     {reply, ok, Ctx1};
 
-handle_call({dump, Qualifier}, _From, Ctx) ->
-    io:format("   NAME: ~p\n", [Ctx#co_ctx.name]),
+handle_call({dump, Qualifier}, _From, Ctx=#co_ctx {name = _Name}) ->
+    io:format("   NAME: ~p\n", [_Name]),
     print_nodeid(" NODEID:", Ctx#co_ctx.nodeid),
     print_nodeid("XNODEID:", Ctx#co_ctx.xnodeid),
     io:format(" VENDOR: ~10.16.0#\n", [Ctx#co_ctx.vendor]),
@@ -783,7 +814,7 @@ handle_call(loop_data, _From, Ctx) ->
     io:format("  LoopData: ~p\n", [Ctx]),
     {reply, ok, Ctx};
 
-handle_call({option, Option}, _From, Ctx) ->
+handle_call({option, Option}, _From, Ctx=#co_ctx {name = _Name}) ->
     Reply = case Option of
 		name -> {Option, Ctx#co_ctx.name};
 		nodeid -> {Option, Ctx#co_ctx.nodeid};
@@ -805,11 +836,11 @@ handle_call({option, Option}, _From, Ctx) ->
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
 	    end,
     ?dbg(node, "~s: handle_call: option = ~p, reply = ~w", 
-	 [Ctx#co_ctx.name, Option, Reply]),    
+	 [_Name, Option, Reply]),    
     {reply, Reply, Ctx};
-handle_call({option, Option, NewValue}, _From, Ctx) ->
+handle_call({option, Option, NewValue}, _From, Ctx=#co_ctx {name = _Name}) ->
     ?dbg(node, "~s: handle_call: option = ~p, new value = ~p", 
-	 [Ctx#co_ctx.name, Option, NewValue]),    
+	 [_Name, Option, NewValue]),    
     Reply = case Option of
 		sdo_timeout -> Ctx#co_ctx.sdo#sdo_ctx {timeout = NewValue};
 		blk_timeout -> Ctx#co_ctx.sdo#sdo_ctx {blk_timeout = NewValue};
@@ -875,36 +906,56 @@ handle_call(_Request, _From, Ctx) ->
 %% Description: Handling cast messages
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({object_event, {Ix, _Si}}, Ctx) ->
+handle_cast({object_event, {Ix, _Si}}, Ctx=#co_ctx {name = _Name}) ->
     ?dbg(node, "~s: handle_cast: object_event, index = ~.16B:~p", 
-	 [Ctx#co_ctx.name, Ix, _Si]),
+	 [_Name, Ix, _Si]),
     inform_subscribers(Ix, Ctx),
     {noreply, Ctx};
-handle_cast({pdo_event, CobId}, Ctx) ->
+
+handle_cast({session_over, Pid, _Reason}, 
+	    Ctx=#co_ctx {name = _Name, sdo_list = SList}) ->
+    ?dbg(node, "~s: handle_cast: session_over, pid ~p, reason ~p", 
+	 [_Name, Pid, _Reason]),
+    NewSList = 
+	case lists:keysearch(Pid, #sdo.pid, SList) of
+	    {value,S} -> 
+		lists:keyreplace(Pid, #sdo.pid, SList, 
+				 S#sdo {state = zombie});
+	    false ->  
+		?dbg(node, "~s: handle_cast: session_over, no sdo process found", 
+		 [_Name]),
+		SList
+	end,
+    {noreply, Ctx#co_ctx {sdo_list = NewSList}};
+
+handle_cast({pdo_event, CobId}, Ctx=#co_ctx {name = _Name}) ->
     ?dbg(node, "~s: handle_cast: pdo_event, CobId = ~.16B", 
-	 [Ctx#co_ctx.name, CobId]),
+	 [_Name, CobId]),
     case lists:keysearch(CobId, #tpdo.cob_id, Ctx#co_ctx.tpdo_list) of
 	{value, T} ->
 	    co_tpdo:transmit(T#tpdo.pid),
 	    {noreply,Ctx};
 	_ ->
 	    ?dbg(node, "~s: handle_cast: pdo_event, no tpdo process found", 
-		 [Ctx#co_ctx.name]),
+		 [_Name]),
 	    {noreply,Ctx}
     end;
-handle_cast({dam_mpdo_event, CobId, Destination}, Ctx) ->
+
+handle_cast({dam_mpdo_event, CobId, Destination}, Ctx=#co_ctx {name = _Name}) ->
     ?dbg(node, "~s: handle_cast: dam_mpdo_event, CobId = ~.16B", 
-	 [Ctx#co_ctx.name, CobId]),
+	 [_Name, CobId]),
     case lists:keysearch(CobId, #tpdo.cob_id, Ctx#co_ctx.tpdo_list) of
 	{value, T} ->
 	    co_tpdo:transmit(T#tpdo.pid, Destination), %% ??
 	    {noreply,Ctx};
 	_ ->
 	    ?dbg(node, "~s: handle_cast: pdo_event, no tpdo process found", 
-		 [Ctx#co_ctx.name]),
+		 [_Name]),
 	    {noreply,Ctx}
     end;
-handle_cast(_Msg, Ctx) ->
+
+handle_cast(_Msg, Ctx=#co_ctx {name = _Name}) ->
+    ?dbg(node, "~s: handle_cast: unknown message ~p.",  [_Name, _Msg]),
     {noreply, Ctx}.
 
 %%--------------------------------------------------------------------
@@ -915,40 +966,42 @@ handle_cast(_Msg, Ctx) ->
 %% Description: Handling all non call/cast messages
 %% @end
 %%--------------------------------------------------------------------
-handle_info(Frame, Ctx) 
+handle_info(Frame, Ctx=#co_ctx {name = _Name}) 
   when is_record(Frame, can_frame) ->
-    ?dbg(node, "~s: handle_info: CAN frame received", [Ctx#co_ctx.name]),
+    ?dbg(node, "~s: handle_info: CAN frame received", [_Name]),
     Ctx1 = handle_can(Frame, Ctx),
     {noreply, Ctx1};
 
-handle_info({timeout,Ref,sync}, Ctx) 
+handle_info({timeout,Ref,sync}, Ctx=#co_ctx {name = _Name}) 
   when Ref =:= Ctx#co_ctx.sync_tmr ->
     %% Send a SYNC frame
     %% FIXME: check that we still are sync producer?
-    ?dbg(node, "~s: handle_info: sync timeout received", [Ctx#co_ctx.name]),
+    ?dbg(node, "~s: handle_info: sync timeout received", [_Name]),
     FrameID = ?COBID_TO_CANID(Ctx#co_ctx.sync_id),
     Frame = #can_frame { id=FrameID, len=0, data=(<<>>) },
     can:send(Frame),
-    ?dbg(node, "~s: handle_info: Sent sync", [Ctx#co_ctx.name]),
+    ?dbg(node, "~s: handle_info: Sent sync", [_Name]),
     Ctx1 = Ctx#co_ctx { sync_tmr = start_timer(Ctx#co_ctx.sync_time, sync) },
     {noreply, Ctx1};
 
-handle_info({timeout,Ref,time_stamp}, Ctx) 
+handle_info({timeout,Ref,time_stamp}, Ctx=#co_ctx {name = _Name}) 
   when Ref =:= Ctx#co_ctx.time_stamp_tmr ->
     %% FIXME: Check that we still are time stamp producer
-    ?dbg(node, "~s: handle_info: time_stamp timeout received", [Ctx#co_ctx.name]),
+    ?dbg(node, "~s: handle_info: time_stamp timeout received", [_Name]),
     FrameID = ?COBID_TO_CANID(Ctx#co_ctx.time_stamp_id),
     Time = time_of_day(),
     Data = co_codec:encode(Time, ?TIME_OF_DAY),
     Size = byte_size(Data),
     Frame = #can_frame { id=FrameID, len=Size, data=Data },
     can:send(Frame),
-    ?dbg(node, "~s: handle_info: Sent time stamp ~p", [Ctx#co_ctx.name, Time]),
+    ?dbg(node, "~s: handle_info: Sent time stamp ~p", [_Name, Time]),
     Ctx1 = Ctx#co_ctx { time_stamp_tmr = start_timer(Ctx#co_ctx.time_stamp_time, time_stamp) },
     {noreply, Ctx1};
 
 handle_info(do_heartbeat, 
-	    Ctx=#co_ctx {state = State, heartbeat_time = HeartBeatTime, name=_Name}) ->
+	    Ctx=#co_ctx {state = State, 
+			 heartbeat_time = HeartBeatTime, 
+			 name=_Name}) ->
     ?dbg(node, "~s: handle_info: do_heartbeat ", [_Name]),
     Data = <<0:1, State:7>>,
     send_node_guard(id(Ctx), 1, Data),
@@ -974,17 +1027,17 @@ handle_info({rc_reset, Pid}, Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
     end;
 
     
-handle_info({'DOWN',Ref,process,_Pid,Reason}, Ctx) ->
+handle_info({'DOWN',Ref,process,_Pid,Reason}, Ctx=#co_ctx {name = _Name}) ->
     ?dbg(node, "~s: handle_info: DOWN for process ~p received", 
-	 [Ctx#co_ctx.name, _Pid]),
+	 [_Name, _Pid]),
     Ctx1 = handle_sdo_processes(Ref, Reason, Ctx),
     Ctx2 = handle_app_processes(Ref, Reason, Ctx1),
     Ctx3 = handle_tpdo_processes(Ref, Reason, Ctx2),
     {noreply, Ctx3};
 
-handle_info({'EXIT', Pid, Reason}, Ctx) ->
+handle_info({'EXIT', Pid, Reason}, Ctx=#co_ctx {name = _Name}) ->
     ?dbg(node, "~s: handle_info: EXIT for process ~p received", 
-	 [Ctx#co_ctx.name, Pid]),
+	 [_Name, Pid]),
     Ctx1 = handle_sdo_processes(Pid, Reason, Ctx),
     Ctx2 = handle_app_processes(Pid, Reason, Ctx1),
     Ctx3 = handle_tpdo_processes(Pid, Reason, Ctx2),
@@ -994,15 +1047,15 @@ handle_info({'EXIT', Pid, Reason}, Ctx) ->
 	    %% No 'normal' linked process died, we should termiate ??
 	    %% co_nmt ??
 	    ?dbg(node, "~s: handle_info: linked process ~p died, reason ~p, "
-		 "terminating\n", [Ctx#co_ctx.name, Pid, Reason]),
+		 "terminating\n", [_Name, Pid, Reason]),
 	    {stop, Reason, Ctx};
 	_ChangedCtx ->
 	    %% 'Normal' linked process died, ignore
 	    {noreply, Ctx3}
     end;
 
-handle_info(_Info, Ctx) ->
-    ?dbg(node, "~s: handle_info: unknown info received", [Ctx#co_ctx.name]),
+handle_info(_Info, Ctx=#co_ctx {name = _Name}) ->
+    ?dbg(node, "~s: handle_info: unknown info received", [_Name]),
     {noreply, Ctx}.
 
 %%--------------------------------------------------------------------
@@ -1014,7 +1067,7 @@ handle_info(_Info, Ctx) ->
 %% The return value is ignored.
 %% @end
 %%--------------------------------------------------------------------
-terminate(_Reason, Ctx) ->
+terminate(_Reason, Ctx=#co_ctx {name = _Name}) ->
     %% If NMT master stop master process
     if Ctx#co_ctx.nmt_role == master ->
 	    deactivate_nmt(Ctx);
@@ -1028,7 +1081,7 @@ terminate(_Reason, Ctx) ->
 	      case A#app.pid of
 		  Pid -> 
 		      ?dbg(node, "~s: terminate: Killing app with pid = ~p", 
-			   [Ctx#co_ctx.name, Pid]),
+			   [_Name, Pid]),
 			  %% Or gen_server:cast(Pid, co_node_terminated) ?? 
 		      exit(Pid, co_node_terminated)
 	      end
@@ -1041,7 +1094,7 @@ terminate(_Reason, Ctx) ->
 	      case T#tpdo.pid of
 		  Pid -> 
 		      ?dbg(node, "~s: terminate: Killing TPDO with pid = ~p", 
-			   [Ctx#co_ctx.name, Pid]),
+			   [_Name, Pid]),
 			  %% Or gen_server:cast(Pid, co_node_terminated) ?? 
 		      exit(Pid, co_node_terminated)
 	      end
@@ -1052,7 +1105,7 @@ terminate(_Reason, Ctx) ->
 	true -> co_proc:clear();
 	false -> do_nothing
     end,
-   ?dbg(node, "~s: terminate: cleaned up, exiting", [Ctx#co_ctx.name]),
+   ?dbg(node, "~s: terminate: cleaned up, exiting", [_Name]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -1418,10 +1471,10 @@ set_data(Ix,Si,Data,Ctx) ->
     set(set_data, Ix,Si, Data, Ctx).
 
 direct_set_value(Ix,Si,Value,Ctx) ->
-    set(direct_set_value, Ix,Si, Value, Ctx).
+    set(direct_set_value, Ix, Si, Value, Ctx).
 
 direct_set_data(Ix,Si,Data,Ctx) ->
-    set(direct_set_data, Ix,Si, Data, Ctx).
+    set(direct_set_data, Ix, Si, Data, Ctx).
 
 set(Func, Ix,Si,ValueOrData,Ctx) ->
     try co_dict:Func(Ctx#co_ctx.dict, Ix,Si,ValueOrData) of
@@ -1603,15 +1656,15 @@ handle_supervision(_Frame, _NodeId, Ctx=#co_ctx {name = _Name}) ->
 %%
 %% LSS
 %% 
-handle_lss(_M, Ctx) ->
-    ?dbg(node, "~s: handle_lss: ~w", [Ctx#co_ctx.name,_M]),
+handle_lss(_M, Ctx=#co_ctx {name = _Name}) ->
+    ?dbg(node, "~s: handle_lss: ~w", [_Name,_M]),
     Ctx.
 
 %%
 %% SYNC
 %%
-handle_sync(_Frame, Ctx) ->
-    ?dbg(node, "~s: handle_sync: ~w", [Ctx#co_ctx.name,_Frame]),
+handle_sync(_Frame, Ctx=#co_ctx {name = _Name}) ->
+    ?dbg(node, "~s: handle_sync: ~w", [_Name,_Frame]),
     lists:foreach(
       fun(T) -> co_tpdo:sync(T#tpdo.pid) end, Ctx#co_ctx.tpdo_list),
     Ctx.
@@ -1619,11 +1672,11 @@ handle_sync(_Frame, Ctx) ->
 %%
 %% TIME STAMP - update local time offset
 %%
-handle_time_stamp(Frame, Ctx) ->
-    ?dbg(node, "~s: handle_timestamp: ~w", [Ctx#co_ctx.name,Frame]),
+handle_time_stamp(Frame, Ctx=#co_ctx {name = _Name}) ->
+    ?dbg(node, "~s: handle_timestamp: ~w", [_Name,Frame]),
     try co_codec:decode(Frame#can_frame.data, ?TIME_OF_DAY) of
 	{T, _Bits} when is_record(T, time_of_day) ->
-	    ?dbg(node, "~s: Got timestamp: ~p", [Ctx#co_ctx.name, T]),
+	    ?dbg(node, "~s: Got timestamp: ~p", [_Name, T]),
 	    set_time_of_day(T),
 	    Ctx;
 	_ ->
@@ -1636,8 +1689,8 @@ handle_time_stamp(Frame, Ctx) ->
 %%
 %% EMERGENCY - this is the consumer side detecting emergency
 %%
-handle_emcy(_Frame, Ctx) ->
-    ?dbg(node, "~s: handle_emcy: ~w", [Ctx#co_ctx.name,_Frame]),
+handle_emcy(_Frame, Ctx=#co_ctx {name = _Name}) ->
+    ?dbg(node, "~s: handle_emcy: ~w", [_Name,_Frame]),
     Ctx.
 
 %%
@@ -1663,16 +1716,18 @@ handle_sdo_tx(Frame, Tx, Rx, Ctx=#co_ctx {state = State, name = _Name})
   when State == ?Operational;
        State == ?PreOperational ->
     ?dbg(node, "~s: handle_sdo_tx: src=~p, ~s",
-	      [Ctx#co_ctx.name, Tx,
+	      [_Name, Tx,
 	       co_format:format_sdo(co_sdo:decode_tx(Frame#can_frame.data))]),
     ID = {Tx,Rx},
     ?dbg(node, "~s: handle_sdo_tx: session id=~p", [_Name, ID]),
     Sessions = Ctx#co_ctx.sdo_list,
     case lists:keysearch(ID,#sdo.id,Sessions) of
-	{value, S} ->
+	{value, S=#sdo {state = active}} ->
 	    gen_fsm:send_event(S#sdo.pid, Frame),
 	    Ctx;
-	false ->
+	_Other ->
+	    %% state = zombie;
+	    %% false
 	    ?dbg(node, "~s: handle_sdo_tx: session not found", [_Name]),
 	    %% no such session active
 	    Ctx
@@ -1680,7 +1735,7 @@ handle_sdo_tx(Frame, Tx, Rx, Ctx=#co_ctx {state = State, name = _Name})
 handle_sdo_tx(_Frame, _Tx, _Rx, 
 	      Ctx=#co_ctx {state = State, name = _Name}) ->
     ?dbg(node, "~s: handle_sdo_tx: src=~p, ~s",
-	 [Ctx#co_ctx.name, _Tx,
+	 [_Name, _Tx,
 	  co_format:format_sdo(co_sdo:decode_tx(_Frame#can_frame.data))]),
     error_logger:warning_msg("Received sdo in state ~p, ignoring\n", [State]),
     Ctx.
@@ -1698,18 +1753,21 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx=#co_ctx {state = State, name = _Name})
     ID = {Rx,Tx},
     Sessions = Ctx#co_ctx.sdo_list,
     case lists:keysearch(ID,#sdo.id,Sessions) of
-	{value, S} ->
+	{value, S=#sdo {state = active}} ->
 	    ?dbg(node, "~s: handle_sdo_rx: Frame sent to old process ~p", 
 		 [_Name,S#sdo.pid]),
 	    gen_fsm:send_event(S#sdo.pid, Frame),
 	    Ctx;
-	false ->
+	_Other -> 
+	    %% state = zombie;
+	    %% false
 	    %% FIXME: handle expedited and spurios frames here
 	    %% like late aborts etc here !!!
 	    case co_sdo_srv_fsm:start(Ctx#co_ctx.sdo,Rx,Tx) of
 		{error, Reason} ->
-		   error_logger:warning_msg("~p: unable to start co_sdo_srv_fsm: ~p\n",
-					    [_Name, Reason]),
+		   error_logger:warning_msg(
+		     "~p: unable to start co_sdo_srv_fsm: ~p\n",
+		     [_Name, Reason]),
 		    Ctx;
 		{ok,Pid} ->
 		    Mon = erlang:monitor(process, Pid),
@@ -1735,12 +1793,12 @@ handle_mpdo(Frame, CobId, Ctx=#co_ctx {state = ?Operational, name = _Name}) ->
 	    case {F, Addr} of
 		{1, 0} ->
 		    %% DAM-MPDO, destination is a group
-		    handle_dam_mpdo(Ctx, CobId, {Ix, Si}, Data),
-		    extended_notify(Ctx, Ix, Frame);
+		    handle_dam_mpdo(CobId, {Ix, Si}, Data, Ctx),
+		    extended_notify(Ix, Frame, Ctx);
 		{1, Nid} when Nid == Ctx#co_ctx.nodeid ->
 		    %% DAM-MPDO, destination is this node
-		    handle_dam_mpdo(Ctx, CobId, {Ix, Si}, Data),
-		    extended_notify(Ctx, Ix, Frame);
+		    handle_dam_mpdo(CobId, {Ix, Si}, Data, Ctx),
+		    extended_notify(Ix, Frame, Ctx);
 		{1, _OtherNid} ->
 		    %% DAM-MPDO, destination is some other node
 		    ?dbg(node, "~s: handle_mpdo: DAM-MPDO: destination is "
@@ -1752,7 +1810,7 @@ handle_mpdo(Frame, CobId, Ctx=#co_ctx {state = ?Operational, name = _Name}) ->
 			 "Frame = ~w", [_Name, Frame]),
 		    Ctx;
 		{0, SourceNid} ->
-		    handle_sam_mpdo(Ctx, SourceNid, {Ix, Si}, Data)
+		    handle_sam_mpdo(SourceNid, {Ix, Si}, Data, Ctx)
 	    end;
 	_Other ->
 	    ?dbg(node, "~s: handle_mpdo: frame not handled: Frame = ~w", 
@@ -1763,8 +1821,8 @@ handle_mpdo(_Frame, _CobId, Ctx=#co_ctx {state = State, name = _Name}) ->
     error_logger:warning_msg("Received pdo in state ~p, ignoring\n", [State]),
     Ctx.
 
-handle_sam_mpdo(Ctx=#co_ctx {mpdo_dispatch = MpdoDispatch, name = _Name}, 
-		SourceNid, {SourceIx, SourceSi}, Data ) ->
+handle_sam_mpdo(SourceNid, {SourceIx, SourceSi}, Data,
+		Ctx=#co_ctx {mpdo_dispatch = MpdoDispatch, name = _Name}) ->
     ?dbg(node, "~s: handle_sam_mpdo: Index = ~.16#:~w, Nid = ~.16.0#, Data = ~w", 
 	 [_Name,SourceIx,SourceSi,SourceNid,Data]),
     case ets:lookup(MpdoDispatch, {SourceIx, SourceSi, SourceNid}) of
@@ -1782,12 +1840,13 @@ handle_sam_mpdo(Ctx=#co_ctx {mpdo_dispatch = MpdoDispatch, name = _Name},
 %%
 %% DAM-MPDO
 %%
-handle_dam_mpdo(Ctx, _CobId, Index = {_Ix, _Si}, Data) ->
-    ?dbg(node, "~s: handle_dam_mpdo: Index = ~.16#:~w", [Ctx#co_ctx.name,_Ix,_Si]),
+handle_dam_mpdo(_CobId, Index = {_Ix, _Si}, Data, Ctx=#co_ctx {name = _Name}) ->
+    ?dbg(node, "~s: handle_dam_mpdo: Index = ~.16#:~w", [_Name,_Ix,_Si]),
     %% Enough ??
     rpdo_value(Index,Data,Ctx).
 
-extended_notify(Ctx=#co_ctx {xnot_table = XNotTable, name = _Name}, Ix, Frame) ->
+extended_notify(Ix, Frame, 
+		Ctx=#co_ctx {xnot_table = XNotTable, name = _Name}) ->
     case lists:usort(subscribers(XNotTable, Ix)) of
 	[] ->
 	    ?dbg(node, "~s: extended_notify: No xnot subscribers for index ~.16#", 
@@ -1813,52 +1872,57 @@ extended_notify(Ctx=#co_ctx {xnot_table = XNotTable, name = _Name}, Ix, Frame) -
 %%
 %% Handle terminated processes
 %%
-handle_sdo_processes(Pid, Reason, Ctx) when is_pid(Pid) ->
-    case lists:keysearch(Pid, #sdo.pid, Ctx#co_ctx.sdo_list) of
+handle_sdo_processes(Pid, Reason, Ctx=#co_ctx {sdo_list = SList}) 
+  when is_pid(Pid) ->
+    case lists:keysearch(Pid, #sdo.pid, SList) of
 	{value,S} -> handle_sdo_process(S, Reason, Ctx);
 	false ->  Ctx
     end;
-handle_sdo_processes(Ref, Reason, Ctx) ->
-    case lists:keysearch(Ref, #sdo.mon, Ctx#co_ctx.sdo_list) of
+handle_sdo_processes(Ref, Reason, Ctx=#co_ctx {sdo_list = SList}) ->
+    case lists:keysearch(Ref, #sdo.mon, SList) of
 	{value,S} -> handle_sdo_process(S, Reason, Ctx);
 	false ->  Ctx
     end.
 
-handle_sdo_process(S, Reason, Ctx) ->
-    maybe_warning(Reason, "sdo session", Ctx#co_ctx.name),
-    Ctx#co_ctx { sdo_list = Ctx#co_ctx.sdo_list -- [S]}.
+handle_sdo_process(S, Reason, Ctx=#co_ctx {name = _Name, sdo_list = SList}) ->
+    maybe_warning(Reason, "sdo session", _Name),
+    Ctx#co_ctx { sdo_list = SList -- [S]}.
 
 maybe_warning(normal, _Type, _Name) ->
     ok;
 maybe_warning(Reason, Type, Name) ->
     error_logger:error_msg("~s: ~s died: ~p\n", [Name, Type, Reason]).
 
-handle_app_processes(Pid, Reason, Ctx) when is_pid(Pid)->
-    case lists:keysearch(Pid, #app.pid, Ctx#co_ctx.app_list) of
+handle_app_processes(Pid, Reason, Ctx=#co_ctx {app_list = AList}) 
+  when is_pid(Pid)->
+    case lists:keysearch(Pid, #app.pid, AList) of
 	{value,A} -> handle_app_process(A, Reason, Ctx);
 	false -> Ctx
     end;
-handle_app_processes(Ref, Reason, Ctx) ->
-    case lists:keysearch(Ref, #app.mon, Ctx#co_ctx.app_list) of
+handle_app_processes(Ref, Reason, Ctx=#co_ctx {app_list = AList}) ->
+    case lists:keysearch(Ref, #app.mon, AList) of
 	{value,A} -> handle_app_process(A, Reason, Ctx);
 	false -> Ctx
     end.
 
-handle_app_process(A, Reason, Ctx) ->
-    error_logger:error_msg("~s: id=~w application died:~p\n", 
-			   [Ctx#co_ctx.name,A#app.pid, Reason]),
-    remove_subscriptions(Ctx#co_ctx.sub_table, A#app.pid), %% Or reset ??
-    reset_reservations(Ctx#co_ctx.res_table, A#app.pid),
+handle_app_process(A=#app {pid = Pid}, Reason, 
+		   Ctx=#co_ctx {name = _Name, app_list = AList,
+			       sub_table = STable, res_table = RTable}) ->
+    error_logger:error_msg(
+      "~s: id=~w application died:~p\n", [_Name,A#app.pid, Reason]),
+    remove_subscriptions(STable, Pid), %% Or reset ??
+    reset_reservations(RTable, Pid),
     %% FIXME: restart application? application_mod ?
-    Ctx#co_ctx { app_list = Ctx#co_ctx.app_list--[A]}.
+    Ctx#co_ctx {app_list = AList--[A]}.
 
-handle_tpdo_processes(Pid, Reason, Ctx) when is_pid(Pid)->
-    case lists:keysearch(Pid, #tpdo.pid, Ctx#co_ctx.tpdo_list) of
+handle_tpdo_processes(Pid, Reason, Ctx=#co_ctx {tpdo_list = TList}) 
+  when is_pid(Pid)->
+    case lists:keysearch(Pid, #tpdo.pid, TList) of
 	{value,T} -> handle_tpdo_process(T, Reason, Ctx);
 	false -> Ctx
     end;
-handle_tpdo_processes(Ref, Reason, Ctx) ->
-    case lists:keysearch(Ref, #tpdo.mon, Ctx#co_ctx.tpdo_list) of
+handle_tpdo_processes(Ref, Reason, Ctx=#co_ctx {tpdo_list = TList}) ->
+    case lists:keysearch(Ref, #tpdo.mon, TList) of
 	{value,T} -> handle_tpdo_process(T, Reason, Ctx);
 	false -> Ctx
     end.
@@ -2356,10 +2420,12 @@ add_subscription(Tab, Ix1, Ix2, Key)
     case ets:lookup(Tab, Key) of
 	[] -> ets:insert(Tab, {Key, I});
 	[{_,ISet}] -> ets:insert(Tab, {Key, co_iset:union(ISet, I)})
-    end.
+    end,
+    ok.
 
 remove_subscriptions(Tab, Key) ->
-    ets:delete(Tab, Key).
+    ets:delete(Tab, Key),
+    ok.
 
 remove_subscription(Tab, Ix, Key) ->
     remove_subscription(Tab, Ix, Ix, Key).
@@ -2380,7 +2446,8 @@ remove_subscription(Tab, Ix1, Ix2, Key) when Ix1 =< Ix2 ->
 			 [ISet1,Key]),
 		    ets:insert(Tab, {Key,ISet1})
 	    end
-    end.
+    end,
+    ok.
 
 subscriptions(Tab, Key) when is_pid(Key) ->
     case ets:lookup(Tab, Key) of

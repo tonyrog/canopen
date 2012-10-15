@@ -53,6 +53,8 @@
 -export([entry/2,entry/3]).
 -export([enum_by_id/2]).
 
+-export([utc_time/0]).
+
 -include("canopen.hrl").
 -include("co_debug.hrl").
 
@@ -1207,3 +1209,11 @@ find_in_mods(_Key, _Pos, []) ->
     ?dbg(lib,"find_in_mods: ~p not found", [_Key]),
     {error, not_found}.
 
+utc_time() ->
+    TS = {_,_,Micro} = os:timestamp(),
+    {{Year,Month,Day},{Hour,Minute,Second}} = 
+	calendar:now_to_universal_time(TS),
+    Mstr = element(Month,{"Jan","Feb","Mar","Apr","May","Jun","Jul",
+			  "Aug","Sep","Oct","Nov","Dec"}),
+    io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w",
+		  [Day,Mstr,Year,Hour,Minute,Second,Micro]).

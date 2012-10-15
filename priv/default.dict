@@ -6,10 +6,10 @@
  [{name, "IDENTITY"},
   {struct, rec},{access, ro},{type, unsigned32},
   {entry,0,[{access,ro},{type,unsigned8},{value,4}]},
-  {entry,1,[{access,ro},{type,unsigned32},{value,16#2A1}]},       %% vendor
-  {entry,2,[{access,ro},{type,unsigned32},{value,16#00010200}]},  %% product
-  {entry,3,[{access,ro},{type,unsigned32},{value,16#00020000}]},  %% revision
-  {entry,4,[{access,ro},{type,unsigned32},{value,16#12345678}]}   %% serial
+  {entry,1,[{access,ro},{type,unsigned32},{value,16#00000000}]},  %% vendor
+  {entry,2,[{access,ro},{type,unsigned32},{value,16#00000000}]},  %% product
+  {entry,3,[{access,ro},{type,unsigned32},{value,16#00000000}]},  %% revision
+  {entry,4,[{access,ro},{type,unsigned32},{value,16#ffffffff}]}   %% serial
  ]}.
 
 {object, 16#100C,
