@@ -207,6 +207,13 @@
 
 -define(MSG_OUTPUT_VALUE,   16#280D).   %% Current value update
 
+-define(MSG_ALARM_CNFRM,    16#280E).   %% Confirm larm condition (from client)
+
+-define(MSG_BLOCK,          16#2810).   %% Block input from a node (in value)
+-define(MSG_UNBLOCK,        16#2811).   %% Unblock input from a node (in value)
+-define(MSG_ECHO_REQUEST,   16#2812).   %% Expect echo reply from matching node
+-define(MSG_ECHO_REPLY,     16#2813).   %% This is the reply
+
 -define(MSG_RESET,          16#28AA).   %%  Reset the node 
 
 %%
@@ -219,6 +226,12 @@
 -define(MSG_DIGITAL,        16#6000).  %% channel, 0|1
 -define(MSG_ANALOG,         16#6400).  %% channel, 0x0000 - 0xFFFF
 -define(MSG_ENCODER,        16#6100).  %% -1,+1
+
+%% rfid node message
+-define(MSG_RFID,           16#6200).  %% sub=type data=rfid:32
+
+%% battery node PDB messages volt=V*100 (0.00 - 65.00), amp=A*100 
+-define(MSG_BATTERY,        16#6201).  %% sub=bank, data=volt:16, amp:16
 
 %% Alarm causes tied to MSG_ALARM_x notifications
 -define(ALARM_CAUSE_OK,      16#00).  %% channel ok

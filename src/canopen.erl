@@ -62,7 +62,7 @@ start(_StartType, _StartArgs) ->
 %% @private
 start() ->
     application:start(eapi),
-    application:start(sl),
+    application:start(uart),  %% for can_usb
     application:start(can),
     application:start(canopen).
 
