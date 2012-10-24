@@ -518,7 +518,7 @@ handle_call({Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term}, From,
 			    {reply, Reason, Ctx};
 			{ok, Pid} ->
 			    Mon = erlang:monitor(process, Pid),
-			    sys:trace(Pid, true),
+			    %% sys:trace(Pid, true),
 			    S = #sdo { dest_node = Nid, id=ID, pid=Pid, mon=Mon },
 			    ?dbg(node, "~s: ~p: added session id=~p", 
 				 [_Name, Action, ID]),
@@ -1055,7 +1055,7 @@ handle_info({'EXIT', Pid, Reason}, Ctx=#co_ctx {name = _Name}) ->
     end;
 
 handle_info(_Info, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg(node, "~s: handle_info: unknown info received", [_Name]),
+    ?dbg(node, "~s: handle_info: unknown info ~p received", [_Name, _Info]),
     {noreply, Ctx}.
 
 %%--------------------------------------------------------------------
@@ -1771,7 +1771,7 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx=#co_ctx {state = State, name = _Name})
 		    Ctx;
 		{ok,Pid} ->
 		    Mon = erlang:monitor(process, Pid),
-		    sys:trace(Pid, true),
+		    %% sys:trace(Pid, true),
 		    ?dbg(node, "~s: handle_sdo_rx: Frame sent to new process ~p", 
 			 [_Name,Pid]),		    
 		    gen_fsm:send_event(Pid, Frame),
