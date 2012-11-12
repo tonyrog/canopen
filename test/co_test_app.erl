@@ -55,7 +55,7 @@
 -define(dbg(Format, Args),
 	Dbg = get(dbg),
 	if Dbg ->
-		ct:pal("~p: " ++ Format ++ "\n", lists:append([?MODULE], Args));
+		ct:pal("~p(~p): " ++ Format ++ "\n", [?MODULE, self() | Args]);
 	   true ->
 		ok
 	end).
@@ -88,16 +88,8 @@
 %% @end
 %%--------------------------------------------------------------------
 start(CoNode, Dict) ->
-    gen_server:start_link({local, name(CoNode)}, 
+    gen_server:start_link({local, co_test_lib:name(?MODULE, CoNode)}, 
 			  ?MODULE, {CoNode, Dict, self()}, []).
-
-name(Serial) when is_integer(Serial) ->
-    list_to_atom("co_test_app_" ++ integer_to_list(Serial,16));
-name({name, Name}) when is_atom(Name) ->
-    %% co_mgr ??
-    list_to_atom("co_test_app_" ++ atom_to_list(Name));
-name({_Tag, Id}) when is_integer(Id)->
-    list_to_atom("co_test_app_" ++ integer_to_list(Id,16)).
 
    	
 %%--------------------------------------------------------------------
@@ -109,8 +101,13 @@ name({_Tag, Id}) when is_integer(Id)->
 %% @end
 %%--------------------------------------------------------------------
 stop(CoNode) ->
-    gen_server:call(name(CoNode), stop).
+    AppName = co_test_lib:name(?MODULE, CoNode),
+    case whereis(AppName) of
+	undefined  -> do_nothing;
+	Pid ->   gen_server:call(Pid, stop)
+    end.
 
+ 
 %%--------------------------------------------------------------------
 %% @spec index_specification(Pid, {Index, SubInd}) -> 
 %%   {entry, Entry::record()} | false
@@ -191,10 +188,10 @@ abort(Pid, Ref) ->
     
 
 loop_data(CoNode) ->
-    gen_server:call(name(CoNode), loop_data).
+    gen_server:call(co_test_lib:name(?MODULE, CoNode), loop_data).
 
 dict(CoNode) ->
-    gen_server:call(name(CoNode), dict).
+    gen_server:call(co_test_lib:name(?MODULE, CoNode), dict).
 
 debug(Pid, TrueOrFalse) when is_boolean(TrueOrFalse) ->
     gen_server:call(Pid, {debug, TrueOrFalse}).

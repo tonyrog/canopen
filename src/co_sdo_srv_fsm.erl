@@ -30,7 +30,7 @@
 %%% <a href="../doc/co_sdo_srv_segment_download_state_diagram2.jpg"> 
 %%% Download segment2 - s_writing_segment_started</a><br/>
 %%% <a href="../doc/co_sdo_srv_segment_download_state_diagram3.jpg"> 
-%%% Download segment3 - s_segmented_download</a><br/>
+%%% Download segment3 - s_segment_download</a><br/>
 %%% <a href="../doc/co_sdo_srv_segment_download_state_diagram4.jpg"> 
 %%% Download segment4 - s_writing_segment_end</a><br/>
 %%% 
@@ -41,7 +41,7 @@
 %%% <a href="../doc/co_sdo_srv_segment_upload_state_diagram2.jpg"> 
 %%% Upload segment2 - s_reading_segment_started</a><br/>
 %%% <a href="../doc/co_sdo_srv_segment_upload_state_diagram3.jpg"> 
-%%% Upload segment3 - s_segmented_upload</a><br/>
+%%% Upload segment3 - s_segment_upload</a><br/>
 %%% <a href="../doc/co_sdo_srv_segment_upload_state_diagram4.jpg"> 
 %%% Upload segment4 - s_reading_segment</a><br/>
 %%% 
@@ -100,12 +100,12 @@
 -export([s_initial/2]).
 
 %% Segment download
--export([s_segmented_download/2]).
+-export([s_segment_download/2]).
 -export([s_writing_segment_started/2]). %% Streamed
 -export([s_writing_segment_end/2]).     %% Streamed
 
 %% Segment upload
--export([s_segmented_upload/2]).
+-export([s_segment_upload/2]).
 -export([s_reading_segment_started/2]). %% Streamed
 -export([s_reading_segment/2]).         %% Streamed
 
@@ -199,7 +199,7 @@ init({Ctx,NodePid,Src,Dst}) when is_record(Ctx, sdo_ctx) ->
 %% <li> s_reading_block_started </li>
 %% <li> s_writing_segment_end </li>
 %% <li> s_segment_download </li>
-%% <li> s_segmented_upload </li>
+%% <li> s_segment_upload </li>
 %% <li> s_block_download </li>
 %% <li> s_block_upload_start </li>
 %% <li> stop </li>
@@ -253,7 +253,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 	    S1 = S#co_session {index=Ix,subind=Si},
 	    case read_begin(S1) of
 		{ok, Buf} ->
-		    start_segmented_upload(S1#co_session {buf = Buf});
+		    start_segment_upload(S1#co_session {buf = Buf});
 		{ok, Buf, Mref} when is_reference(Mref) ->
 		    %% Application called, wait for reply
 		    ?dbg(srv, "s_initial: mref=~p\n", [Mref]),
@@ -274,7 +274,7 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    NBytes = co_data_buf:data_size(Buf),
 		    if Pst =/= 0, NBytes > 0, NBytes =< Pst ->
 			    ?dbg(srv, "protocol switch\n",[]),
-			    start_segmented_upload(S1#co_session {buf = Buf});
+			    start_segment_upload(S1#co_session {buf = Buf});
 		       true ->
 			    start_block_upload(S1#co_session {buf = Buf})
 		       end;
@@ -287,9 +287,9 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    ?dbg(srv,"s_initial: read failed, reason = ~p\n", [Reason]),
 		    abort(S1, Reason)
 	    end;
-	?ma_ccs_abort_transfer(Ix,Si,Code) ->
+	?ma_ccs_abort_transfer(_Ix,_Si,_Code) ->
 	    ?dbg(srv, "s_initial: abort_transfer, index = ~7.16.0#:~w, code = ~p\n",
-		 [Ix, Si, Code]),
+		 [_Ix, _Si, _Code]),
 	    %% If needed add:
 	    %% co_api:session_over(S#co_session.node_pid, 
             %%                     {abort, {Ix, Si}, Code}),
@@ -437,7 +437,7 @@ start_segment_download(S=#co_session {index = Ix, subind = Si}) ->
 	    case co_data_buf:write(S#co_session.buf, Data, true, segment) of
 		{ok, Buf1, Mref} when is_reference(Mref) ->
 		    %% Called an application
-		    ?dbg(srv, "start_segmented_download: mref=~p\n", [Mref]),
+		    ?dbg(srv, "start_segment_download: mref=~p\n", [Mref]),
 		    S1 = S#co_session {mref = Mref, buf = Buf1},
 		    {next_state, s_writing_segment_end, S1, timeout(S1)};
 		{ok, _Buf1} ->
@@ -458,7 +458,7 @@ start_segment_download(S=#co_session {index = Ix, subind = Si}) ->
 	    S1 = S#co_session {t=1},
 	    R  = ?mk_scs_initiate_download_response(Ix,Si),
 	    send(S1, R),
-	    {next_state, s_segmented_download, S1, timeout(S1)}
+	    {next_state, s_segment_download, S1, timeout(S1)}
     end.
 
  
@@ -473,18 +473,18 @@ start_segment_download(S=#co_session {index = Ix, subind = Si}) ->
 %% <ul>
 %% <li> s_reading_segment </li>
 %% <li> s_segment_download </li>
-%% <li> s_segment_download_end</li>
+%% <li> s_writing_segment_end </li>
 %% <li> stop </li>
 %% </ul>
 %% @end
 %%--------------------------------------------------------------------
--spec s_segmented_download(M::term(), S::#co_session{}) -> 
+-spec s_segment_download(M::term(), S::#co_session{}) -> 
 		       {next_state, NextState::atom(), NextS::#co_session{}} |
 		       {next_state, NextState::atom(), NextS::#co_session{}, 
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_segmented_download(M, 
+s_segment_download(M, 
 		     S=#co_session {index = Ix, subind = Si, node_pid = NPid}) 
   when is_record(M, can_frame) ->
     case M#can_frame.data of
@@ -499,7 +499,7 @@ s_segmented_download(M,
 	    case co_data_buf:write(S#co_session.buf, DataToWrite, Eod, segment) of
 		{ok, Buf, Mref} ->
 		    %% Called an application
-		    ?dbg(srv, "s_segmented_download: mref=~p\n", [Mref]),
+		    ?dbg(srv, "s_segment_download: mref=~p\n", [Mref]),
 		    S1 = S#co_session {t = T, mref = Mref, buf = Buf},
 		    if Eod ->
 			    %% Wait for write reply from app
@@ -508,35 +508,37 @@ s_segmented_download(M,
 			    %% Reply with same toggle value as the request
 			    R = ?mk_scs_download_segment_response(T),
 			    send(S1,R),
-			    {next_state, s_segmented_download, S1,timeout(S1)}
+			    {next_state, s_segment_download, S1,timeout(S1)}
 		    end;
 		{ok, Buf} ->
 		    if Eod ->
-			    %% Tell node object has been changed and 
+			    %% Tell node that object has been changed and 
 			    %% that we are finished and don't want more
 			    %% frames.
+			    %% For timing reasons this must be done
+			    %% before sending the response.
 			    co_api:object_event(NPid, {Ix, Si}),
-			    co_api:session_over(NPid, normal);
-		       true ->
-			    tell_no_one
-		    end,
-		    %% Reply with same toggle value as the request
-		    S1 = S#co_session {t = T, buf = Buf},
-		    R = ?mk_scs_download_segment_response(T),
-		    send(S1,R),
-		    if Eod ->
+			    co_api:session_over(NPid, normal),
+			    %% Reply with same toggle value as the request
+			    S1 = S#co_session {t = T, buf = Buf},
+			    R = ?mk_scs_download_segment_response(T),
+			    send(S1,R),
 			    {stop, normal, S1};
 		       true ->
-			    {next_state, s_segmented_download, S1,timeout(S1)}
+			    %% Reply with same toggle value as the request
+			    S1 = S#co_session {t = T, buf = Buf},
+			    R = ?mk_scs_download_segment_response(T),
+			    send(S1,R),
+			    {next_state, s_segment_download, S1,timeout(S1)}
 		    end;
 		{error,Reason} ->
-		    ?dbg(srv, "s_segmented_download: write failed, reason = ~p", [Reason]),
+		    ?dbg(srv, "s_segment_download: write failed, reason = ~p", [Reason]),
 		    abort(S,Reason)
 	    end;
 	_ ->
-	    l_abort(M, S, s_segmented_download)
+	    l_abort(M, S, s_segment_download)
     end;
-s_segmented_download(timeout, S) ->
+s_segment_download(timeout, S) ->
     abort(S, ?abort_timed_out).
 
 %%--------------------------------------------------------------------
@@ -601,6 +603,7 @@ s_writing_segment_started(M, S)  ->
 s_writing_segment_end({Mref, Reply} = _M, 
 		      S=#co_session {index = Index, subind = SubInd, t = T})  ->
     ?dbg(srv, "s_writing_segment_end: Got event = ~p\n", [_M]),
+    timer:sleep(100),
     Ok = case {S#co_session.mref, Reply} of
 	     {Mref, ok} ->
 		 %% Atomic reply
@@ -608,6 +611,9 @@ s_writing_segment_end({Mref, Reply} = _M,
 	     {Mref, {ok, Ref}} when is_reference(Ref)->
 		 %% Streamed reply
 		 ok;
+	     {_OldMref, {ok, Ref}} when is_reference(Ref)->
+		 %% Old streamed reply, wait for last reply
+		 wait;
 	     _Other ->
 		 not_ok
 	 end,
@@ -628,6 +634,9 @@ s_writing_segment_end({Mref, Reply} = _M,
 		    send(S,R)
 	    end,
 	    {stop, normal, S};
+	wait ->
+	    erlang:demonitor(Mref, [flush]),
+	    {next_state, s_writing_segment_end, S,timeout(S)};
 	not_ok ->
 	    ?dbg(srv, "s_writing_segment_end: received other = ~p, aborting", [_M]),
 	    abort(S, ?abort_internal_error)
@@ -649,16 +658,16 @@ s_writing_segment_end(M, S)  ->
 %% Start uploading segments.
 %% @end
 %%--------------------------------------------------------------------
-start_segmented_upload(S=#co_session {index = Ix, subind = Si, buf = Buf}) ->
-    ?dbg(srv, "start_segmented_upload\n", []),
+start_segment_upload(S=#co_session {index = Ix, subind = Si, buf = Buf}) ->
+    ?dbg(srv, "start_segment_upload\n", []),
     NBytes = co_data_buf:data_size(Buf),
     EofFlag = co_data_buf:eof(Buf),
-    ?dbg(srv, "start_segmented_upload, nbytes = ~p, eof = ~p\n", 
+    ?dbg(srv, "start_segment_upload, nbytes = ~p, eof = ~p\n", 
 	 [NBytes, EofFlag]),
     if NBytes =/= 0, NBytes =< 4 andalso EofFlag =:= true ->
 	    case co_data_buf:read(Buf, NBytes) of
 		{ok, Data, true, _Buf1} ->
-		    ?dbg(srv, "start_segmented_upload, expedited, data = ~p", 
+		    ?dbg(srv, "start_segment_upload, expedited, data = ~p", 
 			 [Data]),
 		    co_api:session_over(S#co_session.node_pid, normal),
 		    Data1 = co_sdo:pad(Data, 4),
@@ -669,26 +678,26 @@ start_segmented_upload(S=#co_session {index = Ix, subind = Si, buf = Buf}) ->
 		    send(S, R),
 		    {stop, normal, S};
 		{error, Reason} ->
-		    ?dbg(srv, "start_segmented_upload: read failed, reason = ~p", [Reason]),
+		    ?dbg(srv, "start_segment_upload: read failed, reason = ~p", [Reason]),
 		    abort(S, Reason)
 	    end;
        (NBytes =:= 0 andalso EofFlag =:= true) orelse
        (NBytes =:= undefined) ->
-	    ?dbg(srv, "start_segmented_upload, sizeind = 0, size = ~p",[NBytes]),
+	    ?dbg(srv, "start_segment_upload, sizeind = 0, size = ~p",[NBytes]),
 	    N=0, E=0, SizeInd=0,
 	    Data = <<0:32/?SDO_ENDIAN>>, %% filler
 	    R=?mk_scs_initiate_upload_response(N,E,SizeInd,
 					       Ix,Si,Data),
 	    send(S, R),
-	    {next_state, s_segmented_upload, S, timeout(S)};
+	    {next_state, s_segment_upload, S, timeout(S)};
        true ->
-	    ?dbg(srv, "start_segmented_upload, sizeind = 1, size = ~p",[NBytes]),
+	    ?dbg(srv, "start_segment_upload, sizeind = 1, size = ~p",[NBytes]),
 	    N=0, E=0, SizeInd=1,
 	    Data = <<NBytes:32/?SDO_ENDIAN>>,
 	    R=?mk_scs_initiate_upload_response(N,E,SizeInd,
 					       Ix,Si,Data),
 	    send(S, R),
-	    {next_state, s_segmented_upload, S, timeout(S)}
+	    {next_state, s_segment_upload, S, timeout(S)}
     end.
 
 
@@ -707,22 +716,22 @@ start_segmented_upload(S=#co_session {index = Ix, subind = Si, buf = Buf}) ->
 %% </ul>
 %% @end
 %%--------------------------------------------------------------------
--spec s_segmented_upload(M::term(), S::#co_session{}) -> 
+-spec s_segment_upload(M::term(), S::#co_session{}) -> 
 		       {next_state, NextState::atom(), NextS::#co_session{}} |
 		       {next_state, NextState::atom(), NextS::#co_session{}, 
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_segmented_upload(M, S) when is_record(M, can_frame) ->
+s_segment_upload(M, S) when is_record(M, can_frame) ->
     case M#can_frame.data of
 	?ma_ccs_upload_segment_request(T) when T =/= S#co_session.t ->
 	    abort(S, ?abort_toggle_not_alternated);
 	?ma_ccs_upload_segment_request(T) ->
 	    read_segment(S#co_session {t = T});
 	_ ->
-	    l_abort(M, S, s_segmented_upload)
+	    l_abort(M, S, s_segment_upload)
     end;
-s_segmented_upload(timeout, S) ->
+s_segment_upload(timeout, S) ->
     abort(S, ?abort_timed_out).
 
 read_segment(S) ->
@@ -733,7 +742,7 @@ read_segment(S) ->
 	    upload_segment(S#co_session {buf = Buf}, Data, Eod);
 	{ok, Buf, Mref} ->
 	    %% Called an application
-	    ?dbg(srv, "s_segmented_upload: mref=~p\n", [Mref]),
+	    ?dbg(srv, "s_segment_upload: mref=~p\n", [Mref]),
 	    S1 = S#co_session {mref = Mref, buf = Buf},
 	    {next_state, s_reading_segment, S1, timeout(S1)};
 	{error,Reason} ->
@@ -744,19 +753,18 @@ read_segment(S) ->
 upload_segment(S, Data, Eod) ->
     T1 = 1-S#co_session.t,
     N = 7-size(Data),
-    %% erlang:display({T1,Remain,N,Data}),
+    Data1 = co_sdo:pad(Data,7),
+    erlang:display({T1,N,Data}),
     if Eod =:= true ->
 	    co_api:session_over(S#co_session.node_pid, normal),
-	    Data1 = co_sdo:pad(Data,7),
 	    R = ?mk_scs_upload_segment_response(S#co_session.t,N,1,Data1),
 	    send(S,R),
 	    {stop,normal,S};
        true ->
-	    Data1 = co_sdo:pad(Data,7),
 	    R = ?mk_scs_upload_segment_response(S#co_session.t,N,0,Data1),
 	    send(S,R),
 	    S1 = S#co_session {t=T1},
-	    {next_state, s_segmented_upload, S1, timeout(S1)}
+	    {next_state, s_segment_upload, S1, timeout(S1)}
     end.
 
 %%--------------------------------------------------------------------
@@ -787,7 +795,7 @@ s_reading_segment_started({Mref, Reply} = _M, S)  ->
 	    %% Atomic
 	    erlang:demonitor(Mref, [flush]),
 	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
-	    start_segmented_upload(S#co_session {buf = Buf});	    
+	    start_segment_upload(S#co_session {buf = Buf});	    
 	{Mref, {ok, _Ref, _Size}} ->
 	    %% Streamed
 	    erlang:demonitor(Mref, [flush]),
@@ -796,11 +804,11 @@ s_reading_segment_started({Mref, Reply} = _M, S)  ->
 	    case co_data_buf:load(Buf) of
 		{ok, Buf1} ->
 		    %% Buffer loaded
-		    start_segmented_upload(S#co_session {buf = Buf1});
+		    start_segment_upload(S#co_session {buf = Buf1});
 		{ok, Buf1, Mref1} ->
 		    %% Wait for data ??
 		    ?dbg(srv, "s_reading_segment_started: mref=~p\n", [Mref]),
-		    start_segmented_upload(S#co_session {buf = Buf1, mref = Mref1});
+		    start_segment_upload(S#co_session {buf = Buf1, mref = Mref1});
 		{error, Reason} ->
 		    ?dbg(srv, "s_reading_segment_started: load failed, reason = ~p", [Reason]),
 		    abort(S, Reason)
@@ -1056,7 +1064,7 @@ s_block_upload_end_response(timeout, S) ->
 %% </ul>
 %% Next state can be:
 %% <ul>
-%% <li> s_segmented_upload (protocol switch)</li>
+%% <li> s_segment_upload (protocol switch)</li>
 %% <li> s_block_upload_start </li>
 %% </ul>
 %% @end
@@ -1106,7 +1114,7 @@ segment_or_block(S) ->
     if S#co_session.pst =/= 0, NBytes > 0, 
        NBytes =< S#co_session.pst ->
 	    ?dbg(srv, "segment_or_block: protocol switch",[]),
-	    start_segmented_upload(S);
+	    start_segment_upload(S);
        true ->
 	    start_block_upload(S)
     end.
@@ -1135,7 +1143,7 @@ s_reading_block_segment(timeout, S) ->
     abort(S, ?abort_timed_out);
 s_reading_block_segment(M, S) ->
     %% All correct messages should be handled in handle_info()
-    ?dbg(srv, "s_reading_segment: Got event = ~p, aborting\n", [M]),
+    ?dbg(srv, "s_reading_block_segment: Got event = ~p, aborting\n", [M]),
     demonitor_and_abort(M, S).
 
 
@@ -1421,29 +1429,23 @@ handle_sync_event(_Event, _From, StateName, State) ->
 			 
 handle_info({Mref, {ok, _Ref, _Data, _Eod} = Reply}, StateName, S) ->
     %% Streamed data read from application
+    %% Note that Mref might differ from the latest, stored in S.
     ?dbg(srv, "handle_info: Reply = ~p, State = ~p\n",[Reply, StateName]),
-    case S#co_session.mref of
-	Mref ->
-	    erlang:demonitor(Mref, [flush]),
-	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
-	    %% Fill data buffer if needed
-	    case co_data_buf:load(Buf) of
-		{ok, Buf1} ->
-		    %% Buffer loaded
-		    check_reading(StateName, S#co_session {buf = Buf1});
-		{ok, Buf1, Mref1} ->
-		    %% Wait for data ??
-		    ?dbg(srv, "handle_info: mref=~p\n", [Mref]),
-		    check_reading(StateName, S#co_session {buf = Buf1, 
-							   mref = Mref1});
-		{error, Reason} ->
-		    ?dbg(srv, "handle_info: load failed, reason = ~p", [Reason]),
-		    abort(S, Reason)
-	    end;
-	_OtherRef ->
-	    %% Ignore reply
-	    ?dbg(srv, "handle_info: wrong mref, ignoring\n",[]),
-	    {next_state, StateName, S}
+    erlang:demonitor(Mref, [flush]),
+    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
+    %% Fill data buffer if needed
+    case co_data_buf:load(Buf) of
+	{ok, Buf1} ->
+	    %% Buffer loaded
+	    check_reading(StateName, S#co_session {buf = Buf1});
+	{ok, Buf1, Mref1} ->
+	    %% Wait for data ??
+	    ?dbg(srv, "handle_info: mref=~p\n", [Mref]),
+	    check_reading(StateName, S#co_session {buf = Buf1, 
+						   mref = Mref1});
+	{error, Reason} ->
+	    ?dbg(srv, "handle_info: load failed, reason = ~p", [Reason]),
+	    abort(S, Reason)
     end;
 handle_info({_Mref, ok} = Info, StateName, S) 
   when StateName =:= s_writing_segment_end ->

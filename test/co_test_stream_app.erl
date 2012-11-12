@@ -91,7 +91,11 @@ start(CoSerial, {Index, RFile, WFile}) ->
 %% @end
 %%--------------------------------------------------------------------
 stop() ->
-    gen_server:call(?MODULE, stop).
+    case whereis(?MODULE) of
+	undefined  -> do_nothing;
+	Pid -> gen_server:call(Pid, stop)
+    end.
+    
 
 %%--------------------------------------------------------------------
 %% @spec index_specification(Pid, {Index, SubInd}) -> 
@@ -103,8 +107,8 @@ stop() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-index_specification(_Pid, {Index, SubInd} = I) ->
-    ?dbg(?NAME,"index_specification ~.16B:~.8B \n",[Index, SubInd]),
+index_specification(_Pid, {_Index, _SubInd} = I) ->
+    ?dbg(?NAME,"index_specification ~.16B:~.8B \n",[_Index, _SubInd]),
     gen_server:call(?MODULE, {index_specification, I}).
 
 %%--------------------------------------------------------------------
@@ -222,8 +226,9 @@ init({CoSerial, {Index, RFileName, WFileName}, Starter}) ->
 %% 
 %% @end
 %%--------------------------------------------------------------------
-handle_call({index_specification, {Index, SubInd} = I}, _From, LoopData) ->   
-    ?dbg(?NAME, "handle_call: index_specification ~.16B:~.8B\n", [Index, SubInd]),
+handle_call({index_specification, {Index, _SubInd} = I}, _From, LoopData) ->   
+    ?dbg(?NAME, "handle_call: index_specification ~.16B:~.8B\n", 
+	 [Index, _SubInd]),
     case LoopData#loop_data.index of
 	Index ->
 	    Spec = #index_spec{index = I,
@@ -236,9 +241,9 @@ handle_call({index_specification, {Index, SubInd} = I}, _From, LoopData) ->
 		 [?ABORT_NO_SUCH_OBJECT]),
 	    {reply, {error, ?ABORT_NO_SUCH_OBJECT}, LoopData}
     end;
-handle_call({read_begin, {Index, SubInd}, Ref}, _From, LoopData) ->
+handle_call({read_begin, {Index, _SubInd}, Ref}, _From, LoopData) ->
     ?dbg(?NAME, "handle_call: read_begin ~.16B:~.8B, ref = ~p\n",
-	 [Index, SubInd, Ref]),
+	 [Index, _SubInd, Ref]),
     case LoopData#loop_data.index of
 	Index ->
 	    ?dbg(?NAME, "handle_call: read_begin opening file ~p",
@@ -268,9 +273,9 @@ handle_call({read, Ref, Bytes}, _From, LoopData) ->
 	    ?dbg(?NAME, "handle_call: read error = wrong_ref\n", []), 
 	    {reply, {error, ?ABORT_INTERNAL_ERROR}, LoopData}	    
     end;
-handle_call({write_begin, {Index, SubInd}, Ref}, _From, LoopData) ->
+handle_call({write_begin, {Index, _SubInd}, Ref}, _From, LoopData) ->
     ?dbg(?NAME, "handle_call: write_begin ~.16B:~.8B, ref = ~p\n",
-	 [Index, SubInd, Ref]),
+	 [Index, _SubInd, Ref]),
     case LoopData#loop_data.index of
 	Index ->
 	    {ok, F} = file:open(LoopData#loop_data.writefilename, 
@@ -312,8 +317,8 @@ handle_call(stop, _From, LoopData) ->
     end,
     ?dbg(?NAME, "handle_call: stop detached.\n",[]),
     {stop, normal, ok, LoopData};
-handle_call(Request, _From, LoopData) ->
-    ?dbg(?NAME, "handle_call: bad call ~p.\n",[Request]),
+handle_call(_Request, _From, LoopData) ->
+    ?dbg(?NAME, "handle_call: bad call ~p.\n",[_Request]),
     {reply, {error,bad_call}, LoopData}.
 
 %%--------------------------------------------------------------------
@@ -354,12 +359,12 @@ handle_cast(_Msg, LoopData) ->
 %% 
 %% @end
 %%--------------------------------------------------------------------
-handle_info({notify, _RemoteCobId, {Index, SubInd}, Value}, LoopData) ->
+handle_info({notify, _RemoteCobId, {_Index, _SubInd}, _Value}, LoopData) ->
     ?dbg(?NAME, "handle_info:notify ~.16B: ID=~8.16.0B:~w, Value=~w \n", 
-	      [_RemoteCobId, Index, SubInd, Value]),
+	      [_RemoteCobId, _Index, _SubInd, _Value]),
     {noreply, LoopData};
-handle_info(Info, LoopData) ->
-    ?dbg(?NAME, "handle_info: Unknown Info ~p\n", [Info]),
+handle_info(_Info, LoopData) ->
+    ?dbg(?NAME, "handle_info: Unknown Info ~p\n", [_Info]),
     {noreply, LoopData}.
 
 %%--------------------------------------------------------------------

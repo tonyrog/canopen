@@ -198,7 +198,7 @@ end_per_testcase(Case, Config) when Case == stream_file_segment;
 				    Case == stream_file_block;
 				    Case == stream_0file_segment;
 				    Case == stream_0file_block ->
-    co_test_lib:stop_app(co_test_stream_app, []),
+    co_test_stream_app:stop(),
 
     PrivDir = ?config(priv_dir, Config),
     RFile = filename:join(PrivDir, ct:get_config(read_file)),
@@ -211,7 +211,7 @@ end_per_testcase(Case, Config) when Case == stream_file_segment;
 end_per_testcase(timeout, Config) ->
     %% Wait a little for session to terminate
     timer:sleep(1000),
-    co_test_lib:stop_app(co_test_app, serial()),
+    co_test_app:stop(serial()),
 
     %% Restore the timeout for the co_node
     OldTOut = ?config(timeout, Config),
@@ -221,7 +221,7 @@ end_per_testcase(timeout, Config) ->
 end_per_testcase(_TestCase, _Config) ->
     %% Wait a little for session to terminate
     timer:sleep(1000),
-    co_test_lib:stop_app(co_test_app, serial()),
+    co_test_app:stop(serial()),
     ok.
 %%--------------------------------------------------------------------
 %% TEST CASES

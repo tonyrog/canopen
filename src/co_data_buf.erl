@@ -712,8 +712,10 @@ update(_Buf, Other) ->
 		   ok.
 
 abort(_Buf=#co_data_buf {mode = streamed, pid = Pid, ref = Ref}, Reason) -> 
+    ?dbg(data_buf, "abort: Buf = ~w, Reason = ~p", [_Buf, Reason]),
     gen_server:cast(Pid, {abort, Ref, Reason});
 abort(_Buf=#co_data_buf {mode = {streamed, Module}, pid = Pid, ref = Ref}, Reason) -> 
+    ?dbg(data_buf, "abort: Buf = ~w, Reason = ~p", [_Buf, Reason]),
     Module:abort(Pid, Ref, Reason);
 abort(_Buf, _Reason) -> 
     ok.
@@ -764,7 +766,6 @@ app_call(Buf, Pid, Msg) ->
 
 do_call(Process, Request) ->
     Mref = erlang:monitor(process, Process),
-
-    erlang:send(Process, {'$gen_call', {self(), Mref}, Request}, [noconnect]),
+    ok = erlang:send(Process, {'$gen_call', {self(), Mref}, Request}, [noconnect]),
     Mref.
 

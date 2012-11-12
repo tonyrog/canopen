@@ -204,7 +204,7 @@ end_per_testcase(_TestCase, Config) ->
 	undefined  -> do_nothing;
 	_Pid ->  co_test_tpdo_app:stop()
     end,
-    co_test_lib:stop_app(co_test_app, serial()),
+    co_test_app:stop(?RPDO_NODE),
     %% Restore data
     co_test_lib:load_dict(Config),
     co_test_lib:load_dict(Config, ?RPDO_NODE),

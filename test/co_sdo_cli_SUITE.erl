@@ -223,8 +223,8 @@ end_per_testcase(Case, _Config) when Case == store_atomic_segment;
 				     Case == break ->
     %% Wait a little for session to terminate
     timer:sleep(1000),
-    co_test_lib:stop_app(co_test_app, serial()),
-    co_test_lib:stop_app(co_test_app, co_mgr),
+    co_test_app:stop(serial()),
+    co_test_app:stop(?MGR_NODE),
     ok;
 end_per_testcase(_TestCase, _Config) ->
     ok.
@@ -442,10 +442,10 @@ fetch_streamed_m_block(Config) ->
 %% @end
 %%--------------------------------------------------------------------
 break(Config) ->
-    ets:new(conf, [set, public, named_table]),
-    ets:insert(conf, Config),
+    ets:new(config, [set, public, named_table]),
+    ets:insert(config, Config),
     test_server:break("Break for test development\n" ++
-		     "Get Config by ets:tab2list(conf≈ß)"),
+		     "Get Config by ets:tab2list(config)"),
     ok.
 
 %%--------------------------------------------------------------------

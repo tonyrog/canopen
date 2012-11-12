@@ -25,6 +25,7 @@
 -ifndef(CO_DEBUG_HRL).
 -define(CO_DEBUG_HRL, true).
 
+
 -ifdef(debug).
 -define(dbg(Tag, Format, Args),
 	case get(dbg) of
@@ -35,7 +36,12 @@
 		ok
 	end).
 -else.
--define(dbg(Tag, Format, Args), ok).
+-define(dbg(_Tag, Format, Args),
+	ok.
+%% When switching to lager
+%% -define(dbg(_Tag, Format, Args),
+%% 	lager:debug("~s(~p): " ++ Format, [?MODULE, self() | Args])).
+
 
 -endif.
 

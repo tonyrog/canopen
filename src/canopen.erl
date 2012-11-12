@@ -61,6 +61,7 @@ start(_StartType, _StartArgs) ->
 
 %% @private
 start() ->
+    %% application:start(lager),
     application:start(eapi),
     application:start(uart),  %% for can_usb
     application:start(can),

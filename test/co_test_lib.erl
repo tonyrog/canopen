@@ -39,6 +39,9 @@ start_system(_C) ->
     start_system(2,0).
 
 start_system(Port, Ttl) ->
+    %%lager:start(),
+    %%lager:trace_console([{module, co_mgr}], debug),
+    %%lager:trace_console([{module, co_sdo_cli_fsm}], debug),
     can_udp:start(co_test, Port, [{ttl, Ttl}]),
     {ok, PPid} = co_proc:start_link([{linked, false}]),
     ct:pal("Started co_proc ~p",[PPid]).
@@ -137,20 +140,13 @@ write(F, Data, N) ->
     write(F, Data, N-1).
 
 
-stop_app(App, CoNode) when is_integer(CoNode) ->
-    stop_app(App, CoNode, integer_to_list(CoNode));
-stop_app(App, CoNode) when is_atom(CoNode) ->
-    stop_app(App, CoNode, atom_to_list(CoNode));
-stop_app(App, []) ->
-    case whereis(App) of
-	undefined  -> do_nothing;
-	_Pid -> App:stop()
-    end.
-stop_app(App, CoNode, CoNodeString) ->
-    case whereis(list_to_atom(atom_to_list(App) ++ CoNodeString)) of
-	undefined  -> do_nothing;
-	_Pid -> App:stop(CoNode)
-    end.
+name(Module, Serial) when is_integer(Serial) ->
+    list_to_atom(atom_to_list(Module) ++ "-" ++ integer_to_list(Serial,16));
+name(Module, {name, Name}) when is_atom(Name) ->
+    %% co_mgr ??
+    list_to_atom(atom_to_list(Module) ++ "_" ++ atom_to_list(Name));
+name(Module, {_Tag, Id}) when is_integer(Id)->
+    list_to_atom(atom_to_list(Module) ++ "-" ++ integer_to_list(Id,16)).
 
 set_cmd(Config, Index, Value, Type, BFlag) ->
     set_cmd(Config, Index, Value, Type, BFlag, undefined).

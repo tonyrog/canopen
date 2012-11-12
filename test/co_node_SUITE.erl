@@ -129,7 +129,7 @@ init_per_testcase(_TestCase, Config) ->
 %% @end
 %%--------------------------------------------------------------------
 end_per_testcase(start_stop_app, _Config) ->
-    co_test_lib:stop_app(co_test_app, serial()),
+    co_test_app:stop(serial()),
     ok;
 end_per_testcase(Case, _Config) when Case == save_and_load;
 				     Case == save_and_load_nok ->
