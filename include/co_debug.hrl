@@ -37,7 +37,7 @@
 	end).
 -else.
 -define(dbg(_Tag, Format, Args),
-	ok.
+	ok).
 %% When switching to lager
 %% -define(dbg(_Tag, Format, Args),
 %% 	lager:debug("~s(~p): " ++ Format, [?MODULE, self() | Args])).
