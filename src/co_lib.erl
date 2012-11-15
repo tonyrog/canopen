@@ -54,6 +54,7 @@
 -export([enum_by_id/2]).
 
 -export([utc_time/0]).
+-export([debug/1]).
 
 -include("canopen.hrl").
 -include("co_debug.hrl").
@@ -1217,3 +1218,8 @@ utc_time() ->
 			  "Aug","Sep","Oct","Nov","Dec"}),
     io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w",
 		  [Day,Mstr,Year,Hour,Minute,Second,Micro]).
+
+debug(true) ->
+    ale:trace(on, self(), debug);
+debug(false) ->
+    ale:trace(off, self(), debug).

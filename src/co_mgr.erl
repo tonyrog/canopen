@@ -73,7 +73,8 @@
 	  nodes = [],      %% nodes detected
 	  pids = [],       %% list of outstanding operations
 	  ctx,             %% current context
-	  ctx_list =[]     %% [{mod,<ctx>}] 
+	  ctx_list =[],    %% [{mod,<ctx>}] 
+	  debug           
 	}).
 
 %%====================================================================
@@ -101,7 +102,7 @@ start() ->
 -spec start(Options::list()) ->  {ok, Pid::pid()} | {error, Reason::atom()}.
 
 start(Options) ->
-    put(dbg, proplists:get_value(debug,Options,false)), 
+    co_lib:debug(proplists:get_value(debug,Options,false)), 
     ?dbg(mgr, "start: Opts = ~p", [Options]),
 
     F =	case proplists:get_value(linked,Options,true) of
@@ -508,7 +509,8 @@ loop_data() ->
 
 init(Opts) ->
     %% Trace output enable/disable
-    put(dbg, proplists:get_value(debug,Opts,false)), 
+    Dbg = proplists:get_value(debug,Opts,false),
+    co_lib:debug(Dbg), 
 
     co_proc:reg(?CO_MGR),
 
@@ -523,7 +525,7 @@ init(Opts) ->
 
     process_flag(trap_exit, true),
     
-    {ok, #mgr {def_nid = 0, ctx = undefined}}.
+    {ok, #mgr {def_nid = 0, ctx = undefined, debug = Dbg}}.
 
 
 %%--------------------------------------------------------------------
@@ -554,27 +556,34 @@ init(Opts) ->
 
 handle_call({set_nid,Nid}, _From, Mgr) ->
     {reply, ok, Mgr#mgr { def_nid = Nid }};
+
 handle_call({set_mode,Mode}, _From, Mgr) ->
     {reply, ok, Mgr#mgr { def_trans_mode = Mode }};
+
 handle_call({require,Mod}, _From, Mgr) ->
     {Reply,_DCtx,Mgr1} = load_ctx(Mod, Mgr),
     {reply, Reply, Mgr1};
+
 handle_call({store,Nid,Index,SubInd,Value}, From, Mgr) ->
     do_store(Nid,Index,SubInd,Value, From, Mgr);
 handle_call({store,Index,SubInd,Value}, From, Mgr=#mgr {def_nid = DefNid}) 
   when DefNid =/= 0 ->
     do_store(DefNid, Index, SubInd, Value, From, Mgr);
+
 handle_call({fetch,Nid,Index,SubInd}, From, Mgr) ->
     do_fetch(Nid,Index,SubInd, From, Mgr);
 handle_call({fetch,Index,SubInd}, From, Mgr=#mgr {def_nid = DefNid})
   when DefNid =/= 0 ->
     do_fetch(DefNid, Index, SubInd, From, Mgr);
+
 handle_call({debug, TrueOrFalse}, _From, Mgr) ->
-    put(dbg, TrueOrFalse),
+    co_lib:debug(TrueOrFalse),
     {reply, ok, Mgr};
+
 handle_call({loop_data, all}, _From, Mgr) ->
     io:format("Loop data = ~p\n", [Mgr]),
     {reply, ok, Mgr};
+
 handle_call({loop_data, no_ctx}, _From, Mgr) ->
     io:format("Loop data:\n"
 	      "Default nid = ~.16.0#\n"
@@ -585,8 +594,10 @@ handle_call({loop_data, no_ctx}, _From, Mgr) ->
 	      [Mgr#mgr.def_nid, Mgr#mgr.def_trans_mode,  Mgr#mgr.nodes, Mgr#mgr.pids, 
 	       [Mod || {Mod, _} <-  Mgr#mgr.ctx_list]]),
     {reply, ok, Mgr};
+
 handle_call(stop, _From, Mgr) ->
     {stop, normal, ok, Mgr};
+
 handle_call(_Request, _From, Mgr) ->
     ?dbg(mgr, "handle_call: Unknown request ~p", [ _Request]),
     {reply, {error,bad_call}, Mgr}.
@@ -613,6 +624,7 @@ handle_cast({notify, Nid, Func, Index, SubInd, Value}, Mgr) ->
 handle_cast({notify, Func, Index, SubInd, Value}, Mgr=#mgr {def_nid = DefNid})
   when DefNid =/= 0 ->
     do_notify(DefNid, Func, Index, SubInd, Value, Mgr);
+
 handle_cast(_Msg, Mgr) ->
     ?dbg(mgr, "handle_cast: Unknown msg ~p", [_Msg]),
     {noreply, Mgr}.
@@ -633,7 +645,7 @@ handle_cast(_Msg, Mgr) ->
 			 {noreply, Mgr::#mgr{}}.
 
 handle_info({'EXIT', Pid, Reason}, Mgr=#mgr {pids = PList}) ->
-    ?dbg(?NAME, "handle_info: EXIT for process ~p received, reason ~p", 
+    ?dbg(mgr, "handle_info: EXIT for process ~p received, reason ~p", 
 	 [Pid, Reason]),
     case lists:member(Pid, PList) of
 	true -> 
@@ -648,6 +660,7 @@ handle_info({'EXIT', Pid, Reason}, Mgr=#mgr {pids = PList}) ->
 	false ->
 	    {noreply, Mgr}
     end;
+
 handle_info(_Info, Mgr) ->
     ?dbg(mgr, "handle_info: Unknown info ~p", [_Info]),
     {noreply, Mgr}.
@@ -710,7 +723,7 @@ load_ctx(Mod, Mgr) ->
     end.
     
 do_store(Nid,Index,SubInd,Value,Client, 
-       Mgr=#mgr {pids = PList, def_trans_mode = TransMode}) ->
+       Mgr=#mgr {pids = PList, def_trans_mode = TransMode, debug = Dbg}) ->
     Ctx = context(Nid, Mgr),
     case translate_index(Ctx,Index,SubInd,Value) of
 	{ok,{Ti,Tsi, Tv } = _T} ->
@@ -720,7 +733,7 @@ do_store(Nid,Index,SubInd,Value,Client,
 			      [Nid, Ti, Tsi, TransMode, Tv],
 			      Client,
 			      {store, Nid, Index, SubInd, Value, Tv, Ctx},
-			      get(dbg)),
+			      Dbg),
 	    {noreply, Mgr#mgr { pids = [Pid | PList] }};
 	Error ->
 	    ?dbg(mgr,"do_store: translation failed, error: ~p\n", [Error]),
@@ -729,7 +742,7 @@ do_store(Nid,Index,SubInd,Value,Client,
   
 
 do_fetch(Nid,Index,SubInd, Client, 
-       Mgr=#mgr {pids = PList, def_trans_mode = TransMode}) ->
+       Mgr=#mgr {pids = PList, def_trans_mode = TransMode, debug = Dbg}) ->
     Ctx = context(Nid, Mgr),
     ?dbg(mgr, "do_fetch: translate  ~p:~p", [Index, SubInd]),
     case translate_index(Ctx,Index,SubInd,no_value) of
@@ -740,7 +753,7 @@ do_fetch(Nid,Index,SubInd, Client,
 			      [Nid, Ti, Tsi, TransMode, Tv],
 			      Client,
 			      {fetch, Nid, Index, SubInd, Tv, Ctx},
-			      get(dbg)),
+			      Dbg),
 	    {noreply,  Mgr#mgr { pids = [Pid | PList] }};
 	Error ->
 	    ?dbg(mgr,"do_fetch: translation failed, error: ~p\n", [Error]),
@@ -755,7 +768,7 @@ spawn_request(F, Args, Client, Request, Dbg) ->
 
 %% @private
 execute_request(F, Args, Client, Request, Dbg) ->
-    put(dbg, Dbg),
+    co_lib:debug(Dbg),
     ?dbg(mgr, "execute_request: F = ~p Args = ~w)", [F, Args]),
     Reply = apply(?MODULE,F,Args),
     ?dbg(mgr, "execute_request: reply  ~p", [Reply]),

@@ -26,24 +26,11 @@
 -define(CO_DEBUG_HRL, true).
 
 
--ifdef(debug).
+%% Switching to lager (ale)
 -define(dbg(Tag, Format, Args),
-	case get(dbg) of
-	    true ->
-		io:format("~s: ~p: ~p: " ++ Format ++ "\n", 
-			  [co_lib:utc_time(), self(), ?MODULE] ++ Args);
-	    _ ->
-		ok
-	end).
--else.
--define(dbg(_Tag, Format, Args),
-	ok).
-%% When switching to lager
-%% -define(dbg(_Tag, Format, Args),
-%% 	lager:debug("~s(~p): " ++ Format, [?MODULE, self() | Args])).
-
-
--endif.
+ 	lager:debug({tag, Tag}, 
+		    "~s(~p): " ++ Format, 
+		    [?MODULE, self() | Args])).
 
 
 -endif.

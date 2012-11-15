@@ -157,7 +157,7 @@ start(Ctx,Src,Dst) when is_record(Ctx, sdo_ctx) ->
 %% @end
 %%--------------------------------------------------------------------
 init({Ctx,NodePid,Src,Dst}) when is_record(Ctx, sdo_ctx) ->
-    put(dbg, Ctx#sdo_ctx.debug),
+    co_lib:debug(Ctx#sdo_ctx.debug),
     ?dbg(srv,"init: src=~p, dst=~p \n", [Src, Dst]),
     S0 = #co_session {
       src    = Src,
@@ -568,7 +568,7 @@ s_writing_segment_started({Mref, Reply} = _M, S)  ->
 	Mref ->
 	    erlang:demonitor(Mref, [flush]),
 	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
-	    start_segment_download(S#co_session {buf = Buf});
+	    start_segment_download(S#co_session {buf = Buf, mref = undefined});
 	_Other ->
 	    ?dbg(srv, "s_writing_segment_started: received = ~p, aborting", [_Other]),
 	    abort(S, ?abort_internal_error)
@@ -611,10 +611,13 @@ s_writing_segment_end({Mref, Reply} = _M,
 	     {Mref, {ok, Ref}} when is_reference(Ref)->
 		 %% Streamed reply
 		 ok;
-	     {_OldMref, {ok, Ref}} when is_reference(Ref)->
-		 %% Old streamed reply, wait for last reply
+	     {_NextMref, {ok, Ref}} when is_reference(Ref)->
+		 ?dbg(srv, "s_writing_segment_end: old message, waiting for ~p",
+		      [_NextMref]),
 		 wait;
 	     _Other ->
+		 ?dbg(srv, "s_writing_segment_end: incorrect reply, ignoring", 
+		      []),
 		 not_ok
 	 end,
     case Ok of
@@ -636,10 +639,9 @@ s_writing_segment_end({Mref, Reply} = _M,
 	    {stop, normal, S};
 	wait ->
 	    erlang:demonitor(Mref, [flush]),
-	    {next_state, s_writing_segment_end, S,timeout(S)};
+	    {next_state, s_writing_segment_end, S};
 	not_ok ->
-	    ?dbg(srv, "s_writing_segment_end: received other = ~p, aborting", [_M]),
-	    abort(S, ?abort_internal_error)
+	    {next_state, s_writing_segment_end, S}
      end;
 s_writing_segment_end(timeout, S) ->
     abort(S, ?abort_timed_out);
@@ -795,7 +797,7 @@ s_reading_segment_started({Mref, Reply} = _M, S)  ->
 	    %% Atomic
 	    erlang:demonitor(Mref, [flush]),
 	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
-	    start_segment_upload(S#co_session {buf = Buf});	    
+	    start_segment_upload(S#co_session {buf = Buf, mref = undefined});	    
 	{Mref, {ok, _Ref, _Size}} ->
 	    %% Streamed
 	    erlang:demonitor(Mref, [flush]),
@@ -804,7 +806,7 @@ s_reading_segment_started({Mref, Reply} = _M, S)  ->
 	    case co_data_buf:load(Buf) of
 		{ok, Buf1} ->
 		    %% Buffer loaded
-		    start_segment_upload(S#co_session {buf = Buf1});
+		    start_segment_upload(S#co_session {buf = Buf1, mref = undefined});
 		{ok, Buf1, Mref1} ->
 		    %% Wait for data ??
 		    ?dbg(srv, "s_reading_segment_started: mref=~p\n", [Mref]),
@@ -1082,14 +1084,14 @@ s_reading_block_started({Mref, Reply} = _M, S)  ->
 	    %% Atomic
 	    erlang:demonitor(Mref, [flush]),
 	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
-	    segment_or_block(S#co_session {buf = Buf});
+	    segment_or_block(S#co_session {buf = Buf, mref = undefined});
 	{Mref, {ok, _Ref, _Size}} ->
 	    erlang:demonitor(Mref, [flush]),
 	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
 	    case co_data_buf:load(Buf) of
 		{ok, Buf1} ->
 		    %% Buffer loaded
-		    start_block_upload(S#co_session {buf = Buf1});
+		    start_block_upload(S#co_session {buf = Buf1, mref = undefined});
 		{ok, Buf1, Mref1} ->
 		    ?dbg(srv, "s_reading_block_started: mref=~p\n", [Mref]),
 		    start_block_upload(S#co_session {buf = Buf1, mref = Mref1})
@@ -1341,7 +1343,7 @@ s_writing_block_started({Mref, Reply} = _M, S)  ->
 	{Mref, {ok, _Ref, _WriteSze}} ->
 	    erlang:demonitor(Mref, [flush]),
 	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
-	    start_block_download(S#co_session {buf = Buf});
+	    start_block_download(S#co_session {buf = Buf, mref = undefined});
 	_Other ->
 	    ?dbg(srv, "s_writing_block_started: received = ~p, aborting", [_Other]),
 	    abort(S, ?abort_internal_error)
@@ -1427,24 +1429,34 @@ handle_sync_event(_Event, _From, StateName, State) ->
 			 {next_state, NextState::atom(), NextS::#co_session{}, Tout::timeout()} |
 			 {stop, Reason::atom(), NewS::#co_session{}}.
 			 
-handle_info({Mref, {ok, _Ref, _Data, _Eod} = Reply}, StateName, S) ->
+handle_info({Mref, {ok, _Ref, _Data, _Eod} = Reply}, StateName, 
+	    S=#co_session {mref = NextMref}) ->
     %% Streamed data read from application
-    %% Note that Mref might differ from the latest, stored in S.
     ?dbg(srv, "handle_info: Reply = ~p, State = ~p\n",[Reply, StateName]),
+    %% Note that Mref might differ from the latest, stored in S.
+    if  Mref =/= NextMref ->
+	    ?dbg(srv, "handle_info: queued message, wait for = ~p\n",
+		 [NextMref]);
+	true ->
+	    do_nothing
+    end,
+
+    %% Fill data buffer if needed
     erlang:demonitor(Mref, [flush]),
     {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
-    %% Fill data buffer if needed
     case co_data_buf:load(Buf) of
 	{ok, Buf1} ->
 	    %% Buffer loaded
-	    check_reading(StateName, S#co_session {buf = Buf1});
+	    check_reading(StateName, 
+			  S#co_session {buf = Buf1, mref = undefined});
 	{ok, Buf1, Mref1} ->
 	    %% Wait for data ??
 	    ?dbg(srv, "handle_info: mref=~p\n", [Mref]),
-	    check_reading(StateName, S#co_session {buf = Buf1, 
-						   mref = Mref1});
+	    check_reading(StateName, 
+			  S#co_session {buf = Buf1, mref = Mref1});
 	{error, Reason} ->
-	    ?dbg(srv, "handle_info: load failed, reason = ~p", [Reason]),
+	    ?dbg(srv, "handle_info: load failed, reason = ~p", 
+		 [Reason]),
 	    abort(S, Reason)
     end;
 handle_info({_Mref, ok} = Info, StateName, S) 

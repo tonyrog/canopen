@@ -181,7 +181,8 @@ init({Serial, NodeName, Opts}) ->
 			  [?MODULE, Serial, NodeName, Opts, self()]),
 
     %% Trace output enable/disable
-    put(dbg, proplists:get_value(debug,Opts,false)), 
+    Dbg = proplists:get_value(debug,Opts,false),
+    co_lib:debug(Dbg),
 
     co_proc:reg(Serial),
 
@@ -205,7 +206,7 @@ init({Serial, NodeName, Opts}) ->
       readbufsize     = proplists:get_value(readbufsize,Opts,1024),
       load_ratio      = proplists:get_value(load_ratio,Opts,0.5),
       atomic_limit    = proplists:get_value(atomic_limit,Opts,1024),
-      debug           = proplists:get_value(debug,Opts,false),
+      debug           = Dbg,
       dict            = Dict,
       sub_table       = SubTable,
       res_table       = ResTable
@@ -227,6 +228,7 @@ init({Serial, NodeName, Opts}) ->
       revision = proplists:get_value(revision,Opts),
       serial = Serial,
       state  = ?Initialisation,
+      debug = Dbg,
       nmt_role = proplists:get_value(nmt_role,Opts,autonomous),
       supervision = proplists:get_value(supervision,Opts,none),
       sub_table = SubTable,
@@ -729,10 +731,10 @@ handle_call({set_error,Error,Code}, _From, Ctx) ->
 
 handle_call({dump, Qualifier}, _From, Ctx=#co_ctx {name = _Name}) ->
     io:format("   NAME: ~p\n", [_Name]),
-    print_nodeid(" NODEID:", Ctx#co_ctx.nodeid),
-    print_nodeid("XNODEID:", Ctx#co_ctx.xnodeid),
-    io:format(" VENDOR: ~10.16.0#\n", [Ctx#co_ctx.vendor]),
-    io:format(" SERIAL: ~10.16.0#\n", [Ctx#co_ctx.serial]),
+    print_hex(nodeid, Ctx#co_ctx.nodeid),
+    print_hex(xnodeid, Ctx#co_ctx.xnodeid),
+    print_hex(vendor, Ctx#co_ctx.vendor),
+    print_hex(serial, Ctx#co_ctx.serial),
     io:format("  STATE: ~s\n", [co_format:state(Ctx#co_ctx.state)]),
 
     io:format("---- COB TABLE ----\n"),
@@ -806,7 +808,7 @@ handle_call({dump, Qualifier}, _From, Ctx=#co_ctx {name = _Name}) ->
        true ->
 	    do_nothing
     end,
-    io:format("  DEBUG: ~p\n", [get(dbg)]),
+    io:format("DEBUG: ~p~n",[Ctx#co_ctx.debug]),
     {reply, ok, Ctx};
 
 %% FIXME: this can be done with sys:get_status(Pid)!
@@ -832,28 +834,39 @@ handle_call({option, Option}, _From, Ctx=#co_ctx {name = _Name}) ->
 		load_ratio -> {Option, Ctx#co_ctx.sdo#sdo_ctx.load_ratio};
 		atomic_limit -> {Option, Ctx#co_ctx.sdo#sdo_ctx.atomic_limit};
 		time_stamp -> {Option, Ctx#co_ctx.time_stamp_time};
-		debug -> {Option, Ctx#co_ctx.sdo#sdo_ctx.debug};
+		debug -> {Option, Ctx#co_ctx.debug};
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
 	    end,
     ?dbg(node, "~s: handle_call: option = ~p, reply = ~w", 
 	 [_Name, Option, Reply]),    
     {reply, Reply, Ctx};
-handle_call({option, Option, NewValue}, _From, Ctx=#co_ctx {name = _Name}) ->
+handle_call({option, Option, NewValue}, _From, 
+	    Ctx=#co_ctx {name = _Name, sdo = SDO}) ->
     ?dbg(node, "~s: handle_call: option = ~p, new value = ~p", 
 	 [_Name, Option, NewValue]),    
     Reply = case Option of
-		sdo_timeout -> Ctx#co_ctx.sdo#sdo_ctx {timeout = NewValue};
-		blk_timeout -> Ctx#co_ctx.sdo#sdo_ctx {blk_timeout = NewValue};
-		pst ->  Ctx#co_ctx.sdo#sdo_ctx {pst = NewValue};
-		max_blksize -> Ctx#co_ctx.sdo#sdo_ctx {max_blksize = NewValue};
-		use_crc -> Ctx#co_ctx.sdo#sdo_ctx {use_crc = NewValue};
-		readbufsize -> Ctx#co_ctx.sdo#sdo_ctx {readbufsize = NewValue};
-		load_ratio -> Ctx#co_ctx.sdo#sdo_ctx {load_ratio = NewValue};
-		atomic_limit -> Ctx#co_ctx.sdo#sdo_ctx {atomic_limit = NewValue};
-		time_stamp -> Ctx#co_ctx {time_stamp_time = NewValue};
+		sdo_timeout -> 
+		    Ctx#co_ctx {sdo = SDO#sdo_ctx {timeout = NewValue}};
+		blk_timeout -> 
+		    Ctx#co_ctx {sdo = SDO#sdo_ctx {blk_timeout = NewValue}};
+		pst ->  
+		    Ctx#co_ctx {sdo = SDO#sdo_ctx {pst = NewValue}};
+		max_blksize -> 
+		    Ctx#co_ctx {sdo = SDO#sdo_ctx {max_blksize = NewValue}};
+		use_crc -> 
+		    Ctx#co_ctx {sdo = SDO#sdo_ctx {use_crc = NewValue}};
+		readbufsize -> 
+		    Ctx#co_ctx {sdo = SDO#sdo_ctx{readbufsize = NewValue}};
+		load_ratio -> 
+		    Ctx#co_ctx {sdo = SDO#sdo_ctx{load_ratio = NewValue}};
+		atomic_limit -> 
+		    Ctx#co_ctx {sdo = SDO#sdo_ctx{atomic_limit = NewValue}};
+		time_stamp -> 
+		    Ctx#co_ctx {time_stamp_time = NewValue};
 
-		debug -> put(dbg, NewValue),
-			 Ctx#co_ctx.sdo#sdo_ctx {debug = NewValue};
+		debug -> co_lib:debug(NewValue),
+			 Ctx#co_ctx {debug = NewValue, 
+				     sdo = SDO#sdo_ctx {debug = NewValue}};
 
 		name -> OldName = Ctx#co_ctx.name,
 			co_proc:unreg({name, OldName}),			
@@ -1945,12 +1958,13 @@ handle_tpdo_process(T=#tpdo {pid = _Pid, offset = _Offset}, _Reason,
 
 
 
-activate_nmt(Ctx=#co_ctx {supervision = Sup, dict = Dict, name = _Name}) ->
+activate_nmt(Ctx=#co_ctx {supervision = Sup, dict = Dict, 
+			  name = _Name, debug = Dbg}) ->
     ?dbg(node, "~s: activate_nmt", [_Name]),
     co_nmt:start_link([{node_pid, self()},
 		       {dict, Dict},
 		       {supervision, Sup},
-		       {debug, get(dbg)}]),
+		       {debug, Dbg}]),
     Ctx.
 
 deactivate_nmt(Ctx=#co_ctx {name = _Name}) ->
@@ -2278,15 +2292,16 @@ update_sync(Ctx) ->
     
 
 update_tpdo(P=#pdo_parameter {offset = Offset, cob_id = CId, valid = Valid}, 
-	    Ctx=#co_ctx { tpdo_list = TList, tpdo = TpdoCtx, name = _Name }) ->
+	    Ctx=#co_ctx { tpdo_list = TList, tpdo = TpdoCtx, 
+			  name = _Name, debug = Dbg }) ->
     ?dbg(node, "~s: update_tpdo: pdo param for ~p", [_Name, Offset]),
     case lists:keytake(CId, #tpdo.cob_id, TList) of
 	false ->
 	    if Valid ->
-		    {ok,Pid} = co_tpdo:start(TpdoCtx#tpdo_ctx {debug = get(dbg)}, P),
+		    {ok,Pid} = co_tpdo:start(TpdoCtx#tpdo_ctx {debug = Dbg}, P),
 		    ?dbg(node, "~s: update_tpdo: starting tpdo process ~p for ~p", 
 			 [_Name, Pid, Offset]),
-		    co_tpdo:debug(Pid, get(dbg)),
+		    %%co_tpdo:debug(Pid, Dbg),
 		    gen_server:cast(Pid, {state, Ctx#co_ctx.state}),
 		    Mon = erlang:monitor(process, Pid),
 		    T = #tpdo { offset = Offset,
@@ -2308,7 +2323,8 @@ update_tpdo(P=#pdo_parameter {offset = Offset, cob_id = CId, valid = Valid},
     end.
 
 restart_tpdo(T=#tpdo {offset = Offset, rc = RC}, 
-	     Ctx=#co_ctx {tpdo = TpdoCtx, tpdo_restart_limit = TRL, name = _Name}) ->
+	     Ctx=#co_ctx {tpdo = TpdoCtx, tpdo_restart_limit = TRL, 
+			  name = _Name, debug = Dbg}) ->
     case load_pdo_parameter(?IX_TPDO_PARAM_FIRST + Offset, Offset, Ctx) of
 	undefined -> 
 	    ?dbg(node, "~s: restart_tpdo: pdo param for ~p not found", 
@@ -2321,8 +2337,8 @@ restart_tpdo(T=#tpdo {offset = Offset, rc = RC},
 		    {error, restart_not_allowed};
 		false ->
 		    {ok,Pid} = 
-			co_tpdo:start(TpdoCtx#tpdo_ctx {debug = get(dbg)}, Param),
-		    co_tpdo:debug(Pid, get(dbg)),
+			co_tpdo:start(TpdoCtx#tpdo_ctx {debug = Dbg}, Param),
+		    %% co_tpdo:debug(Pid, Dbg),
 		    gen_server:cast(Pid, {state, Ctx#co_ctx.state}),
 		    Mon = erlang:monitor(process, Pid),
 		    
@@ -2976,14 +2992,12 @@ update_error_list([Code|Cs], Si, Ctx) ->
     [Code | update_error_list(Cs, Si+1, Ctx)].
     
 
-print_nodeid(Label, undefined) ->
-    io:format(Label ++ " not defined\n",[]);
-print_nodeid(" NODEID:", NodeId) ->
-    io:format(" NODEID:" ++ " ~4.16.0#\n", [NodeId]);
-print_nodeid("XNODEID:", NodeId) ->
-    io:format("XNODEID:" ++ " ~8.16.0#\n", [NodeId]).
-
-				       
+print_hex(Label, undefined) ->
+    io:format("~7s:"++ " not defined~n",
+	      [string:to_upper(atom_to_list(Label))]);
+print_hex(Label, NodeId) ->
+    io:format("~7s:" ++ " ~10.16.0#\n", 
+	      [string:to_upper(atom_to_list(Label)),NodeId]).
 
 %% Optionally start a timer
 start_timer(0, _Type) -> false;
@@ -3030,3 +3044,5 @@ id(_Ctx=#co_ctx {nodeid = NodeId}) when NodeId =/= undefined ->
     {nodeid, NodeId};
 id(_Ctx=#co_ctx {xnodeid = XNodeId}) when XNodeId =/= undefined ->
     {xnodeid, XNodeId}.
+
+

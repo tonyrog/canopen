@@ -94,7 +94,7 @@
 -define(INDEX_UBOOT_WRITE,      16#2651).   %% write 0..4 bytes
 -define(INDEX_UBOOT_READ,       16#2652).   %% read 4 bytes of memory/eeprom
 -define(INDEX_UBOOT_ERASE,      16#2653).   %% erase flash memory
--define(INDEX_UBOOT_FLASH,      16#2654).   %% erase flash memory
+-define(INDEX_UBOOT_FLASH,      16#2654).   %% flash memory
 
 -define(INDEX_UBOOT_HOLD,       16#2655).   %% hold the boot loader 
 -define(INDEX_UBOOT_GO,         16#26AA).   %% run application

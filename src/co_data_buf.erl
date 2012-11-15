@@ -45,20 +45,20 @@
 
 -record(co_data_buf,
 	{
-	  access          ::atom(),
-	  data = (<<>>)   ::binary(),
-	  i               ::{integer(), integer()},
-	  type            ::integer(),
-	  size            ::non_neg_integer(),
-	  buf_size = 0    ::non_neg_integer(),
-	  load_level = 0  ::non_neg_integer(),
-	  tmp = (<<>>)    ::binary(),
-	  write_size = 0  ::non_neg_integer(),
-	  pid             ::pid(),
-	  ref             ::reference(),
-	  mode            ::term(),
-	  timeout         ::timeout(),
-	  eof = false     ::boolean()
+	  access           ::atom(),
+	  data = (<<>>)    ::binary(),
+	  i                ::{integer(), integer()},
+	  type             ::integer(),
+	  size             ::non_neg_integer(),
+	  buf_size = 0     ::non_neg_integer(),
+	  load_level = 0   ::non_neg_integer(),
+	  tmp = (<<>>)     ::binary(),
+	  write_size = 0   ::non_neg_integer(),
+	  pid              ::pid(),
+	  ref              ::reference(),
+	  mode             ::term(),
+	  timeout          ::timeout(),
+	  eof = false      ::boolean()
 	}).
 
 

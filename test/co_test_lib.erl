@@ -39,9 +39,7 @@ start_system(_C) ->
     start_system(2,0).
 
 start_system(Port, Ttl) ->
-    %%lager:start(),
-    %%lager:trace_console([{module, co_mgr}], debug),
-    %%lager:trace_console([{module, co_sdo_cli_fsm}], debug),
+    ale:start(),
     can_udp:start(co_test, Port, [{ttl, Ttl}]),
     {ok, PPid} = co_proc:start_link([{linked, false}]),
     ct:pal("Started co_proc ~p",[PPid]).
@@ -49,7 +47,8 @@ start_system(Port, Ttl) ->
 stop_system() ->
     co_proc:stop(),
     can_udp:stop(co_test),
-    can_router:stop().
+    can_router:stop(),
+    ale:stop().
 
 start_node(C) ->
     %% From test suite
@@ -60,7 +59,7 @@ start_node(C, Opts) when is_list (Opts) andalso is_list(Opts) ->
     start_node(C, serial(), Opts);
 start_node(C, Serial) when is_list(C) ->
     %% From test suite
-    start_node(C, Serial, [{debug, true}]).
+    start_node(C, Serial, [{debug, false}]).
 
 start_node(C, Serial, Opts) when is_list(C) andalso is_list(Opts) ->
     %% From test suite

@@ -143,7 +143,7 @@ loop_data(Pid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Ctx, Param, FromPid]) ->
-    put(dbg, Ctx#tpdo_ctx.debug),
+    co_lib:debug(Ctx#tpdo_ctx.debug),
     ?dbg(tpdo, "init: param = ~p", [Param]),
     Valid = Param#pdo_parameter.valid,
     COBID = Param#pdo_parameter.cob_id,
@@ -211,12 +211,12 @@ handle_call(update_map, _From, S) ->
 	end,
     S1 = S#s { type = Type, index_list = Is },
     {reply, ok, S1};
-handle_call({debug, TrueOrFalse}, _From, LD) ->
-    put(dbg, TrueOrFalse),
-    {reply, ok, LD};
-handle_call(loop_data, _From, LD) ->
-    io:format("Loop data = ~p\n", [LD]),
-    {reply, ok, LD};
+handle_call({debug, TrueOrFalse}, _From, S) ->
+    co_lib:debug(TrueOrFalse),
+    {reply, ok, S};
+handle_call(loop_data, _From, S) ->
+    io:format("Loop data = ~p\n", [S]),
+    {reply, ok, S};
 handle_call(stop, _From, S) ->
     ?dbg(tpdo, "handle_call: stop", []),
     {stop, normal, S};

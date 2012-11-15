@@ -560,7 +560,10 @@
 	  time_stamp_tmr = false, %% Time stamp timer
 	  time_stamp_id = 0,      %% Time stamp COBID
 	  emcy_id = 0,
-	  error_list = []         %% time unique ordered list (0-254)
+	  error_list = [],        %% time unique ordered list (0-254)
+
+	  %% DEBUG
+	  debug         %% enable/disable debug
 	}).
 
 

@@ -89,7 +89,7 @@ start(App, Index = {_Ix, _Si}, Data)  ->
 %% @end
 %%--------------------------------------------------------------------
 init([App, I = {_Ix, _Si}, Data]) ->
-    put(dbg, true),
+    %% co_lib:debug(??),
     ?dbg(set,"init: App = ~p, Index = ~7.16.0#:~w, Data = ~w", 
 	 [App, _Ix, _Si, Data]),
     LD = #loop_data{ index = I, app = App, data = Data },

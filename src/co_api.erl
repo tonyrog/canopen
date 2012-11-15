@@ -157,7 +157,7 @@
 			{error, Reason::term()}.
 start_link(S, Opts) ->
     %% Trace output enable/disable
-    put(dbg, proplists:get_value(debug,Opts,false)), 
+    co_lib:debug(proplists:get_value(debug,Opts,false)), 
     ?dbg(node, "start_link: Serial = ~.16#, Opts = ~p", [S, Opts]),
 
     F =	case proplists:get_value(linked,Opts,true) of

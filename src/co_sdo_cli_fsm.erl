@@ -145,7 +145,7 @@ fetch(Ctx,Mode,Client,Src,Dst,Ix,Si,Destination) ->
 %% @end
 %%--------------------------------------------------------------------
 init({Action,Mode,Ctx,Client,NodePid,Src,Dst,Ix,Si,Term}) ->
-    put(dbg, Ctx#sdo_ctx.debug),
+    co_lib:debug(Ctx#sdo_ctx.debug),
     ?dbg(cli,"init: ~p ~p src=~.16#, dst=~.16#", [Action, Mode, Src, Dst]),
     ?dbg(cli,"init: from = ~w, index = ~4.16.0B:~p, term = ~w",
     	 [Client, Ix, Si, Term]),

@@ -408,7 +408,7 @@ handle_call(loop_data, _From, LoopData) ->
     io:format("~p: LoopData = ~p\n", [?MODULE,LoopData]),
     {reply, ok, LoopData};
 handle_call({debug, TrueOrFalse}, _From, LoopData) ->
-    put(dbg, TrueOrFalse),
+    co_lib:debug(TrueOrFalse),
     {reply, ok, LoopData};
 handle_call(stop, _From, LoopData) ->
     ?dbg(?NAME," handle_call: stop\n",[]),    

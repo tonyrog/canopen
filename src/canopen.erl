@@ -28,7 +28,15 @@
 
 -behaviour(application).
 
--export([start/0, start/2, stop/1]).
+%% Application API
+-export([start/2, 
+	 stop/1]).
+
+%% Shortcut API
+-export([start/0,
+	 stop/0]).
+
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the canopen application, that is, the canopen supervisor.<br/>
@@ -59,13 +67,6 @@ start(_StartType, _StartArgs) ->
 	    canopen_sup:start_link(Args)
     end.
 
-%% @private
-start() ->
-    %% application:start(lager),
-    application:start(eapi),
-    application:start(uart),  %% for can_usb
-    application:start(can),
-    application:start(canopen).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -77,3 +78,28 @@ start() ->
 
 stop(_State) ->
     ok.
+
+%% @private
+start() ->
+    call([sasl, lager, ale, eapi, uart, can, canopen], 
+	 start).
+
+stop() ->
+    call([flashzone, can, uart, eapi, ale, lager],
+	 stop).
+
+call([], _F) ->
+    ok;
+call([App|Apps], F) ->
+    error_logger:info_msg("~p: ~p\n", [F,App]),
+    case application:F(App) of
+	{error,{not_started,App1}} ->
+	    call([App1,App|Apps], F);
+	{error,{already_started,App}} ->
+	    call(Apps, F);
+	ok ->
+	    call(Apps, F);
+	Error ->
+	    Error
+    end.
+

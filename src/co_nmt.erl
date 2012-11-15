@@ -342,12 +342,13 @@ init(Args) ->
 			  [?MODULE, Args, self()]),
 
     %% Trace output enable/disable
-    put(dbg, proplists:get_value(debug,Args,false)), 
+    Dbg = proplists:get_value(debug,Args,false),
+    co_lib:debug(Dbg), 
 
     case proplists:get_value(node_pid, Args) of
 	NodePid when is_pid(NodePid) ->
 	    %% Manager needed
-	    co_mgr:start([{debug, get(dbg)}]),
+	    co_mgr:start([{debug, Dbg}]),
 	    Supervision = proplists:get_value(supervision, Args, none),
 	    NMT = ets:new(co_nmt_table, [{keypos,#nmt_slave.id},
 					 protected, named_table, ordered_set]),
@@ -476,7 +477,8 @@ handle_call(load, _From, Ctx) ->
     {reply, Reply, Ctx};
 
 handle_call({debug, TrueOrFalse}, _From, Ctx) ->
-    put(dbg, TrueOrFalse),
+    co_lib:debug(TrueOrFalse),
+    co_mgr:debug(TrueOrFalse),
     {reply, ok, Ctx};
 
 handle_call(dump, _From, Ctx) ->
@@ -562,11 +564,11 @@ handle_cast({supervision_frame, SlaveId = {_Flag, _NodeId}, Frame},
     {noreply, Ctx};
     
 handle_cast({supervision, Supervision}, Ctx=#ctx {supervision = Supervision}) ->
-    ?dbg(?NAME," handle_cast: supervision ~p, no change.", [Supervision]),
+    ?dbg(nmt," handle_cast: supervision ~p, no change.", [Supervision]),
     {noreply, Ctx};
 
 handle_cast({supervision, New}, Ctx=#ctx {supervision = Old}) ->
-    ?dbg(?NAME," handle_cast: supervision ~p -> ~p.", [Old, New]),
+    ?dbg(nmt," handle_cast: supervision ~p -> ~p.", [Old, New]),
     %% Activate/deactivate .. or handle in co_node ??
     case Old of
 	node_guard -> deactivate_node_guard(Ctx);
@@ -581,7 +583,7 @@ handle_cast({supervision, New}, Ctx=#ctx {supervision = Old}) ->
     {noreply, Ctx#ctx {supervision = New}};
 
 handle_cast(_Msg, Ctx) ->
-    ?dbg(?NAME," handle_cast: Unknown message = ~p, ignored. ", [_Msg]),
+    ?dbg(nmt," handle_cast: Unknown message = ~p, ignored. ", [_Msg]),
     {noreply, Ctx}.
 
 
@@ -681,7 +683,7 @@ handle_info({'DOWN',_Ref,process,Pid,_Reason},
     {noreply, Ctx#ctx {subscribers = lists:keydelete(Pid,1,SubList)}};
 
 handle_info(_Info, Ctx) ->
-    ?dbg(?NAME," handle_info: Unknown Info ~p, ignored.\n", [_Info]),
+    ?dbg(nmt," handle_info: Unknown Info ~p, ignored.\n", [_Info]),
     {noreply, Ctx}.
 
 %%--------------------------------------------------------------------
