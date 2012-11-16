@@ -603,7 +603,6 @@ s_writing_segment_started(M, S)  ->
 s_writing_segment_end({Mref, Reply} = _M, 
 		      S=#co_session {index = Index, subind = SubInd, t = T})  ->
     ?dbg(srv, "s_writing_segment_end: Got event = ~p\n", [_M]),
-    timer:sleep(100),
     Ok = case {S#co_session.mref, Reply} of
 	     {Mref, ok} ->
 		 %% Atomic reply
