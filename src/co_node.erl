@@ -846,21 +846,21 @@ handle_call({option, Option, NewValue}, _From,
 	 [_Name, Option, NewValue]),    
     Reply = case Option of
 		sdo_timeout -> 
-		    Ctx#co_ctx {sdo = SDO#sdo_ctx {timeout = NewValue}};
+		    SDO#sdo_ctx {timeout = NewValue};
 		blk_timeout -> 
-		    Ctx#co_ctx {sdo = SDO#sdo_ctx {blk_timeout = NewValue}};
+		    SDO#sdo_ctx {blk_timeout = NewValue};
 		pst ->  
-		    Ctx#co_ctx {sdo = SDO#sdo_ctx {pst = NewValue}};
+		    SDO#sdo_ctx {pst = NewValue};
 		max_blksize -> 
-		    Ctx#co_ctx {sdo = SDO#sdo_ctx {max_blksize = NewValue}};
+		    SDO#sdo_ctx {max_blksize = NewValue};
 		use_crc -> 
-		    Ctx#co_ctx {sdo = SDO#sdo_ctx {use_crc = NewValue}};
+		    SDO#sdo_ctx {use_crc = NewValue};
 		readbufsize -> 
-		    Ctx#co_ctx {sdo = SDO#sdo_ctx{readbufsize = NewValue}};
+		    SDO#sdo_ctx{readbufsize = NewValue};
 		load_ratio -> 
-		    Ctx#co_ctx {sdo = SDO#sdo_ctx{load_ratio = NewValue}};
+		    SDO#sdo_ctx{load_ratio = NewValue};
 		atomic_limit -> 
-		    Ctx#co_ctx {sdo = SDO#sdo_ctx{atomic_limit = NewValue}};
+		    SDO#sdo_ctx{atomic_limit = NewValue};
 		time_stamp -> 
 		    Ctx#co_ctx {time_stamp_time = NewValue};
 
@@ -890,8 +890,8 @@ handle_call({option, Option, NewValue}, _From,
     case Reply of
 	SdoCtx when is_record(SdoCtx, sdo_ctx) ->
 	    {reply, ok, Ctx#co_ctx {sdo = SdoCtx}};
-	NewCtx when is_record(NewCtx, co_ctx) ->
-	    {reply, ok, NewCtx};
+	CoCtx when is_record(CoCtx, co_ctx) ->
+	    {reply, ok, CoCtx};
 	{error, _Reason} ->
 	    {reply, Reply, Ctx}
     end;
@@ -1615,7 +1615,7 @@ handle_node_guard(Frame, NodeId = {TypeOfNid, _Nid},
     %% If NMT supervision has been down resend bootup ?? Toggle ??
     if NgError ->
 	    send_to_apps(found_nmt_master_contact, Ctx),
-	    send_bootup(Ctx);
+	    send_bootup(id(Ctx));
        true ->
 	    do_nothing
     end,

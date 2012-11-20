@@ -159,12 +159,12 @@ stop() ->
 	    Ix::integer(), Si::integer(),
 	    TransferMode:: block | segment,
 	    Destination:: {app, Pid::pid(), Mod::atom()} | 
-			  {value, Type::integer()} |
+			  {value, Type::integer() | atom()} |
 			  data) ->
 		   ok | 
 		   {ok, Value::term()} | 
 		   {ok, Data::binary()} |
-		   {error, Reason::atom()}.
+		   {error, Reason::term()}.
 		   
 fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {app, Pid, Mod} = Term) 
   when is_integer(Nid), 
@@ -216,7 +216,7 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, data = Term)
 		   ok | 
 		   {ok, Value::term()} | 
 		   {ok, Data::binary()} |
-		   {error, Reason::atom()}.
+		   {error, Reason::term()}.
 		   
 fetch(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode, Term) 
   when is_integer(Nid), 
@@ -249,9 +249,9 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode, Term)
 	    TransferMode:: block | segment,
 	    Source:: {app, Pid::pid(), Mod::atom()} | 
 		      {value, Value::term(), Type::integer() | atom()} |
-		      {data, Bin::binary}) ->
+		      {data, Bin::binary()}) ->
 		   ok | 
-		   {error, Reason::atom()}.
+		   {error, Reason::term()}.
 
 store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {app, Pid, Mod} = Term) 
   when is_integer(Nid), 
@@ -292,10 +292,10 @@ store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {data, Bin} = Term)
 	    {Ix::integer(), Si::integer()} | integer(),
 	    TransferMode:: block | segment,
 	    Source:: {app, Pid::pid(), Mod::atom()} | 
-		      {value, Value::term(), Type::integer()} |
-		      {data, Bin::binary}) ->
+		      {value, Value::term(), Type::integer() | atom()} |
+		      {data, Bin::binary()}) ->
 		   ok | 
-		   {error, Reason::atom()}.
+		   {error, Reason::term()}.
 
 store(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode,  Term) 
   when is_integer(Nid), 
