@@ -16,7 +16,8 @@ canopen is built using rebar that can be found [here](https://github.com/basho/r
 
 canopen also requires the following applications to be installed:
 <ul>
-<li>sl - https://github.com/tonyrog/sl</li>
+<li>dthread - https://github.com/tonyrog/dthread</li>
+<li>uart - https://github.com/tonyrog/uart</li>
 <li>eapi - https://github.com/tonyrog/eapi</li>
 <li>can - https://github.com/tonyrog/can</li>
 </ul>
