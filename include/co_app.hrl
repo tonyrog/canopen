@@ -96,7 +96,7 @@
 -define(INDEX_UBOOT_ERASE,      16#2653).   %% erase flash memory
 -define(INDEX_UBOOT_FLASH,      16#2654).   %% flash memory
 
--define(INDEX_UBOOT_HOLD,       16#2655).   %% hold the boot loader 
+-define(INDEX_UBOOT_HOLD,       16#2656).   %% hold the boot loader 
 -define(INDEX_UBOOT_GO,         16#26AA).   %% run application
 
 -define(INDEX_PWM_DUTY,         16#2702).
