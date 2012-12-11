@@ -73,7 +73,7 @@
 notify(CobId,Index,Subind,Data)
   when ?is_index(Index), ?is_subind(Subind), is_binary(Data) ->
     FrameID = ?COBID_TO_CANID(CobId),
-    Frame = #can_frame { id=FrameID, len=0, 
+    Frame = #can_frame { id=FrameID, len=8, 
 			 data=(<<16#80,Index:16/little,Subind:8,Data:4/binary>>) },
     ?dbg(node, "notify: Sending frame ~p from CobId = ~.16#, CanId = ~.16#)",
 	 [Frame, CobId, FrameID]),
@@ -93,7 +93,7 @@ notify(CobId,Index,Subind,Data)
 notify_from(NodePid, CobId,Index,Subind,Data)
   when ?is_index(Index), ?is_subind(Subind), is_binary(Data) ->
     FrameID = ?COBID_TO_CANID(CobId),
-    Frame = #can_frame { id=FrameID, len=0, 
+    Frame = #can_frame { id=FrameID, len=8, 
 			 data=(<<16#80,Index:16/little,Subind:8,Data:4/binary>>) },
     ?dbg(node, "notify: Sending frame ~p from CobId = ~.16#, CanId = ~.16#)",
 	 [Frame, CobId, FrameID]),
