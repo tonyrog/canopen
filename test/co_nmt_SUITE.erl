@@ -59,14 +59,6 @@ suite() ->
 %%  Returns the list of groups and test cases that
 %%  are to be executed.
 %%
-%% GroupsAndTestCases = [{group,GroupName} | TestCase]
-%% GroupName = atom()
-%%   Name of a test case group.
-%% TestCase = atom()
-%%   Name of a test case.
-%% Reason = term()
-%%   The reason for skipping all groups and test cases.
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec all() -> list(GroupsAndTestCases::atom() | tuple()) | 
@@ -178,11 +170,6 @@ init_per_group(GroupName, Config) ->
 %%--------------------------------------------------------------------
 %% @doc
 %% Cleanup after each test case group.
-%%
-%% GroupName = atom()
-%%   Name of the test case group that is finished.
-%% Config0 = Config1 = [tuple()]
-%%   A list of key/value pairs, holding configuration data for the group.
 %%
 %% @end
 %%--------------------------------------------------------------------

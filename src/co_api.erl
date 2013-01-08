@@ -957,7 +957,7 @@ data(Identity, Ix) when is_integer(Ix) ->
 	    Term::{data, binary()} | 
 		  {value, Value::term(), Type::integer() | atom()} |
 		  {app, Pid::pid(), Module::atom()}) ->
-		   ok | {error, Error::atom()}.
+		   ok | {error, Error::term()}.
 
 store(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, TransferMode, Term) 
   when ?is_index(IX), ?is_subind(SI) ->
@@ -981,7 +981,7 @@ store(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, TransferMode, Term)
 	    Term::data | 
 		  {app, Pid::pid(), Module::atom()} |
 		  {value, Type::integer() | atom()}) ->
-		   ok | {ok, Data::binary()} | {error, Error::atom()}.
+		   ok | {ok, Data::binary()} | {error, Error::term()}.
 
 
 fetch(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, TransferMode, Term)
