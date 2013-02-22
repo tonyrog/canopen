@@ -9,22 +9,24 @@
 %% General configurations.
 
 %% "output-type"
-{enum, out_type,
- [{none, 16#00},
-  {onoff,16#01},
-  {dimmer, 16#02},
-  {interval,16#03},
-  {moment,16#04},
-  {pulse,16#05},
-
-  {input,16#ff}
+{enum, otype,
+ [{none,    16#00},
+  {onoff,   16#01},
+  {dimmer,  16#02},
+  {interval, 16#03},
+  {moment,   16#04},
+  {pulse,    16#05},
+  {external, 16#06},
+  {alwayson, 16#07},
+  {input,    16#ff}
  ]}.
 
 %% "output-type" for virtual output 9-16
-{enum, vout_type,
+{enum, votype,
  [{none, 16#00},
-  {led,  16#81},
-  {backlight,16#82}
+  {backlight,16#81},
+  {block,    16#82},
+  {alarm,    16#83}
  ]}.
 
 %% "output-done" function
@@ -39,7 +41,15 @@
   {start_5,16#07},
   {start_6,16#08},
   {start_7,16#09},
-  {start_8,16#0A}
+  {start_8,16#0A},
+  {start_9,16#0B},
+  {start_10,16#0C},
+  {start_11,16#0D},
+  {start_12,16#0E},
+  {start_13,16#0F},
+  {start_14,16#10},
+  {start_15,16#11},
+  {start_16,16#12}
  ]}.
 
 {enum, ramp_fn,
@@ -57,7 +67,24 @@
   {springback, 16#0020},     %% switch is springback
   {push_encoder,16#0040},    %% implements push encoder (when springback!)
   {inc_encoder, 16#0080},    %% increment push encoder
-  {dec_encoder, 16#0100}     %% decrement push encoder
+  {dec_encoder, 16#0100},    %% decrement push encoder
+  {off_only, 16#0200},       %% match for "off" events only
+  {on_only,  16#0400}         %% match for "on" events only
+ ]}.
+
+
+{enum, oflags,
+ [{ctlmem, 16#0001},    %% save/restore control state 
+  {ctldef, 16#0002},    %% control is default on
+  {ctlact, 16#0004},    %% control active led
+  {ctlinv, 16#0008},    %% control is inverted
+  {stpmem, 16#0010},    %% save/restore step value
+  {outact, 16#0020},    %% outA control activity
+  {anself, 16#0040},    %% output duty analog to input
+  {ancan,  16#0080},    %% output duty to can bus MSG_ANALOG
+  {scale1a,16#0100},    %% power in range 0-1.5A,normal 0-15A
+  {ondef,  16#0200},    %% output is ON by default
+  {onmem,  16#0400}     %% output state is saved/restored
  ]}.
 
 
@@ -69,11 +96,22 @@
   {description, "Output channel type"},
   {struct, array},
   {entry, {1, 8},
-   [{type, {enum,unsigned8,out_type}},
+   [{type, {enum,unsigned8,otype}},
     {category, optional},
     {access, rw}]},
   {entry, {9, 16},
-   [{type, {enum,unsigned8,vout_type}},
+   [{type, {enum,unsigned8,votype}},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#2710,
+ [{id, output_delay},
+  {name, "output-delay"},
+  {description, "pulse start delay in milliseconds"},
+  {struct, array},
+  {entry, {1,16},
+   [{type, unsigned32},
     {category, optional},
     {access, rw}]}
 ]}.
@@ -93,7 +131,7 @@
   {name, "output-waitmax"},
   {struct, array},
   {entry, {1,16},
-   [{type, unsigned16},
+   [{type, unsigned32},
     {category, optional},
     {access, rw}]}
 ]}.
@@ -103,7 +141,7 @@
   {name, "output-waitmult"},
   {struct, array},
   {entry, {1,16},
-   [{type, unsigned16},
+   [{type, unsigned32},
     {category, optional},
     {access, rw}]}
 ]}.
@@ -121,10 +159,10 @@
 {objdef, 16#2715,
  [{id, output_rampup},
   {name, "output-rampup"},
-  {description, "rampup time in milliseconds, max 30s"},
+  {description, "rampup time in milliseconds"},
   {struct, array},
   {entry, {1,16},
-   [{type, unsigned16},
+   [{type, unsigned32},
     {category, optional},
     {access, rw}]}
 ]}.
@@ -132,10 +170,10 @@
 {objdef, 16#2716,
  [{id, output_rampdown},
   {name, "output-rampdown"},
-  {description, "rampdown time in milliseconds, max 30s"},
+  {description, "rampdown time in milliseconds"},
   {struct, array},
   {entry, {1,16},
-   [{type, unsigned16},
+   [{type, unsigned32},
     {category, optional},
     {access, rw}]}
 ]}.
@@ -143,10 +181,10 @@
 {objdef, 16#2717,
  [{id, output_sustain},
   {name, "output-sustain"},
-  {description, "sustain time in milliseconds when using pulse, max 30s"},
+  {description, "sustain time in milliseconds when using pulse"},
   {struct, array},
   {entry, {1,16},
-   [{type, unsigned16},
+   [{type, unsigned32},
     {category, optional},
     {access, rw}]}
 ]}.
@@ -172,6 +210,40 @@
     {category, optional},
     {access, rw}]}
 ]}.
+
+{objdef, 16#271A,
+ [{id, output_prio},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}
+ ]}.
+
+%% FIXME: add 271B, 271C, 271D, 271E
+
+{objdef, 16#2780,
+ [{id, output_deact},
+  {name, "output-deact"},
+  {description, "deactivation delay in milliseconds"},
+  {struct, array},
+  {entry, {1,16},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+%% FIXME: add 2781, 2782, 2783, 2784, 2785, 2786, 2787
+
+{objdef, 16#271F,
+ [{id, output_flags},
+  {name, "output-flags"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, {bitfield,unsigned16,oflags}},
+    {category, optional},
+    {access, rw}]}]}.
+
 
 {objdef, 16#2720,
  [{id, input_flags},
@@ -260,12 +332,13 @@
    ]}
   ]}.
 
+%% FIXME: 2728, 2729, 27AA, 27AB
 
 %% TEMPORARY (none stored) objects for debugging and play
 
 {objdef, 16#2702,
- [{id, output_pwm_duty},
-  {name, "output-pwm-duty"},
+ [{id, pwm},
+  {name, "output-pwm"},
   {struct, array},
   {entry, {1,8},
    [{type, unsigned16},
@@ -274,8 +347,8 @@
 ]}.
 
 {objdef, 16#2703,
- [{id, output_pwm_reload},
-  {name, "output-pwm-reload"},
+ [{id, reload},
+  {name, "output-reload"},
   {description, "Set the PWM reload value"},
   {struct, array},
   {entry, {1,8},
@@ -403,7 +476,7 @@
 
 %% Second calibration value at 10A to convert analog to ampare
 {objdef, 16#2738,
- [{id, w1a},
+ [{id, w10a},
   {name, "w10a"},
   {description, "Analog calibration value at 10A"},
   {struct, array},
@@ -425,30 +498,6 @@
     {access, rw}]}
 ]}.
 
-%% 
-%% Power load statistics, total and per output
-%%
-%%  
-%% 
-{objdef, 16#2740,
- [{id, power_total_hour},
-  {name, "power-total-hour"},
-  {description, "Total ampere hours *100 for the last 24 hours"},
-  {struct, array},
-  {entry, {1,24},
-   [{type, unsigned16},
-    {access, ro}]}
- ]}.
-
-%% {objdef, {16#2741,16#2748},
-%%  [{id, power_output_hour},
-%%   {name, "power-output${index}-hour"},
-%%   {description, "Ampere hours on output channel *100 for the last 24 hours"},
-%%   {struct, array},
-%%   {entry, {1,24},
-%%    [{type, unsigned16},
-%%     {access, ro}]}
-%%  ]}.
-
+%% FIXME add 2740, 2741, 2742, 2743, 2744, 2745, 2746, 2747
 
 %% end of pds

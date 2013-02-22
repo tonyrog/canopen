@@ -27,6 +27,6 @@
 	     co_transfer
 	     ]},
   {registered, []},
-  {applications,[kernel,stdlib,can]},
+  {applications,[kernel,stdlib,can,ale]},
   {mod, {canopen, []}} 
  ]}.
