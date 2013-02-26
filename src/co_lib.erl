@@ -27,37 +27,48 @@
 %%%-------------------------------------------------------------------
 -module(co_lib).
 
--import(lists, [map/2, reverse/1]).
-
--export([serial_to_string/1, string_to_serial/1]).
--export([serial_to_xnodeid/1]).
--export([serial_to_nodeid/1]).
--export([cobid_to_nodeid/1]).
--export([cobid/2]).
--export([add_xflag/1]).
--export([encode_type/1]).
--export([encode_struct/1]).
--export([encode_access/1]).
--export([encode_func/1]).
--export([encode_transmission/1]).
--export([encode_nmt_command/1]).
--export([decode_type/1]).
--export([decode_struct/1]).
--export([decode_access/1]).
--export([decode_transmission/1]).
--export([decode_category/1]).
--export([decode_pdo_mapping/1]).
--export([decode_nmt_command/1]).
--export([load_definition/1,load_definition/2]).
--export([object/2]).
--export([entry/2,entry/3]).
--export([enum_by_id/2]).
-
--export([utc_time/0]).
--export([debug/1]).
-
 -include("canopen.hrl").
 -include("co_debug.hrl").
+
+-import(lists, [map/2, reverse/1]).
+
+%% Serial/nodeid/cobid transformations
+-export([serial_to_string/1, 
+         string_to_serial/1,
+         serial_to_xnodeid/1,
+         serial_to_nodeid/1,
+         cobid_to_nodeid/1,
+         cobid/2,
+         add_xflag/1]).
+
+%% Encode CANOpen attributes
+-export([encode_type/1,
+         encode_struct/1,
+         encode_access/1,
+         encode_func/1,
+         encode_transmission/1,
+         encode_nmt_command/1]).
+
+%% Decode CANOpen attributes
+-export([decode_type/1,
+         decode_struct/1,
+         decode_access/1,
+         decode_transmission/1,
+         decode_category/1,
+         decode_pdo_mapping/1,
+         decode_nmt_command/1]).
+
+%% Definition file decoding
+-export([load_definition/1,
+         load_definition/2,
+         object/2,
+         entry/2,
+         entry/3,
+         enum_by_id/2]).
+
+%% Utilities
+-export([utc_time/0,
+         debug/1]).
 
 
 %%--------------------------------------------------------------------

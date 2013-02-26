@@ -846,5 +846,4 @@
 -define(TMPDO_MAP_INDEX(Map),  (((Map) bsr 8) band 16#ffff)).
 -define(TMPDO_MAP_SUBIND(Map), ((Map)  band 16#ff)).
 
-
 -endif.

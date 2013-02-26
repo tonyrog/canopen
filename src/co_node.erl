@@ -43,11 +43,11 @@
 	 code_change/3]).
 
 %% Application interface
--export([notify/4]). %% To send MPOs
--export([notify_from/5]). %% To send MPOs
--export([subscribers/2]).
--export([reserver_with_module/2]).
--export([tpdo_mapping/2, 
+-export([notify/4,  %% To send MPOs
+         notify_from/5, %% To send MPOs
+         subscribers/2,
+         reserver_with_module/2,
+         tpdo_mapping/2, 
 	 rpdo_mapping/2, 
 	 tpdo_data/2]).
 
@@ -55,6 +55,10 @@
 
 -define(LAST_SAVED_DICT, "last.dict").
 -define(DEFAULT_DICT, "default.dict").
+
+%% Convenience defines
+-define(ee(String, List), error_logger:error_msg(String, List)).
+-define(ei(String, List),  error_logger:info_msg(String, List)).
 
 %%====================================================================
 %% API
@@ -176,9 +180,8 @@ reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
 
 
 init({Serial, NodeName, Opts}) ->
-    error_logger:info_msg("~p: init: serial = ~.16#, name = ~p, opts = ~p\n "
-			  "pid = ~p\n", 
-			  [?MODULE, Serial, NodeName, Opts, self()]),
+    ?ei("~p: init: serial = ~.16#, name = ~p, opts = ~p\n pid = ~p\n", 
+        [?MODULE, Serial, NodeName, Opts, self()]),
 
     %% Trace output enable/disable
     Dbg = proplists:get_value(debug,Opts,false),
@@ -273,8 +276,8 @@ init({Serial, NodeName, Opts}) ->
 	    end;
 
 	{error, Reason} ->
-	    error_logger:error_msg(" ~p: Loading of dict failed, reason = ~p, "
-				   "exiting.\n", [NodeName, Reason]),
+	    ?ee("~p: Loading of dict failed, reason = ~p, exiting.\n", 
+                [NodeName, Reason]),
 	    {stop, Reason}
     end.
 
@@ -306,21 +309,18 @@ reg(Term) ->
 %%
 %%
 reset_application(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId}) ->
-    error_logger:info_msg("Node '~s' id=~w,~w reset_application\n", 
-	      [_Name, _XNodeId, _SNodeId]),
+    ?ei("Node '~s' id=~w,~w reset_application\n", [_Name, _XNodeId, _SNodeId]),
     send_to_apps(reset_app, Ctx),
     reset_communication(Ctx).
 
 reset_communication(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId}) ->
-    error_logger:info_msg("Node '~s' id=~w,~w reset_communication\n",
-	      [_Name, _XNodeId, _SNodeId]),
+    ?ei("Node '~s' id=~w,~w reset_communication\n",[_Name, _XNodeId, _SNodeId]),
     send_to_apps(reset_com, Ctx),
     initialization(Ctx).
 
 initialization(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId,
 			    nmt_role = NmtRole, supervision = Supervision}) ->
-    error_logger:info_msg("Node '~s' id=~w,~w initialization\n",
-	      [_Name, _XNodeId, _SNodeId]),
+    ?ei("Node '~s' id=~w,~w initialization\n", [_Name, _XNodeId, _SNodeId]),
 
     broadcast_state(?PreOperational, Ctx),
 
@@ -1024,7 +1024,7 @@ handle_info(do_heartbeat,
 handle_info(node_guard_timeout, Ctx=#co_ctx {name=_Name}) ->
     ?dbg(node, "~s: handle_info: node_guard timeout received", [_Name]),
     send_to_apps(lost_nmt_master_contact, Ctx),
-    error_logger:error_msg("Node guard timeout, check NMT master.\n"),
+    ?ee("Node guard timeout, check NMT master.\n", []),
     {noreply, Ctx#co_ctx {node_guard_error = true}};
 
 handle_info({rc_reset, Pid}, Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
@@ -1388,7 +1388,7 @@ load_dict_init(saved, Ctx=#co_ctx {serial = Serial}) ->
 	true -> 
 	    load_dict_internal(File, Ctx);
 	false -> 
-	    error_logger:error_msg("No saved dictionary found, using default\n"),
+	    ?ei("No saved dictionary found, using default\n", []),
 	    load_dict_init(default, Ctx)
     end;
 load_dict_init(File, Ctx) when is_list(File) ->
@@ -1652,8 +1652,8 @@ handle_node_guard(Frame, _NodeId,
   when ?is_can_frame_rtr(Frame) ->
     ?dbg(node, "~s: handle_node_guard: request ~w", [_Name,Frame]),
     %% Node is nmt master and should NOT receive node_guard request
-    error_logger:error_msg("Illegal NMT confiuration, receiving node_guard "
-			   " request even though being NMT master\n"),
+    ?ee("Illegal NMT confiuration, receiving node_guard "
+        " request even though being NMT master\n", []),
     Ctx.
 
 handle_supervision(Frame, NodeId, Ctx=#co_ctx {nmt_role = master, name = _Name}) 
@@ -1904,7 +1904,7 @@ handle_sdo_process(S, Reason, Ctx=#co_ctx {name = _Name, sdo_list = SList}) ->
 maybe_warning(normal, _Type, _Name) ->
     ok;
 maybe_warning(Reason, Type, Name) ->
-    error_logger:error_msg("~s: ~s died: ~p\n", [Name, Type, Reason]).
+    ?ee("~s: ~s died: ~p\n", [Name, Type, Reason]).
 
 handle_app_processes(Pid, Reason, Ctx=#co_ctx {app_list = AList}) 
   when is_pid(Pid)->
@@ -1921,8 +1921,7 @@ handle_app_processes(Ref, Reason, Ctx=#co_ctx {app_list = AList}) ->
 handle_app_process(A=#app {pid = Pid}, Reason, 
 		   Ctx=#co_ctx {name = _Name, app_list = AList,
 			       sub_table = STable, res_table = RTable}) ->
-    error_logger:error_msg(
-      "~s: id=~w application died:~p\n", [_Name,A#app.pid, Reason]),
+    ?ee("~s: id=~w application died:~p\n", [_Name,A#app.pid, Reason]),
     remove_subscriptions(STable, Pid), %% Or reset ??
     reset_reservations(RTable, Pid),
     %% FIXME: restart application? application_mod ?
@@ -1942,13 +1941,12 @@ handle_tpdo_processes(Ref, Reason, Ctx=#co_ctx {tpdo_list = TList}) ->
 
 handle_tpdo_process(T=#tpdo {pid = _Pid, offset = _Offset}, _Reason, 
 		    Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
-    error_logger:error_msg("~s: id=~w tpdo process died: ~p\n", 
-			   [_Name,_Pid, _Reason]),
+    ?ee("~s: id=~w tpdo process died: ~p\n", [_Name,_Pid, _Reason]),
     case restart_tpdo(T, Ctx) of
 	{error, _Error} ->
-	    error_logger:error_msg(" ~s: not possible to restart "
-				   "tpdo process for offset ~p, reason = ~p\n", 
-				   [_Name,_Offset,_Error]),
+	    ?ee(" ~s: not possible to restart "
+                "tpdo process for offset ~p, reason = ~p\n", 
+                [_Name,_Offset,_Error]),
 	    Ctx;
 	NewT ->
 	    ?dbg(node, "~s: handle_tpdo_processes: new tpdo process ~p started", 

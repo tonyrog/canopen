@@ -45,8 +45,12 @@
 -export([client_notify/5, client_notify/4, client_notify/3]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
+-export([init/1, 
+         handle_call/3, 
+         handle_cast/2, 
+         handle_info/2,
+	 terminate/2, 
+         code_change/3]).
 
 %% spawned function
 -export([execute_request/5]).
