@@ -418,6 +418,7 @@
 -type uint32() :: non_neg_integer().
 
 -type nmt_role() :: slave | master | autonomous.
+-type nid_type() :: nodeid | xnodeid.
 
 %% SDO configuration parameters
 -record(sdo_ctx,
@@ -694,6 +695,10 @@
 -define(SI_RESTORE_ALL, 1).
 -define(SI_RESTORE_COM, 2).
 -define(SI_RESTORE_APP, 3).
+
+%% Flags to indicate if store/restore command is valid
+-define(EVAS, 1935767141). %% $e + ($v bsl 8) + ($a bsl 16) + ($s bsl 24)
+-define(DOAL, 1819238756). %% $d + ($a bsl 8) + ($o bsl 16) + ($l bsl 24)
 
 -define(IX_COB_ID_TIME_STAMP,          16#1012).
 -define(IX_HIGHRES_TIME_STAMP,         16#1013).

@@ -85,7 +85,7 @@ start() ->
 	 start).
 
 stop() ->
-    call([flashzone, can, uart, eapi, ale, lager],
+    call([can, uart, eapi, ale, lager],
 	 stop).
 
 call([], _F) ->
