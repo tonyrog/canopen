@@ -143,7 +143,10 @@ loop_data(Pid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Ctx, Param, FromPid]) ->
-    co_lib:debug(Ctx#tpdo_ctx.debug),
+    case Ctx#tpdo_ctx.debug of 
+        true -> co_lib:debug(true);
+        _ -> do_nothing
+    end,
     ?dbg(tpdo, "init: param = ~p", [Param]),
     Valid = Param#pdo_parameter.valid,
     COBID = Param#pdo_parameter.cob_id,

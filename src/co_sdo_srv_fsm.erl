@@ -157,7 +157,10 @@ start(Ctx,Src,Dst) when is_record(Ctx, sdo_ctx) ->
 %% @end
 %%--------------------------------------------------------------------
 init({Ctx,NodePid,Src,Dst}) when is_record(Ctx, sdo_ctx) ->
-    co_lib:debug(Ctx#sdo_ctx.debug),
+    case Ctx#sdo_ctx.debug of 
+        true -> co_lib:debug(true);
+        _ -> do_nothing
+    end,
     ?dbg(srv,"init: src=~p, dst=~p \n", [Src, Dst]),
     S0 = #co_session {
       src    = Src,
