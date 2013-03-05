@@ -54,15 +54,18 @@ run_mgr() ->
     run_mgr(1, 0).
 
 run_mgr(Port, Ttl) ->
-    can_udp:start(co_test, Port, [{ttl, Ttl}]),
+    can_udp:start(Port, [{ttl, Ttl}]),
     co_proc:start_link([{linked, false}]),
     co_mgr:start([{linked, false}, 
 		  {debug, true}]).
 
 halt_mgr() ->
+    halt_mgr(1).
+
+halt_mgr(Port) ->
     co_mgr:stop(),
     co_proc:stop(),
-    can_udp:stop(co_test),
+    can_udp:stop(Port),
     can_router:stop().
 
 run_master(Serial) ->

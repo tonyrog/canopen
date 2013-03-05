@@ -40,13 +40,16 @@ start_system(_C) ->
 
 start_system(Port, Ttl) ->
     ale:start(),
-    can_udp:start(co_test, Port, [{ttl, Ttl}]),
+    can_udp:start(Port, [{ttl, Ttl}]),
     {ok, PPid} = co_proc:start_link([{linked, false}]),
     ct:pal("Started co_proc ~p",[PPid]).
 
 stop_system() ->
+    stop_system(2).
+
+stop_system(Port) ->
     co_proc:stop(),
-    can_udp:stop(co_test),
+    can_udp:stop(Port),
     can_router:stop(),
     ale:stop().
 

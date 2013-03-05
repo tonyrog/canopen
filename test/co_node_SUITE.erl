@@ -30,10 +30,6 @@
 -include_lib("common_test/include/ct.hrl").
 -include("canopen.hrl").
 
-%% Flags to indicate if store/restore command is valid
--define(EVAS, 1935767141). %% $e + ($v bsl 8) + ($a bsl 16) + ($s bsl 24)
--define(DOAL, 1819238756). %% $d + ($a bsl 8) + ($o bsl 16) + ($l bsl 24)
-
 %%--------------------------------------------------------------------
 %% COMMON TEST CALLBACK FUNCTIONS
 %%--------------------------------------------------------------------
