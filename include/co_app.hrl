@@ -218,7 +218,7 @@
 -define(MSG_RESET,          16#28AA).   %%  Reset the node 
 
 %%
-%% Device specific indexes
+%% Device specific indexes and subindexes
 %%
 -define(DEV_SPEC_MIN, 16#6000).
 -define(DEV_SPEC_MAX, 16#9FFF).
@@ -250,6 +250,9 @@
 -define(ALARM_CAUSE_VIN_LEV, 16#85).  %% fatal vin level (internal)
 -define(ALARM_CAUSE_HIS_LEV, 16#86).  %% fatal his level (internal)
 -define(ALARM_CAUSE_HIS,     16#87).  %% fatal his < vin (internal)
+
+%% Return to factory default, subindex to IX_RESTORE_DEFAULT_PARAMETERS
+-define(SI_FACTORY_DEFAULT, 4).
 
 
 %% Application get_entry return data
