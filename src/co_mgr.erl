@@ -33,8 +33,8 @@
 
 %% regular api
 -export([start/0, start/1, stop/0]).
--export([fetch/5,fetch/4]).
--export([store/5,store/4]).
+-export([fetch/6,fetch/5,fetch/4]).
+-export([store/6,store/5,store/4]).
 
 %% api when using definition files
 -export([client_require/1]).
@@ -124,7 +124,8 @@ start(Options) ->
 	    ok;
 	{error, not_found} ->
 	    ?dbg(mgr, "Starting co_mgr with function = ~p", [F]),
-	    {ok, _NewMPid} = gen_server:F({local, ?CO_MGR}, ?MODULE, Options, [])
+	    {ok, _NewMPid} = 
+		gen_server:F({local, ?CO_MGR}, ?MODULE, Options, [])
     end.
 
 
@@ -164,34 +165,46 @@ stop() ->
 	    TransferMode:: block | segment,
 	    Destination:: {app, Pid::pid(), Mod::atom()} | 
 			  {value, Type::integer() | atom()} |
-			  data) ->
+			  data,
+	    TimeOut::timeout() | default) ->
 		   ok | 
 		   {ok, Value::term()} | 
 		   {ok, Data::binary()} |
 		   {error, Reason::term()}.
 		   
-fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {app, Pid, Mod} = Term) 
+fetch(NodeId = {_TypeOfNid, Nid}, 
+      Ix, Si, TransferMode,
+      {app, Pid, Mod} = Destination,
+      TimeOut) 
   when is_integer(Nid), 
        is_integer(Ix), 
        is_integer(Si), 
+       (TransferMode == block orelse TransferMode == segment),
        is_pid(Pid),
-       is_atom(Mod) ->
+       is_atom(Mod),
+       ((is_integer(TimeOut) andalso TimeOut > 0) orelse TimeOut == default)  ->
     case process_info(Pid) of
 	undefined -> {error, non_existing_application};
-	_Info -> co_api:fetch(?MGR_NODE, NodeId, Ix, Si, TransferMode, Term)
+	_Info -> co_api:fetch(?MGR_NODE, NodeId, Ix, Si, TransferMode, 
+			      Destination, TimeOut)
     end;
-fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {value, Type}) 
+fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {value, Type}, TimeOut) 
   when is_integer(Nid), 
        is_integer(Ix), 
        is_integer(Si), 
-       is_atom(Type) ->
-    fetch(NodeId, Ix, Si, TransferMode, {value, co_lib:encode_type(Type)}); 
-fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {value, Type}) 
+       (TransferMode == block orelse TransferMode == segment),
+       is_atom(Type),
+       ((is_integer(TimeOut) andalso TimeOut > 0) orelse TimeOut == default)  ->
+    fetch(NodeId, Ix, Si, TransferMode, 
+	  {value, co_lib:encode_type(Type)}, TimeOut); 
+fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {value, Type}, TimeOut) 
   when is_integer(Nid), 
        is_integer(Ix), 
        is_integer(Si), 
-       is_integer(Type) ->
-    case co_api:fetch(?MGR_NODE, NodeId, Ix, Si, TransferMode, data) of
+       (TransferMode == block orelse TransferMode == segment),
+       is_integer(Type),
+       ((is_integer(TimeOut) andalso TimeOut > 0) orelse TimeOut == default)  ->
+    case co_api:fetch(?MGR_NODE, NodeId, Ix, Si, TransferMode, data, TimeOut) of
 	{ok, Data} ->
 	    try co_codec:decode(Data, Type) of
 		{Value, _Rest} -> {ok, Value}
@@ -200,15 +213,63 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {value, Type})
 	    end;
 	Error -> Error
     end;
-fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, data = Term)  
+fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, 
+      data = Destination, TimeOut)  
   when is_integer(Nid), 
        is_integer(Ix), 
-       is_integer(Si) ->
-    co_api:fetch(?MGR_NODE, NodeId, Ix, Si, TransferMode, Term).
+       is_integer(Si),
+       (TransferMode == block orelse TransferMode == segment),
+       ((is_integer(TimeOut) andalso TimeOut > 0) orelse TimeOut == default)  ->
+    co_api:fetch(?MGR_NODE, NodeId, Ix, Si, TransferMode, Destination, TimeOut).
 
 %%--------------------------------------------------------------------
 %% @doc
-%% See {@link fetch/5}.
+%% See {@link fetch/6}.
+%% @end
+%%--------------------------------------------------------------------
+-spec fetch({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
+	    {Ix::integer(), Si::integer()} | integer(),
+	    TransferMode:: block | segment,
+	    Destination:: {app, Pid::pid(), Mod::atom()} | 
+			  {value, Type::integer() | atom()} |
+			  data,
+	    TimeOut::timeout() | default) ->
+		   ok | 
+		   {ok, Value::term()} | 
+		   {ok, Data::binary()} |
+		   {error, Reason::term()};
+	   ({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
+	    Ix::integer(), Si::integer(),
+	    TransferMode:: block | segment,
+	    Destination:: {app, Pid::pid(), Mod::atom()} | 
+			  {value, Type::integer() | atom()} |
+			  data) ->
+		   ok | 
+		   {ok, Value::term()} | 
+		   {ok, Data::binary()} |
+		   {error, Reason::term()}.
+	  	   
+fetch(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode, Destination, Timeout) 
+  when is_integer(Nid), 
+       is_integer(Ix), 
+       is_integer(Si),
+       (TransferMode == block orelse TransferMode == segment) ->
+    fetch(NodeId, Ix, Si, TransferMode, Destination, Timeout);
+fetch(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode, Destination, Timeout) 
+  when is_integer(Nid), 
+       is_integer(Ix),
+       (TransferMode == block orelse TransferMode == segment) ->
+    fetch(NodeId, Ix, 0, TransferMode, Destination, Timeout);
+fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, Destination)
+  when is_integer(Nid), 
+       is_integer(Ix), 
+       is_integer(Si),
+       (TransferMode == block orelse TransferMode == segment) ->
+    fetch(NodeId, Ix, Si, TransferMode, Destination, default).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link fetch/6}.
 %% @end
 %%--------------------------------------------------------------------
 -spec fetch({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
@@ -222,15 +283,17 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, data = Term)
 		   {ok, Data::binary()} |
 		   {error, Reason::term()}.
 		   
-fetch(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode, Term) 
+fetch(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode, Destination) 
   when is_integer(Nid), 
        is_integer(Ix), 
-       is_integer(Si) ->
-    fetch(NodeId, Ix, Si, TransferMode, Term);
-fetch(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode, Term) 
+       is_integer(Si),
+       (TransferMode == block orelse TransferMode == segment) ->
+    fetch(NodeId, Ix, Si, TransferMode, Destination);
+fetch(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode, Destination) 
   when is_integer(Nid), 
-       is_integer(Ix) ->
-    fetch(NodeId, Ix, 0, TransferMode, Term).
+       is_integer(Ix),
+       (TransferMode == block orelse TransferMode == segment) ->
+    fetch(NodeId, Ix, 0, TransferMode, Destination).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -253,43 +316,100 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode, Term)
 	    TransferMode:: block | segment,
 	    Source:: {app, Pid::pid(), Mod::atom()} | 
 		      {value, Value::term(), Type::integer() | atom()} |
+		      {data, Bin::binary()},
+	    TimeOut::timeout() | default) ->
+		   ok | 
+		   {error, Reason::term()}.
+
+store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, 
+      {app, Pid, Mod} = Source, TimeOut) 
+  when is_integer(Nid), 
+       is_integer(Ix), 
+       is_integer(Si), 
+       (TransferMode == block orelse TransferMode == segment),
+       is_pid(Pid),
+       is_atom(Mod),
+       ((is_integer(TimeOut) andalso TimeOut > 0) orelse TimeOut == default)  ->
+    case process_info(Pid) of
+	undefined -> {error, non_existing_application};
+	_Info -> co_api:store(?MGR_NODE, NodeId, Ix, Si, 
+			      TransferMode, Source, TimeOut)
+    end;
+store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, 
+      {value, Value, Type}, TimeOut) 
+  when is_integer(Nid), 
+       is_integer(Ix), 
+       is_integer(Si), 
+       (TransferMode == block orelse TransferMode == segment),
+       is_atom(Type),
+       ((is_integer(TimeOut) andalso TimeOut > 0) orelse TimeOut == default)  ->
+ store(NodeId, Ix, Si, TransferMode, 
+       {value, Value, co_lib:encode_type(Type)}, TimeOut);
+store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, 
+      {value, Value, Type}, TimeOut) 
+  when is_integer(Nid), 
+       is_integer(Ix), 
+       is_integer(Si), 
+       (TransferMode == block orelse TransferMode == segment),
+       is_integer(Type),
+       ((is_integer(TimeOut) andalso TimeOut > 0) orelse TimeOut == default)  ->
+    co_api:store(?MGR_NODE, NodeId, Ix, Si, TransferMode, 
+		  {data, co_codec:encode(Value, Type)}, TimeOut);
+store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, 
+      {data, Bin} = Source, TimeOut)
+  when is_integer(Nid), 
+       is_integer(Ix), 
+       is_integer(Si), 
+       (TransferMode == block orelse TransferMode == segment),
+       is_binary(Bin),
+       ((is_integer(TimeOut) andalso TimeOut > 0) orelse TimeOut == default)  ->
+   co_api:store(?MGR_NODE, NodeId, Ix, Si, TransferMode, Source, TimeOut).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link  store/6}.
+%% @end
+%%--------------------------------------------------------------------
+-spec store({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
+	    {Ix::integer(), Si::integer()} | integer(),
+	    TransferMode:: block | segment,
+	    Source:: {app, Pid::pid(), Mod::atom()} | 
+		      {value, Value::term(), Type::integer() | atom()} |
+		      {data, Bin::binary()},
+	    TimeOut::timeout() | default) ->
+		   ok | 
+		   {error, Reason::term()};
+	   ({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
+	    Ix::integer(), Si::integer(),
+	    TransferMode:: block | segment,
+	    Source:: {app, Pid::pid(), Mod::atom()} | 
+		      {value, Value::term(), Type::integer() | atom()} |
 		      {data, Bin::binary()}) ->
 		   ok | 
 		   {error, Reason::term()}.
 
-store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {app, Pid, Mod} = Term) 
+store(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode, Source, TimeOut) 
   when is_integer(Nid), 
        is_integer(Ix), 
-       is_integer(Si), 
-       is_pid(Pid),
-       is_atom(Mod) ->
-    case process_info(Pid) of
-	undefined -> {error, non_existing_application};
-	_Info -> co_api:store(?MGR_NODE, NodeId, Ix, Si, TransferMode, Term)
-    end;
-store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {value, Value, Type}) 
+       is_integer(Si),
+       (TransferMode == block orelse TransferMode == segment),
+       ((is_integer(TimeOut) andalso TimeOut > 0) orelse TimeOut == default) ->
+    store(NodeId, Ix, Si, TransferMode, Source, TimeOut);
+store(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode, Source, TimeOut) 
   when is_integer(Nid), 
-       is_integer(Ix), 
-       is_integer(Si), 
-       is_atom(Type) ->
- store(NodeId, Ix, Si, TransferMode, {value, Value, co_lib:encode_type(Type)});
-store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {value, Value, Type}) 
+       is_integer(Ix),
+       (TransferMode == block orelse TransferMode == segment),
+       ((is_integer(TimeOut) andalso TimeOut > 0) orelse TimeOut == default) ->
+    store(NodeId, Ix, 0, TransferMode, Source, TimeOut);
+store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, Source)
   when is_integer(Nid), 
-       is_integer(Ix), 
-       is_integer(Si), 
-       is_integer(Type) ->
-    co_api:store(?MGR_NODE, NodeId, Ix, Si, TransferMode, 
-		  {data, co_codec:encode(Value, Type)});
-store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {data, Bin} = Term)
-  when is_integer(Nid), 
-       is_integer(Ix), 
-       is_integer(Si), 
-       is_binary(Bin) ->
-    co_api:store(?MGR_NODE, NodeId, Ix, Si, TransferMode, Term).
+       is_integer(Ix),
+       (TransferMode == block orelse TransferMode == segment) ->
+    store(NodeId, Ix, Si, TransferMode, Source, default).
 
 %%--------------------------------------------------------------------
 %% @doc
-%% See {@link  store/5}.
+%% See {@link  store/6}.
 %% @end
 %%--------------------------------------------------------------------
 -spec store({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
@@ -301,15 +421,17 @@ store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {data, Bin} = Term)
 		   ok | 
 		   {error, Reason::term()}.
 
-store(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode,  Term) 
+store(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode, Source) 
   when is_integer(Nid), 
        is_integer(Ix), 
-       is_integer(Si) ->
-    store(NodeId, Ix, Si, TransferMode,  Term);
-store(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode,  Term) 
+       is_integer(Si),
+       (TransferMode == block orelse TransferMode == segment) ->
+    store(NodeId, Ix, Si, TransferMode, Source);
+store(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode, Source) 
   when is_integer(Nid), 
-       is_integer(Ix) ->
-    store(NodeId, Ix, 0, TransferMode,  Term).
+       is_integer(Ix),
+       (TransferMode == block orelse TransferMode == segment) ->
+    store(NodeId, Ix, 0, TransferMode, Source).
 
 %% API used by co_script
 %%--------------------------------------------------------------------
@@ -858,10 +980,12 @@ translate_index2(Ctx, E=#entdef {index = S}, Index, SubInd, Value)
   when ?is_subind(SubInd) andalso not is_integer(S) ->
     %% Found entry with index as range use original sub_index
     translate_index2(Ctx, E#entdef {index = SubInd}, Index, SubInd, Value);
-translate_index2(_Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, no_value) ->
+translate_index2(_Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, 
+		 no_value) ->
     %% For fetch 
     {ok,{Index,SubInd,{value, co_lib:encode_type(Type)}}};
-translate_index2(Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, Value) ->
+translate_index2(Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, 
+		 Value) ->
     case translate_value(Type, Value, Ctx) of
 	{ok,TValue} ->
 	    {ok,{Index,SubInd,{value, TValue, co_lib:encode_type(Type)}}};

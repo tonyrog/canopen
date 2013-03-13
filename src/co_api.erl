@@ -66,7 +66,7 @@
 %%-export([delete_object/2, delete_entry/2]).
 -export([set_data/3, set_value/3]).
 -export([data/2, value/2]).
--export([store/6, fetch/6]).
+-export([store/7, fetch/7]).
 -export([subscribers/2]).
 -export([reserver_with_module/2]).
 -export([tpdo_mapping/2, rpdo_mapping/2, tpdo_set/4, tpdo_data/2]).
@@ -956,18 +956,31 @@ data(Identity, Ix) when is_integer(Ix) ->
 	    TransferMode:: block | segment,
 	    Term::{data, binary()} | 
 		  {value, Value::term(), Type::integer() | atom()} |
-		  {app, Pid::pid(), Module::atom()}) ->
+		  {app, Pid::pid(), Module::atom()},
+	    TimeOut::timeout() | default) ->
 		   ok | {error, Error::term()}.
 
-store(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, TransferMode, Term) 
+store(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, 
+      TransferMode, Term, default) 
   when ?is_index(IX), ?is_subind(SI) ->
     ?dbg(node, "store: Identity = ~p, NodeId = {~p, ~.16#}, " ++
 	     "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p", 
 	 [Identity, _TypeOfNid, _Nid, IX, SI, TransferMode, Term]),
     gen_server:call(identity_to_pid(Identity), 
-		    {store,TransferMode,NodeId,IX,SI,Term}).
+		    {store,TransferMode,NodeId,IX,SI,Term});
+store(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, 
+      TransferMode, Term, TimeOut) 
+  when ?is_index(IX), ?is_subind(SI),
+       (is_integer(TimeOut) andalso TimeOut > 0) ->
+    ?dbg(node, "store: Identity = ~p, NodeId = {~p, ~.16#}, " ++
+	     "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p, TimeOut = ~p", 
+	 [Identity, _TypeOfNid, _Nid, IX, SI, TransferMode, Term, TimeOut]),
+    gen_server:call(identity_to_pid(Identity), 
+		    {store,TransferMode,NodeId,IX,SI,Term,TimeOut},
+		    TimeOut + 1000).
 
 
+    
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts a fetch session to fetch Value at Index:Subind on remote node.
@@ -980,17 +993,29 @@ store(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, TransferMode, Term)
  	    TransferMode:: block | segment,
 	    Term::data | 
 		  {app, Pid::pid(), Module::atom()} |
-		  {value, Type::integer() | atom()}) ->
+		  {value, Type::integer() | atom()},
+	    TimeOut::timeout() | default) ->
 		   ok | {ok, Data::binary()} | {error, Error::term()}.
 
 
-fetch(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, TransferMode, Term)
+fetch(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, 
+      TransferMode, Term, default)
   when ?is_index(IX), ?is_subind(SI) ->
     ?dbg(node, "fetch: Identity = ~p, NodeId = {~p, ~.16#}, " ++
 	     "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p", 
 	 [Identity, _TypeOfNid, _Nid, IX, SI, TransferMode, Term]),
     gen_server:call(identity_to_pid(Identity), 
-		    {fetch,TransferMode,NodeId,IX,SI,Term}).
+		    {fetch,TransferMode,NodeId,IX,SI,Term});
+fetch(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, 
+      TransferMode, Term, TimeOut)
+  when ?is_index(IX), ?is_subind(SI),
+       (is_integer(TimeOut) andalso TimeOut > 0) ->
+    ?dbg(node, "fetch: Identity = ~p, NodeId = {~p, ~.16#}, " ++
+	     "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p, TimeOut = ~p", 
+	 [Identity, _TypeOfNid, _Nid, IX, SI, TransferMode, Term, TimeOut]),
+    gen_server:call(identity_to_pid(Identity), 
+		    {fetch,TransferMode,NodeId,IX,SI,Term,TimeOut},
+		    TimeOut + 1000).
 
 
 %%--------------------------------------------------------------------

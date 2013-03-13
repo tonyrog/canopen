@@ -94,7 +94,9 @@ all() ->
      store_streamed_m_segment,
      fetch_streamed_m_segment,
      store_streamed_m_block,
-     fetch_streamed_m_block].
+     fetch_streamed_m_block,
+     timeout,
+     change_timeout].
 %%     break].
 
 
@@ -155,36 +157,13 @@ end_per_suite(Config) ->
 %%               Config1 | {skip,Reason} | {skip_and_save,Reason,Config1}
 %% @end
 %%--------------------------------------------------------------------
-init_per_testcase(Case, Config) when Case == store_atomic_segment;
-				     Case == fetch_atomic_segment;
-				     Case == store_atomic_block;
-				     Case == fetch_atomic_block;
-				     Case == store_atomic_exp;
-				     Case == fetch_atomic_exp;
-				     Case == store_streamed_segment;
-				     Case == fetch_streamed_segment;
-				     Case == store_streamed_block;
-				     Case == fetch_streamed_block;
-				     Case == store_streamed_exp;
-				     Case == fetch_streamed_exp;
-				     Case == store_atomic_m_segment;
-				     Case == fetch_atomic_m_segment;
-				     Case == store_atomic_m_block;
-				     Case == fetch_atomic_m_block;
-				     Case == store_streamed_m_segment;
-				     Case == fetch_streamed_m_segment;
-				     Case == store_streamed_m_block;
-				     Case == fetch_streamed_m_block;
-				     Case == break ->
+init_per_testcase(Case, Config) ->
     ct:pal("Testcase: ~p", [Case]),
     {ok, Pid} = co_test_app:start(serial(), app_dict()),
     ok = co_test_app:debug(Pid, true),
     {ok, Cli} = co_test_app:start(?MGR_NODE, app_dict_cli()),
     ok = co_test_app:debug(Cli, true),
-    [{app, Cli} | Config];
-init_per_testcase(_TestCase, Config) ->
-    ct:pal("Testcase: ~p", [_TestCase]),
-    Config.
+    [{app, Cli} | Config].
 
 
 %%--------------------------------------------------------------------
@@ -200,33 +179,11 @@ init_per_testcase(_TestCase, Config) ->
 %%               void() | {save_config,Config1} | {fail,Reason}
 %% @end
 %%--------------------------------------------------------------------
-end_per_testcase(Case, _Config) when Case == store_atomic_segment;
-				     Case == fetch_atomic_segment;
-				     Case == store_atomic_block;
-				     Case == fetch_atomic_block;
-				     Case == store_atomic_exp;
-				     Case == fetch_atomic_exp;
-				     Case == store_streamed_segment;
-				     Case == fetch_streamed_segment;
-				     Case == store_streamed_block;
-				     Case == fetch_streamed_block;
-				     Case == store_streamed_exp;
-				     Case == fetch_streamed_exp;
-				     Case == store_atomic_m_segment;
-				     Case == fetch_atomic_m_segment;
-				     Case == store_atomic_m_block;
-				     Case == fetch_atomic_m_block;
-				     Case == store_streamed_m_segment;
-				     Case == fetch_streamed_m_segment;
-				     Case == store_streamed_m_block;
-				     Case == fetch_streamed_m_block;
-				     Case == break ->
+end_per_testcase(_Case, _Config) ->
     %% Wait a little for session to terminate
     timer:sleep(1000),
     co_test_app:stop(serial()),
     co_test_app:stop(?MGR_NODE),
-    ok;
-end_per_testcase(_TestCase, _Config) ->
     ok.
 %%--------------------------------------------------------------------
 %% TEST CASES
@@ -435,6 +392,41 @@ fetch_streamed_m_block(Config) ->
 
 
 %%--------------------------------------------------------------------
+%% @spec timeout(Config) -> ok 
+%% @doc 
+%% Negative test of what happens if the storing causes a timeout.
+%% @end
+%%--------------------------------------------------------------------
+timeout(Config) ->
+    {{Index, _Type, _M, _SrvValue}, _CliValue} = ct:get_config({dict, timeout}),
+							
+    %% Timeout
+    {error,timed_out} = store_cmd(Config, Index, segment).
+
+%%--------------------------------------------------------------------
+%% @spec change_timeout(Config) -> ok 
+%% @doc 
+%% A test of giving a longer timeout and changing timeout on 
+%% application side.
+%% @end
+%%--------------------------------------------------------------------
+change_timeout(Config) ->
+
+    {{Index, Type, _M, SrvValue}, CliValue} = 
+	ct:get_config({dict, change_timeout}),
+
+    %% Verify old value
+    {Index, Type, _Transfer, SrvValue} = 
+	lists:keyfind(Index, 1, co_test_app:dict(serial())),
+							
+    %% Change to new
+    ok = store_cmd(Config, Index, segment, 10000),
+
+    %% Verify new value
+    {Index, _Type, _Transfer, CliValue} = 
+	lists:keyfind(Index, 1, co_test_app:dict(serial())).
+
+%%--------------------------------------------------------------------
 %% @spec break(Config) -> ok 
 %% @doc 
 %% Dummy test case to have a test environment running.
@@ -445,7 +437,7 @@ break(Config) ->
     ets:new(config, [set, public, named_table]),
     ets:insert(config, Config),
     test_server:break("Break for test development\n" ++
-		     "Get Config by ets:tab2list(config)"),
+		     "Get Config by C = ets:tab2list(config)."),
     ok.
 
 %%--------------------------------------------------------------------
@@ -505,7 +497,15 @@ store_cmd(Config, {Ix, Si}, BlockOrSegment) ->
     co_mgr:store(xnodeid(), Ix, Si, BlockOrSegment, 
 		 {app, ?config(app, Config), co_test_app}).
 
+store_cmd(Config, {Ix, Si}, BlockOrSegment, TimeOut) -> 
+    co_mgr:store(xnodeid(), Ix, Si, BlockOrSegment, 
+		 {app, ?config(app, Config), co_test_app}, TimeOut).
+
 fetch_cmd(Config, {Ix, Si}, BlockOrSegment) ->
     co_mgr:fetch(xnodeid(), Ix, Si, BlockOrSegment, 
 		 {app, ?config(app, Config), co_test_app}).
+    
+fetch_cmd(Config, {Ix, Si}, BlockOrSegment, TimeOut) ->
+    co_mgr:fetch(xnodeid(), Ix, Si, BlockOrSegment, 
+		 {app, ?config(app, Config), co_test_app}, TimeOut).
     

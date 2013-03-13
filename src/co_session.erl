@@ -30,7 +30,7 @@
 
 -compile(export_all).
 
-timeout(S) ->
+local_timeout(S) ->
     BufTimeout = 
 	if S#co_session.buf =/= undefined ->
 		co_data_buf:timeout(S#co_session.buf);
@@ -42,6 +42,9 @@ timeout(S) ->
        true ->
 	    (S#co_session.ctx)#sdo_ctx.timeout
     end.
+
+remote_timeout(S) ->
+    (S#co_session.ctx)#sdo_ctx.timeout.
 
 block_timeout(S) ->
     (S#co_session.ctx)#sdo_ctx.blk_timeout.

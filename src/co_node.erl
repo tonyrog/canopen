@@ -493,45 +493,18 @@ handle_call({tpdo_set,I,Value,Mode}, _From, Ctx) ->
     {Reply,Ctx1} = tpdo_set(I,Value,Mode,Ctx),
     {reply, Reply, Ctx1};
 
-handle_call({Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term}, From, 
-	    Ctx=#co_ctx {name = _Name, sdo_list = Sessions, sdo = SdoCtx}) 
+handle_call({Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term}, From, Ctx) 
   when Action == store;
        Action == fetch ->
-    Nid = case TypeOfNode of
-	      nodeid -> NodeId;
-	      xnodeid -> co_lib:add_xflag(NodeId)
-	  end,
-    case lookup_sdo_server(Nid,Ctx) of
-	ID={Tx,Rx} ->
-	    ?dbg(node, "~s: ~p: ID = ~p", [_Name,Action,ID]),
-	    case lists:keyfind(Nid, #sdo.dest_node, Sessions) of
-		_S=#sdo {state = active} ->
-		    ?dbg(node, "~s: ~p: Session already in progress to ~.16.0#", 
-			 [_Name, Action, Nid]),
-		    {reply, {error, session_already_in_progress}, Ctx};
-		_Other ->
-		    %% state = zombie
-		    %% false
-		    %% OK to start new session
-		    case co_sdo_cli_fsm:Action(SdoCtx,Mode,From,Tx,Rx,Ix,Si,Term) of
-			{error, Reason} ->
-			    ?dbg(node,"~s: ~p: unable to start co_sdo_cli_fsm: ~p", 
-				 [_Name, Action, Reason]),
-			    {reply, Reason, Ctx};
-			{ok, Pid} ->
-			    Mon = erlang:monitor(process, Pid),
-			    %% sys:trace(Pid, true),
-			    S = #sdo { dest_node = Nid, id=ID, pid=Pid, mon=Mon },
-			    ?dbg(node, "~s: ~p: added session id=~p", 
-				 [_Name, Action, ID]),
-			    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
-		    end
-	    end;
-	undefined ->
-	    ?dbg(node, "~s: ~p: No sdo server found for node ~.16.0#.", 
-		 [_Name, Action, Nid]),
-	    {reply, {error, badarg}, Ctx}
-    end;
+    %% {reply, Res, Cx} and {noreply, Ctx} are possible reults
+    handle_mgr_action(Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term,default, 
+		      From, Ctx);
+handle_call({Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term,TOut}, From, Ctx) 
+  when Action == store;
+       Action == fetch ->
+    %% {reply, Res, Cx} and {noreply, Ctx} are possible reults
+    handle_mgr_action(Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term,TOut, 
+		      From, Ctx);
 
 handle_call({add_object,Object, Es}, _From, Ctx) 
   when is_record(Object, dict_object) ->
@@ -1798,6 +1771,52 @@ handle_sdo_rx(_Frame, _Rx, _Tx, Ctx=#co_ctx {state = State, name = _Name}) ->
 		       co_sdo:decode_rx(_Frame#can_frame.data))]),
     error_logger:warning_msg("Received sdo in state ~p, ignoring\n", [State]),
     Ctx.
+
+handle_mgr_action(Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term,TOut, From, 
+	    Ctx=#co_ctx {name = _Name, sdo_list = Sessions, sdo = SdoCtx}) ->
+    Nid = case TypeOfNode of
+	      nodeid -> NodeId;
+	      xnodeid -> co_lib:add_xflag(NodeId)
+	  end,
+    case lookup_sdo_server(Nid,Ctx) of
+	ID={Tx,Rx} ->
+	    ?dbg(node, "~s: ~p: ID = ~p", [_Name,Action,ID]),
+	    case lists:keyfind(Nid, #sdo.dest_node, Sessions) of
+		_S=#sdo {state = active} ->
+		    ?dbg(node, "~s: ~p: Session already in progress to ~.16.0#",
+			 [_Name, Action, Nid]),
+		    {reply, {error, session_already_in_progress}, Ctx};
+		_Other ->
+		    %% state = zombie or
+		    %% false
+		    %% OK to start new session
+		    case co_sdo_cli_fsm:Action(
+			   SdoCtx#sdo_ctx {timeout =
+					       %% If remote timeout given use it
+					       %% otherwise use default
+					       if TOut =/= default -> TOut;
+						  true -> SdoCtx#sdo_ctx.timeout
+					       end},
+					       Mode,From,Tx,Rx,Ix,Si,Term) of
+			{error, Reason} ->
+			    ?dbg(node,"~s: ~p: unable to start co_sdo_cli_fsm, "
+				 "reason ~p",  [_Name, Action, Reason]),
+			    {reply, Reason, Ctx};
+			{ok, Pid} ->
+			    Mon = erlang:monitor(process, Pid),
+			    %% sys:trace(Pid, true),
+			    S = #sdo {dest_node = Nid, id=ID, pid=Pid, mon=Mon},
+			    ?dbg(node, "~s: ~p: added session id=~p", 
+				 [_Name, Action, ID]),
+			    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
+		    end
+	    end;
+	undefined ->
+	    ?dbg(node, "~s: ~p: No sdo server found for node ~.16.0#.", 
+		 [_Name, Action, Nid]),
+	    {reply, {error, badarg}, Ctx}
+    end.
+
 
 handle_mpdo(Frame, CobId, Ctx=#co_ctx {state = ?Operational, name = _Name}) ->
     case Frame#can_frame.data of
