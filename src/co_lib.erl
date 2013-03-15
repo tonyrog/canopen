@@ -572,21 +572,21 @@ object(Key, [{_ModName, DefMod=#def_mod {objects = Objects}} | DefMods])
     end;
 object(Id, ObjList) 
   when is_atom(Id) andalso is_list(ObjList) ->
-    ?dbg(lib,"object: searching for ~p", [Id]),
+    ?dbg(lib,"object: searching for atom ~p", [Id]),
     case lists:keyfind(Id, #objdef.id, ObjList) of
 	false -> {error, not_found};
 	Obj -> Obj
     end;
 object(Name, ObjList)
   when is_list(Name) andalso is_list(ObjList) ->
-    ?dbg(lib,"object: searching for ~p", [Name]),
+    ?dbg(lib,"object: searching for string ~p", [Name]),
     case lists:keyfind(Name, #objdef.name, ObjList) of
 	false -> {error, not_found};
 	Obj -> Obj
     end;
 object(Index, [Obj| Objects]) 
   when ?is_index(Index) andalso is_record(Obj, objdef)->
-    ?dbg(lib,"object: searching for ~p", [Index]),
+    ?dbg(lib,"object: searching for index ~p", [Index]),
     %% Index can be a range
     case match_index(Index, Obj#objdef.index) of
 	true -> Obj;

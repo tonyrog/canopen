@@ -43,6 +43,7 @@
 -export([client_store/4, client_store/3, client_store/2]).
 -export([client_fetch/3, client_fetch/2, client_fetch/1]).
 -export([client_notify/5, client_notify/4, client_notify/3]).
+-export([translate/1, translate/2]).
 
 %% gen_server callbacks
 -export([init/1, 
@@ -609,6 +610,33 @@ client_notify(Func, Index, Subind, Value) ->
 client_notify(Func, Index, Value) ->
     gen_server:cast(?CO_MGR, {notify, Func, Index, 0, Value}).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Looks up index in def files.
+%% @end
+%%--------------------------------------------------------------------
+-spec translate(Index::atom(), SubInd::atom()) -> 
+		       {IndexI::integer(), SubIndI::integer()} | 
+		       {error, Reason::term()}.
+
+translate(Index, SubInd) 
+  when is_atom(Index), is_atom(SubInd) ->
+    gen_server:call(?CO_MGR, {translate, Index, SubInd}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link  translate/2}.
+%% SubInd = 0.
+%% @end
+%%--------------------------------------------------------------------
+-spec translate(Index::atom()) ->
+			  IndexI::integer() | 
+				  {error, Reason::term()}.
+
+translate(Index) 
+  when is_atom(Index) ->
+    gen_server:call(?CO_MGR, {translate, Index, 0}).
+
 %% For testing
 %% @private
 debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
@@ -669,8 +697,9 @@ init(Opts) ->
 	 Ix::integer(), Si::integer(), Value::term()} |
 	{store, Ix::integer(), Si::integer(), Value::term()} |
 	{fetch, {TypeOfNid::nodeid | xnodeid, Nid::integer()},
-	 Ix::integer(), Si::integer()} |
+	 Ix::integer() | atom(), Si::integer() | atom()} |
 	{fetch, Ix::integer(), Si::integer()} |
+	{translate, Ix::atom(), Si::atom()} |
 	{debug, TrueOrFalse::boolean()} |
 	{loop_data, Qual:: all | no_ctx}.
 
@@ -701,6 +730,10 @@ handle_call({fetch,Nid,Index,SubInd}, From, Mgr) ->
 handle_call({fetch,Index,SubInd}, From, Mgr=#mgr {def_nid = DefNid})
   when DefNid =/= 0 ->
     do_fetch(DefNid, Index, SubInd, From, Mgr);
+
+handle_call({translate,Index,SubInd}, _From, Mgr=#mgr {def_nid = DefNid})
+  when DefNid =/= 0 ->
+    do_translate(DefNid, Index, SubInd, Mgr);
 
 handle_call({debug, TrueOrFalse}, _From, Mgr) ->
     co_lib:debug(TrueOrFalse),
@@ -870,7 +903,7 @@ do_store(Nid,Index,SubInd,Value,Client,
 do_fetch(Nid,Index,SubInd, Client, 
        Mgr=#mgr {pids = PList, def_trans_mode = TransMode, debug = Dbg}) ->
     Ctx = context(Nid, Mgr),
-    ?dbg(mgr, "do_fetch: translate  ~p:~p", [Index, SubInd]),
+    ?dbg(mgr, "do_fetch: translate ~p:~p", [Index, SubInd]),
     case translate_index(Ctx,Index,SubInd,no_value) of
 	{ok,{Ti,Tsi,Tv} = _T} ->
 	    ?dbg(mgr, "do_fetch: translated  ~p", [_T]),
@@ -883,6 +916,18 @@ do_fetch(Nid,Index,SubInd, Client,
 	    {noreply,  Mgr#mgr { pids = [Pid | PList] }};
 	Error ->
 	    ?dbg(mgr,"do_fetch: translation failed, error: ~p\n", [Error]),
+	    {reply, Error, Mgr}
+    end.
+
+do_translate(Nid,Index,SubInd, Mgr) ->
+    Ctx = context(Nid, Mgr),
+    ?dbg(mgr, "do_translate: translate ~p:~p", [Index, SubInd]),
+    case translate_index(Ctx,Index,SubInd,no_value) of
+	{ok,{Ti,Tsi,Tv} = _T} ->
+	    ?dbg(mgr, "do_translate: translated  ~p", [_T]),
+	    {reply, {Ti,Tsi}, Mgr};
+	Error ->
+	    ?dbg(mgr,"do_translate: translation failed, error: ~p\n", [Error]),
 	    {reply, Error, Mgr}
     end.
 
@@ -950,7 +995,7 @@ translate_index(Ctx,Index,SubInd,Value)
     translate_index2(Ctx, Res, Index, SubInd, Value);
 translate_index(Ctx,Index,SubInd,Value) 
   when is_atom(Index);
-       is_list(Index)->
+       is_list(Index) ->
     Res = co_lib:object(Index, Ctx),
     ?dbg(mgr,"translate_index: found ~p\n", [Res]),
     translate_index1(Ctx, Res, Index, SubInd, Value);
@@ -978,16 +1023,20 @@ translate_index2(_Ctx, {error, _Error} = _E, _Index, _SubInd, _Value) ->
     {error,argument};
 translate_index2(Ctx, E=#entdef {index = S}, Index, SubInd, Value) 
   when ?is_subind(SubInd) andalso not is_integer(S) ->
-    %% Found entry with index as range use original sub_index
+    ?dbg(mgr,"translate_index2: found entry with index as range use "
+	 "original sub_index",[]),
     translate_index2(Ctx, E#entdef {index = SubInd}, Index, SubInd, Value);
 translate_index2(_Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, 
 		 no_value) ->
-    %% For fetch 
+    ?dbg(mgr,"translate_index2: for fetch, found entry, type ~p ",[Type]),
     {ok,{Index,SubInd,{value, co_lib:encode_type(Type)}}};
 translate_index2(Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, 
 		 Value) ->
+    ?dbg(mgr,"translate_index2: found entry, type ~p, value ~p ",
+	 [Type, Value]),
     case translate_value(Type, Value, Ctx) of
 	{ok,TValue} ->
+	    ?dbg(mgr,"translate_index2: translated value ~p ", [TValue]),
 	    {ok,{Index,SubInd,{value, TValue, co_lib:encode_type(Type)}}};
 	error ->
 	    {error,argument}
