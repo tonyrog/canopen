@@ -237,6 +237,9 @@ init({Serial, NodeName, Opts}) ->
       sub_table = SubTable,
       res_table = ResTable,
       xnot_table = XNotTable,
+      inact_subs = [],     
+      inact_timeout = proplists:get_value(inact_timeout,Opts,infinity),
+      can_timestamp = 0,
       dict = Dict,
       mpdo_dispatch = MpdoDispatch,
       tpdo_cache = TpdoCache,
@@ -698,6 +701,35 @@ handle_call({xnot_subscribers}, _From, Ctx)  ->
     Subs = subscribers(Ctx#co_ctx.xnot_table),
     {reply, Subs, Ctx};
 
+handle_call({inactive_subscribe, Pid}, _From, 
+	    Ctx=#co_ctx {name = _Name, inact_subs = [], inact_timeout = IT})
+  when is_pid(Pid), IT =/= infinity ->
+    ?dbg(node, "~s: handle_call: first inactive subscribe pid = ~p", 
+	 [_Name, Pid]),
+    %% Timer must be activated
+    Ref = start_timer(IT * 1000, inactive),
+    {reply, ok, Ctx#co_ctx {inact_subs = [Pid], inact_timer = Ref}};
+
+handle_call({inactive_subscribe, Pid}, _From, 
+	    Ctx=#co_ctx {name = _Name, inact_subs = IS})
+  when is_pid(Pid) ->
+    ?dbg(node, "~s: handle_call: inactive subscribe pid = ~p", [_Name, Pid]),
+    {reply, ok, Ctx#co_ctx {inact_subs = lists:usort([Pid | IS])}};
+
+handle_call({inactive_unsubscribe, Pid}, _From, 
+	    Ctx=#co_ctx {name = _Name, inact_subs = [Pid], inact_timer = Ref}) 
+  when is_pid(Pid) ->
+    %% Timer must be deactivated
+    stop_timer(Ref),
+    {reply, ok, Ctx#co_ctx {inact_subs = []}};
+handle_call({inactive_unsubscribe, Pid}, _From, 
+	    Ctx=#co_ctx {name = _Name, inact_subs = IS}) 
+  when is_pid(Pid) ->
+    {reply, ok, Ctx#co_ctx {inact_subs = IS -- [Pid]}};
+
+handle_call({inactive_subscribers}, _From, Ctx=#co_ctx {inact_subs = IS})  ->
+    {reply, IS, Ctx};
+
 handle_call({set_error,Error,Code}, _From, Ctx) ->
     Ctx1 = set_error(Error,Code,Ctx),
     {reply, ok, Ctx1};
@@ -796,6 +828,7 @@ handle_call({option, Option}, _From, Ctx=#co_ctx {name = _Name}) ->
 		xnodeid -> {Option, Ctx#co_ctx.xnodeid};
 		nmt_role -> {Option, Ctx#co_ctx.nmt_role};
 		supervision -> {Option, Ctx#co_ctx.supervision};
+		inact_timeout -> {Option, Ctx#co_ctx.inact_timeout};
 		id -> id(Ctx);
 		use_serial_as_xnodeid -> {Option, calc_use_serial(Ctx)};
 		sdo_timeout ->  {Option, Ctx#co_ctx.sdo#sdo_ctx.timeout};
@@ -834,6 +867,8 @@ handle_call({option, Option, NewValue}, _From,
 		    SDO#sdo_ctx{load_ratio = NewValue};
 		atomic_limit -> 
 		    SDO#sdo_ctx{atomic_limit = NewValue};
+		inact_timeout -> 
+		    Ctx#co_ctx {inact_timeout = NewValue};
 		time_stamp -> 
 		    Ctx#co_ctx {time_stamp_time = NewValue};
 
@@ -955,7 +990,9 @@ handle_cast(_Msg, Ctx=#co_ctx {name = _Name}) ->
 handle_info(Frame, Ctx=#co_ctx {name = _Name}) 
   when is_record(Frame, can_frame) ->
     ?dbg(node, "~s: handle_info: CAN frame received", [_Name]),
-    Ctx1 = handle_can(Frame, Ctx),
+    Ctx1 = handle_can(Frame, 
+		      Ctx#co_ctx {can_timestamp = sz_util:sec(),
+				  inact_sent = false}),
     {noreply, Ctx1};
 
 handle_info({timeout,Ref,sync}, Ctx=#co_ctx {name = _Name}) 
@@ -984,10 +1021,56 @@ handle_info({timeout,Ref,time_stamp}, Ctx=#co_ctx {name = _Name})
     Ctx1 = Ctx#co_ctx { time_stamp_tmr = start_timer(Ctx#co_ctx.time_stamp_time, time_stamp) },
     {noreply, Ctx1};
 
-handle_info(do_heartbeat, 
-	    Ctx=#co_ctx {state = State, 
-			 heartbeat_time = HeartBeatTime, 
-			 name=_Name}) ->
+handle_info({timeout, Ref, inactive}, Ctx=#co_ctx {name = _Name, 
+						   inact_subs = [], 
+						   inact_timer = Ref}) ->
+    ?dbg(node, "~s: handle_info: inactive timeout, no one to send to.", 
+	 [_Name]),
+    %% No subscribers, timer should not be restarted
+    {noreply, Ctx#co_ctx {inact_timer = undefined, inact_sent = false}};
+
+handle_info({timeout, Ref, inactive}, Ctx=#co_ctx {name = _Name, 
+						   can_timestamp = CT, 
+						   inact_subs = IS, 
+						   inact_timeout = IT, 
+						   inact_timer = Ref, 
+						   inact_sent = false}) 
+  when is_integer(IT) ->
+    %% Send an inactive event
+    ?dbg(node, "~s: handle_info: inactive timeout received.", [_Name]),
+    Now = sz_util:sec(),
+    if Now - CT >= IT ->
+	    ?dbg(node, "~s: handle_info: sending inactive event to ~p.", 
+		 [_Name, IS]),
+	    lists:foldl(
+	      fun(Pid, _Acc) ->
+		      Pid ! inactive
+	      end, [], IS),
+	    NewRef = start_timer(IT, inactive),
+	    {noreply, Ctx#co_ctx {inact_sent = true, inact_timer = NewRef}};
+       true ->
+	    %% Restart timer with the time left minus 1 to be on safe side
+	    NewTimeOut = max(IT - (Now - CT)  - 1, 1),
+	    ?dbg(node, "~s: handle_info: restart timer with ~p.", 
+		 [_Name, NewTimeOut]),
+	    NewRef = start_timer(NewTimeOut * 1000, inactive),
+	    {noreply, Ctx#co_ctx {inact_timer = NewRef}}
+    end;
+
+handle_info({timeout, Ref, inactive}, Ctx=#co_ctx {name = _Name, 
+						   inact_timeout = IT, 
+						   inact_timer = Ref, 
+						   inact_sent = true}) 
+  when is_integer(IT) ->
+    ?dbg(node, "~s: handle_info: inactive timeout received, restart timer.", 
+	 [_Name]),
+    NewRef = start_timer(IT * 1000, inactive),
+    {noreply, Ctx#co_ctx {
+inact_timer = NewRef}};
+    
+handle_info(do_heartbeat, Ctx=#co_ctx {state = State, 
+				       heartbeat_time = HeartBeatTime, 
+				       name=_Name}) ->
     ?dbg(node, "~s: handle_info: do_heartbeat ", [_Name]),
     Data = <<0:1, State:7>>,
     send_node_guard(id(Ctx), 1, Data),
@@ -2613,7 +2696,6 @@ inform_reserver(Ix, _Ctx=#co_ctx {name = _Name, res_table = RTable}) ->
 	    gen_server:cast(Pid, {object_event, Ix})
     end.
 
-
 lookup_sdo_server(Nid, _Ctx=#co_ctx {name = _Name}) ->
     if ?is_nodeid_extended(Nid) ->
 	    NodeID = Nid band ?COBID_ENTRY_ID_MASK,
@@ -3017,11 +3099,13 @@ print_hex(Label, NodeId) ->
 	      [string:to_upper(atom_to_list(Label)),NodeId]).
 
 %% Optionally start a timer
-start_timer(0, _Type) -> false;
-start_timer(Time, Type) -> erlang:start_timer(Time,self(),Type).
+start_timer(infinity, _Msg) -> false;
+start_timer(0, _Msg) -> false;
+start_timer(Time, Msg) -> erlang:start_timer(Time,self(),Msg).
 
 %% Optionally stop a timer and flush
 stop_timer(false) -> false;
+stop_timer(undefined) -> false;
 stop_timer(TimerRef) ->
     case erlang:cancel_timer(TimerRef) of
 	false ->

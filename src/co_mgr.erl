@@ -923,7 +923,7 @@ do_translate(Nid,Index,SubInd, Mgr) ->
     Ctx = context(Nid, Mgr),
     ?dbg(mgr, "do_translate: translate ~p:~p", [Index, SubInd]),
     case translate_index(Ctx,Index,SubInd,no_value) of
-	{ok,{Ti,Tsi,Tv} = _T} ->
+	{ok,{Ti,Tsi,_Tv} = _T} ->
 	    ?dbg(mgr, "do_translate: translated  ~p", [_T]),
 	    {reply, {Ti,Tsi}, Mgr};
 	Error ->

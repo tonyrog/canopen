@@ -553,6 +553,13 @@
 	  sdo,              %% sdo context
 	  sdo_list=[],      %% [#sdo{}]
 
+	  %% Can event supervision
+	  inact_timeout = infinity, %% 
+	  inact_subs,       %% inactive event subscriptions
+	  inact_timer = undefined, 
+	  inact_sent = false,
+	  can_timestamp = 0,%% last event on can bus
+
 	  %% SYNC
 	  sync_tmr = false, %% TimerRef
 	  sync_time = 0,    %% Sync timer value (ms) should be us

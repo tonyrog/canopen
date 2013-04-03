@@ -46,6 +46,7 @@
 -export([subscribe/2, unsubscribe/2]).
 -export([reserve/3, unreserve/2]).
 -export([extended_notify_subscribe/2, extended_notify_unsubscribe/2]).
+-export([inactive_event_subscribe/1, inactive_event_unsubscribe/1]).
 -export([my_subscriptions/1, my_subscriptions/2]).
 -export([my_reservations/1, my_reservations/2]).
 -export([all_subscribers/1, all_subscribers/2]).
@@ -94,6 +95,9 @@
 %%          {time_stamp,  timeout()}  - ( 60000 ) in msec. <br/>
 %%          {nmt_role, nmt_role()}        - ( autonomous ) slave/master/autonomous
 %%          {supervision, node_guard | heartbeat | none}   - ( none )
+%%          {inact_timeout, timeout()} - (infinity) in sec. <br/>
+%%                                      timeout for sending inactive event 
+%%                                      when can bus has been inactive. <br/>
 %%
 %%            Dictionary option
 %%          {dict, none | default | saved | string()} - ( saved )
@@ -138,10 +142,11 @@
 	{revision, integer()} | 
 	{nmt_role, nmt_role()} | 
 	{supervision, supervision()} | 
+	{inact_timeout, timeout() } |
 	{dict, obj_dict()} | 
 	{time_stamp,  timeout()} | 
 	{sdo_timeout, timeout()} | 
-	{blk_timeout, timeout()} | 
+	{blk_timeout, timeout()} |
 	{pst, integer()} | 
 	{max_blksize, integer()} | 
 	{use_crc, boolean()} | 
@@ -249,12 +254,21 @@ verify_option(supervision, NewValue)
        NewValue == none ->
     ok;
 verify_option(supervision, _NewValue) ->
-    {error, "Option supervision can only be set to node_guard/heartbeat/none."};
+    {error, "Option supervision can only be set to "
+     "node_guard/heartbeat/none."};
 verify_option(pst, NewValue) 
   when is_integer(NewValue) andalso NewValue >= 0 ->
     ok;
 verify_option(pst, _NewValue) ->
     {error, "Option pst can only be set to a positive integer value or zero."};
+verify_option(inact_timeout, NewValue) 
+  when is_integer(NewValue) andalso NewValue > 0 ->
+    ok;
+verify_option(inact_timeout, infinity) ->
+    ok;
+verify_option(inact_timeout, _NewValue) ->
+    {error, "Option inact_timeout can only be set to a positive "
+     "integer value or infinity."};
 verify_option(Option, NewValue) 
   when Option == vendor;
        Option == product;
@@ -480,6 +494,30 @@ extended_notify_subscribe(Identity, Ix) ->
 		       ok | {error, Error::atom()}.
 extended_notify_unsubscribe(Identity, Ix) ->
     gen_server:call(identity_to_pid(Identity), {xnot_unsubscribe, Ix, self()}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Adds a subscription to event when can bus has been inactive.
+%% @end
+%%--------------------------------------------------------------------
+-spec inactive_event_subscribe(Identity::node_identity()) -> 
+		       ok | {error, Error::atom()}.
+
+inactive_event_subscribe(Identity) ->
+    gen_server:call(identity_to_pid(Identity), 
+		    {inactive_subscribe, self()}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Removes a subscription to event when can bus has been inactive.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec inactive_event_unsubscribe(Identity::node_identity()) -> 
+		       ok | {error, Error::atom()}.
+inactive_event_unsubscribe(Identity) ->
+    gen_server:call(identity_to_pid(Identity), 
+		    {inactive_unsubscribe, self()}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -1164,7 +1202,7 @@ notify(CobId,Index,Subind,Data) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec notify({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
-	     Func::atom(), Ix::integer(), Si::integer(), Data::binary()) -> 
+	    Func::atom(), Ix::integer(), Si::integer(), Data::binary()) -> 
 		    ok | {error, Error::atom()}.
 
 notify({xnodeid, XNid}, Func, Index, Subind, Data) ->
