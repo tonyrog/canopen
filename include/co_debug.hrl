@@ -34,3 +34,7 @@
 
 
 -endif.
+
+-define(ei(Format, Args), error_logger:info_msg(Format, Args)).
+-define(ee(Format, Args), error_logger:error_msg(Format, Args)).
+-define(ew(Format, Args), error_logger:warning_msg(Format, Args)).
