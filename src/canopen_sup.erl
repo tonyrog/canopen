@@ -94,18 +94,16 @@ init(Args) ->
     error_logger:info_msg("~p: init: args = ~p,\n pid = ~p\n", [?MODULE, Args, self()]),
     Serial = proplists:get_value(serial, Args, 0),
     Opts = proplists:get_value(options, Args, []),
-    CU = can_udp,
     CP = co_proc,
     CN = co_api,
     SA = co_sys_app,
     OA = co_os_app,
     %% can_router started by can application
-    CanUdp = {CU, {CU, start, [0]}, permanent, 5000, worker, [CU]}, %% start_link ??
     CoProc = {CP, {CP, start_link, [[]]}, permanent, 5000, worker, [CP]},
     CoNode = {co_node, {CN, start_link, [Serial, Opts]}, permanent, 5000, worker, [CN]},
     SysApp = {SA, {SA, start_link, [Serial]}, permanent, 5000, worker, [SA]},
     OsApp = {OA, {OA, start_link, [Serial]}, permanent, 5000, worker, [OA]},
-    Processes = [CanUdp, CoProc, CoNode, SysApp, OsApp],
+    Processes = [CoProc, CoNode, SysApp, OsApp],
     error_logger:info_msg("~p: About to start ~p\n", [?MODULE, Processes]),
     {ok, { {rest_for_one, 0, 300}, Processes} }.
 
