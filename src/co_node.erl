@@ -56,10 +56,6 @@
 -define(LAST_SAVED_DICT, "last.dict").
 -define(DEFAULT_DICT, "default.dict").
 
-%% Convenience defines
--define(ee(String, List), error_logger:error_msg(String, List)).
--define(ei(String, List),  error_logger:info_msg(String, List)).
-
 %%====================================================================
 %% API
 %%====================================================================
