@@ -55,11 +55,11 @@
 
 start(_StartType, _StartArgs) ->
     error_logger:info_msg("~p: start: arguments ignored.\n", [?MODULE]),
-    case application:get_env(serial) of
+    case application:get_env(canopen, serial) of
 	undefined -> 
 	    {error, no_serial_specified};
 	{ok,Serial} ->
-	    Opts = case application:get_env(options) of
+	    Opts = case application:get_env(canopen, options) of
 		       undefined -> [];
 		       {ok, O} -> O
 		   end,
