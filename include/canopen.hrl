@@ -858,4 +858,9 @@
 -define(TMPDO_MAP_INDEX(Map),  (((Map) bsr 8) band 16#ffff)).
 -define(TMPDO_MAP_SUBIND(Map), ((Map)  band 16#ff)).
 
+%% Convenience defines
+-define(ei(Format, Args), error_logger:info_msg(Format, Args)).
+-define(ee(Format, Args), error_logger:error_msg(Format, Args)).
+-define(ew(Format, Args), error_logger:warning_msg(Format, Args)).
+
 -endif.

@@ -1,6 +1,6 @@
-%%%---- BEGIN COPYRIGHT --------------------------------------------------------
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -13,11 +13,10 @@
 %%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 %%% KIND, either express or implied.
 %%%
-%%%---- END COPYRIGHT ----------------------------------------------------------
-%%%-------------------------------------------------------------------
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @author Malotte W Lönne <malotte@malotte.net>
-%%% @copyright (C) 2012, Tony Rogvall
+%%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%%    CANopen SDO Server Finite State Machine
 %%%
@@ -161,7 +160,7 @@ init({Ctx,NodePid,Src,Dst}) when is_record(Ctx, sdo_ctx) ->
         true -> co_lib:debug(true);
         _ -> do_nothing
     end,
-    ?dbg(srv,"init: src=~p, dst=~p ", [Src, Dst]),
+    ?dbg("init: src=~p, dst=~p ", [Src, Dst]),
     S0 = #co_session {
       src    = Src,
       dst    = Dst,
@@ -226,12 +225,13 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    start_segment_download(S1#co_session {buf = Buf});
 		{ok, Buf, Mref} when is_reference(Mref) ->
 		    %% Application called, wait for reply
-		    ?dbg(srv, "s_initial: mref=~p", [Mref]),
+		    ?dbg({index, {Ix, Si}}, "s_initial: mref=~p", [Mref]),
 		    S2 = S1#co_session { buf=Buf, mref=Mref },
 		    {next_state, s_writing_segment_started, S2, 
 		     local_timeout(S2)};
 		{error, Reason} ->
-		    ?dbg(srv, "s_initial: write failed, reason = ~p", [Reason]),
+		    ?dbg({index, {Ix, Si}}, 
+			 "s_initial: write failed, reason = ~p", [Reason]),
 		    abort(S1, Reason)
 	    end;
 
@@ -245,11 +245,12 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    start_block_download(S1#co_session {buf = Buf});
 		{ok, Buf, Mref} ->
 		    %% Application called, wait for reply
-		    ?dbg(srv, "s_initial: mref=~p", [Mref]),
+		    ?dbg({index, {Ix, Si}}, "s_initial: mref=~p", [Mref]),
 		    S2 = S1#co_session { buf=Buf, mref=Mref },
 		    {next_state, s_writing_block_started,S2, local_timeout(S2)};
 		{error,Reason} ->
-		    ?dbg(srv, "s_initial: write failed, reason = ~p", [Reason]),
+		    ?dbg({index, {Ix, Si}}, 
+			 "s_initial: write failed, reason = ~p", [Reason]),
 		    abort(S1, Reason)
 	    end;
 
@@ -260,17 +261,19 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		    start_segment_upload(S1#co_session {buf = Buf});
 		{ok, Buf, Mref} when is_reference(Mref) ->
 		    %% Application called, wait for reply
-		    ?dbg(srv, "s_initial: mref=~p", [Mref]),
+		    ?dbg({index, {Ix, Si}}, "s_initial: mref=~p", [Mref]),
 		    S2 = S1#co_session {mref = Mref, buf = Buf},
 		    {next_state, s_reading_segment_started, S2, 
 		     local_timeout(S2)};
 		{error,Reason} ->
-		    ?dbg(srv, "s_initial: read failed, reason = ~p", [Reason]),
+		    ?dbg({index, {Ix, Si}}, 
+			 "s_initial: read failed, reason = ~p", [Reason]),
 		    abort(S1, Reason)
 	    end;
 
 	?ma_ccs_block_upload_request(GenCrc,Ix,Si,BlkSize,Pst) ->
-	    ?dbg(srv, "s_initial: block_upload_request blksize = ~p",
+	    ?dbg({index, {Ix, Si}}, 
+		 "s_initial: block_upload_request blksize = ~p",
 		 [BlkSize]),
 	    S1 = S#co_session {index=Ix, subind=Si, pst=Pst, blksize=BlkSize, 
 			       clientcrc=(GenCrc =:= 1)},
@@ -278,23 +281,25 @@ s_initial(M, S) when is_record(M, can_frame) ->
 		{ok, Buf} ->
 		    NBytes = co_data_buf:data_size(Buf),
 		    if Pst =/= 0, NBytes > 0, NBytes =< Pst ->
-			    ?dbg(srv, "protocol switch",[]),
+			    ?dbg({index, {Ix, Si}}, "protocol switch",[]),
 			    start_segment_upload(S1#co_session {buf = Buf});
 		       true ->
 			    start_block_upload(S1#co_session {buf = Buf})
 		       end;
 		{ok, Buf, Mref} when is_reference(Mref) ->
 		    %% Application called, wait for reply
-		    ?dbg(srv, "s_initial: mref=~p", [Mref]),
+		    ?dbg({index, {Ix, Si}}, "s_initial: mref=~p", [Mref]),
 		    S2 = S1#co_session {mref = Mref, buf = Buf},
 		    {next_state, s_reading_block_started, S2, 
 		     local_timeout(S2)};
 		{error,Reason} ->
-		    ?dbg(srv,"s_initial: read failed, reason = ~p", [Reason]),
+		    ?dbg({index, {Ix, Si}},
+			 "s_initial: read failed, reason = ~p", [Reason]),
 		    abort(S1, Reason)
 	    end;
 	?ma_ccs_abort_transfer(_Ix,_Si,_Code) ->
-	    ?dbg(srv, "s_initial: abort_transfer, index = ~7.16.0#:~w, "
+	    ?dbg({index, {_Ix, _Si}}, 
+		 "s_initial: abort_transfer, index = ~7.16.0#:~w, "
 		 "code = ~p", [_Ix, _Si, _Code]),
 	    %% If needed add:
 	    %% co_api:session_over(S#co_session.node_pid, 
@@ -316,32 +321,37 @@ s_initial(timeout, S) ->
 			{ok, Buf::term()} |
 			{error, Error::atom()}.
 
-write_begin(_S=#co_session {ctx = Ctx, index = Index, subind = SubInd, 
+write_begin(_S=#co_session {ctx = Ctx, index = Ix, subind = Si, 
 			    node_pid = NodePid}) ->
-    case co_api:reserver_with_module(Ctx#sdo_ctx.res_table, Index) of
+    case co_api:reserver_with_module(Ctx#sdo_ctx.res_table, Ix) of
 	[] ->
-	    ?dbg(srv, "write_begin: No reserver for index ~7.16.0#", [Index]),
-	    central_write_begin(Ctx, Index, SubInd);
+	    ?dbg({index, {Ix, Si}}, 
+		 "write_begin: No reserver for index ~7.16.0#", [Ix]),
+	    central_write_begin(Ctx, Ix, Si);
 	{NodePid, _Mod} when is_pid(NodePid) ->
-	    ?dbg(srv, "write_begin: co_node ~p has reserved index ~7.16.0#", 
-		 [NodePid, Index]),
-	    central_write_begin(Ctx, Index, SubInd);
+	    ?dbg({index, {Ix, Si}}, 
+		 "write_begin: co_node ~p has reserved index ~7.16.0#", 
+		 [NodePid, Ix]),
+	    central_write_begin(Ctx, Ix, Si);
 	{Pid, Mod} when is_pid(Pid) ->
-	    ?dbg(srv, "write_begin: Process ~p, ~p has reserved index ~7.16.0#",
-		 [Pid, Mod, Index]),
-	    app_write_begin(Index, SubInd, Pid, Mod);
+	    ?dbg({index, {Ix, Si}}, 
+		 "write_begin: Process ~p, ~p has reserved index ~7.16.0#",
+		 [Pid, Mod, Ix]),
+	    app_write_begin(Ix, Si, Pid, Mod);
 	{dead, _Mod} ->
-	    ?dbg(srv, "write_begin: Reserver process for index ~7.16.0# dead.",
-		 [Index]),
+	    ?dbg({index, {Ix, Si}}, 
+		 "write_begin: Reserver process for index ~7.16.0# dead.",
+		 [Ix]),
 	    {error, ?abort_internal_error}
     end.
 
 
-central_write_begin(_Ctx=#sdo_ctx {dict = Dict}, Index, SubInd) ->
-    case co_dict:lookup_entry(Dict, {Index,SubInd}) of
+central_write_begin(_Ctx=#sdo_ctx {dict = Dict}, Ix, Si) ->
+    case co_dict:lookup_entry(Dict, {Ix,Si}) of
 	{ok,E} ->
 	    if (E#dict_entry.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
-		    ?dbg(srv, "central_write_begin: Write access ok", []),
+		    ?dbg({index, {Ix, Si}}, 
+			 "central_write_begin: Write access ok", []),
 		    co_data_buf:init(write, Dict, E);
 	       true ->
 		    {error,?abort_write_not_allowed}
@@ -350,11 +360,12 @@ central_write_begin(_Ctx=#sdo_ctx {dict = Dict}, Index, SubInd) ->
 	    {error, Reason}
     end.
 
-app_write_begin(Index, SubInd, Pid, Mod) ->
-    case Mod:index_specification(Pid, {Index, SubInd}) of
+app_write_begin(Ix, Si, Pid, Mod) ->
+    case Mod:index_specification(Pid, {Ix, Si}) of
 	{spec, Spec} ->
 	    if (Spec#index_spec.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
-		    ?dbg(srv, "app_write_begin: transfer=~p, type = ~p",
+		    ?dbg({index, {Ix, Si}}, 
+			 "app_write_begin: transfer=~p, type = ~p",
 			 [Spec#index_spec.transfer, Spec#index_spec.type]),
 		    co_data_buf:init(write, Pid, Spec);
 	       true ->
@@ -375,27 +386,31 @@ app_write_begin(Index, SubInd, Pid, Mod) ->
 			{ok, Buf::term()} |
 			{error, Error::atom()}.
 
-read_begin(_S=#co_session {ctx = Ctx, index = Index, subind = SubInd}) ->
-    case co_api:reserver_with_module(Ctx#sdo_ctx.res_table, Index) of
+read_begin(_S=#co_session {ctx = Ctx, index = Ix, subind = Si}) ->
+    case co_api:reserver_with_module(Ctx#sdo_ctx.res_table, Ix) of
 	[] ->
-	    ?dbg(srv, "read_begin: No reserver for index ~7.16.0#", [Index]),
-	    central_read_begin(Ctx, Index, SubInd);
+	    ?dbg({index, {Ix, Si}}, 
+		 "read_begin: No reserver for index ~7.16.0#", [Ix]),
+	    central_read_begin(Ctx, Ix, Si);
 	{Pid, Mod} when is_pid(Pid)->
-	    ?dbg(srv, "read_begin: Process ~p subscribes to index ~7.16.0#", 
-		 [Pid, Index]),
-	    app_read_begin(Ctx, Index, SubInd, Pid, Mod);
+	    ?dbg({index, {Ix, Si}}, 
+		 "read_begin: Process ~p subscribes to index ~7.16.0#", 
+		 [Pid, Ix]),
+	    app_read_begin(Ctx, Ix, Si, Pid, Mod);
 	{dead, _Mod} ->
-	    ?dbg(srv, "read_begin: Reserver process for index ~7.16.0# dead.",
-		 [Index]),
+	    ?dbg({index, {Ix, Si}}, 
+		 "read_begin: Reserver process for index ~7.16.0# dead.",
+		 [Ix]),
 	    {error, ?abort_internal_error}
     end.
 
-central_read_begin(Ctx, Index, SubInd) ->
+central_read_begin(Ctx, Ix, Si) ->
     Dict = Ctx#sdo_ctx.dict,
-    case co_dict:lookup_entry(Dict, {Index,SubInd}) of
+    case co_dict:lookup_entry(Dict, {Ix,Si}) of
 	{ok,E} ->
 	    if (E#dict_entry.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
-		    ?dbg(srv, "central_read_begin: Read access ok", []),
+		    ?dbg({index, {Ix, Si}}, 
+			 "central_read_begin: Read access ok", []),
 		    co_data_buf:init(read, Dict, E,
 				     Ctx#sdo_ctx.readbufsize, 
 				     trunc(Ctx#sdo_ctx.readbufsize * 
@@ -407,12 +422,14 @@ central_read_begin(Ctx, Index, SubInd) ->
 	    {error, Reason}
     end.
 
-app_read_begin(Ctx, Index, SubInd, Pid, Mod) ->
-    case Mod:index_specification(Pid, {Index, SubInd}) of
+app_read_begin(Ctx, Ix, Si, Pid, Mod) ->
+    case Mod:index_specification(Pid, {Ix, Si}) of
 	{spec, Spec} ->
 	    if (Spec#index_spec.access band ?ACCESS_RO) =:= ?ACCESS_RO ->
-		    ?dbg(srv, "app_read_begin: Read access ok", []),
-		    ?dbg(srv, "app_read_begin: Transfer mode = ~p", 
+		    ?dbg({index, {Ix, Si}}, 
+			 "app_read_begin: Read access ok", []),
+		    ?dbg({index, {Ix, Si}}, 
+			 "app_read_begin: Transfer mode = ~p", 
 			 [Spec#index_spec.transfer]),
 		    co_data_buf:init(read, Pid, Spec, 
 				     Ctx#sdo_ctx.readbufsize, 
@@ -442,11 +459,13 @@ start_segment_download(S=#co_session {index = Ix, subind = Si}) ->
 			true -> 0
 		     end,
 	    <<Data:NBytes/binary, _Filler/binary>> = S#co_session.data,
-	    ?dbg(srv, "start_segment_download: expedited, Data = ~p", [Data]),
+	    ?dbg({index, {Ix, Si}}, 
+		 "start_segment_download: expedited, Data = ~p", [Data]),
 	    case co_data_buf:write(S#co_session.buf, Data, true, segment) of
 		{ok, Buf1, Mref} when is_reference(Mref) ->
 		    %% Called an application
-		    ?dbg(srv, "start_segment_download: mref=~p", [Mref]),
+		    ?dbg({index, {Ix, Si}}, 
+			 "start_segment_download: mref=~p", [Mref]),
 		    S1 = S#co_session {mref = Mref, buf = Buf1},
 		    {next_state, s_writing_segment_end, S1, local_timeout(S1)};
 		{ok, _Buf1} ->
@@ -456,12 +475,14 @@ start_segment_download(S=#co_session {index = Ix, subind = Si}) ->
 		    send(S, R),
 		    {stop, normal, S};
 		{error,Reason} ->
-		    ?dbg(srv, "start_segment_download: write failed, "
+		    ?dbg({index, {Ix, Si}}, 
+			 "start_segment_download: write failed, "
 			 "reason = ~p", [Reason]),
 		    abort(S, Reason)
 	    end;
        true ->
-	    ?dbg(srv, "start_segment_download: not expedited", []),
+	    ?dbg({index, {Ix, Si}}, 
+		 "start_segment_download: not expedited", []),
 	    %% FIXME: check if max_size already set
 	    %% reject if bad!
 	    %% set T=1 since client will start wibuf 0
@@ -495,7 +516,7 @@ start_segment_download(S=#co_session {index = Ix, subind = Si}) ->
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
 s_segment_download(M, 
-		     S=#co_session {index = Ix, subind = Si, node_pid = NPid}) 
+		   S=#co_session {index = Ix, subind = Si, node_pid = NPid}) 
   when is_record(M, can_frame) ->
     case M#can_frame.data of
 	?ma_ccs_download_segment_request(T,_N,_C,_D) 
@@ -510,7 +531,8 @@ s_segment_download(M,
 				   Eod, segment) of
 		{ok, Buf, Mref} ->
 		    %% Called an application
-		    ?dbg(srv, "s_segment_download: mref=~p", [Mref]),
+		    ?dbg({index, {Ix, Si}}, 
+			 "s_segment_download: mref=~p", [Mref]),
 		    S1 = S#co_session {t = T, mref = Mref, buf = Buf},
 		    if Eod ->
 			    %% Wait for write reply from app
@@ -546,7 +568,8 @@ s_segment_download(M,
 			     remote_timeout(S1)}
 		    end;
 		{error,Reason} ->
-		    ?dbg(srv, "s_segment_download: write failed, reason = ~p", 
+		    ?dbg({index, {Ix, Si}}, 
+			 "s_segment_download: write failed, reason = ~p", 
 			 [Reason]),
 		    abort(S,Reason)
 	    end;
@@ -577,22 +600,26 @@ s_segment_download(timeout, S) ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_writing_segment_started({Mref, Reply} = _M, S)  ->
-    ?dbg(srv, "s_writing_segment_started: Got event = ~p", [_M]),
+s_writing_segment_started({Mref, Reply} = _M, 
+			  S=#co_session {buf = OldBuf, 
+					 index = Ix, subind = Si})  ->
+    ?dbg({index, {Ix, Si}}, "s_writing_segment_started: Got event = ~p", [_M]),
     case S#co_session.mref of
 	Mref ->
 	    erlang:demonitor(Mref, [flush]),
-	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
+	    {ok, Buf} = co_data_buf:update(OldBuf, Reply),
 	    start_segment_download(S#co_session {buf = Buf, mref = undefined});
 	_Other ->
-	    ?dbg(srv, "s_writing_segment_started: received = ~p, aborting", 
+	    ?dbg({index, {Ix, Si}}, 
+		 "s_writing_segment_started: received = ~p, aborting", 
 		 [_Other]),
 	    abort(S, ?abort_internal_error)
     end;
 s_writing_segment_started(timeout, S) ->
     abort(S, ?abort_timed_out);
-s_writing_segment_started(M, S)  ->
-    ?dbg(srv, "s_writing_segment_started: Got event = ~p, aborting", [M]),
+s_writing_segment_started(M, S=#co_session {index = Ix, subind = Si})  ->
+    ?dbg({index, {Ix, Si}}, 
+	 "s_writing_segment_started: Got event = ~p, aborting", [M]),
     demonitor_and_abort(M, S).
 
 
@@ -617,8 +644,8 @@ s_writing_segment_started(M, S)  ->
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
 s_writing_segment_end({Mref, Reply} = _M, 
-		      S=#co_session {index = Index, subind = SubInd, t = T})  ->
-    ?dbg(srv, "s_writing_segment_end: Got event = ~p", [_M]),
+		      S=#co_session {index = Ix, subind = Si, t = T})  ->
+    ?dbg({index, {Ix, Si}}, "s_writing_segment_end: Got event = ~p", [_M]),
     Ok = case {S#co_session.mref, Reply} of
 	     {Mref, ok} ->
 		 %% Atomic reply
@@ -627,26 +654,30 @@ s_writing_segment_end({Mref, Reply} = _M,
 		 %% Streamed reply
 		 ok;
 	     {_NextMref, {ok, Ref}} when is_reference(Ref)->
-		 ?dbg(srv, "s_writing_segment_end: old message, waiting for ~p",
+		 ?dbg({index, {Ix, Si}}, 
+		      "s_writing_segment_end: old message, waiting for ~p",
 		      [_NextMref]),
 		 wait;
 	     _Other ->
-		 ?dbg(srv, "s_writing_segment_end: incorrect reply, ignoring", 
+		 ?dbg({index, {Ix, Si}}, 
+		      "s_writing_segment_end: incorrect reply, ignoring", 
 		      []),
 		 not_ok
 	 end,
     case Ok of
 	ok ->
 	    erlang:demonitor(Mref, [flush]),
-	    co_api:object_event(S#co_session.node_pid, {Index, SubInd}),
+	    co_api:object_event(S#co_session.node_pid, {Ix, Si}),
 	    co_api:session_over(S#co_session.node_pid, normal),
 	    if S#co_session.exp =:= 1 ->
-		    ?dbg(srv, "s_writing_segment_end: expedited", []),
+		    ?dbg({index, {Ix, Si}}, 
+			 "s_writing_segment_end: expedited", []),
 		    %% No response has been sent
-		    R = ?mk_scs_initiate_download_response(Index, SubInd),
+		    R = ?mk_scs_initiate_download_response(Ix, Si),
 		    send(S,R);
 	       true ->
-		    ?dbg(srv, "s_writing_segment_end: not expedited", []),
+		    ?dbg({index, {Ix, Si}}, 
+			 "s_writing_segment_end: not expedited", []),
 		    %% Last reply with same toggle value as the request
 		    R = ?mk_scs_download_segment_response(T),
 		    send(S,R)
@@ -660,8 +691,9 @@ s_writing_segment_end({Mref, Reply} = _M,
      end;
 s_writing_segment_end(timeout, S) ->
     abort(S, ?abort_timed_out);
-s_writing_segment_end(M, S)  ->
-    ?dbg(srv, "s_writing_segment_end: Got event = ~p, aborting", [M]),
+s_writing_segment_end(M, S=#co_session {index = Ix, subind = Si})  ->
+    ?dbg({index, {Ix, Si}}, 
+	 "s_writing_segment_end: Got event = ~p, aborting", [M]),
     demonitor_and_abort(M, S).
 
 
@@ -676,15 +708,16 @@ s_writing_segment_end(M, S)  ->
 %% @end
 %%--------------------------------------------------------------------
 start_segment_upload(S=#co_session {index = Ix, subind = Si, buf = Buf}) ->
-    ?dbg(srv, "start_segment_upload", []),
+    ?dbg({index, {Ix, Si}}, "start_segment_upload", []),
     NBytes = co_data_buf:data_size(Buf),
     EofFlag = co_data_buf:eof(Buf),
-    ?dbg(srv, "start_segment_upload, nbytes = ~p, eof = ~p", 
+    ?dbg({index, {Ix, Si}}, "start_segment_upload, nbytes = ~p, eof = ~p", 
 	 [NBytes, EofFlag]),
     if NBytes =/= 0, NBytes =< 4 andalso EofFlag =:= true ->
 	    case co_data_buf:read(Buf, NBytes) of
 		{ok, Data, true, _Buf1} ->
-		    ?dbg(srv, "start_segment_upload, expedited, data = ~p", 
+		    ?dbg({index, {Ix, Si}}, 
+			 "start_segment_upload, expedited, data = ~p", 
 			 [Data]),
 		    co_api:session_over(S#co_session.node_pid, normal),
 		    Data1 = co_sdo:pad(Data, 4),
@@ -695,13 +728,14 @@ start_segment_upload(S=#co_session {index = Ix, subind = Si, buf = Buf}) ->
 		    send(S, R),
 		    {stop, normal, S};
 		{error, Reason} ->
-		    ?dbg(srv, "start_segment_upload: read failed, reason = ~p",
+		    ?dbg({index, {Ix, Si}}, 
+			 "start_segment_upload: read failed, reason = ~p",
 			 [Reason]),
 		    abort(S, Reason)
 	    end;
        (NBytes =:= 0 andalso EofFlag =:= true) orelse
        (NBytes =:= undefined) ->
-	    ?dbg(srv, "start_segment_upload, sizeind = 0, size = ~p",[NBytes]),
+	    ?dbg({index, {Ix, Si}}, "start_segment_upload, sizeind = 0, size = ~p",[NBytes]),
 	    N=0, E=0, SizeInd=0,
 	    Data = <<0:32/?SDO_ENDIAN>>, %% filler
 	    R=?mk_scs_initiate_upload_response(N,E,SizeInd,
@@ -709,7 +743,8 @@ start_segment_upload(S=#co_session {index = Ix, subind = Si, buf = Buf}) ->
 	    send(S, R),
 	    {next_state, s_segment_upload, S, remote_timeout(S)};
        true ->
-	    ?dbg(srv, "start_segment_upload, sizeind = 1, size = ~p",[NBytes]),
+	    ?dbg({index, {Ix, Si}}, 
+		 "start_segment_upload, sizeind = 1, size = ~p",[NBytes]),
 	    N=0, E=0, SizeInd=1,
 	    Data = <<NBytes:32/?SDO_ENDIAN>>,
 	    R=?mk_scs_initiate_upload_response(N,E,SizeInd,
@@ -752,19 +787,21 @@ s_segment_upload(M, S) when is_record(M, can_frame) ->
 s_segment_upload(timeout, S) ->
     abort(S, ?abort_timed_out).
 
-read_segment(S) ->
+read_segment(S=#co_session {index = Ix, subind = Si}) ->
     case co_data_buf:read(S#co_session.buf,7) of
 	{ok, Data, Eod, Buf} ->
-	    ?dbg(srv, "read_segment: data=~p, Size = ~p, Eod=~p", 
+	    ?dbg({index, {Ix, Si}}, 
+		 "read_segment: data=~p, Size = ~p, Eod=~p", 
 		 [Data, size(Data), Eod]),
 	    upload_segment(S#co_session {buf = Buf}, Data, Eod);
 	{ok, Buf, Mref} ->
 	    %% Called an application
-	    ?dbg(srv, "s_segment_upload: mref=~p", [Mref]),
+	    ?dbg({index, {Ix, Si}}, "s_segment_upload: mref=~p", [Mref]),
 	    S1 = S#co_session {mref = Mref, buf = Buf},
 	    {next_state, s_reading_segment, S1, local_timeout(S1)};
 	{error,Reason} ->
-	    ?dbg(srv, "read_segment: read failed, reason = ~p", [Reason]),
+	    ?dbg({index, {Ix, Si}}, 
+		 "read_segment: read failed, reason = ~p", [Reason]),
 	    abort(S,Reason)
     end.
 
@@ -806,18 +843,21 @@ upload_segment(S, Data, Eod) ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_reading_segment_started({Mref, Reply} = _M, S)  ->
-    ?dbg(srv, "s_reading_segment_started: Got event = ~p", [_M]),
+s_reading_segment_started({Mref, Reply} = _M, 
+			  S=#co_session {buf = OldBuf, 
+					 index = Ix, subind = Si})  ->
+    ?dbg({index, {Ix, Si}}, 
+	 "s_reading_segment_started: Got event = ~p", [_M]),
     case {S#co_session.mref, Reply} of
 	{Mref, {ok, _Value}} ->
 	    %% Atomic
 	    erlang:demonitor(Mref, [flush]),
-	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
+	    {ok, Buf} = co_data_buf:update(OldBuf, Reply),
 	    start_segment_upload(S#co_session {buf = Buf, mref = undefined});
 	{Mref, {ok, _Ref, _Size}} ->
 	    %% Streamed
 	    erlang:demonitor(Mref, [flush]),
-	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
+	    {ok, Buf} = co_data_buf:update(OldBuf, Reply),
 	    %% Start to fill data buffer
 	    case co_data_buf:load(Buf) of
 		{ok, Buf1} ->
@@ -826,23 +866,27 @@ s_reading_segment_started({Mref, Reply} = _M, S)  ->
 						       mref = undefined});
 		{ok, Buf1, Mref1} ->
 		    %% Wait for data ??
-		    ?dbg(srv, "s_reading_segment_started: mref=~p", [Mref]),
+		    ?dbg({index, {Ix, Si}}, 
+			 "s_reading_segment_started: mref=~p", [Mref]),
 		    start_segment_upload(S#co_session {buf = Buf1, 
 						       mref = Mref1});
 		{error, Reason} ->
-		    ?dbg(srv, "s_reading_segment_started: load failed, "
+		    ?dbg({index, {Ix, Si}}, 
+			 "s_reading_segment_started: load failed, "
 			 "reason = ~p", [Reason]),
 		    abort(S, Reason)
 	    end;
 	_Other ->
-	    ?dbg(srv, "s_reading_segment_started: received = ~p, aborting", 
+	    ?dbg({index, {Ix, Si}}, 
+		 "s_reading_segment_started: received = ~p, aborting", 
 		 [_Other]),
 	    abort(S, ?abort_internal_error)
      end;
 s_reading_segment_started(timeout, S) ->
     abort(S, ?abort_timed_out);
-s_reading_segment_started(M, S)  ->
-    ?dbg(srv, "s_reading_segment_started: Got event = ~p, aborting", [M]),
+s_reading_segment_started(M, S=#co_session {index = Ix, subind = Si})  ->
+    ?dbg({index, {Ix, Si}}, 
+	 "s_reading_segment_started: Got event = ~p, aborting", [M]),
     demonitor_and_abort(M, S).
 
 %%--------------------------------------------------------------------
@@ -868,9 +912,10 @@ s_reading_segment_started(M, S)  ->
 
 s_reading_segment(timeout, S) ->
     abort(S, ?abort_timed_out);
-s_reading_segment(M, S) ->
+s_reading_segment(M, S=#co_session {index = Ix, subind = Si}) ->
     %% All correct messages should be handled in handle_info()
-    ?dbg(srv, "s_reading_segment: Got event = ~p, aborting", [M]),
+    ?dbg({index, {Ix, Si}}, 
+	 "s_reading_segment: Got event = ~p, aborting", [M]),
     demonitor_and_abort(M, S).
 
 
@@ -890,7 +935,7 @@ start_block_upload(S=#co_session {index = Ix, subind = Si, buf = Buf}) ->
 		 undefined -> 0;
 		 N -> N
 	     end,
-    ?dbg(srv, "start_block_upload bytes=~p", [NBytes]),
+    ?dbg({index, {Ix, Si}}, "start_block_upload bytes=~p", [NBytes]),
     DoCrc = 
 	(S#co_session.ctx)#sdo_ctx.use_crc andalso S#co_session.clientcrc,
     CrcSup = ?UINT1(DoCrc),
@@ -931,29 +976,32 @@ s_block_upload_start(timeout, S) ->
     abort(S, ?abort_timed_out).
 
 
-read_block_segment(S) ->
-    ?dbg(srv, "read_block_segment: Seq=~p", [S#co_session.blkseq]),
+read_block_segment(S=#co_session {index = Ix, subind = Si}) ->
+    ?dbg({index, {Ix, Si}}, 
+	 "read_block_segment: Seq=~p", [S#co_session.blkseq]),
     case co_data_buf:read(S#co_session.buf,7) of
 	{ok, Data, Eod, Buf} ->
 	    upload_block_segment(S#co_session {buf = Buf}, Data, Eod);
 	{ok, Buf, Mref} ->
 	    %% Called an application
-	    ?dbg(srv, "read_block_segment: mref=~p", [Mref]),
+	    ?dbg({index, {Ix, Si}}, "read_block_segment: mref=~p", [Mref]),
 	    S1 = S#co_session {mref = Mref, buf = Buf},
 	    {next_state, s_reading_block_segment, S1, local_timeout(S1)};
 	{error,Reason} ->
-	    ?dbg(srv, "read_block_segment: read failed, reason = ~p", [Reason]),
+	    ?dbg({index, {Ix, Si}}, 
+		 "read_block_segment: read failed, reason = ~p", [Reason]),
 	    abort(S,Reason)
     end.
 
-upload_block_segment(S, Data, Eod) ->
-    ?dbg(srv, "upload_block_segment: Data = ~p, Eod = ~p", [Data, Eod]),
+upload_block_segment(S=#co_session {index = Ix, subind = Si}, Data, Eod) ->
+    ?dbg({index, {Ix, Si}}, 
+	 "upload_block_segment: Data = ~p, Eod = ~p", [Data, Eod]),
     Seq = S#co_session.blkseq,
     Last = ?UINT1(Eod),
     Data1 = co_sdo:pad(Data, 7),
     R = ?mk_block_segment(Last,Seq,Data1),
     NBytes = S#co_session.blkbytes + byte_size(Data),
-    ?dbg(srv, "upload_block_segment: data1 = ~p, nbytes = ~p",
+    ?dbg({index, {Ix, Si}}, "upload_block_segment: data1 = ~p, nbytes = ~p",
 	 [Data1, NBytes]),
     BlkCrc = if S#co_session.crc ->
 		     co_crc:update(S#co_session.blkcrc, Data);
@@ -963,10 +1011,10 @@ upload_block_segment(S, Data, Eod) ->
     S1 = S#co_session { blkseq=Seq, blkbytes=NBytes, blkcrc=BlkCrc},
     send(S1, R),
     if Eod ->
-	    ?dbg(srv, "upload_block_segment: Last = ~p", [Last]),
+	    ?dbg({index, {Ix, Si}}, "upload_block_segment: Last = ~p", [Last]),
 	    {next_state, s_block_upload_response_last, S1, remote_timeout(S1)};
        Seq =:= S#co_session.blksize ->
-	    ?dbg(srv, "upload_block_segment: Seq = ~p", [Seq]),
+	    ?dbg({index, {Ix, Si}}, "upload_block_segment: Seq = ~p", [Seq]),
 	    {next_state, s_block_upload_response, S1, remote_timeout(S1)};
        true ->
 	    read_block_segment(S1#co_session {blkseq = Seq + 1})
@@ -1098,8 +1146,10 @@ s_block_upload_end_response(timeout, S) ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_reading_block_started({Mref, Reply} = _M, S)  ->
-    ?dbg(srv, "s_reading_block_started: Got event = ~p", [_M]),
+s_reading_block_started({Mref, Reply} = _M, 
+			S=#co_session {index = Ix, subind = Si})  ->
+    ?dbg({index, {Ix, Si}}, 
+	 "s_reading_block_started: Got event = ~p", [_M]),
     case {S#co_session.mref, Reply} of
 	{Mref, {ok, _Value}} ->
 	    %% Atomic
@@ -1115,30 +1165,33 @@ s_reading_block_started({Mref, Reply} = _M, S)  ->
 		    start_block_upload(S#co_session {buf = Buf1, 
 						     mref = undefined});
 		{ok, Buf1, Mref1} ->
-		    ?dbg(srv, "s_reading_block_started: mref=~p", [Mref]),
+		    ?dbg({index, {Ix, Si}}, 
+			 "s_reading_block_started: mref=~p", [Mref]),
 		    start_block_upload(S#co_session {buf = Buf1, mref = Mref1})
 	    end;
 	_Other ->
-	    ?dbg(srv, "s_reading_block_started: received = ~p, aborting", 
+	    ?dbg({index, {Ix, Si}}, 
+		 "s_reading_block_started: received = ~p, aborting", 
 		 [_Other]),
 	    abort(S, ?abort_internal_error)
     end;
 s_reading_block_started(timeout, S) ->
     abort(S, ?abort_timed_out);
-s_reading_block_started(M, S)  ->
-    ?dbg(srv, "s_reading_block_started: Got event = ~p, aborting", [M]),
+s_reading_block_started(M, S=#co_session {index = Ix, subind = Si})  ->
+    ?dbg({index, {Ix, Si}}, 
+	 "s_reading_block_started: Got event = ~p, aborting", [M]),
     demonitor_and_abort(M, S).
 
 
 %% Checks if protocol switch from block to segment should be done
-segment_or_block(S) -> 
+segment_or_block(S=#co_session {index = Ix, subind = Si}) -> 
     NBytes = case co_data_buf:data_size(S#co_session.buf) of
 		 undefined -> 0;
 		 N -> N
 	     end,
     if S#co_session.pst =/= 0, NBytes > 0, 
        NBytes =< S#co_session.pst ->
-	    ?dbg(srv, "segment_or_block: protocol switch",[]),
+	    ?dbg({index, {Ix, Si}}, "segment_or_block: protocol switch",[]),
 	    start_segment_upload(S);
        true ->
 	    start_block_upload(S)
@@ -1166,9 +1219,10 @@ segment_or_block(S) ->
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 s_reading_block_segment(timeout, S) ->
     abort(S, ?abort_timed_out);
-s_reading_block_segment(M, S) ->
+s_reading_block_segment(M, S=#co_session {index = Ix, subind = Si}) ->
     %% All correct messages should be handled in handle_info()
-    ?dbg(srv, "s_reading_block_segment: Got event = ~p, aborting", [M]),
+    ?dbg({index, {Ix, Si}}, 
+	 "s_reading_block_segment: Got event = ~p, aborting", [M]),
     demonitor_and_abort(M, S).
 
 
@@ -1214,7 +1268,8 @@ start_block_download(S=#co_session {index = Ix, subind = Si}) ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_block_download(M, S) when is_record(M, can_frame) ->
+s_block_download(M, S=#co_session {index = Ix, subind = Si}) 
+  when is_record(M, can_frame) ->
     NextSeq = S#co_session.blkseq+1,
     BlkCrc = S#co_session.blkcrc,
     case M#can_frame.data of
@@ -1233,12 +1288,14 @@ s_block_download(M, S) when is_record(M, can_frame) ->
 		    block_segment_written(S1#co_session {buf = Buf, 
 							 last = Last});
 		{ok, Buf, Mref} ->
-		    ?dbg(srv, "s_block_download: mref=~p", [Mref]),
+		    ?dbg({index, {Ix, Si}}, 
+			 "s_block_download: mref=~p", [Mref]),
 		    block_segment_written(S1#co_session {buf = Buf, 
 							 last = Last, 
 							 mref = Mref});
 		{error, Reason} ->
-		    ?dbg(srv, "s_block_download: write failed, reason = ~p", 
+		    ?dbg({index, {Ix, Si}}, 
+			 "s_block_download: write failed, reason = ~p", 
 			 [Reason]),
 		    abort(S, Reason)
 	    end;
@@ -1321,7 +1378,8 @@ s_block_download_end(M,
 		    case co_data_buf:write(S#co_session.buf,N,true,block) of
 			{ok, Buf, Mref} ->
 			    %% Called an application
-			    ?dbg(srv, "s_block_download_end: mref=~p", [Mref]),
+			    ?dbg({index, {Ix, Si}}, 
+				 "s_block_download_end: mref=~p", [Mref]),
 			    S1 = S#co_session {mref = Mref, buf = Buf},
 			    {next_state, s_writing_block_end, S1, 
 			     local_timeout(S1)};
@@ -1332,13 +1390,15 @@ s_block_download_end(M,
 			    send(S, R),
 			    {stop, normal, S};
 			{error, Reason} ->
-			    ?dbg(srv, "s_block_download_end: write failed, "
+			    ?dbg({index, {Ix, Si}}, 
+				 "s_block_download_end: write failed, "
 				 "reason = ~p", [Reason]),
 			    abort(S, Reason)
 		    end;
 		_Crc ->
 		    %% CRC not ok
-		    ?dbg(srv, "s_block_download_end: crc error, "
+		    ?dbg({index, {Ix, Si}}, 
+			 "s_block_download_end: crc error, "
 			 "remote crc = ~p, node crc = ~p", 
 			 [RemoteCrc, NodeCrc]),
 		    abort(S, ?abort_crc_error)
@@ -1368,22 +1428,26 @@ s_block_download_end(timeout, S) ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-s_writing_block_started({Mref, Reply} = _M, S)  ->
-    ?dbg(srv, "s_writing_block_started: Got event = ~p", [_M]),
+s_writing_block_started({Mref, Reply} = _M, 
+			S=#co_session {index = Ix, subind = Si})  ->
+    ?dbg({index, {Ix, Si}}, 
+	 "s_writing_block_started: Got event = ~p", [_M]),
     case {S#co_session.mref, Reply} of
 	{Mref, {ok, _Ref, _WriteSze}} ->
 	    erlang:demonitor(Mref, [flush]),
 	    {ok, Buf} = co_data_buf:update(S#co_session.buf, Reply),
 	    start_block_download(S#co_session {buf = Buf, mref = undefined});
 	_Other ->
-	    ?dbg(srv, "s_writing_block_started: received = ~p, aborting", 
+	    ?dbg({index, {Ix, Si}}, 
+		 "s_writing_block_started: received = ~p, aborting", 
 		 [_Other]),
 	    abort(S, ?abort_internal_error)
     end;
 s_writing_block_started(timeout, S) ->
     abort(S, ?abort_timed_out);
-s_writing_block_started(M, S)  ->
-    ?dbg(srv, "s_writing_block_started: Got event = ~p, aborting", [M]),
+s_writing_block_started(M, S=#co_session {index = Ix, subind = Si})  ->
+    ?dbg({index, {Ix, Si}}, 
+	 "s_writing_block_started: Got event = ~p, aborting", [M]),
     demonitor_and_abort(M, S).
 
 %%--------------------------------------------------------------------
@@ -1407,9 +1471,10 @@ s_writing_block_started(M, S)  ->
 
 s_writing_block_end(timeout, S) ->
     abort(S, ?abort_timed_out);
-s_writing_block_end(M, S)  ->
+s_writing_block_end(M, S=#co_session {index = Ix, subind = Si})  ->
     %% All correct messages should be taken care of in handle_info()
-    ?dbg(srv, "s_writing_block: Got event = ~p, aborting", [M]),
+    ?dbg({index, {Ix, Si}}, 
+	 "s_writing_block: Got event = ~p, aborting", [M]),
     demonitor_and_abort(M, S).
 
 
@@ -1424,8 +1489,8 @@ s_writing_block_end(M, S)  ->
 			Tout::timeout()} |
 		       {stop, Reason::atom(), NextS::#co_session{}}.
 
-handle_event(Event, StateName, S) ->
-    ?dbg(srv, "handle_event: Got event ~p",[Event]),
+handle_event(Event, StateName, S=#co_session {index = Ix, subind = Si}) ->
+    ?dbg({index, {Ix, Si}}, "handle_event: Got event ~p",[Event]),
     %% FIXME: handle abort here!!!
     apply(?MODULE, StateName, [Event, S]).
 
@@ -1435,12 +1500,13 @@ handle_event(Event, StateName, S) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec handle_sync_event(Event::term(), From::{pid(), term()},
-			StateName::atom(), State::#co_session{}) ->
+			State::atom(), S::#co_session{}) ->
 		       {reply, ok, NextState::atom(), NextS::#co_session{}}.
 
-handle_sync_event(_Event, _From, StateName, State) ->
-    ?dbg(srv, "handle_sync_event: Got event ~p",[_Event]),
-    {reply, ok, StateName, State}.
+handle_sync_event(_Event, _From, State, 
+		  S=#co_session {index = Ix, subind = Si}) ->
+    ?dbg({index, {Ix, Si}}, "handle_sync_event: Got event ~p",[_Event]),
+    {reply, ok, State, S}.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -1456,19 +1522,21 @@ handle_sync_event(_Event, _From, StateName, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec handle_info(Info::term(), StateName::atom(), S::#co_session{}) ->
+-spec handle_info(Info::term(), State::atom(), S::#co_session{}) ->
 			 {next_state, NextState::atom(), NextS::#co_session{}} |
 			 {next_state, NextState::atom(), NextS::#co_session{}, 
 			  Tout::timeout()} |
 			 {stop, Reason::atom(), NewS::#co_session{}}.
 			 
-handle_info({Mref, {ok, _Ref, _Data, _Eod} = Reply}, StateName, 
-	    S=#co_session {mref = NextMref}) ->
+handle_info({Mref, {ok, _Ref, _Data, _Eod} = Reply}, State, 
+	    S=#co_session {mref = NextMref, index = Ix, subind = Si}) ->
     %% Streamed data read from application
-    ?dbg(srv, "handle_info: Reply = ~p, State = ~p",[Reply, StateName]),
+    ?dbg({index, {Ix, Si}}, 
+	 "handle_info: Reply = ~p, State = ~p",[Reply, State]),
     %% Note that Mref might differ from the latest, stored in S.
     if  Mref =/= NextMref ->
-	    ?dbg(srv, "handle_info: queued message, wait for = ~p",
+	    ?dbg({index, {Ix, Si}}, 
+		 "handle_info: queued message, wait for = ~p",
 		 [NextMref]);
 	true ->
 	    do_nothing
@@ -1480,42 +1548,45 @@ handle_info({Mref, {ok, _Ref, _Data, _Eod} = Reply}, StateName,
     case co_data_buf:load(Buf) of
 	{ok, Buf1} ->
 	    %% Buffer loaded
-	    check_reading(StateName, 
+	    check_reading(State, 
 			  S#co_session {buf = Buf1, mref = undefined});
 	{ok, Buf1, Mref1} ->
 	    %% Wait for data ??
-	    ?dbg(srv, "handle_info: mref=~p", [Mref]),
-	    check_reading(StateName, 
+	    ?dbg({index, {Ix, Si}}, "handle_info: mref=~p", [Mref]),
+	    check_reading(State, 
 			  S#co_session {buf = Buf1, mref = Mref1});
 	{error, Reason} ->
-	    ?dbg(srv, "handle_info: load failed, reason = ~p", 
+	    ?dbg({index, {Ix, Si}}, "handle_info: load failed, reason = ~p", 
 		 [Reason]),
 	    abort(S, Reason)
     end;
-handle_info({_Mref, ok} = Info, StateName, S) 
-  when StateName =:= s_writing_segment_end ->
+handle_info({_Mref, ok} = Info, State, S) 
+  when State =:= s_writing_segment_end ->
     %% "Converting" info to event
-    apply(?MODULE, StateName, [Info, S]);
-handle_info({_Mref, ok} = Info, StateName, S) ->
-    check_writing_block_end(Info, StateName, S);
-handle_info({_Mref, {ok, Ref}} = Info, StateName, S) 
+    apply(?MODULE, State, [Info, S]);
+handle_info({_Mref, ok} = Info, State, S) ->
+    check_writing_block_end(Info, State, S);
+handle_info({_Mref, {ok, Ref}} = Info, State, S) 
   when  is_reference(Ref) andalso
-	StateName =:= s_writing_segment_end ->
+	State =:= s_writing_segment_end ->
     %% "Converting" info to event
-    apply(?MODULE, StateName, [Info, S]);
-handle_info({_Mref, {ok, Ref}} = Info, StateName, S) 
+    apply(?MODULE, State, [Info, S]);
+handle_info({_Mref, {ok, Ref}} = Info, State, S) 
   when is_reference(Ref) ->
-    check_writing_block_end(Info, StateName, S);
-handle_info({_Mref, {error, Error}}, _StateName, S) ->
-    ?dbg(srv, "handle_info: received = ~p, aborting", [Error]),
+    check_writing_block_end(Info, State, S);
+handle_info({_Mref, {error, Error}}, _State, 
+	    S=#co_session {index = Ix, subind = Si}) ->
+    ?dbg({index, {Ix, Si}}, "handle_info: received = ~p, aborting", [Error]),
     abort(S, Error);
-handle_info({'DOWN',_Ref,process,_Pid,_Reason}, _StateName, S) ->
-    ?dbg(srv, "handle_info: DOWN for process ~p received, aborting", [_Pid]),
+handle_info({'DOWN',_Ref,process,_Pid,_Reason}, _State, 
+	    S=#co_session {index = Ix, subind = Si}) ->
+    ?dbg({index, {Ix, Si}}, 
+	 "handle_info: DOWN for process ~p received, aborting", [_Pid]),
     abort(S, ?abort_internal_error);
-handle_info(Info, StateName, S) ->
-    ?dbg(srv, "handle_info: Got info ~p",[Info]),
+handle_info(Info, State, S=#co_session {index = Ix, subind = Si}) ->
+    ?dbg({index, {Ix, Si}}, "handle_info: Got info ~p",[Info]),
     %% "Converting" info to event
-    apply(?MODULE, StateName, [Info, S]).
+    apply(?MODULE, State, [Info, S]).
 
 
 check_reading(s_reading_segment, S) ->
@@ -1526,15 +1597,17 @@ check_reading(State, S) ->
     {next_state, State, S}.
 	    
 
-check_writing_block_end({Mref, Reply}, StateName, S) ->
+check_writing_block_end({Mref, Reply}, State, 
+			S=#co_session {index = Ix, subind = Si}) ->
     %% Streamed data write acknowledged
-    ?dbg(srv, "check_writing_block_end: State = ~p",[StateName]),
+    ?dbg({index, {Ix, Si}}, "check_writing_block_end: State = ~p",[State]),
     case S#co_session.mref of
 	Mref ->
 	    erlang:demonitor(Mref, [flush]),
-	    case StateName of
+	    case State of
 		s_writing_block_end ->
-		    ?dbg(srv, "handle_info: last reply, terminating",[]),
+		    ?dbg({index, {Ix, Si}}, 
+			 "handle_info: last reply, terminating",[]),
 		    co_api:session_over(S#co_session.node_pid, normal),
 		    R = ?mk_scs_block_download_end_response(),
 		    send(S, R),
@@ -1545,17 +1618,17 @@ check_writing_block_end({Mref, Reply}, StateName, S) ->
 	    end;
 	_OtherRef ->
 	    %% Ignore reply
-	    ?dbg(srv, "handle_info: wrong mref, ignoring",[]),
-	    {next_state, StateName, S}
+	    ?dbg({index, {Ix, Si}}, "handle_info: wrong mref, ignoring",[]),
+	    {next_state, State, S}
     end.
 
 %%--------------------------------------------------------------------
 %% @private
 %%--------------------------------------------------------------------
--spec terminate(Reason::term(), StateName::atom(), S::#co_session{}) -> 
+-spec terminate(Reason::term(), State::atom(), S::#co_session{}) -> 
 		       no_return().
 
-terminate(_Reason, _StateName, _State) ->
+terminate(_Reason, _State, _S) ->
     ok.
 
 %%--------------------------------------------------------------------
@@ -1565,12 +1638,12 @@ terminate(_Reason, _StateName, _State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec code_change(OldVsn::term(), StateName::atom(), 
+-spec code_change(OldVsn::term(), State::atom(), 
 		  S::#co_session{}, Extra::term()) -> 
-			 {ok, StateName::atom(), NewS::#co_session{}}.
+			 {ok, State::atom(), NewS::#co_session{}}.
 
-code_change(_OldVsn, StateName, State, _Extra) ->
-    {ok, StateName, State}.
+code_change(_OldVsn, State, S, _Extra) ->
+    {ok, State, S}.
 
 %%%===================================================================
 %%% Internal functions
@@ -1590,7 +1663,7 @@ demonitor_and_abort(M, S) ->
     end,
     l_abort(M, S, s_reading).
 
-l_abort(M, S, StateName) ->
+l_abort(M, S, State) ->
     case M#can_frame.data of
 	?ma_scs_abort_transfer(Ix,Si,_Code) when
 	      Ix =:= S#co_session.index,
@@ -1603,7 +1676,7 @@ l_abort(M, S, StateName) ->
 	    {stop, normal, S};	    
 	?ma_scs_abort_transfer(_Ix,_Si,_Code) ->
 	    %% probably a delayed abort for an old session ignore
-	    {next_state, StateName, S, remote_timeout(S)};
+	    {next_state, State, S, remote_timeout(S)};
 	_ ->
 	    %% we did not expect this command abort
 	    abort(S, ?abort_command_specifier)
@@ -1619,7 +1692,9 @@ abort(S=#co_session {index = Ix, subind = Si, buf = Buf}, Reason) ->
     {stop, normal, S}.
     
 
-send(S, Data) when is_binary(Data) ->
-    ?dbg(srv, "send: ~s", [co_format:format_sdo(co_sdo:decode_tx(Data))]),
+send(S=#co_session {index = Ix, subind = Si}, Data) 
+     when is_binary(Data) ->
+    ?dbg({index, {Ix, Si}}, 
+	 "send: ~s", [co_format:format_sdo(co_sdo:decode_tx(Data))]),
     co_session:send(S, Data).
 

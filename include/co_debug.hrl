@@ -27,14 +27,14 @@
 
 
 %% Switching to lager (ale)
--define(dbg(Tag, Format, Args),
- 	lager:debug([{tag, Tag}], 
-		    "~s(~p): " ++ Format, 
+-define(dbg(Format, Args),
+ 	lager:debug("~s(~p): " ++ Format, 
 		    [?MODULE, self() | Args])).
 
 
--endif.
+-define(dbg(Tag, Format, Args),
+ 	lager:debug([Tag], 
+		    "~s(~p): " ++ Format, 
+		    [?MODULE, self() | Args])).
 
--define(ei(Format, Args), error_logger:info_msg(Format, Args)).
--define(ee(Format, Args), error_logger:error_msg(Format, Args)).
--define(ew(Format, Args), error_logger:warning_msg(Format, Args)).
+-endif.

@@ -1,6 +1,6 @@
-%%%---- BEGIN COPYRIGHT --------------------------------------------------------
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -13,10 +13,9 @@
 %%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 %%% KIND, either express or implied.
 %%%
-%%%---- END COPYRIGHT ----------------------------------------------------------
-%%%-------------------------------------------------------------------
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Malotte Westman Lönne <malotte@malotte.net>
-%%% @copyright (C) 2012, Tony Rogvall
+%%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%%  Process dictionary.
 %%%
@@ -26,17 +25,24 @@
 %%%-------------------------------------------------------------------
 -module(co_proc).
 
+-include("canopen.hrl").
 -include("co_debug.hrl").
 
 -behaviour(gen_server).
 
-%% API
--export([start_link/1, stop/0]).
+%% gen_server api
+-export([start_link/1, 
+	 stop/0]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
+-export([init/1, 
+	 handle_call/3, 
+	 handle_cast/2, 
+	 handle_info/2,
+	 terminate/2, 
+	 code_change/3]).
 
+%% function api
 -export([reg/1]).
 -export([unreg/1]).
 -export([lookup/1]).
@@ -130,7 +136,7 @@ unreg(Term) ->
 -spec lookup(Term::term()) -> Pid::pid() | {error, Error::term()}.
 
 lookup(Term) ->
-    ?dbg(proc, "lookup Term = ~w", [Term]),    
+    ?dbg("lookup: Term = ~w", [Term]),    
     case ets:info(co_term_dict, name) of
 	undefined -> 
 	    {error, no_process};
@@ -257,7 +263,7 @@ init([]) ->
 
 handle_call({reg, Term, Pid}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) 
   when is_pid(Pid) ->
-    ?dbg(proc, "handle_call: reg Term = ~w, Pid = ~w", [Term, Pid]),    
+    ?dbg("handle_call: reg Term = ~w, Pid = ~w", [Term, Pid]),    
     case ets:lookup(TD, Term) of
 	[] ->
 	    ets:insert(TD, {Term, Pid}),
@@ -281,7 +287,7 @@ handle_call({reg, Term, Pid}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD})
 	    {reply, {error, already_registered}, Ctx}
     end;
 handle_call({unreg, Term}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
-    ?dbg(proc, "handle_call: unreg Term = ~w", [Term]),    
+    ?dbg("handle_call: unreg Term = ~w", [Term]),    
     case ets:lookup(TD, Term) of
 	[{Term, Pid}] ->
 	    ets:delete(TD, Term),
@@ -300,7 +306,7 @@ handle_call({unreg, Term}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
 	    {reply, ok, Ctx}
     end;
 handle_call({clear, Pid}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
-    ?dbg(proc, "handle_call: clear Pid = ~w", [Pid]),    
+    ?dbg("handle_call: clear Pid = ~w", [Pid]),    
     case ets:lookup(PD, Pid) of
 	[{Pid, Mon, _TermList}] ->
 	    try ets:match_delete(TD, {'_', Pid}) of

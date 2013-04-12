@@ -1,4 +1,4 @@
-%%%---- BEGIN COPYRIGHT --------------------------------------------------------
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
 %%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
 %%%
@@ -13,8 +13,7 @@
 %%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 %%% KIND, either express or implied.
 %%%
-%%%---- END COPYRIGHT ----------------------------------------------------------
-%%%-------------------------------------------------------------------
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @author Marina Westman Lönne <malotte@malotte.net>
 %%% @copyright (C) 2012, Tony Rogvall
@@ -25,13 +24,14 @@
 %%% Created:  5 November 2011 by Tony Rogvall
 %%% @end
 %%%-------------------------------------------------------------------
-
 -module(canopen_sup).
-
 -behaviour(supervisor).
 
+-include("canopen.hrl").
+
 %% API
--export([start_link/1, stop/0]).
+-export([start_link/1, 
+	 stop/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -49,18 +49,17 @@
 %% @end
 %%--------------------------------------------------------------------
 start_link(Args) ->
-    error_logger:info_msg("~p: start_link: args = ~p\n", [?MODULE, Args]),
+    ?ei("~p: start_link: args = ~p\n", [?MODULE, Args]),
     try supervisor:start_link({local, ?MODULE}, ?MODULE, Args) of
 	{ok, Pid} ->
 	    {ok, Pid, {normal, Args}};
 	Error -> 
-	    error_logger:error_msg("~p: start_link: Failed to start process, "
-				   "reason ~p\n",  [?MODULE, Error]),
+	    ?ee("~p: start_link: Failed to start process, "
+		"reason ~p\n",  [?MODULE, Error]),
 	    Error
     catch 
 	error:Reason ->
-	    error_logger:error_msg("~p: start_link: Try failed, reason ~p\n", 
-				   [?MODULE,Reason]),
+	    ?ee("~p: start_link: Try failed, reason ~p\n", [?MODULE,Reason]),
 	    Reason
 
     end.
@@ -91,7 +90,7 @@ stop() ->
 %% @end
 %%--------------------------------------------------------------------
 init(Args) ->
-    error_logger:info_msg("~p: init: args = ~p,\n pid = ~p\n", [?MODULE, Args, self()]),
+    ?ei("~p: init: args = ~p,\n pid = ~p\n", [?MODULE, Args, self()]),
     Serial = proplists:get_value(serial, Args, 0),
     Opts = proplists:get_value(options, Args, []),
     CP = co_proc,
@@ -104,7 +103,7 @@ init(Args) ->
     SysApp = {SA, {SA, start_link, [Serial]}, permanent, 5000, worker, [SA]},
     OsApp = {OA, {OA, start_link, [Serial]}, permanent, 5000, worker, [OA]},
     Processes = [CoProc, CoNode, SysApp, OsApp],
-    error_logger:info_msg("~p: About to start ~p\n", [?MODULE, Processes]),
+    ?ei("~p: About to start ~p\n", [?MODULE, Processes]),
     {ok, { {rest_for_one, 0, 300}, Processes} }.
 
 

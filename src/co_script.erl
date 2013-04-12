@@ -1,6 +1,6 @@
-%%%---- BEGIN COPYRIGHT --------------------------------------------------------
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -13,11 +13,10 @@
 %%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 %%% KIND, either express or implied.
 %%%
-%%%---- END COPYRIGHT ----------------------------------------------------------
-%%%------------------------------------------------------------------
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @author Malotte Westman Lönne <malotte@malotte.net>
-%%% @copyright (C) 2012, Tony Rogvall
+%%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%% CANopen script interpretor.
 %%%
@@ -25,25 +24,19 @@
 %%% Created: 23 Feb 2010 by Tony Rogvall (as pds_conf)
 %%% @end
 %%%-------------------------------------------------------------------
-
 -module(co_script).
+
+-include("co_debug.hrl").
 
 -import(lists, [reverse/1]).
 
 %% While testing ??
--compile(export_all).
+%%-compile(export_all).
 
 -export([run/0, run/1, script/1]).
 -export([file/1]).
 -export([string/1]).
 
--ifdef(debug).
--define(dbg(Format, Args),
-	io:format("~p: " ++ Format ++ "\n", [?MODULE] ++ Args)).
--else.
--define(dbg(Format, Args), ok).
-
--endif.
 
 %%====================================================================
 %% API

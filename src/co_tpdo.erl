@@ -1,6 +1,6 @@
-%%%---- BEGIN COPYRIGHT --------------------------------------------------------
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -13,11 +13,10 @@
 %%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 %%% KIND, either express or implied.
 %%%
-%%%---- END COPYRIGHT ----------------------------------------------------------
-%%%-------------------------------------------------------------------
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @author Malotte W Lönne <malotte@malotte.net>
-%%% @copyright (C) 2012, Tony Rogvall
+%%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%%  TPDO manager. 
 %%%  This server manages ONE TPDO. <br/>
@@ -147,7 +146,7 @@ init([Ctx, Param, FromPid]) ->
         true -> co_lib:debug(true);
         _ -> do_nothing
     end,
-    ?dbg(tpdo, "init: param = ~p", [Param]),
+    ?dbg("init: param = ~p", [Param]),
     Valid = Param#pdo_parameter.valid,
     COBID = Param#pdo_parameter.cob_id,
     ID = if (COBID band ?COBID_ENTRY_EXTENDED) =/= 0 ->
@@ -201,11 +200,11 @@ init([Ctx, Param, FromPid]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call({update_param,Param}, _From, S) ->
-    ?dbg(tpdo, "handle_call: update_param", []),
+    ?dbg("handle_call: update_param", []),
     S1 = update_param_int(Param, S),
     {reply, ok, S1};
 handle_call(update_map, _From, S) ->
-    ?dbg(tpdo, "handle_call: update_map", []),
+    ?dbg("handle_call: update_map", []),
     {Type, Is} =
 	if S#s.valid andalso S#s.state == ?Operational ->
 		tpdo_mapping(S#s.offset, S#s.ctx);
@@ -221,7 +220,7 @@ handle_call(loop_data, _From, S) ->
     io:format("Loop data = ~p\n", [S]),
     {reply, ok, S};
 handle_call(stop, _From, S) ->
-    ?dbg(tpdo, "handle_call: stop", []),
+    ?dbg("handle_call: stop", []),
     {stop, normal, S};
 handle_call(_Request, _From, S) ->
     {reply, {error,bad_call}, S}.
@@ -238,7 +237,7 @@ handle_call(_Request, _From, S) ->
 %%--------------------------------------------------------------------
 handle_cast({state, State}, S=#s {offset = I, ctx = Ctx}) 
   when State == ?Operational ->
-    ?dbg(tpdo, "handle_cast: state ~p", [State]),
+    ?dbg("handle_cast: state ~p", [State]),
     {Type, Is} = tpdo_mapping(I, Ctx),
     {noreply, S#s {state = State, type = Type, index_list = Is}};
 handle_cast({state, State}, S) ->
@@ -247,13 +246,13 @@ handle_cast({nodeid_change, nodeid, OldNid, NewNid},
 	    S=#s {ctx = Ctx=#tpdo_ctx {nodeid = OldNid}, type = Type}) ->
     case {NewNid, Type} of
 	{undefined, sam_mpdo} -> 
-	    error_logger:warning_msg("~p: (Short) nodeid undefined"
-				     "not possible to send sam-mpdos", 
-				     [self()]);
+	    ?ew("~p: (Short) nodeid undefined"
+		"not possible to send sam-mpdos", 
+		[self()]);
 	{undefined, _OtherType} ->
-	    ?dbg(tpdo, "handle_cast: nodeid set to undefined", []);
+	    ?dbg("handle_cast: nodeid set to undefined", []);
 	_Defined ->
-	    ?dbg(tpdo, "handle_cast: new nodeid ~5.16.0#", [NewNid])
+	    ?dbg("handle_cast: new nodeid ~5.16.0#", [NewNid])
     end,
     NewCtx = Ctx#tpdo_ctx {nodeid = NewNid},
     {noreply, S#s {ctx = NewCtx}};
@@ -267,7 +266,7 @@ handle_cast({transmit, Destination}, S=#s {type = Type})
   when Type == dam_mpdo ->
     {noreply, do_transmit(S, Destination)};
 handle_cast(_Msg, S) ->
-    ?dbg(tpdo, "handle_cast: Unknown Msg ~p received, Session = ~p", [_Msg, S]),
+    ?dbg("handle_cast: Unknown Msg ~p received, Session = ~p", [_Msg, S]),
     {noreply, S}.
 
 %%--------------------------------------------------------------------
@@ -390,22 +389,22 @@ update_param_int(Param, S) ->
  
 
 tpdo_mapping(Offset, Ctx) ->
-    ?dbg(tpdo, "tpdo_mapping: offset=~.16#", [Offset]),
+    ?dbg("tpdo_mapping: offset=~.16#", [Offset]),
     case co_api:tpdo_mapping(Offset, Ctx) of
 	{Type, Mapping} when Type == tpdo;
 			     Type == rpdo;
 			     Type == dam_mpdo;
 			     Type == sam_mpdo -> 
-	    ?dbg(tpdo, "tpdo_mapping: ~p mapping = ~p", [Type, Mapping]),
+	    ?dbg("tpdo_mapping: ~p mapping = ~p", [Type, Mapping]),
 	    {Type, Mapping};
 	_Error ->
-	    ?dbg(tpdo, "tpdo_mapping: mapping error= ~p", [_Error]),
+	    ?dbg("tpdo_mapping: mapping error= ~p", [_Error]),
 	    %% Should we terminate ??
 	    {undefined, {[],[]}} 
     end.
 
 do_transmit(S=#s {state = ?Operational})->
-    ?dbg(tpdo, "do_transmit:", []),
+    ?dbg("do_transmit:", []),
     if S#s.transmission_type =:= ?TRANS_SYNC_ONCE ->
 	    S#s { emit=true }; %% send at next sync
        S#s.transmission_type >= ?TRANS_RTR_SYNC ->
@@ -417,15 +416,15 @@ do_transmit(S) ->
     S.
 
 do_transmit(S=#s {state = ?Operational, type = dam_mpdo}, Destination)->
-    ?dbg(tpdo, "do_transmit: dam_mpdo to ~p", [Destination]),
+    ?dbg("do_transmit: dam_mpdo to ~p", [Destination]),
     do_send(S,Destination, true);
 do_transmit(S, _Destination) ->
-    ?dbg(tpdo, "do_transmit: dam_mpdo to ~p, wrong type/state in session ~p", 
+    ?dbg("do_transmit: dam_mpdo to ~p, wrong type/state in session ~p", 
 	[_Destination, S]),
     S.
 
 do_rtr(S=#s {state = ?Operational}) ->
-    ?dbg(tpdo, "do_rtr:", []),
+    ?dbg("do_rtr:", []),
     if S#s.rtr_allowed ->
 	    if S#s.transmission_type =:= ?TRANS_RTR_SYNC ->
 		    S#s { emit=true };  %% send at next sync
@@ -442,14 +441,14 @@ do_rtr(S) ->
 
 
 do_sync(S=#s {state = ?Operational}) ->
-    ?dbg(tpdo, "do_sync:", []),
+    ?dbg("do_sync:", []),
     if S#s.transmission_type =:= ?TRANS_RTR_SYNC ->
 	    do_send(S, S#s.emit);
        S#s.transmission_type =:= ?TRANS_SYNC_ONCE ->
 	    do_send(S, S#s.emit);
        S#s.transmission_type =< ?TRANS_SYNC_MAX ->
 	    Count = S#s.count - 1,
-	    ?dbg(tpdo, "do_sync: count=~w", [Count]),
+	    ?dbg("do_sync: count=~w", [Count]),
 	    if Count =:= 0 ->
 		    do_send(S#s { count=S#s.transmission_type }, true);
 	       true ->
@@ -468,7 +467,7 @@ do_send(S=#s {state = ?Operational, type = sam_mpdo, itmr = false,
 	      index_list = [{{{Ix, Si}, BlockSize}, ?MPDO_DATA_SIZE}]}, 
 	true) 
   when Nid =/= undefined ->
-    ?dbg(tpdo, "do_send: sam_mpdo index = ~7.16.0#:~w, block_size = ~w", 
+    ?dbg("do_send: sam_mpdo index = ~7.16.0#:~w, block_size = ~w", 
 	 [Ix, Si, BlockSize]),
     IndexList = [{Ix, I} || I <- lists:seq(Si, Si + BlockSize - 1)],
     send_sam_mpdo(S, IndexList);
@@ -476,7 +475,7 @@ do_send(S=#s {state = ?Operational, itmr = Itmr}, true)
   when Itmr =/= false ->
     S#s { emit=true };  %% inhibit is running, delay transmission
 do_send(S,true) ->
-    ?dbg(tpdo, "do_send: invalid combination, session = ~p", [S]),
+    ?dbg("do_send: invalid combination, session = ~p", [S]),
     S;
 do_send(S,_) ->
     S.
@@ -490,22 +489,22 @@ do_send(S=#s {state = ?Operational, itmr = Itmr}, _Dest, true)
   when Itmr =/= false ->
     S#s { emit=true };  %% inhibit is running, delay transmission
 do_send(S,_Dest,true) ->
-    ?dbg(tpdo, "do_send: invalid combination, session = ~p, destination = ~p", 
+    ?dbg("do_send: invalid combination, session = ~p, destination = ~p", 
 	 [S, _Dest]),
     S.
 
 send_tpdo(S=#s {ctx = Ctx, index_list = IL}) ->
-    ?dbg(tpdo, "send_tpdo: indexes = ~w", [IL]),
+    ?dbg("send_tpdo: indexes = ~w", [IL]),
     case tpdo_data(IL, Ctx, []) of
 	{error, Reason} ->
-	    error_logger:error_msg("~p: TPDO value not retreived, reason = ~p\n", 
-				   [self(), Reason]),
+	    ?ee("~p: TPDO value not retreived, reason = ~p\n", 
+		[self(), Reason]),
 	    S;
 	DataList ->
-	    ?dbg(tpdo, "send_tpdo: values = ~w, ", [DataList]),
+	    ?dbg("send_tpdo: values = ~w, ", [DataList]),
 	    BitLenList = [BitLen || {_Ix, BitLen} <- IL],
 	    Data = co_codec:encode_pdo(DataList,BitLenList),
-	    ?dbg(tpdo, "send_tpdo: data = ~p", [Data]),
+	    ?dbg("send_tpdo: data = ~p", [Data]),
 	    Frame = #can_frame { id = S#s.id,
 				 len = byte_size(Data),
 				 data = Data },
@@ -516,17 +515,17 @@ send_tpdo(S=#s {ctx = Ctx, index_list = IL}) ->
     
 send_dam_mpdo(S=#s {ctx = Ctx, index_list = [{Index = {Ix, Si}, _Size}]}, 
 	      Destination) ->
-    ?dbg(tpdo, "send_dam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
+    ?dbg("send_dam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
     case co_api:tpdo_data(Index, Ctx) of
 	{ok, DataToSend} ->
-	    ?dbg(tpdo, "send_dam_mpdo, index data = ~p", [DataToSend]),
+	    ?dbg("send_dam_mpdo, index data = ~p", [DataToSend]),
 	    Dest = case Destination of
 		       broadcast -> 0;
 		       NodeId -> NodeId
 		   end,
 	    Bin = <<1:1, Dest:7, Ix:16/little, Si:8, DataToSend:4/binary>>,
 	    Data = co_codec:encode_binary(Bin, 64),
-	    ?dbg(tpdo, "send_dam_mpdo: data = ~p", [Data]),
+	    ?dbg("send_dam_mpdo: data = ~p", [Data]),
 	    Frame = #can_frame { id = S#s.id,
 				 len = byte_size(Data),
 				 data = Data },
@@ -534,8 +533,8 @@ send_dam_mpdo(S=#s {ctx = Ctx, index_list = [{Index = {Ix, Si}, _Size}]},
 	    ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
 	    S#s { emit=false, itmr=ITmr };
 	{error, Reason}->
-	    error_logger:warning_msg("~p: TPDO value not retreived, reason = ~p\n", 
-				     [self(), Reason]),
+	    ?ew("~p: TPDO value not retreived, reason = ~p\n", 
+		[self(), Reason]),
 	    S
     end.
 
@@ -544,13 +543,13 @@ send_sam_mpdo(S, []) ->
 send_sam_mpdo(S=#s {state = ?Operational, type = sam_mpdo,
 		    ctx = Ctx=#tpdo_ctx {nodeid = Nid}},
 	      [Index = {Ix, Si} | Ixs]) ->
-    ?dbg(tpdo, "send_sam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
+    ?dbg("send_sam_mpdo, index = ~7.16.0#:~w", [Ix, Si]),
     S1 = 
 	case co_api:tpdo_data(Index, Ctx) of
 	    {ok, DataToSend} ->
 		Bin = <<0:1, Nid:7, Ix:16/little, Si:8, DataToSend:4/binary>>,
 		Data = co_codec:encode_binary(Bin, 64),
-		?dbg(tpdo, "send_sam_mpdo: data = ~p", [Data]),
+		?dbg("send_sam_mpdo: data = ~p", [Data]),
 		Frame = #can_frame { id = S#s.id,
 				     len = byte_size(Data),
 				     data = Data },
@@ -558,8 +557,8 @@ send_sam_mpdo(S=#s {state = ?Operational, type = sam_mpdo,
 		ITmr = start_timer(?INHIBIT_TO_MS(S#s.inhibit_time), inhibit),
 		S#s { emit=false, itmr=ITmr };
 	    {error, Reason} ->
-		error_logger:warning_msg("~p: TPDO value not retreived, reason = ~p\n", 
-					 [self(), Reason]),
+		?ew("~p: TPDO value not retreived, reason = ~p\n", 
+		    [self(), Reason]),
 		S
 	end,
     send_sam_mpdo(S1, Ixs).

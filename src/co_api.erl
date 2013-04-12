@@ -1,6 +1,6 @@
-%%%---- BEGIN COPYRIGHT --------------------------------------------------------
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -13,11 +13,10 @@
 %%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 %%% KIND, either express or implied.
 %%%
-%%%---- END COPYRIGHT ----------------------------------------------------------
-%%%------------------------------------------------------------------
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @author Malotte W Lönne <malotte@malotte.net>
-%%% @copyright (C) 2012, Tony Rogvall
+%%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%%   CANopen node interface.
 %%%
@@ -163,7 +162,7 @@
 start_link(S, Opts) ->
     %% Trace output enable/disable
     co_lib:debug(proplists:get_value(debug,Opts,false)), 
-    ?dbg(node, "start_link: Serial = ~.16#, Opts = ~p", [S, Opts]),
+    ?dbg("start_link: Serial = ~.16#, Opts = ~p", [S, Opts]),
 
     F =	case proplists:get_value(linked,Opts,true) of
 	    true -> start_link;
@@ -174,8 +173,8 @@ start_link(S, Opts) ->
     case verify_options(Opts) of
 	ok ->
 	    Name = name(Opts, Serial),
-	    ?dbg(node, "Starting co_node with function ~p, Name = ~p, Serial = ~.16#", 
-		 [F, Name, Serial]),
+	    ?dbg("start_link: Starting co_node with function ~p, "
+		 "Name = ~p, Serial = ~.16#", [F, Name, Serial]),
 	    gen_server:F({local, Name}, ?CO_NODE, {Serial,Name,Opts}, []);
 	E ->
 	    E
@@ -353,12 +352,12 @@ get_option(Identity, Option) ->
 			ok | {error, Reason::string()}.
 
 set_option(Identity, Option, NewValue) ->
-    ?dbg(node, "set_option: Option = ~p, NewValue = ~p",[Option, NewValue]),
+    ?dbg("set_option: Option = ~p, NewValue = ~p",[Option, NewValue]),
     case verify_option(Option, NewValue) of
 	ok ->
 	    gen_server:call(identity_to_pid(Identity), {option, Option, NewValue});	    
 	{error, _Reason} = Error ->
-	    ?dbg(node, "set_option: option rejected, reason = ~p",[_Reason]),
+	    ?dbg("set_option: option rejected, reason = ~p",[_Reason]),
 	    Error
     end.
 
@@ -707,7 +706,7 @@ dam_mpdo_event(Identity, CobId, DestinationNode)
        (is_integer(DestinationNode) andalso DestinationNode) =< 127 ->
     gen_server:cast(identity_to_pid(Identity), {dam_mpdo_event, CobId, DestinationNode});
 dam_mpdo_event(_Identity, _CobId, _DestinationNode) ->
-    ?dbg(node, "dam_mpdo_event: Invalid destination = ~p", [_DestinationNode]),
+    ?dbg("dam_mpdo_event: Invalid destination = ~p", [_DestinationNode]),
     {error, invalid_destination}.
 
 
@@ -759,7 +758,7 @@ add_entry(Identity, Dict, Entry) when is_record(Entry, dict_entry) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec delete_object(Identity::node_identity(), Dict::term(), Index::integer()) ->
+-spec delete_object(Identity::node_identity(), Dict::term(), Ix::integer()) ->
 			ok | {error, badarg}.
 
 delete_object(Identity, Dict, Ix) when ?is_index(Ix) ->
@@ -898,7 +897,7 @@ add_entry(Identity, Ent) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec get_entry(Identity::node_identity(), 
-		{Index::integer(), SubIndex::integer()}) -> 
+		{Ix::integer(), Si::integer()}) -> 
 		       ok | {error, Error::atom()}.
 
 get_entry(Identity, Index) ->
@@ -910,7 +909,7 @@ get_entry(Identity, Index) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get_object(Identity::node_identity(), Index::integer()) -> 
+-spec get_object(Identity::node_identity(), Ix::integer()) -> 
 		       ok | {error, Error::atom()}.
 
 get_object(Identity, Ix) ->
@@ -984,13 +983,13 @@ data(Identity, Ix) when is_integer(Ix) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Starts a store session to store Value at Index:Subind on remote node.
+%% Starts a store session to store Value at Index:Si on remote node.
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec store(Identity::node_identity(),
 	    {TypeOfNid::nodeid | xnodeid, Nid::integer()},
-	    Index::integer(), SubInd::integer(), 
+	    Ix::integer(), Si::integer(), 
 	    TransferMode:: block | segment,
 	    Term::{data, binary()} | 
 		  {value, Value::term(), Type::integer() | atom()} |
@@ -998,36 +997,38 @@ data(Identity, Ix) when is_integer(Ix) ->
 	    TimeOut::timeout() | default) ->
 		   ok | {error, Error::term()}.
 
-store(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, 
+store(Identity, NodeId = {_TypeOfNid, _Nid}, Ix, Si, 
       TransferMode, Term, default) 
-  when ?is_index(IX), ?is_subind(SI) ->
-    ?dbg(node, "store: Identity = ~p, NodeId = {~p, ~.16#}, " ++
-	     "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p", 
-	 [Identity, _TypeOfNid, _Nid, IX, SI, TransferMode, Term]),
+  when ?is_index(Ix), ?is_subind(Si) ->
+    ?dbg({index, {Ix, Si}},
+	 "store: Identity = ~p, NodeId = {~p, ~.16#}, "
+	 "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p", 
+	 [Identity, _TypeOfNid, _Nid, Ix, Si, TransferMode, Term]),
     gen_server:call(identity_to_pid(Identity), 
-		    {store,TransferMode,NodeId,IX,SI,Term});
-store(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, 
+		    {store,TransferMode,NodeId,Ix,Si,Term});
+store(Identity, NodeId = {_TypeOfNid, _Nid}, Ix, Si, 
       TransferMode, Term, TimeOut) 
-  when ?is_index(IX), ?is_subind(SI),
+  when ?is_index(Ix), ?is_subind(Si),
        (is_integer(TimeOut) andalso TimeOut > 0) ->
-    ?dbg(node, "store: Identity = ~p, NodeId = {~p, ~.16#}, " ++
-	     "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p, TimeOut = ~p", 
-	 [Identity, _TypeOfNid, _Nid, IX, SI, TransferMode, Term, TimeOut]),
+    ?dbg({index, {Ix, Si}},
+	 "store: Identity = ~p, NodeId = {~p, ~.16#}, "
+	 "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p, TimeOut = ~p", 
+	 [Identity, _TypeOfNid, _Nid, Ix, Si, TransferMode, Term, TimeOut]),
     gen_server:call(identity_to_pid(Identity), 
-		    {store,TransferMode,NodeId,IX,SI,Term,TimeOut},
+		    {store,TransferMode,NodeId,Ix,Si,Term,TimeOut},
 		    TimeOut + 1000).
 
 
     
 %%--------------------------------------------------------------------
 %% @doc
-%% Starts a fetch session to fetch Value at Index:Subind on remote node.
+%% Starts a fetch session to fetch Value at Ix:Si on remote node.
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec fetch(Identity::node_identity(), 
 	    {TypeOfNid::nodeid | xnodeid, Nid::integer()},
-	    Index::integer(), SubInd::integer(),
+	    Ix::integer(), Si::integer(),
  	    TransferMode:: block | segment,
 	    Term::data | 
 		  {app, Pid::pid(), Module::atom()} |
@@ -1036,23 +1037,25 @@ store(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI,
 		   ok | {ok, Data::binary()} | {error, Error::term()}.
 
 
-fetch(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, 
+fetch(Identity, NodeId = {_TypeOfNid, _Nid}, Ix, Si, 
       TransferMode, Term, default)
-  when ?is_index(IX), ?is_subind(SI) ->
-    ?dbg(node, "fetch: Identity = ~p, NodeId = {~p, ~.16#}, " ++
-	     "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p", 
-	 [Identity, _TypeOfNid, _Nid, IX, SI, TransferMode, Term]),
+  when ?is_index(Ix), ?is_subind(Si) ->
+    ?dbg({index, {Ix, Si}},
+	 "fetch: Identity = ~p, NodeId = {~p, ~.16#}, "
+	 "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p", 
+	 [Identity, _TypeOfNid, _Nid, Ix, Si, TransferMode, Term]),
     gen_server:call(identity_to_pid(Identity), 
-		    {fetch,TransferMode,NodeId,IX,SI,Term});
-fetch(Identity, NodeId = {_TypeOfNid, _Nid}, IX, SI, 
+		    {fetch,TransferMode,NodeId,Ix,Si,Term});
+fetch(Identity, NodeId = {_TypeOfNid, _Nid}, Ix, Si, 
       TransferMode, Term, TimeOut)
-  when ?is_index(IX), ?is_subind(SI),
+  when ?is_index(Ix), ?is_subind(Si),
        (is_integer(TimeOut) andalso TimeOut > 0) ->
-    ?dbg(node, "fetch: Identity = ~p, NodeId = {~p, ~.16#}, " ++
-	     "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p, TimeOut = ~p", 
-	 [Identity, _TypeOfNid, _Nid, IX, SI, TransferMode, Term, TimeOut]),
+    ?dbg({index, {Ix, Si}},
+	 "fetch: Identity = ~p, NodeId = {~p, ~.16#}, "
+	 "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p, TimeOut = ~p", 
+	 [Identity, _TypeOfNid, _Nid, Ix, Si, TransferMode, Term, TimeOut]),
     gen_server:call(identity_to_pid(Identity), 
-		    {fetch,TransferMode,NodeId,IX,SI,Term,TimeOut},
+		    {fetch,TransferMode,NodeId,Ix,Si,Term,TimeOut},
 		    TimeOut + 1000).
 
 
@@ -1147,20 +1150,23 @@ dict(Identity) ->
 tpdo_set(Identity, {Ix, Si} = I, Data, Mode) 
   when ?is_index(Ix), ?is_subind(Si), is_binary(Data) andalso
        (Mode == append orelse Mode == overwrite) ->
-    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Data = ~p, Mode ~p",
+    ?dbg({index, {Ix, Si}},
+	 "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Data = ~p, Mode ~p",
 	 [Identity, Ix, Si, Data, Mode]), 
     Data64 = co_codec:encode_binary(Data, 64),
     gen_server:call(identity_to_pid(Identity), {tpdo_set,I,Data64,Mode});   
 tpdo_set(Identity, {Ix, Si} = I, {Value, Type}, Mode) 
   when ?is_index(Ix), ?is_subind(Si) ->
-    ?dbg(node, "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Value = ~p, Type = ~p, Mode ~p",
-	 [Identity, Ix, Si, Value, Type, Mode]), 
+    ?dbg({index, {Ix, Si}},
+	 "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Value = ~p, "
+	 "Type = ~p, Mode ~p", [Identity, Ix, Si, Value, Type, Mode]), 
     try co_codec:encode(Value, Type) of
 	Data ->
 	    tpdo_set(Identity, I, Data, Mode) 
     catch
 	error:_Reason ->
-	    ?dbg(node, "tpdo_set: encode failed, reason = ~p", [_Reason]), 
+	    ?dbg({index, {Ix, Si}},
+		 "tpdo_set: encode failed, reason = ~p", [_Reason]), 
 	    {error, badarg}
     end;
 tpdo_set(Identity, Ix, Term, Mode) 
@@ -1170,7 +1176,7 @@ tpdo_set(Identity, Ix, Term, Mode)
 %%--------------------------------------------------------------------
 %% @doc
 %% Send notification. <br/>
-%% SubInd is set to 0.<br/>
+%% SubIndex is set to 0.<br/>
 %% Executing in calling process context.<br/>
 %%
 %% @end
@@ -1178,8 +1184,8 @@ tpdo_set(Identity, Ix, Term, Mode)
 -spec notify(CobId::integer(), Ix::integer(), Value::term()) -> 
 		    ok | {error, Error::atom()}.
 
-notify(CobId,Index,Value) ->
-    notify(CobId,Index,0,Value).
+notify(CobId,Ix,Value) ->
+    notify(CobId,Ix,0,Value).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -1191,8 +1197,8 @@ notify(CobId,Index,Value) ->
 -spec notify(CobId::integer(), Ix::integer(), Si::integer(), Data::binary()) -> 
 		    ok | {error, Error::atom()}.
 
-notify(CobId,Index,Subind,Data) ->
-    co_node:notify(CobId,Index,Subind,Data).
+notify(CobId,Ix,Si,Data) ->
+    co_node:notify(CobId,Ix,Si,Data).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -1205,11 +1211,11 @@ notify(CobId,Index,Subind,Data) ->
 	    Func::atom(), Ix::integer(), Si::integer(), Data::binary()) -> 
 		    ok | {error, Error::atom()}.
 
-notify({xnodeid, XNid}, Func, Index, Subind, Data) ->
+notify({xnodeid, XNid}, Func, Ix, Si, Data) ->
     notify(?XCOB_ID(co_lib:encode_func(Func), co_lib:add_xflag(XNid)),
-	   Index,Subind,Data);
-notify({nodeid, Nid}, Func, Index, Subind, Data) ->
-    notify(?COB_ID(co_lib:encode_func(Func), Nid),Index,Subind,Data).
+	   Ix,Si,Data);
+notify({nodeid, Nid}, Func, Ix, Si, Data) ->
+    notify(?COB_ID(co_lib:encode_func(Func), Nid),Ix,Si,Data).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -1233,19 +1239,21 @@ notify({nodeid, Nid}, Func, Index, Subind, Data) ->
 			 ok | {error, Error::atom()}.
 		  
 
-notify_from(Identity={xnodeid, XNid}, Func, Index, Subind, Data) when is_atom(Func) ->
-    ?dbg(node, "notify_from: NodeId = {xnodeid, ~.16#}, Func = ~p, " ++
+notify_from(Identity={xnodeid, XNid}, Func, Ix, Si, Data) when is_atom(Func) ->
+    ?dbg({index, {Ix, Si}},
+	 "notify_from: NodeId = {xnodeid, ~.16#}, Func = ~p, " ++
 	     "Ix = ~4.16.0B, Si = ~p, Data = ~w", 
-	 [XNid, Func, Index, Subind, Data]),
+	 [XNid, Func, Ix, Si, Data]),
     notify_from(Identity,?XCOB_ID(co_lib:encode_func(Func), co_lib:add_xflag(XNid)),
-		Index,Subind,Data);
-notify_from(Identity={nodeid, Nid}, Func, Index, Subind, Data) when is_atom(Func)->
-    ?dbg(node, "notify_from: NodeId = {nodeid, ~.16#}, Func = ~p, " ++
-	     "Ix = ~4.16.0B, Si = ~p, Data = ~p", 
-	 [Nid, Func, Index, Subind, Data]),
-    notify_from(Identity,?COB_ID(co_lib:encode_func(Func), Nid),Index,Subind,Data);
-notify_from(Identity,CobId,Index,Subind,Data) when is_integer(CobId) ->
-    co_node:notify_from(identity_to_pid(Identity),CobId,Index,Subind,Data).
+		Ix,Si,Data);
+notify_from(Identity={nodeid, Nid}, Func, Ix, Si, Data) when is_atom(Func)->
+    ?dbg({index, {Ix, Si}},
+	"notify_from: NodeId = {nodeid, ~.16#}, Func = ~p, "
+	 "Ix = ~4.16.0B, Si = ~p, Data = ~p", 
+	 [Nid, Func, Ix, Si, Data]),
+    notify_from(Identity,?COB_ID(co_lib:encode_func(Func), Nid),Ix,Si,Data);
+notify_from(Identity,CobId,Ix,Si,Data) when is_integer(CobId) ->
+    co_node:notify_from(identity_to_pid(Identity),CobId,Ix,Si,Data).
 
 
 %%--------------------------------------------------------------------
@@ -1297,7 +1305,7 @@ tpdo_data(Index = {Ix, Si}, TpdoCtx)
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec subscribers(Tab::atom() | integer(), Index::integer()) -> 
+-spec subscribers(Tab::atom() | integer(), Ix::integer()) -> 
 			 list(Pid::pid()) | {error, Error::atom()}.
 
 subscribers(Tab, Ix) when ?is_index(Ix) ->
@@ -1305,12 +1313,12 @@ subscribers(Tab, Ix) when ?is_index(Ix) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Get the reserver in Tab for Index if any. <br/>
+%% Get the reserver in Tab for Ix if any. <br/>
 %% Executing in calling process context.<br/>
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec reserver_with_module(Tab::atom() | integer(), Index::integer()) -> 
+-spec reserver_with_module(Tab::atom() | integer(), Ix::integer()) -> 
 				  {Pid::pid() | dead, Mod::atom()} | [].
 
 reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
