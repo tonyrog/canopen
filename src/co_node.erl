@@ -986,7 +986,7 @@ handle_info(Frame, Ctx=#co_ctx {name = _Name})
   when is_record(Frame, can_frame) ->
     ?dbg("~s: handle_info: CAN frame received", [_Name]),
     Ctx1 = handle_can(Frame, 
-		      Ctx#co_ctx {can_timestamp = sz_util:sec(),
+		      Ctx#co_ctx {can_timestamp = co_lib:sec(),
 				  inact_sent = false}),
     {noreply, Ctx1};
 
@@ -1033,7 +1033,7 @@ handle_info({timeout, Ref, inactive}, Ctx=#co_ctx {name = _Name,
   when is_integer(IT) ->
     %% Send an inactive event
     ?dbg("~s: handle_info: inactive timeout received.", [_Name]),
-    Now = sz_util:sec(),
+    Now = co_lib:sec(),
     if Now - CT >= IT ->
 	    ?dbg("~s: handle_info: sending inactive event to ~p.", 
 		 [_Name, IS]),

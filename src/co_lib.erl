@@ -67,6 +67,7 @@
 
 %% Utilities
 -export([utc_time/0,
+	 sec/0,
          debug/1]).
 
 
@@ -1228,6 +1229,17 @@ utc_time() ->
 			  "Aug","Sep","Oct","Nov","Dec"}),
     io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w",
 		  [Day,Mstr,Year,Hour,Minute,Second,Micro]).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Seconds utility, gives timestamp as seconds.
+%% @end
+%%--------------------------------------------------------------------
+-spec sec() -> Sec::integer().
+sec() ->
+    {MegaSec, Sec, _MilliSec} = os:timestamp(),
+    1000 * MegaSec + Sec.
+
 
 debug(true) ->
     ale:trace(on, self(), debug);
