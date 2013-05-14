@@ -76,7 +76,7 @@ start(_StartType, _StartArgs) ->
 -spec stop(State::term()) -> ok | {error, Error::term()}.
 
 stop(_State) ->
-    ok.
+    exit(normal).
 
 %% @private
 start() ->
