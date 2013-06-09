@@ -83,6 +83,7 @@ start() ->
     call([sasl, lager, ale, eapi, uart, can, canopen], 
 	 start).
 
+%% @private
 stop() ->
     call([can, uart, eapi, ale, lager],
 	 stop).
