@@ -553,6 +553,13 @@
 	  sdo,              %% sdo context
 	  sdo_list=[],      %% [#sdo{}]
 
+	  %% Can event supervision
+	  inact_timeout = infinity, %% 
+	  inact_subs,       %% inactive event subscriptions
+	  inact_timer = undefined, 
+	  inact_sent = false,
+	  can_timestamp = 0,%% last event on can bus
+
 	  %% SYNC
 	  sync_tmr = false, %% TimerRef
 	  sync_time = 0,    %% Sync timer value (ms) should be us
@@ -850,5 +857,10 @@
 -define(TMPDO_MAP_SIZE(Map),   (((Map)  bsr 24) band 16#ff)).
 -define(TMPDO_MAP_INDEX(Map),  (((Map) bsr 8) band 16#ffff)).
 -define(TMPDO_MAP_SUBIND(Map), ((Map)  band 16#ff)).
+
+%% Convenience defines
+-define(ei(Format, Args), error_logger:info_msg(Format, Args)).
+-define(ee(Format, Args), error_logger:error_msg(Format, Args)).
+-define(ew(Format, Args), error_logger:warning_msg(Format, Args)).
 
 -endif.

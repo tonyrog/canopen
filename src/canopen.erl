@@ -1,6 +1,6 @@
-%%%---- BEGIN COPYRIGHT --------------------------------------------------------
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -13,10 +13,9 @@
 %%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 %%% KIND, either express or implied.
 %%%
-%%%---- END COPYRIGHT ----------------------------------------------------------
-%%%-------------------------------------------------------------------
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @copyright (C) 2012, Tony Rogvall
+%%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%% CANopen application.
 %%%
@@ -55,11 +54,11 @@
 
 start(_StartType, _StartArgs) ->
     error_logger:info_msg("~p: start: arguments ignored.\n", [?MODULE]),
-    case application:get_env(serial) of
+    case application:get_env(canopen, serial) of
 	undefined -> 
 	    {error, no_serial_specified};
 	{ok,Serial} ->
-	    Opts = case application:get_env(options) of
+	    Opts = case application:get_env(canopen, options) of
 		       undefined -> [];
 		       {ok, O} -> O
 		   end,
@@ -77,13 +76,14 @@ start(_StartType, _StartArgs) ->
 -spec stop(State::term()) -> ok | {error, Error::term()}.
 
 stop(_State) ->
-    ok.
+    exit(normal).
 
 %% @private
 start() ->
     call([sasl, lager, ale, eapi, uart, can, canopen], 
 	 start).
 
+%% @private
 stop() ->
     call([can, uart, eapi, ale, lager],
 	 stop).

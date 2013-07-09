@@ -1,6 +1,6 @@
-%%%---- BEGIN COPYRIGHT --------------------------------------------------------
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -13,10 +13,9 @@
 %%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 %%% KIND, either express or implied.
 %%%
-%%%---- END COPYRIGHT ----------------------------------------------------------
-%%%-------------------------------------------------------------------
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Malotte Westman Lönne <malotte@malotte.net>
-%%% @copyright (C) 2012, Tony Rogvall
+%%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%%  Process dictionary.
 %%%
@@ -26,17 +25,24 @@
 %%%-------------------------------------------------------------------
 -module(co_proc).
 
+-include("canopen.hrl").
 -include("co_debug.hrl").
 
 -behaviour(gen_server).
 
-%% API
--export([start_link/1, stop/0]).
+%% gen_server api
+-export([start_link/1, 
+	 stop/0]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
+-export([init/1, 
+	 handle_call/3, 
+	 handle_cast/2, 
+	 handle_info/2,
+	 terminate/2, 
+	 code_change/3]).
 
+%% function api
 -export([reg/1]).
 -export([unreg/1]).
 -export([lookup/1]).
@@ -68,7 +74,7 @@
 			{ok, Pid::pid()} | ignore | {error, Error::term()}.
 
 start_link(Opts) ->
-    error_logger:info_msg("~p: start_link: args = ~p\n", [?MODULE, Opts]),
+    ?ei("~p: start_link: args = ~p\n", [?MODULE, Opts]),
     F =	case proplists:get_value(linked,Opts,true) of
 	    true -> start_link;
 	    false -> start
@@ -91,7 +97,10 @@ start_link(Opts) ->
 -spec stop() -> ok | {error, Reason::atom()}.
 				  
 stop() ->
-    gen_server:call(?MODULE, stop).
+    case alive() of
+	true -> gen_server:call(?MODULE, stop);
+	false -> {error, no_process}
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -101,7 +110,10 @@ stop() ->
 -spec reg(Term::term()) -> ok | {error, Error::term()}.
 
 reg(Term) ->
-    gen_server:call(?MODULE, {reg, Term, self()}).
+    case alive() of
+	true -> gen_server:call(?MODULE, {reg, Term, self()});
+	false -> {error, no_process}
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -111,7 +123,10 @@ reg(Term) ->
 -spec unreg(Term::term()) -> ok | {error, Error::term()}.
 
 unreg(Term) ->
-    gen_server:call(?MODULE, {unreg, Term}).
+    case alive() of
+	true -> gen_server:call(?MODULE, {unreg, Term});
+	false -> {error, no_process}
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -121,7 +136,7 @@ unreg(Term) ->
 -spec lookup(Term::term()) -> Pid::pid() | {error, Error::term()}.
 
 lookup(Term) ->
-    ?dbg(proc, "lookup Term = ~w", [Term]),    
+    ?dbg("lookup: Term = ~w", [Term]),    
     case ets:info(co_term_dict, name) of
 	undefined -> 
 	    {error, no_process};
@@ -162,8 +177,7 @@ regs(Pid) ->
 %%--------------------------------------------------------------------
 -spec clear() -> ok | {error, Error::term()}.
 
-clear()  ->
-    gen_server:call(?MODULE, {clear, self()}).
+clear()  -> clear(self()).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -173,7 +187,10 @@ clear()  ->
 -spec clear(Pid::pid()) -> ok | {error, Error::term()}.
 
 clear(Pid) when is_pid(Pid) ->
-    gen_server:call(?MODULE, {clear, Pid}).
+    case alive() of
+	true -> gen_server:call(?MODULE, {clear, Pid});
+	false -> {error, no_process}
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -219,7 +236,7 @@ debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
 -spec init([]) -> {ok, Ctx::#ctx{}}.
 
 init([]) ->
-    error_logger:info_msg("~p: init: args = [], pid = ~p\n", [?MODULE, self()]),
+    ?ei("~p: init: args = [], pid = ~p\n", [?MODULE, self()]),
 
     PD = ets:new(co_proc_dict, [protected, named_table, ordered_set]),
     TD = ets:new(co_term_dict, [protected, named_table, ordered_set]),
@@ -246,7 +263,7 @@ init([]) ->
 
 handle_call({reg, Term, Pid}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) 
   when is_pid(Pid) ->
-    ?dbg(proc, "handle_call: reg Term = ~w, Pid = ~w", [Term, Pid]),    
+    ?dbg("handle_call: reg Term = ~w, Pid = ~w", [Term, Pid]),    
     case ets:lookup(TD, Term) of
 	[] ->
 	    ets:insert(TD, {Term, Pid}),
@@ -270,7 +287,7 @@ handle_call({reg, Term, Pid}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD})
 	    {reply, {error, already_registered}, Ctx}
     end;
 handle_call({unreg, Term}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
-    ?dbg(proc, "handle_call: unreg Term = ~w", [Term]),    
+    ?dbg("handle_call: unreg Term = ~w", [Term]),    
     case ets:lookup(TD, Term) of
 	[{Term, Pid}] ->
 	    ets:delete(TD, Term),
@@ -289,20 +306,25 @@ handle_call({unreg, Term}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
 	    {reply, ok, Ctx}
     end;
 handle_call({clear, Pid}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
-    ?dbg(proc, "handle_call: clear Pid = ~w", [Pid]),    
-    try ets:match_delete(TD, {'_', Pid}) of
-	true -> 
-	    %% All entries removed
-	    [{Pid, Mon, _TermList}] = ets:lookup(PD, Pid),
+    ?dbg("handle_call: clear Pid = ~w", [Pid]),    
+    case ets:lookup(PD, Pid) of
+	[{Pid, Mon, _TermList}] ->
+	    try ets:match_delete(TD, {'_', Pid}) of
+		true -> ok
+	    catch 
+		error:Reason ->
+		    ?ew("~p: Delete of terms for ~p failed, reason ~p\n", 
+			[?MODULE, Pid, Reason]),
+		    ok
+	    end,
 	    case Mon of
 		{dead, _R} -> do_nothing;
 		_M -> erlang:demonitor(Mon)
 	    end,
 	    ets:delete(PD, Pid),
+	    {reply, ok, Ctx};
+	[]->
 	    {reply, ok, Ctx}
-    catch 
-	error:Reason ->
-	    {reply, {error, Reason}, Ctx}
     end;
 handle_call({debug, TrueOrFalse}, _From, Ctx) ->
     put(dbg, TrueOrFalse),
@@ -341,7 +363,7 @@ handle_cast(_Msg, Ctx) ->
 
 handle_info({'DOWN',_Ref, process, Pid, Reason}, 
 	    Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
-    error_logger:warning_msg("~p: Monitored process ~p died\n", [?MODULE, Pid]),
+    ?ew("~p: Monitored process ~p died\n", [?MODULE, Pid]),
     ets:match_delete(TD, {'_', Pid}),
     ets:insert(PD, {Pid, {dead, Reason}, []}),
     {noreply, Ctx};

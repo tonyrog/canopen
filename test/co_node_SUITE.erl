@@ -65,7 +65,8 @@ all() ->
      restore_dict,
      save_and_load,
      save_and_load_nok,
-     start_stop_app].
+     start_stop_app,
+     inactive].
 %%     break].
 
 
@@ -133,6 +134,9 @@ end_per_testcase(Case, _Config) when Case == save_and_load;
 	undefined  -> do_nothing;
 	_Pid ->  co_sys_app:stop(serial())
     end,
+    ok;
+end_per_testcase(inactive, _Config) ->
+    co_api:set_option(serial(), inact_timeout, infinity),
     ok;
 end_per_testcase(_TestCase, _Config) ->
     ok.
@@ -352,6 +356,29 @@ start_stop_app(_Config) ->
     ct:pal("Dictionary = ~p", [Dict]),
 
     ok = co_test_app:stop(serial()),
+    ok.
+
+
+%%--------------------------------------------------------------------
+%% @doc 
+%% Verifies that an inactive is sent if subscribed to.
+%% @end
+%%--------------------------------------------------------------------
+-spec inactive(Config::list(tuple())) -> ok.
+
+inactive(_Config) ->
+    ok = co_api:set_option(serial(), inact_timeout, 2),
+    ok = co_api:inactive_event_subscribe(serial()),
+
+    receive 
+	inactive ->
+	    ct:pal("Got inactive.",[]);
+	_Other1 ->
+	    ct:pal("Received other = ~p", [_Other1]),
+	    ct:fail("Received other")
+    after 2500 ->
+	    ct:fail("Application did not get inactive")
+    end,
     ok.
 
 

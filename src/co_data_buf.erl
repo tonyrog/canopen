@@ -1,6 +1,6 @@
-%%%---- BEGIN COPYRIGHT --------------------------------------------------------
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -13,10 +13,9 @@
 %%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 %%% KIND, either express or implied.
 %%%
-%%%---- END COPYRIGHT ----------------------------------------------------------
-%%%-------------------------------------------------------------------
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Malotte Westman Lönne <malotte@malotte.net>
-%%% @copyright (C) 2012, Tony Rogvall
+%%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%% Intermediate data storage for an SDO session process.<br/>
 %%% Responsible for setting up a connection to an application
@@ -133,8 +132,7 @@ init(Access, Pid, E, BSize) ->
 		  {error, Error::atom()}.
 
 init(Access, Pid, E, BSize, LLevel) ->
-    ?dbg(data_buf, 
-	 "init: e = ~w,\n access = ~p, blocksize = ~p, load_level ~p",
+    ?dbg("init: e = ~w,\n access = ~p, blocksize = ~p, load_level ~p",
 	 [E, Access, BSize, LLevel]),
     init_i(Access, Pid, E, BSize, LLevel).
 
@@ -156,13 +154,14 @@ init_i(read, Pid,
 				     timeout = Tout})
     catch
 	error:_Reason ->
-	    ?dbg(data_buf, "init: encode of = ~p, ~p failed, Reason = ~p", 
+	    ?dbg({index, I}, "init: encode of = ~p, ~p failed, Reason = ~p", 
 		 [Value,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 
 init_i(read, Pid, 
-       #index_spec{index = {Ix, Si} = I, type = Type, transfer = {dict, Dict} = M, timeout = Tout},
+       #index_spec{index = {Ix, Si} = I, type = Type, 
+		   transfer = {dict, Dict} = M, timeout = Tout},
        BSize, LLevel) when is_pid(Pid) ->
     %% Fetch data from dictionary
     {ok, Value} = co_dict:value(Dict, Ix, Si),
@@ -181,12 +180,13 @@ init_i(read, Pid,
 				     timeout = Tout})
     catch
 	error:_Reason ->
-	    ?dbg(data_buf, "init: encode of = ~p, ~p failed, Reason = ~p", 
+	    ?dbg({index, I}, "init: encode of = ~p, ~p failed, Reason = ~p", 
 		 [Value,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 
-init_i(Access, Pid, #index_spec{index = I, type = Type, transfer = Mode, timeout = Tout}, 
+init_i(Access, Pid, #index_spec{index = I, type = Type, 
+				transfer = Mode, timeout = Tout}, 
        BSize, LLevel)  when is_pid(Pid) ->
     open(Access, #co_data_buf {access = Access,
 			       pid = Pid,
@@ -197,7 +197,8 @@ init_i(Access, Pid, #index_spec{index = I, type = Type, transfer = Mode, timeout
 			       load_level = LLevel,
 			       mode = Mode,
 			       timeout = Tout});
-init_i(read, Dict, #dict_entry{index = I, type = Type, data = Data}, BSize, LLevel) ->
+init_i(read, Dict, #dict_entry{index = I, type = Type, data = Data}, 
+       BSize, LLevel) ->
     {ok, #co_data_buf {access = read,
 		       i = I,
 		       type = Type,
@@ -246,11 +247,12 @@ init_i(Access, Pid, {Data, I}, BSize, LLevel) when is_binary(Data) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec open(read | write, Buf::#co_data_buf{}) -> {ok, NewBuf::#co_data_buf{}} |
-						 {ok, NewBuf::#co_data_buf{}, Mref::reference()} |
+						 {ok, NewBuf::#co_data_buf{}, 
+						  Mref::reference()} |
 						 {error, Error::atom()}. 
 
 open(Access, Buf=#co_data_buf {pid = _Pid, i = _I, mode = _M})  ->
-    ?dbg(data_buf, "open: access = ~p, pid = ~p, i = ~p, mode = ~w", 
+    ?dbg({index, _I}, "open: access = ~p, pid = ~p, i = ~p, mode = ~w", 
 	 [Access, _Pid, _I, _M]),
     open_i(Access, Buf).
 
@@ -260,7 +262,8 @@ open_i(read, Buf=#co_data_buf {pid = Pid, i = I, mode = streamed}) ->
     %% Call app async
     Ref = make_ref(),
     app_call(Buf#co_data_buf {ref = Ref}, Pid, {read_begin, I, Ref});
-open_i(read, Buf=#co_data_buf {pid = Pid, i = I, type = Type, mode = {atomic, Module}}) ->
+open_i(read, Buf=#co_data_buf {pid = Pid, i = I, type = Type, 
+			       mode = {atomic, Module}}) ->
     %% Call app sync
     case Module:get(Pid, I) of
 	{ok, Value} -> 
@@ -271,14 +274,16 @@ open_i(read, Buf=#co_data_buf {pid = Pid, i = I, type = Type, mode = {atomic, Mo
 					  eof = true}}
 	    catch
 		error:_Reason ->
-		    ?dbg(data_buf, "open: encode of = ~p, ~p failed, Reason = ~p", 
+		    ?dbg({index, I}, 
+			 "open: encode of = ~p, ~p failed, Reason = ~p", 
 			 [Value,  Type, _Reason]),
 		    {error, ?abort_value_range_error}
 	    end;
 	Other ->
 	    Other
     end;
-open_i(read, Buf=#co_data_buf {pid = Pid, i = I, mode = {streamed, Module}}) ->
+open_i(read, Buf=#co_data_buf {pid = Pid, i = I, 
+			       mode = {streamed, Module}}) ->
     %% Call app sync
     Ref = make_ref(),
     case Module:read_begin(Pid, I, Ref) of
@@ -297,7 +302,8 @@ open_i(write, Buf=#co_data_buf {pid = Pid, i = I, mode = streamed}) ->
     %% Call app async
     Ref = make_ref(),
     app_call(Buf#co_data_buf {ref = Ref}, Pid, {write_begin, I, Ref});
-open_i(write, Buf=#co_data_buf {pid = Pid, i = I, mode = {streamed, Module}}) ->
+open_i(write, Buf=#co_data_buf {pid = Pid, i = I, 
+				mode = {streamed, Module}}) ->
     %% Call app sync
     Ref = make_ref(),
     case Module:write_begin(Pid, I, Ref) of
@@ -315,16 +321,17 @@ open_i(write, Buf) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec load(Buf::#co_data_buf{}) -> {ok, NewBuf::#co_data_buf{}} |
-				   {ok, NewBuf::#co_data_buf{}, Mref::reference()} |
+				   {ok, NewBuf::#co_data_buf{}, 
+				    Mref::reference()} |
 				   {error, Error::atom()}.
 		  
-load(Buf) when is_record(Buf, co_data_buf) ->
-    ?dbg(data_buf, "load: available data = ~w, load_level = ~p", 
+load(Buf=#co_data_buf {i = _I})  ->
+    ?dbg({index, _I}, "load: available data = ~w, load_level = ~p", 
 	 [size(Buf#co_data_buf.data),  Buf#co_data_buf.load_level]),
     if size(Buf#co_data_buf.data) =< Buf#co_data_buf.load_level andalso
        Buf#co_data_buf.eof =/= true ->
 	    %% Time to fech more data
-	    ?dbg(data_buf, "load: loading",[]), 
+	    ?dbg({index, _I}, "load: loading",[]), 
 	    read_app_call(Buf);
        true ->
 	    {ok, Buf}
@@ -338,23 +345,24 @@ load(Buf) when is_record(Buf, co_data_buf) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec read(Buf::#co_data_buf{}, Bytes::integer) -> 
-		  {ok, Data::binary(), EofFlag::boolean(), NewBuf::#co_data_buf{}} |
+		  {ok, Data::binary(), EofFlag::boolean(), 
+		   NewBuf::#co_data_buf{}} |
 		  {ok, Mref::reference()} |
 		  {error, Error::atom()}.
 
-read(Buf, Bytes) when is_record(Buf, co_data_buf) ->
-    ?dbg(data_buf, "read: Bytes = ~p", [Bytes]),
+read(Buf=#co_data_buf {i = _I}, Bytes) ->
+    ?dbg({index, _I}, "read: Bytes = ~p", [Bytes]),
     if Bytes =< size(Buf#co_data_buf.data) ->
 	    %% Enough data is available
 	    <<Data:Bytes/binary, NewData/binary>> = Buf#co_data_buf.data,
-	    ?dbg(data_buf, "read: Data = ~w", [Data]),
+	    ?dbg({index, _I}, "read: Data = ~w", [Data]),
 	    {ok, Data, Buf#co_data_buf.eof andalso (size(NewData) =:= 0),
 	     Buf#co_data_buf {data = NewData, size = size(NewData)}};
        true ->
 	    %% More data is asked for
 	    if Buf#co_data_buf.eof =:= true ->
 		    %% No more data to fetch
-		    ?dbg(data_buf, "read: Data = ~w, Eod = true", 
+		    ?dbg({index, _I}, "read: Data = ~w, Eod = true", 
 			 [Buf#co_data_buf.data]),
 		    {ok, Buf#co_data_buf.data, true, 
 		     Buf#co_data_buf {data = (<<>>), size = 0}};
@@ -370,10 +378,12 @@ read(Buf, Bytes) when is_record(Buf, co_data_buf) ->
 	    end
     end.
 		
-read_app_call(Buf=#co_data_buf {pid=Pid, buf_size=BSize, ref=Ref, mode=streamed}) ->
+read_app_call(Buf=#co_data_buf {pid=Pid, buf_size=BSize, ref=Ref, 
+				mode=streamed}) ->
     %% Async call
     app_call(Buf, Pid, {read, Ref, BSize});
-read_app_call(Buf=#co_data_buf {pid=Pid, buf_size=BSize, ref=Ref, mode={streamed, Mod}}) ->
+read_app_call(Buf=#co_data_buf {pid=Pid, buf_size=BSize, ref=Ref, 
+				mode={streamed, Mod}}) ->
     %% Sync call
     Reply = Mod:read(Pid, Ref, BSize),
     update(Buf, Reply);
@@ -399,37 +409,38 @@ read_app_call(_Buf) ->
 write(Buf=#co_data_buf {mode = atomic, pid = Pid, type = Type, data = OldData, 
 		     tmp = TmpData, i = I}, 
       Data, true, segment) ->
-    ?dbg(data_buf, "write: mode = atomic, Data = ~w, Eod = ~p", [Data, true]),
+    ?dbg({index, I}, 
+	 "write: mode = atomic, Data = ~w, Eod = ~p", [Data, true]),
     %% All data received, time to transfer to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     try co_codec:decode(DataToSend, Type) of
 	{Value, _} ->
-	    ?dbg(data_buf, "write: set Value = ~p", [Value]),
-	    app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true} , 
+	    ?dbg({index, I}, "write: set Value = ~p", [Value]),
+	    app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true},
 		     Pid, {set, I, Value})
     catch
 	error:_Reason ->
-	    ?dbg(data_buf, "write: decode of = ~p, ~p failed, Reason = ~p", 
+	    ?dbg({index, I}, "write: decode of = ~p, ~p failed, Reason = ~p", 
 		 [DataToSend,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 		
-write(Buf=#co_data_buf {mode = atomic = _Mode, pid = Pid, type = Type, data = Data, 
-		     tmp = TmpData, i = I}, 
+write(Buf=#co_data_buf {mode = atomic = _Mode, pid = Pid, type = Type, 
+			data = Data, tmp = TmpData, i = I}, 
       N, true, block) ->
-    ?dbg(data_buf, "write: mode = ~w, N = ~p, Eod = ~p", [_Mode, N, true]),
+    ?dbg({index, I}, "write: mode = ~w, N = ~p, Eod = ~p", [_Mode, N, true]),
     %% All data received, time to transfer to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<Data/binary, DataToAdd/binary>>,
     try co_codec:decode(DataToSend, Type) of
 	{Value, _} ->
-	    ?dbg(data_buf, "write: set  Value = ~p", [Value]),
-	    app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}, 
+	    ?dbg({index, I}, "write: set  Value = ~p", [Value]),
+	    app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true},
 		     Pid, {set, I, Value})
    catch
 	error:_Reason ->
-	    ?dbg(data_buf, "write: decode of = ~p, ~p failed, Reason = ~p", 
+	    ?dbg({index, I}, "write: decode of = ~p, ~p failed, Reason = ~p", 
 		 [DataToSend,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
@@ -437,12 +448,12 @@ write(Buf=#co_data_buf {mode = atomic = _Mode, pid = Pid, type = Type, data = Da
 write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type, 
 		     data = OldData, tmp = TmpData, i = I}, 
       Data, true, segment) ->
-    ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p", 
+    ?dbg({index, I}, "write: mode = ~w, Data = ~w, Eod = ~p", 
 	 [_Mode, Data, true]),
     %% All data received, time to transfer to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     {Value, _} = co_codec:decode(DataToSend, Type),
-    ?dbg(data_buf, "write: set Value = ~p", [Value]),
+    ?dbg({index, I}, "write: set Value = ~p", [Value]),
     case Module:set(Pid, I, Value) of
 	ok ->
 	    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
@@ -452,71 +463,75 @@ write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type,
 write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type, 
 		     data = Data, tmp = TmpData, i = I}, 
       N, true, block) ->
-    ?dbg(data_buf, "write: mode = ~w, N = ~p, Eod = ~p", [_Mode, N, true]),
+    ?dbg({index, I}, "write: mode = ~w, N = ~p, Eod = ~p", [_Mode, N, true]),
     %% All data received, time to transfer to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<Data/binary, DataToAdd/binary>>,
     try co_codec:decode(DataToSend, Type) of
 	{Value, _} ->
-	    ?dbg(data_buf, "write: set  Value = ~p", [Value]),
+	    ?dbg({index, I}, "write: set  Value = ~p", [Value]),
 	    case Module:set(Pid, I, Value) of
 		ok ->
-		    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
+		    {ok, Buf#co_data_buf {data = (<<>>), 
+					  tmp = (<<>>), 
+					  eof = true}};
 		Other ->
 		    Other
 	    end
    catch
 	error:_Reason ->
-	    ?dbg(data_buf, "write: decode of = ~p, ~p failed, Reason = ~p", 
+	    ?dbg({index, I}, "write: decode of = ~p, ~p failed, Reason = ~p", 
 		 [DataToSend,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 
 %% Transfer == streamed
-write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = OldData, ref = Ref, 
-		     tmp = TmpData}, 
+write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = OldData, 
+			ref = Ref, tmp = TmpData, i = I}, 
       Data, true, segment) ->
-    ?dbg(data_buf, "write: mode = ~p,  Data = ~p, Eod = ~p", [_Mode, Data, true]),
+    ?dbg({index, I}, "write: mode = ~p,  Data = ~p, Eod = ~p", 
+	 [_Mode, Data, true]),
     %% All data received, time to transfer rest to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
-    ?dbg(data_buf, "write: send Data = ~p", [DataToSend]),
+    ?dbg({index, I}, "write: send Data = ~p", [DataToSend]),
     app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}, Pid, 
 	     {write, Ref, DataToSend, true});
-write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = Data, ref = Ref, 
-		     tmp = TmpData}, 
+write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = Data, 
+			ref = Ref, tmp = TmpData, i = I}, 
       N, true, block) ->
-    ?dbg(data_buf, "write: mode = ~w,  N = ~p, Eod = ~p", [_Mode, N, true]),
+    ?dbg({index, I}, "write: mode = ~w,  N = ~p, Eod = ~p", [_Mode, N, true]),
     %% All data received, time to transfer rest to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<Data/binary, DataToAdd/binary>>,
-    ?dbg(data_buf, "write: send Data = ~w", [DataToSend]),
+    ?dbg({index, I}, "write: send Data = ~w", [DataToSend]),
     app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}, Pid, 
 	     {write, Ref, DataToSend, true});
-write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = OldData, 
-		     ref = Ref, tmp = TmpData}, 
+write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, 
+			data = OldData,  ref = Ref, tmp = TmpData, i = I}, 
       Data, true, segment) ->
-    ?dbg(data_buf, "write: mode = ~w,  Data = ~w, Eod = ~p", [_Mode, Data, true]),
+    ?dbg({index, I}, "write: mode = ~w,  Data = ~w, Eod = ~p", 
+	 [_Mode, Data, true]),
     %% All data received, time to transfer rest to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
-    ?dbg(data_buf, "write: send Data = ~w", [DataToSend]),
+    ?dbg({index, I}, "write: send Data = ~w", [DataToSend]),
     case Module:write(Pid, Ref, DataToSend, true) of
 	{ok ,Ref} ->
 	    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
 	Other ->
 	    Other
     end;
-write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = Data, 
-		     ref = Ref, tmp = TmpData}, 
+write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, 
+			data = Data, ref = Ref, tmp = TmpData, i = I}, 
       N, true, block) ->
-    ?dbg(data_buf, "write: mode = ~w,  N = ~p, TmpData = ~w, Eod = ~p", 
+    ?dbg({index, I}, "write: mode = ~w,  N = ~p, TmpData = ~w, Eod = ~p", 
 	 [_Mode, N, TmpData, true]),
     %% All data received, time to transfer rest to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<Data/binary, DataToAdd/binary>>,
-    ?dbg(data_buf, "write: send Data = ~w", [DataToSend]),
+    ?dbg({index, I}, "write: send Data = ~w", [DataToSend]),
     case Module:write(Pid, Ref, DataToSend, true) of
 	{ok ,Ref} ->
 	    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
@@ -525,17 +540,18 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = Dat
     end;
 %% Transfer == dict
 write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, data = OldData, 
-		     i = {Index, SubInd}, tmp = TmpData}, 
+		     i = {Index, SubInd} = I, tmp = TmpData}, 
       Data, true, segment) -> 
-    ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p", [_Mode, Data, true]),
+    ?dbg({index, I}, "write: mode = ~w, Data = ~w, Eod = ~p", 
+	 [_Mode, Data, true]),
     DataToSave = <<OldData/binary, TmpData/binary, Data/binary>>,
     co_dict:direct_set_data(Dict, Index, SubInd, DataToSave),
     {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
 		
 write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, data = OldData, 
-		     i = {Index, SubInd}, tmp = TmpData}, 
+			i = {Index, SubInd} = I, tmp = TmpData}, 
       N, true, block) -> 
-    ?dbg(data_buf, "write: mode = ~w, N = ~p, TmpData = ~w, Eod = ~p", 
+    ?dbg({index, I}, "write: mode = ~w, N = ~p, TmpData = ~w, Eod = ~p", 
 	 [_Mode, N, TmpData, true]),
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
@@ -544,11 +560,12 @@ write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, data = OldData,
     {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
 		
 write(Buf=#co_data_buf {mode = {data, Client} = _Mode, data = OldData, 
-		     i = {_Index, _SubInd}, tmp = TmpData}, 
+			i = {_Index, _SubInd} = I, tmp = TmpData}, 
       Data, true, segment) -> 
-    ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p", [_Mode, Data, true]),
+    ?dbg({index, I}, "write: mode = ~w, Data = ~w, Eod = ~p", 
+	 [_Mode, Data, true]),
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
-    ?dbg(data_buf, "write: reply to ~w I = ~.16B:~.8B, Data = ~p", 
+    ?dbg({index, I}, "write: reply to ~w I = ~.16B:~.8B, Data = ~p", 
 	 [Client, _Index, _SubInd, DataToSend]),
     gen_server:reply(Client, {ok, DataToSend}),
     {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
@@ -556,30 +573,33 @@ write(Buf=#co_data_buf {mode = {data, Client} = _Mode, data = OldData,
 %%%% Not End of Data
 %% Transfer == streamed => maybe send
 write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = OldData, 
-		     write_size = WSize, ref = Ref, tmp = TmpData}, 
+			write_size = WSize, ref = Ref, tmp = TmpData, i = I}, 
       Data, false, _DownloadMode) ->
-    ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p", [_Mode, Data, false]),
+    ?dbg({index, I}, "write: mode = ~w, Data = ~w, Eod = ~p", 
+	 [_Mode, Data, false]),
     %% Not the last data, store it
     NewData = <<OldData/binary, TmpData/binary>>,
     if size(NewData) >= WSize ->
 	    %% Time to send to app
 	    <<TransferData:WSize/binary, RestData/binary>> = NewData,
-	    ?dbg(data_buf, "write: send Data = ~w", [TransferData]),
+	    ?dbg({index, I}, "write: send Data = ~w", [TransferData]),
 	    app_call(Buf#co_data_buf {data = RestData, tmp = Data}, Pid, 
 		     {write, Ref, TransferData, false});
        true ->
 	    {ok, Buf#co_data_buf {data = NewData, tmp = Data}}
     end;
-write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = OldData, 
-		     write_size = WSize, ref = Ref, tmp = TmpData}, 
+write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, 
+			data = OldData,  write_size = WSize, ref = Ref, 
+			tmp = TmpData, i = I}, 
       Data, false, _DownloadMode) ->
-    ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p", [_Mode, Data, false]),
+    ?dbg({index, I}, "write: mode = ~w, Data = ~w, Eod = ~p", 
+	 [_Mode, Data, false]),
     %% Not the last data, store it
     NewData = <<OldData/binary, TmpData/binary>>,
     if size(NewData) >= WSize ->
 	    %% Time to send to app
 	    <<TransferData:WSize/binary, RestData/binary>> = NewData,
-	    ?dbg(data_buf, "write: send Data = ~w", [TransferData]),
+	    ?dbg({index, I}, "write: send Data = ~w", [TransferData]),
 	    case Module:write(Pid, Ref, TransferData, false) of
 		{ok, Ref} ->
 		    {ok, Buf#co_data_buf {data = RestData, tmp = Data}};
@@ -590,9 +610,9 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, data = Old
 	    {ok, Buf#co_data_buf {data = NewData, tmp = Data}}
     end;
 %% Transfer =/= streamed => check size limit and store if OK
-write(Buf=#co_data_buf {mode = _Mode, data = OldData, tmp = TmpData}, 
+write(Buf=#co_data_buf {mode = _Mode, data = OldData, tmp = TmpData, i = I}, 
       Data, false, BlockOrSegment) ->
-    ?dbg(data_buf, "write: mode = ~w, Data = ~w, Eod = ~p, storing", 
+    ?dbg({index, I}, "write: mode = ~w, Data = ~w, Eod = ~p, storing", 
 	 [_Mode, Data, false]),
     CheckLimitResult = check_limit(Buf, Data, BlockOrSegment),
     if CheckLimitResult == ok ->
@@ -611,7 +631,8 @@ check_limit(Buf=#co_data_buf {mode = {atomic, _M}}, Data, BlockOrSegment) ->
 check_limit(_Buf, _Data, _BlockOrSegment) ->
     ok.
 
-check_limit_i(Buf=#co_data_buf {data = OldData, tmp = TmpData}, Data, BlockOrSegment) ->
+check_limit_i(Buf=#co_data_buf {data = OldData, tmp = TmpData}, 
+	      Data, BlockOrSegment) ->
     TypeSize = case Buf#co_data_buf.type of
 		   undefined -> 0;
 		   Type -> co_codec:bytesize(Type)
@@ -644,20 +665,20 @@ check_limit_i(Buf=#co_data_buf {data = OldData, tmp = TmpData}, Data, BlockOrSeg
 		    {ok, Ref::reference()} | 
 		    {ok, Ref::reference(), Size::integer()} |
 		    {ok, Ref::reference(), WSize::integer()} | 
-		    {ok, Ref::reference(), Data::binary(), EofFlag::boolean()} |
+		    {ok, Ref::reference(), Data::binary(), Eof::boolean()} |
 		    ok) -> 
 		    {ok, NewBuf::#co_data_buf{}} |
 		    {error, Error::atom()}.
     
 
-update(Buf, {ok, Ref}) when is_reference(Ref) ->
-    ?dbg(data_buf, "update: Ref = ~p", [Ref]),
+update(Buf=#co_data_buf {i = I}, {ok, Ref}) when is_reference(Ref) ->
+    ?dbg({index, I}, "update: Ref = ~p", [Ref]),
     case Buf#co_data_buf.ref of
 	Ref ->  {ok, Buf};
 	_OtherRef -> {error, ?abort_internal_error}
     end;
-update(Buf=#co_data_buf {access = read, type = Type}, {ok, Value}) ->
-    ?dbg(data_buf, "update: Value = ~p", [Value]),
+update(Buf=#co_data_buf {access = read, type = Type, i = I}, {ok, Value}) ->
+    ?dbg({index, I}, "update: Value = ~p", [Value]),
     try co_codec:encode(Value, Type) of
 	Data ->
 	    {ok, Buf#co_data_buf {data = Data, 
@@ -665,28 +686,28 @@ update(Buf=#co_data_buf {access = read, type = Type}, {ok, Value}) ->
 				  eof = true}}
    catch
 	error:_Reason ->
-	    ?dbg(data_buf, "update: decode of = ~p, ~p failed, Reason = ~p", 
+	    ?dbg({index, I}, "update: decode of = ~p, ~p failed, Reason = ~p", 
 		 [Value,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 		
-update(Buf=#co_data_buf {access = write}, {ok, Size}) ->
-    ?dbg(data_buf, "update: Size = ~p", [Size]),
+update(Buf=#co_data_buf {access = write, i = I}, {ok, Size}) ->
+    ?dbg({index, I}, "update: Size = ~p", [Size]),
     {ok, Buf#co_data_buf {size = Size}};
-update(Buf=#co_data_buf {access = read}, {ok, Ref, Size}) ->
-    ?dbg(data_buf, "update: Ref = ~p, Size = ~p", [Ref, Size]),
+update(Buf=#co_data_buf {access = read, i = I}, {ok, Ref, Size}) ->
+    ?dbg({index, I}, "update: Ref = ~p, Size = ~p", [Ref, Size]),
     case Buf#co_data_buf.ref of
 	Ref ->  {ok, Buf#co_data_buf {size=Size}};
 	_OtherRef -> {error, ?abort_internal_error}
     end;
-update(Buf=#co_data_buf {access = write}, {ok, Ref, WSize}) ->
-    ?dbg(data_buf, "update: Ref = ~p, WSize = ~p", [Ref, WSize]),
+update(Buf=#co_data_buf {access = write, i = I}, {ok, Ref, WSize}) ->
+    ?dbg({index, I}, "update: Ref = ~p, WSize = ~p", [Ref, WSize]),
     case Buf#co_data_buf.ref of
 	Ref ->  {ok, Buf#co_data_buf {write_size=WSize}};
 	_OtherRef -> {error, ?abort_internal_error}
     end;
-update(Buf=#co_data_buf {data = OldData}, {ok, Ref, Data, Eod}) ->
-    ?dbg(data_buf, "update: Ref = ~p, Data ~w, Eod = ~p", [Ref, Data, Eod]),
+update(Buf=#co_data_buf {data = OldData, i = I}, {ok, Ref, Data, Eod}) ->
+    ?dbg({index, I}, "update: Ref = ~p, Data ~w, Eod = ~p", [Ref, Data, Eod]),
     case Buf#co_data_buf.ref of
 	Ref -> 
 	    NewData = <<OldData/binary, Data/binary>>,
@@ -696,8 +717,8 @@ update(Buf=#co_data_buf {data = OldData}, {ok, Ref, Data, Eod}) ->
     end;    
 update(Buf, ok) ->
     {ok, Buf};
-update(_Buf, Other) ->
-    ?dbg(data_buf, "update: Buf = ~w, Other = ~p", [_Buf, Other]),
+update(_Buf=#co_data_buf {i = I}, Other) ->
+    ?dbg({index, I}, "update: Buf = ~w, Other = ~p", [_Buf, Other]),
     %% Error replies
     Other.
 
@@ -711,11 +732,14 @@ update(_Buf, Other) ->
 -spec abort(Buf::#co_data_buf{}, Reason::integer()) ->
 		   ok.
 
-abort(_Buf=#co_data_buf {mode = streamed, pid = Pid, ref = Ref}, Reason) -> 
-    ?dbg(data_buf, "abort: Buf = ~w, Reason = ~p", [_Buf, Reason]),
+abort(_Buf=#co_data_buf {mode = streamed, pid = Pid, ref = Ref, i = I}, 
+      Reason) -> 
+    ?dbg({index, I}, "abort: Buf = ~w, Reason = ~p", [_Buf, Reason]),
     gen_server:cast(Pid, {abort, Ref, Reason});
-abort(_Buf=#co_data_buf {mode = {streamed, Module}, pid = Pid, ref = Ref}, Reason) -> 
-    ?dbg(data_buf, "abort: Buf = ~w, Reason = ~p", [_Buf, Reason]),
+abort(_Buf=#co_data_buf {mode = {streamed, Module}, pid = Pid, 
+			 ref = Ref, i = I}, 
+      Reason) -> 
+    ?dbg({index, I}, "abort: Buf = ~w, Reason = ~p", [_Buf, Reason]),
     Module:abort(Pid, Ref, Reason);
 abort(_Buf, _Reason) -> 
     ok.
@@ -757,7 +781,7 @@ timeout(Buf) ->
 app_call(Buf, Pid, Msg) ->
     case catch do_call(Pid, Msg) of 
 	{'EXIT', Reason} ->
-	    error_logger:warning_msg("app_call: catch error ~p\n",[Reason]), 
+	    ?ew("app_call: catch error ~p\n",[Reason]), 
 	    {error, ?abort_internal_error};
 	Mref ->
 	    {ok, Buf, Mref}
@@ -766,6 +790,7 @@ app_call(Buf, Pid, Msg) ->
 
 do_call(Process, Request) ->
     Mref = erlang:monitor(process, Process),
-    ok = erlang:send(Process, {'$gen_call', {self(), Mref}, Request}, [noconnect]),
+    ok = erlang:send(Process, {'$gen_call', {self(), Mref}, Request}, 
+		     [noconnect]),
     Mref.
 

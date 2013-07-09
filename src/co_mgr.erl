@@ -1,6 +1,6 @@
-%%%---- BEGIN COPYRIGHT --------------------------------------------------------
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -13,10 +13,10 @@
 %%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 %%% KIND, either express or implied.
 %%%
-%%%---- END COPYRIGHT ----------------------------------------------------------
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @author Malotte W Lönne <malotte@malotte.net>
-%%% @copyright (C) 2012, Tony Rogvall
+%%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%%  CANopen manager interface.
 %%%  A co_mgr and a co_node with serial number 0 are started.
@@ -43,6 +43,7 @@
 -export([client_store/4, client_store/3, client_store/2]).
 -export([client_fetch/3, client_fetch/2, client_fetch/1]).
 -export([client_notify/5, client_notify/4, client_notify/3]).
+-export([translate/1, translate/2]).
 
 %% gen_server callbacks
 -export([init/1, 
@@ -107,7 +108,7 @@ start() ->
 
 start(Options) ->
     co_lib:debug(proplists:get_value(debug,Options,false)), 
-    ?dbg(mgr, "start: Opts = ~p", [Options]),
+    ?dbg("start: Opts = ~p", [Options]),
 
     F =	case proplists:get_value(linked,Options,true) of
 	    true -> start_link;
@@ -119,11 +120,11 @@ start(Options) ->
 	false -> co_proc:start_link(Options)
     end,
 
-    case co_proc:lookup(?CO_MGR) of
+    case whereis(?CO_MGR) of
 	MPid when is_pid(MPid) ->
 	    ok;
-	{error, not_found} ->
-	    ?dbg(mgr, "Starting co_mgr with function = ~p", [F]),
+	undefined ->
+	    ?dbg("Starting co_mgr with function = ~p", [F]),
 	    {ok, _NewMPid} = 
 		gen_server:F({local, ?CO_MGR}, ?MODULE, Options, [])
     end.
@@ -444,7 +445,7 @@ store(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode, Source)
 
 client_require(Mod) 
   when is_atom(Mod) ->
-    ?dbg(mgr, "client_require: module ~p", [Mod]),
+    ?dbg("client_require: module ~p", [Mod]),
     gen_server:call(?CO_MGR, {require, Mod}).
 
 
@@ -609,6 +610,33 @@ client_notify(Func, Index, Subind, Value) ->
 client_notify(Func, Index, Value) ->
     gen_server:cast(?CO_MGR, {notify, Func, Index, 0, Value}).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Looks up index in def files.
+%% @end
+%%--------------------------------------------------------------------
+-spec translate(Index::atom(), SubInd::atom()) -> 
+		       {IndexI::integer(), SubIndI::integer()} | 
+		       {error, Reason::term()}.
+
+translate(Index, SubInd) 
+  when is_atom(Index), is_atom(SubInd) ->
+    gen_server:call(?CO_MGR, {translate, Index, SubInd}).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link  translate/2}.
+%% SubInd = 0.
+%% @end
+%%--------------------------------------------------------------------
+-spec translate(Index::atom()) ->
+			  IndexI::integer() | 
+				  {error, Reason::term()}.
+
+translate(Index) 
+  when is_atom(Index) ->
+    gen_server:call(?CO_MGR, {translate, Index, 0}).
+
 %% For testing
 %% @private
 debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
@@ -644,7 +672,7 @@ init(Opts) ->
 	NPid when is_pid(NPid) ->
 	    ok;
 	{error, not_found} ->
-	    ?dbg(mgr, "init: starting co_node with serial = 0", []),
+	    ?dbg("init: starting co_node with serial = 0", []),
 	    {ok, _NewNPid}  = co_api:start_link(?MGR_NODE,  
 						 [{nodeid, 0}] ++ Opts)
     end,
@@ -669,8 +697,9 @@ init(Opts) ->
 	 Ix::integer(), Si::integer(), Value::term()} |
 	{store, Ix::integer(), Si::integer(), Value::term()} |
 	{fetch, {TypeOfNid::nodeid | xnodeid, Nid::integer()},
-	 Ix::integer(), Si::integer()} |
+	 Ix::integer() | atom(), Si::integer() | atom()} |
 	{fetch, Ix::integer(), Si::integer()} |
+	{translate, Ix::atom(), Si::atom()} |
 	{debug, TrueOrFalse::boolean()} |
 	{loop_data, Qual:: all | no_ctx}.
 
@@ -702,6 +731,10 @@ handle_call({fetch,Index,SubInd}, From, Mgr=#mgr {def_nid = DefNid})
   when DefNid =/= 0 ->
     do_fetch(DefNid, Index, SubInd, From, Mgr);
 
+handle_call({translate,Index,SubInd}, _From, Mgr=#mgr {def_nid = DefNid})
+  when DefNid =/= 0 ->
+    do_translate(DefNid, Index, SubInd, Mgr);
+
 handle_call({debug, TrueOrFalse}, _From, Mgr) ->
     co_lib:debug(TrueOrFalse),
     {reply, ok, Mgr};
@@ -725,7 +758,7 @@ handle_call(stop, _From, Mgr) ->
     {stop, normal, ok, Mgr};
 
 handle_call(_Request, _From, Mgr) ->
-    ?dbg(mgr, "handle_call: Unknown request ~p", [ _Request]),
+    ?dbg("handle_call: Unknown request ~p", [ _Request]),
     {reply, {error,bad_call}, Mgr}.
 
 %%--------------------------------------------------------------------
@@ -752,7 +785,7 @@ handle_cast({notify, Func, Index, SubInd, Value}, Mgr=#mgr {def_nid = DefNid})
     do_notify(DefNid, Func, Index, SubInd, Value, Mgr);
 
 handle_cast(_Msg, Mgr) ->
-    ?dbg(mgr, "handle_cast: Unknown msg ~p", [_Msg]),
+    ?dbg("handle_cast: Unknown msg ~p", [_Msg]),
     {noreply, Mgr}.
 
 
@@ -771,7 +804,7 @@ handle_cast(_Msg, Mgr) ->
 			 {noreply, Mgr::#mgr{}}.
 
 handle_info({'EXIT', Pid, Reason}, Mgr=#mgr {pids = PList}) ->
-    ?dbg(mgr, "handle_info: EXIT for process ~p received, reason ~p", 
+    ?dbg("handle_info: EXIT for process ~p received, reason ~p", 
 	 [Pid, Reason]),
     case lists:member(Pid, PList) of
 	true -> 
@@ -779,8 +812,7 @@ handle_info({'EXIT', Pid, Reason}, Mgr=#mgr {pids = PList}) ->
 		normal -> 
 		    do_nothing;
 		_Other -> 
-		    error_logger:warning_msg("Request failed, reason ~p\n", 
-					     [Reason])
+		    ?ew("Request failed, reason ~p\n", [Reason])
 	    end,
 	    {noreply, Mgr#mgr {pids = PList -- [Pid]}};
 	false ->
@@ -788,7 +820,7 @@ handle_info({'EXIT', Pid, Reason}, Mgr=#mgr {pids = PList}) ->
     end;
 
 handle_info(_Info, Mgr) ->
-    ?dbg(mgr, "handle_info: Unknown info ~p", [_Info]),
+    ?dbg("handle_info: Unknown info ~p", [_Info]),
     {noreply, Mgr}.
 
 %%--------------------------------------------------------------------
@@ -798,12 +830,12 @@ handle_info(_Info, Mgr) ->
 		       no_return().
 
 terminate(_Reason, _Mgr) ->
-   ?dbg(mgr, "terminate: reason ~p", [_Reason]),
+   ?dbg("terminate: reason ~p", [_Reason]),
     case co_proc:lookup(?MGR_NODE) of
 	Pid when is_pid(Pid) ->
-	    ?dbg(mgr, "terminate: Stopping co_node 0", []),
+	    ?dbg("terminate: Stopping co_node 0", []),
 	    co_api:stop(?MGR_NODE);
-	{error, not_found} ->
+	{error, _E} ->
 	    do_nothing
     end,
     co_proc:unreg(?CO_MGR),
@@ -820,7 +852,7 @@ terminate(_Reason, _Mgr) ->
 			 {ok, NewMgr::#mgr{}}.
 
 code_change(_OldVsn, Mgr, _Extra) ->
-    ?dbg(mgr, "code_change: Old version ~p", [_OldVsn]),
+    ?dbg("code_change: Old version ~p", [_OldVsn]),
     {ok, Mgr}.
 
 
@@ -828,23 +860,23 @@ code_change(_OldVsn, Mgr, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 load_ctx(Mod, Mgr) ->
-    ?dbg(mgr, "load_ctx: Loading ~p", [Mod]),
+    ?dbg("load_ctx: Loading ~p", [Mod]),
     case lists:keyfind(Mod, 1, Mgr#mgr.ctx_list) of
 	false ->
 	    try co_lib:load_definition(Mod) of
 		{ok, DCtx} ->
-		    ?dbg(mgr, "load_ctx: Loaded ~p", [Mod]),
+		    ?dbg("load_ctx: Loaded ~p", [Mod]),
 		    List = [{Mod,DCtx}|Mgr#mgr.ctx_list],
 		    {ok, DCtx, Mgr#mgr { ctx=DCtx, ctx_list = List }};
 		{Error, _} ->
-		    ?dbg(mgr, "load_ctx: failed loading ~p", [Mod]),
+		    ?dbg("load_ctx: failed loading ~p", [Mod]),
 		    {Error, [], Mgr}
 	    catch
 		error:Reason ->
 		    {{error,Reason}, [], Mgr}
 	    end;
 	{Mod, DCtx} ->
-	    ?dbg(mgr, "load_ctx: ~p already loaded", [Mod]),
+	    ?dbg("load_ctx: ~p already loaded", [Mod]),
 	    {ok, DCtx, Mgr#mgr { ctx = DCtx }}
     end.
     
@@ -852,8 +884,8 @@ do_store(Nid,Index,SubInd,Value,Client,
        Mgr=#mgr {pids = PList, def_trans_mode = TransMode, debug = Dbg}) ->
     Ctx = context(Nid, Mgr),
     case translate_index(Ctx,Index,SubInd,Value) of
-	{ok,{Ti,Tsi, Tv } = _T} ->
-	    ?dbg(mgr, "do_store: translated  ~p", [_T]),
+	{ok, {Ti, Tsi, Tv} = _T} ->
+	    ?dbg({index, {Ti, Tsi}},"do_store: translated  ~p", [_T]),
 	    Pid = 
 		spawn_request(store, 
 			      [Nid, Ti, Tsi, TransMode, Tv],
@@ -870,10 +902,10 @@ do_store(Nid,Index,SubInd,Value,Client,
 do_fetch(Nid,Index,SubInd, Client, 
        Mgr=#mgr {pids = PList, def_trans_mode = TransMode, debug = Dbg}) ->
     Ctx = context(Nid, Mgr),
-    ?dbg(mgr, "do_fetch: translate  ~p:~p", [Index, SubInd]),
+    ?dbg("do_fetch: translate ~p:~p", [Index, SubInd]),
     case translate_index(Ctx,Index,SubInd,no_value) of
-	{ok,{Ti,Tsi,Tv} = _T} ->
-	    ?dbg(mgr, "do_fetch: translated  ~p", [_T]),
+	{ok, {Ti, Tsi, Tv} = _T} ->
+	    ?dbg({index, {Ti, Tsi}},"do_fetch: translated  ~p", [_T]),
 	    Pid = 
 		spawn_request(fetch, 
 			      [Nid, Ti, Tsi, TransMode, Tv],
@@ -886,53 +918,69 @@ do_fetch(Nid,Index,SubInd, Client,
 	    {reply, Error, Mgr}
     end.
 
+do_translate(Nid,Index,SubInd, Mgr) ->
+    Ctx = context(Nid, Mgr),
+    ?dbg("do_translate: translate ~p:~p", [Index, SubInd]),
+    case translate_index(Ctx,Index,SubInd,no_value) of
+	{ok,{Ti,Tsi,_Tv} = _T} ->
+	    ?dbg({index, {Ti, Tsi}},"do_translate: translated  ~p", [_T]),
+	    {reply, {Ti,Tsi}, Mgr};
+	Error ->
+	    ?dbg( "do_translate: translation failed, error: ~p\n", [Error]),
+	    {reply, Error, Mgr}
+    end.
+
 spawn_request(F, Args, Client, Request, Dbg) ->
     Pid = proc_lib:spawn_link(?MODULE, execute_request, 
 			      [F, Args, Client, Request, Dbg]),
-    ?dbg(mgr, "spawn_request: spawned  ~p", [Pid]),
+    ?dbg("spawn_request: spawned  ~p", [Pid]),
     Pid.
 
 %% @private
 execute_request(F, Args, Client, Request, Dbg) ->
     co_lib:debug(Dbg),
-    ?dbg(mgr, "execute_request: F = ~p Args = ~w)", [F, Args]),
+    ?dbg("execute_request: F = ~p Args = ~w)", [F, Args]),
     Reply = apply(?MODULE,F,Args),
-    ?dbg(mgr, "execute_request: reply  ~p", [Reply]),
+    ?dbg("execute_request: reply  ~p", [Reply]),
     handle_reply(Reply, Client, Request).
 
 handle_reply({ok, Value}, Client, 
 	     {fetch, _Nid, _Index, _SubInd, {value, Type}, Ctx}) ->
     Reply = format_value(Value, co_lib:decode_type(Type), Ctx),
-    ?dbg(mgr,"handle_reply: Format ~p, type ~p => ~p", [Value, Type, Reply]),
+    ?dbg("handle_reply: Format ~p, type ~p => ~p", [Value, Type, Reply]),
     gen_server:reply(Client, Reply);
 handle_reply({ok, Data}, Client, 
 	     {fetch, _Nid, _Index, _SubInd, data, _Ctx}) ->
-    ?dbg(mgr,"handle_reply: Formatting ~p, not possible", [Data]),
+    ?dbg("handle_reply: Formatting ~p, not possible", [Data]),
     gen_server:reply(Client, Data);
 handle_reply({error, ECode}, Client, _Request) ->
     gen_server:reply(Client, {error, co_sdo:decode_abort_code(ECode)});
 handle_reply(ok, Client, _Request) -> 
-    ?dbg(mgr,"handle_reply: ok", []),
+    ?dbg("handle_reply: ok", []),
     gen_server:reply(Client, ok);
 handle_reply(Other, Client, _Request) -> %% ok ???
-    ?dbg(mgr,"handle_reply: Other ~p", [Other]),
+    ?dbg("handle_reply: Other ~p", [Other]),
     gen_server:reply(Client, Other).
 
 do_notify(Nid, Func,Index,SubInd, Value, Mgr) ->
     Ctx = context(Nid, Mgr),
     case translate_index(Ctx,Index,SubInd,Value) of
 	{ok,{Ti,Tsi,{value, Tv, Type}} = _T} ->
-	    ?dbg(mgr, "do_notify: translated  ~p", [_T]),
+	    ?dbg({index, {Ti, Tsi}},"do_notify: translated  ~p", [_T]),
 	    try co_codec:encode(Tv, {Type, 32}) of
 		Data ->
-		    ?dbg(mgr,"do_notify: ~w ~w ~.16.0#:~w ~w\n", [Nid,Func,Ti,Tsi,Data]),
+		    ?dbg({index, {Ti, Tsi}},
+			 "do_notify: ~w ~w ~.16.0#:~w ~w\n", 
+			 [Nid,Func,Ti,Tsi,Data]),
 		    co_api:notify_from(Nid,Func,Ti,Tsi,Data)
 	    catch error:_Reason ->
-		    ?dbg(mgr,"do_notify: encode failed ~w ~w ~.16.0#~w ~w, reason ~p\n", 
-			      [Nid, Func, Index, SubInd, Value, _Reason])
+		    ?dbg({index, {Ti, Tsi}},
+			 "do_notify: encode failed ~w ~w ~.16.0#~w ~w, "
+			 "reason ~p\n", 
+			 [Nid, Func, Index, SubInd, Value, _Reason])
 	    end;
 	_Error ->
-	    ?dbg(mgr,"do_notify: translation failed, error: ~p\n", [_Error]),
+	    ?dbg("do_notify: translation failed, error: ~p\n", [_Error]),
 	    error
     end,
     {noreply, Mgr}.
@@ -950,15 +998,15 @@ translate_index(Ctx,Index,SubInd,Value)
     translate_index2(Ctx, Res, Index, SubInd, Value);
 translate_index(Ctx,Index,SubInd,Value) 
   when is_atom(Index);
-       is_list(Index)->
+       is_list(Index) ->
     Res = co_lib:object(Index, Ctx),
-    ?dbg(mgr,"translate_index: found ~p\n", [Res]),
+    ?dbg("translate_index: found ~p\n", [Res]),
     translate_index1(Ctx, Res, Index, SubInd, Value);
 translate_index(_Ctx,_Index,_Subind,_Value) ->
     {error,argument}.
 
 translate_index1(_Ctx, {error, _Error} = _E ,_Index,_SubInd,_Value) ->
-    ?dbg(mgr,"translate_index1: not found ~p\n", [_E]),
+    ?dbg("translate_index1: not found ~p\n", [_E]),
     {error, argument};
 translate_index1(Ctx, Obj,_Index,SubInd,Value) 
   when ?is_subind(SubInd);
@@ -966,28 +1014,32 @@ translate_index1(Ctx, Obj,_Index,SubInd,Value)
        is_atom(SubInd) ->
     Ti = Obj#objdef.index,
     Res = co_lib:entry(SubInd, Obj, Ctx), 
-    ?dbg(mgr,"translate_index1: found ~p\n", [Res]),
+    ?dbg("translate_index1: found ~p\n", [Res]),
     translate_index2(Ctx, Res, Ti, SubInd, Value).
 
 translate_index2(_Ctx, {error, _Error} = _E, Index, SubInd, no_value) ->
-    ?dbg(mgr,"translate_index2: not found ~p\n", [_E]),
+    ?dbg("translate_index2: not found ~p\n", [_E]),
     %% For fetch 
     {ok, {Index, SubInd, data}};
 translate_index2(_Ctx, {error, _Error} = _E, _Index, _SubInd, _Value) ->
-    ?dbg(mgr,"translate_index2: not found ~p\n", [_E]),
+    ?dbg("translate_index2: not found ~p\n", [_E]),
     {error,argument};
 translate_index2(Ctx, E=#entdef {index = S}, Index, SubInd, Value) 
   when ?is_subind(SubInd) andalso not is_integer(S) ->
-    %% Found entry with index as range use original sub_index
+    ?dbg("translate_index2: found entry with index as range use "
+	 "original sub_index",[]),
     translate_index2(Ctx, E#entdef {index = SubInd}, Index, SubInd, Value);
 translate_index2(_Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, 
 		 no_value) ->
-    %% For fetch 
+    ?dbg("translate_index2: for fetch, found entry, type ~p ",[Type]),
     {ok,{Index,SubInd,{value, co_lib:encode_type(Type)}}};
 translate_index2(Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, 
 		 Value) ->
+    ?dbg("translate_index2: found entry, type ~p, value ~p ",
+	 [Type, Value]),
     case translate_value(Type, Value, Ctx) of
 	{ok,TValue} ->
+	    ?dbg("translate_index2: translated value ~p ", [TValue]),
 	    {ok,{Index,SubInd,{value, TValue, co_lib:encode_type(Type)}}};
 	error ->
 	    {error,argument}
@@ -1059,7 +1111,7 @@ context(Nid, Mgr) ->
 
 
 format_value(Value, Type, _DCtx) ->
-   ?dbg(mgr,"format_value: Formatting ~p, type ~p", [Value, Type]),
+   ?dbg("format_value: Formatting ~p, type ~p", [Value, Type]),
     case Type of
 	boolean    -> ite(Value==0, "false", "true");
 	unsigned8  -> unsigned(Value,16#ff);

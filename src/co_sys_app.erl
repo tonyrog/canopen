@@ -1,6 +1,6 @@
-%%%---- BEGIN COPYRIGHT --------------------------------------------------------
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -13,10 +13,9 @@
 %%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 %%% KIND, either express or implied.
 %%%
-%%%---- END COPYRIGHT ----------------------------------------------------------
-%%-------------------------------------------------------------------
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %% @author Malotte W Lönne <malotte@malotte.net>
-%% @copyright (C) 2012, Tony Rogvall
+%% @copyright (C) 2013, Tony Rogvall
 %% @doc
 %%    System command CANopen application.<br/>
 %%    Implements index 16#1010 (save), 16#1011(load).<br/>
@@ -103,47 +102,47 @@ stop(CoNode) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec index_specification(Pid::pid(), {Index::integer(), SubInd::integer()}) -> 
+-spec index_specification(Pid::pid(), {Ix::integer(), Si::integer()}) -> 
 		       {spec, Spec::#index_spec{}} |
 		       {error, Reason::atom()}.
 
-index_specification(_Pid, {?IX_STORE_PARAMETERS = _Index, 255} = I) ->
-    ?dbg(?NAME,"index_specification: store type ~.16B ",[_Index]),
+index_specification(_Pid, {?IX_STORE_PARAMETERS = _Ix, 255} = I) ->
+    ?dbg("index_specification: store type ~.16B ",[_Ix]),
     Value = ((?UNSIGNED32 band 16#ff) bsl 8) bor (?OBJECT_ARRAY band 16#ff),
     reply_specification(I, ?UNSIGNED32, ?ACCESS_RO, {value, Value});
 index_specification(_Pid, {?IX_STORE_PARAMETERS, 0} = I) ->
     reply_specification(I, ?UNSIGNED8, ?ACCESS_RO, {value, 1});
 index_specification(_Pid, {?IX_STORE_PARAMETERS, ?SI_STORE_ALL} = I) ->
     reply_specification(I, ?UNSIGNED32, ?ACCESS_RW, atomic, 9000);
-index_specification(Pid, Index) when is_integer(Index) ->
-    index_specification(Pid, {Index, 0});
-index_specification(_Pid, {?IX_STORE_PARAMETERS, _SubInd})  ->
-    ?dbg(?NAME,"index_specification: store unknown subindex ~.8B ",[_SubInd]),
+index_specification(Pid, Ix) when is_integer(Ix) ->
+    index_specification(Pid, {Ix, 0});
+index_specification(_Pid, {?IX_STORE_PARAMETERS, _Si})  ->
+    ?dbg("index_specification: store unknown subindex ~.8B ",[_Si]),
     {error, ?abort_no_such_subindex};
-index_specification(_Pid, {?IX_RESTORE_DEFAULT_PARAMETERS = _Index, 255} = I) ->
-    ?dbg(?NAME,"index_specification: restore type ~.16B ",[_Index]),
+index_specification(_Pid, {?IX_RESTORE_DEFAULT_PARAMETERS = _Ix, 255} = I) ->
+    ?dbg("index_specification: restore type ~.16B ",[_Ix]),
     Value = ((?UNSIGNED32 band 16#ff) bsl 8) bor (?OBJECT_ARRAY band 16#ff),
     reply_specification(I, ?UNSIGNED32, ?ACCESS_RO, {value, Value});
 index_specification(_Pid, {?IX_RESTORE_DEFAULT_PARAMETERS, 0} = I) ->
     reply_specification(I, ?UNSIGNED8, ?ACCESS_RO, {value, 1});
 index_specification(_Pid, {?IX_RESTORE_DEFAULT_PARAMETERS, ?SI_RESTORE_ALL} = I) ->
     reply_specification(I, ?UNSIGNED32, ?ACCESS_RW, atomic, 9000);
-index_specification(Pid, Index) when is_integer(Index) ->
-    index_specification(Pid, {Index, 0});
-index_specification(_Pid, {?IX_RESTORE_DEFAULT_PARAMETERS, _SubInd})  ->
-    ?dbg(?NAME,"index_specification: restore unknown subindex ~.8B ",[_SubInd]),
+index_specification(Pid, Ix) when is_integer(Ix) ->
+    index_specification(Pid, {Ix, 0});
+index_specification(_Pid, {?IX_RESTORE_DEFAULT_PARAMETERS, _Si})  ->
+    ?dbg("index_specification: restore unknown subindex ~.8B ",[_Si]),
     {error, ?abort_no_such_subindex};
-index_specification(_Pid, {_Index, _SubInd})  ->
-    ?dbg(?NAME,"index_specification: unknown index ~.16B:~.8B ",[_Index, _SubInd]),
+index_specification(_Pid, {_Ix, _Si})  ->
+    ?dbg("index_specification: unknown index ~.16B:~.8B ",[_Ix, _Si]),
     {error, ?abort_no_such_object}.
 
-reply_specification({_Index, _SubInd} = I, Type, Access, Mode) ->
-    reply_specification({_Index, _SubInd} = I, Type, Access, Mode, undefined).
+reply_specification({_Ix, _Si} = I, Type, Access, Mode) ->
+    reply_specification({_Ix, _Si} = I, Type, Access, Mode, undefined).
 
-reply_specification({_Index, _SubInd} = I, Type, Access, Mode, TOut) ->
-    ?dbg(?NAME,"reply_specification: ~.16B:~.8B, "
+reply_specification({_Ix, _Si} = I, Type, Access, Mode, TOut) ->
+    ?dbg("reply_specification: ~.16B:~.8B, "
 	 "type = ~w, access = ~w, mode = ~w, timeout = ~p",
-	 [_Index, _SubInd, Type, Access, Mode, TOut]),
+	 [_Ix, _Si, Type, Access, Mode, TOut]),
     Spec = #index_spec{index = I,
 		       type = Type,
 		       access = Access,
@@ -160,13 +159,13 @@ reply_specification({_Index, _SubInd} = I, Type, Access, Mode, TOut) ->
 %% Used for transfer_mode = {atomic, Module}.
 %% @end
 %%--------------------------------------------------------------------
--spec set(Pid::pid(), {Index::integer(), SubInd::integer()}, NewValue::term()) ->
+-spec set(Pid::pid(), {Ix::integer(), Si::integer()}, NewValue::term()) ->
 		 ok |
 		 {error, Reason::atom()}.
 
-set(Pid, {Index, SubInd}, NewValue) ->
-    ?dbg(?NAME," set ~.16B:~.8B to ~p",[Index, SubInd, NewValue]),
-    gen_server:call(Pid, {set, {Index, SubInd}, NewValue}).
+set(Pid, {Ix, Si}, NewValue) ->
+    ?dbg("set ~.16B:~.8B to ~p",[Ix, Si, NewValue]),
+    gen_server:call(Pid, {set, {Ix, Si}, NewValue}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -174,13 +173,13 @@ set(Pid, {Index, SubInd}, NewValue) ->
 %% Used for transfer_mode = {atomic, Module}.
 %% @end
 %%--------------------------------------------------------------------
--spec get(Pid::pid(), {Index::integer(), SubInd::integer()}) ->
+-spec get(Pid::pid(), {Ix::integer(), Si::integer()}) ->
 		 {ok, Value::term()} |
 		 {error, Reason::atom()}.
 
-get(Pid, {Index, SubInd}) ->
-    ?dbg(?NAME," get ~.16B:~.8B",[Index, SubInd]),
-    gen_server:call(Pid, {get, {Index, SubInd}}).
+get(Pid, {Ix, Si}) ->
+    ?dbg("get ~.16B:~.8B",[Ix, Si]),
+    gen_server:call(Pid, {get, {Ix, Si}}).
 
 
 %% Test functions
@@ -205,7 +204,7 @@ loop_data(Pid) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec init(CoNode::node_identity()) -> {ok, LoopData::#loop_data{}}.
+-spec init(CoNode::node_identity()) -> {ok, LD::#loop_data{}}.
 
 init(CoNode) ->
     CoName = {name, _Name} = co_api:get_option(CoNode, name),
@@ -231,95 +230,95 @@ init(CoNode) ->
 %% @end
 %%--------------------------------------------------------------------
 -type call_request()::
-	{get, {Index::integer(), SubIndex::integer()}} |
-	{set, {Index::integer(), SubInd::integer()}, Value::term()} |
+	{get, {Ix::integer(), Si::integer()}} |
+	{set, {Ix::integer(), Si::integer()}, Value::term()} |
 	stop.
 
--spec handle_call(Request::call_request(), From::{pid(), term()}, LoopData::#loop_data{}) ->
-			 {reply, Reply::term(), LoopData::#loop_data{}} |
-			 {reply, Reply::term(), LoopData::#loop_data{}, Timeout::timeout()} |
-			 {noreply, LoopData::#loop_data{}} |
-			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
-			 {stop, Reason::atom(), Reply::term(), LoopData::#loop_data{}} |
-			 {stop, Reason::atom(), LoopData::#loop_data{}}.
+-spec handle_call(Request::call_request(), From::{pid(), term()}, LD::#loop_data{}) ->
+			 {reply, Reply::term(), LD::#loop_data{}} |
+			 {reply, Reply::term(), LD::#loop_data{}, Timeout::timeout()} |
+			 {noreply, LD::#loop_data{}} |
+			 {noreply, LD::#loop_data{}, Timeout::timeout()} |
+			 {stop, Reason::atom(), Reply::term(), LD::#loop_data{}} |
+			 {stop, Reason::atom(), LD::#loop_data{}}.
 
-handle_call({set, {?IX_STORE_PARAMETERS, ?SI_STORE_ALL}, Flag}, _From, LoopData) ->
-    ?dbg(?NAME," handle_call: store all",[]),
-    handle_store(LoopData, Flag);
-handle_call({set, {?IX_STORE_PARAMETERS, _SubInd}, _NewValue}, _From, LoopData) ->
-    ?dbg(?NAME, "handle_call: set store unknown subindex ~.8B ",[_SubInd]),    
-    {reply, {error, ?abort_no_such_subindex}, LoopData};
-handle_call({set, {?IX_RESTORE_DEFAULT_PARAMETERS, ?SI_RESTORE_ALL}, Flag}, _From, LoopData) ->
-    ?dbg(?NAME," handle_call: restore all",[]),
-    handle_restore(LoopData, Flag);
-handle_call({set, {?IX_RESTORE_DEFAULT_PARAMETERS, _SubInd}, _NewValue}, _From, LoopData) ->
-    ?dbg(?NAME, "handle_call: set restore unknown subindex ~.8B ",[_SubInd]),    
-    {reply, {error, ?abort_no_such_subindex}, LoopData};
-handle_call({set, {_Index, _SubInd}, _NewValue}, _From, LoopData) ->
-    ?dbg(?NAME, "handle_call: set ~.16B:~.8B ",[_Index, _SubInd]),    
-    {reply, {error, ?abort_no_such_object}, LoopData};
-handle_call({get, {?IX_STORE_PARAMETERS, 0}}, _From, LoopData) ->
-    ?dbg(?NAME, "handle_call: get object size = 1",[]),    
-    {reply, {ok, 1}, LoopData};
-handle_call({get, {?IX_STORE_PARAMETERS, ?SI_STORE_ALL}}, _From, LoopData) ->
-    ?dbg(?NAME, "handle_call: get store all",[]),
+handle_call({set, {?IX_STORE_PARAMETERS, ?SI_STORE_ALL}, Flag}, _From, LD) ->
+    ?dbg("handle_call: store all",[]),
+    handle_store(LD, Flag);
+handle_call({set, {?IX_STORE_PARAMETERS, _Si}, _NewValue}, _From, LD) ->
+    ?dbg("handle_call: set store unknown subindex ~.8B ",[_Si]),    
+    {reply, {error, ?abort_no_such_subindex}, LD};
+handle_call({set, {?IX_RESTORE_DEFAULT_PARAMETERS, ?SI_RESTORE_ALL}, Flag}, _From, LD) ->
+    ?dbg("handle_call: restore all",[]),
+    handle_restore(LD, Flag);
+handle_call({set, {?IX_RESTORE_DEFAULT_PARAMETERS, _Si}, _NewValue}, _From, LD) ->
+    ?dbg("handle_call: set restore unknown subindex ~.8B ",[_Si]),    
+    {reply, {error, ?abort_no_such_subindex}, LD};
+handle_call({set, {_Ix, _Si}, _NewValue}, _From, LD) ->
+    ?dbg("handle_call: set ~.16B:~.8B ",[_Ix, _Si]),    
+    {reply, {error, ?abort_no_such_object}, LD};
+handle_call({get, {?IX_STORE_PARAMETERS, 0}}, _From, LD) ->
+    ?dbg("handle_call: get object size = 1",[]),    
+    {reply, {ok, 1}, LD};
+handle_call({get, {?IX_STORE_PARAMETERS, ?SI_STORE_ALL}}, _From, LD) ->
+    ?dbg("handle_call: get store all",[]),
     %% Device supports save on command
-    {reply, {ok, 0}, LoopData};
-handle_call({get, {?IX_STORE_PARAMETERS, _SubInd}}, _From, LoopData) ->
-    ?dbg(?NAME, "handle_call: get store unknown subindex ~.8B ",[_SubInd]),    
-    {reply, {error, ?abort_no_such_subindex}, LoopData};
-handle_call({get, {?IX_RESTORE_DEFAULT_PARAMETERS, 0}}, _From, LoopData) ->
-    ?dbg(?NAME, "handle_call: get object size = 3",[]),    
-    {reply, {ok, 3}, LoopData};
-handle_call({get, {?IX_RESTORE_DEFAULT_PARAMETERS, ?SI_STORE_ALL}}, _From, LoopData) ->
-    ?dbg(?NAME, "handle_call: get store_all",[]),
+    {reply, {ok, 0}, LD};
+handle_call({get, {?IX_STORE_PARAMETERS, _Si}}, _From, LD) ->
+    ?dbg("handle_call: get store unknown subindex ~.8B ",[_Si]),    
+    {reply, {error, ?abort_no_such_subindex}, LD};
+handle_call({get, {?IX_RESTORE_DEFAULT_PARAMETERS, 0}}, _From, LD) ->
+    ?dbg("handle_call: get object size = 3",[]),    
+    {reply, {ok, 3}, LD};
+handle_call({get, {?IX_RESTORE_DEFAULT_PARAMETERS, ?SI_STORE_ALL}}, _From, LD) ->
+    ?dbg("handle_call: get store_all",[]),
     %% Device supports save on command
-    {reply, {ok, 0}, LoopData};
-handle_call({get, {?IX_RESTORE_DEFAULT_PARAMETERS, _SubInd}}, _From, LoopData) ->
-    ?dbg(?NAME, "handle_call: get unknown subindex ~.8B ",[_SubInd]),    
-    {reply, {error, ?abort_no_such_subindex}, LoopData};
-handle_call({get, {_Index, _SubInd}}, _From, LoopData) ->
-    ?dbg(?NAME, "handle_call: get ~.16B:~.8B ",[_Index, _SubInd]),
-    {reply, {error, ?abort_no_such_object}, LoopData};
-handle_call(loop_data, _From, LoopData) ->
-    io:format("~p: LoopData = ~p", [?MODULE,LoopData]),
-    {reply, ok, LoopData};
-handle_call({debug, TrueOrFalse}, _From, LoopData) ->
+    {reply, {ok, 0}, LD};
+handle_call({get, {?IX_RESTORE_DEFAULT_PARAMETERS, _Si}}, _From, LD) ->
+    ?dbg("handle_call: get unknown subindex ~.8B ",[_Si]),    
+    {reply, {error, ?abort_no_such_subindex}, LD};
+handle_call({get, {_Ix, _Si}}, _From, LD) ->
+    ?dbg("handle_call: get ~.16B:~.8B ",[_Ix, _Si]),
+    {reply, {error, ?abort_no_such_object}, LD};
+handle_call(loop_data, _From, LD) ->
+    io:format("~p: LD = ~p", [?MODULE,LD]),
+    {reply, ok, LD};
+handle_call({debug, TrueOrFalse}, _From, LD) ->
     co_lib:debug(TrueOrFalse),
-    {reply, ok, LoopData};
-handle_call(stop, _From, LoopData) ->
-    ?dbg(?NAME," handle_call: stop",[]),    
-    handle_stop(LoopData);
-handle_call(_Request, _From, LoopData) ->
-    ?dbg(?NAME," handle_call: bad call ~p.",[_Request]),
-    {reply, {error, ?abort_internal_error}, LoopData}.
+    {reply, ok, LD};
+handle_call(stop, _From, LD) ->
+    ?dbg("handle_call: stop",[]),    
+    handle_stop(LD);
+handle_call(_Request, _From, LD) ->
+    ?dbg("handle_call: bad call ~p.",[_Request]),
+    {reply, {error, ?abort_internal_error}, LD}.
 
-handle_store(LoopData=#loop_data {co_node = CoNode}, ?EVAS) ->
+handle_store(LD=#loop_data {co_node = CoNode}, ?EVAS) ->
     case co_api:save_dict(CoNode) of
 	ok ->
-	    {reply, ok, LoopData};
+	    {reply, ok, LD};
 	{error, _Reason} ->
-	    ?dbg(?NAME, "handle_store: save_dict failed, reason = ~p ",[_Reason]),
-	    {reply, {error, ?abort_hardware_failure}, LoopData}
+	    ?dbg("handle_store: save_dict failed, reason = ~p ",[_Reason]),
+	    {reply, {error, ?abort_hardware_failure}, LD}
     end;
-handle_store(LoopData, _NotOk) ->
-    ?dbg(?NAME, "handle_store: incorrect flag = ~p ",[_NotOk]),
-    {reply, {error, ?abort_local_control_error}, LoopData}.
+handle_store(LD, _NotOk) ->
+    ?dbg("handle_store: incorrect flag = ~p ",[_NotOk]),
+    {reply, {error, ?abort_local_control_error}, LD}.
 
-handle_restore(LoopData=#loop_data {co_node = CoNode}, ?DOAL) ->
+handle_restore(LD=#loop_data {co_node = CoNode}, ?DOAL) ->
     case co_api:load_dict(CoNode) of
 	ok ->
-	    {reply, ok, LoopData};
+	    {reply, ok, LD};
 	{error, _Reason} ->
-	    ?dbg(?NAME, "handle_restore: save_dict failed, reason = ~p ",[_Reason]),
-	    {reply, {error, ?abort_hardware_failure}, LoopData}
+	    ?dbg("handle_restore: save_dict failed, reason = ~p ",[_Reason]),
+	    {reply, {error, ?abort_hardware_failure}, LD}
     end;
-handle_restore(LoopData, _NotOk) ->
-    ?dbg(?NAME, "handle_restore: incorrect flag = ~p ",[_NotOk]),
-    {reply, {error, ?abort_local_control_error}, LoopData}.
+handle_restore(LD, _NotOk) ->
+    ?dbg("handle_restore: incorrect flag = ~p ",[_NotOk]),
+    {reply, {error, ?abort_local_control_error}, LD}.
 
 
-handle_stop(LoopData=#loop_data {co_node = CoNode}) ->
+handle_stop(LD=#loop_data {co_node = CoNode}) ->
     case co_api:alive(CoNode) of
 	true ->
 	    co_api:unreserve(CoNode, ?IX_STORE_PARAMETERS),
@@ -328,8 +327,8 @@ handle_stop(LoopData=#loop_data {co_node = CoNode}) ->
 	false -> 
 	    do_nothing %% Not possible to detach and unsubscribe
     end,
-    ?dbg(?NAME," handle_stop: detached.",[]),
-    {stop, normal, ok, LoopData}.
+    ?dbg("handle_stop: detached.",[]),
+    {stop, normal, ok, LD}.
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -337,25 +336,25 @@ handle_stop(LoopData=#loop_data {co_node = CoNode}) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec handle_cast(Msg::term(), LoopData::#loop_data{}) ->
-			 {noreply, LoopData::#loop_data{}} |
-			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
-			 {stop, Reason::atom(), LoopData::#loop_data{}}.
+-spec handle_cast(Msg::term(), LD::#loop_data{}) ->
+			 {noreply, LD::#loop_data{}} |
+			 {noreply, LD::#loop_data{}, Timeout::timeout()} |
+			 {stop, Reason::atom(), LD::#loop_data{}}.
 			 
 handle_cast({name_change, OldName, NewName}, 
-	    LoopData=#loop_data {co_node = {name, OldName}}) ->
-   ?dbg(?NAME, "handle_cast: co_node name change from ~p to ~p.", 
+	    LD=#loop_data {co_node = {name, OldName}}) ->
+   ?dbg("handle_cast: co_node name change from ~p to ~p.", 
 	 [OldName, NewName]),
-    {noreply, LoopData#loop_data {co_node = {name, NewName}}};
+    {noreply, LD#loop_data {co_node = {name, NewName}}};
 
-handle_cast({name_change, _OldName, _NewName}, LoopData) ->
-   ?dbg(?NAME, "handle_cast: co_node name change from ~p to ~p, ignored.", 
+handle_cast({name_change, _OldName, _NewName}, LD) ->
+   ?dbg("handle_cast: co_node name change from ~p to ~p, ignored.", 
 	 [_OldName, _NewName]),
-    {noreply, LoopData};
+    {noreply, LD};
 
-handle_cast(_Msg, LoopData) ->
-    ?dbg(?NAME," handle_cast: Message = ~p. ", [_Msg]),
-    {noreply, LoopData}.
+handle_cast(_Msg, LD) ->
+    ?dbg("handle_cast: Message = ~p. ", [_Msg]),
+    {noreply, LD}.
 
 
 %%--------------------------------------------------------------------
@@ -363,23 +362,23 @@ handle_cast(_Msg, LoopData) ->
 %% Handling all non call/cast messages.
 %%% @end
 %%--------------------------------------------------------------------
--spec handle_info(Info::term(), LoopData::#loop_data{}) ->
-			 {noreply, LoopData::#loop_data{}} |
-			 {noreply, LoopData::#loop_data{}, Timeout::timeout()} |
-			 {stop, Reason::atom(), LoopData::#loop_data{}}.
+-spec handle_info(Info::term(), LD::#loop_data{}) ->
+			 {noreply, LD::#loop_data{}} |
+			 {noreply, LD::#loop_data{}, Timeout::timeout()} |
+			 {stop, Reason::atom(), LD::#loop_data{}}.
 			 
-handle_info(_Info, LoopData) ->
-    ?dbg(?NAME," handle_info: Unknown Info ~p", [_Info]),
-    {noreply, LoopData}.
+handle_info(_Info, LD) ->
+    ?dbg("handle_info: Unknown Info ~p", [_Info]),
+    {noreply, LD}.
 
 %%--------------------------------------------------------------------
 %% @private
 %%
 %%--------------------------------------------------------------------
--spec terminate(Reason::term(), LoopData::#loop_data{}) -> 
+-spec terminate(Reason::term(), LD::#loop_data{}) -> 
 		       no_return().
 
-terminate(_Reason, _LoopData) ->
+terminate(_Reason, _LD) ->
     ok.
 
 %%--------------------------------------------------------------------
@@ -390,14 +389,14 @@ terminate(_Reason, _LoopData) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec code_change(OldVsn::term(), LoopData::#loop_data{}, Extra::term()) -> 
-			 {ok, NewLoopData::#loop_data{}}.
+-spec code_change(OldVsn::term(), LD::#loop_data{}, Extra::term()) -> 
+			 {ok, NewLD::#loop_data{}}.
 
-code_change(_OldVsn, LoopData, _Extra) ->
+code_change(_OldVsn, LD, _Extra) ->
     %% Note!
     %% If the code change includes a change in which indexes that should be
     %% reserved it is vital to unreserve the indexes no longer used.
-    {ok, LoopData}.
+    {ok, LD}.
 
      
 %%%===================================================================

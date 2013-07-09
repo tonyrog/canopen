@@ -18,7 +18,6 @@ canopen also requires the following applications to be installed:
 <ul>
 <li>dthread - https://github.com/tonyrog/dthread</li>
 <li>uart - https://github.com/tonyrog/uart</li>
-<li>eapi - https://github.com/tonyrog/eapi</li>
 <li>can - https://github.com/tonyrog/can</li>
 </ul>
 

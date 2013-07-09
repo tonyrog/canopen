@@ -1,6 +1,6 @@
-%%%---- BEGIN COPYRIGHT --------------------------------------------------------
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -13,10 +13,9 @@
 %%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 %%% KIND, either express or implied.
 %%%
-%%%---- END COPYRIGHT ----------------------------------------------------------
-%%%-------------------------------------------------------------------
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @copyright (C) 2012, Tony Rogvall
+%%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%% Utilities to load dictionary from file.
 %%%
@@ -52,8 +51,8 @@ load(File) ->
 		Os -> {ok,Os}
 	    catch
 		error:Error ->
-		    error_logger:error_msg("load: error ~p\n~w\n",
-					   [Error,erlang:get_stacktrace()]),
+		    ?ee("load: error ~p\n~w\n",
+			[Error,erlang:get_stacktrace()]),
 		    {error,Error}
 	    end;
 	Error ->
@@ -64,14 +63,16 @@ load(File) ->
 %% @private
 load_objects([{object,Index,Options}|Es],Os) 
   when ?is_index(Index), is_list(Options) ->
-    ?dbg(file, "load_objects: object ~.16.0# (~p)\n", [Index, Index]),
+    ?dbg({index, Index},
+	 "load_objects: object ~.16.0# (~p)\n", [Index, Index]),
     Obj = load_object(Options,#dict_object { index=Index },undefined,[]),
     load_objects(Es, [Obj|Os]);
 %%
 %% Simplified SDO server config
 %%
 load_objects([{sdo_server,I,ClientID}|Es],Os) ->
-    ?dbg(file, "load_objects: SDO-SERVER: ~w\n", [I]),
+    ?dbg({index, I},
+	 "load_objects: SDO-SERVER: ~w\n", [I]),
     Access = if I==0 -> ?ACCESS_RO; true -> ?ACCESS_RW end,
     Index = ?IX_SDO_SERVER_FIRST+I,
     SDORx = co_lib:cobid(sdo_rx, ClientID),
@@ -81,7 +82,8 @@ load_objects([{sdo_server,I,ClientID}|Es],Os) ->
     load_objects(Es, [Obj|Os]);
 
 load_objects([{sdo_server,I,Rx,Tx}|Es],Os) ->
-    ?dbg(file, "load_objects: SDO-SERVER: ~w\n", [I]),
+    ?dbg({index, I},
+	 "load_objects: SDO-SERVER: ~w\n", [I]),
     Access = if I==0 -> ?ACCESS_RO; true -> ?ACCESS_RW end,
     Index = ?IX_SDO_SERVER_FIRST,
     SDORx = cobid(Rx),
@@ -93,7 +95,8 @@ load_objects([{sdo_server,I,Rx,Tx}|Es],Os) ->
 %% Load general SDO server config
 %%
 load_objects([{sdo_server,I,Rx,Tx,ClientID}|Es],Os) ->
-    ?dbg(file, "load_objects: SDO-SERVER: ~w\n", [I]),
+    ?dbg({index, I},
+	 "load_objects: SDO-SERVER: ~w\n", [I]),
     Access = if I==0 -> ?ACCESS_RO; true -> ?ACCESS_RW end,
     Index = ?IX_SDO_SERVER_FIRST+I,
     SDORx = cobid(Rx),
@@ -105,7 +108,8 @@ load_objects([{sdo_server,I,Rx,Tx,ClientID}|Es],Os) ->
 %% SDO - client spec
 %%
 load_objects([{sdo_client,I,Tx,Rx,ServerID}|Es],Os) ->
-    ?dbg(file, "load_objects: SDO-CLIENT: ~w\n", [I]),
+    ?dbg({index, I},
+	 "load_objects: SDO-CLIENT: ~w\n", [I]),
     Index = ?IX_SDO_CLIENT_FIRST + I,
     SDORx = cobid(Rx),
     SDOTx = cobid(Tx),
@@ -116,7 +120,8 @@ load_objects([{sdo_client,I,Tx,Rx,ServerID}|Es],Os) ->
 %% TPDO parameter config
 %%
 load_objects([{tpdo,I,ID,Opts}|Es],Os) ->
-    ?dbg(file, "load_objects: TPDO-PARAMETER: ~w\n", [I]),
+    ?dbg({index, I},
+	 "load_objects: TPDO-PARAMETER: ~w\n", [I]),
     Index = ?IX_TPDO_PARAM_FIRST + I,
     COBID = cobid(ID),
     Trans = proplists:get_value(transmission_type,Opts,specific),
@@ -142,13 +147,14 @@ load_objects([{tpdo,I,ID,Opts}|Es],Os) ->
 	    #dict_entry { index={Index,5}, type=?UNSIGNED16,
 			  access=?ACCESS_RW, 
 			  data=co_codec:encode(EventTimer,?UNSIGNED16) }]},
-    ?dbg(file, "load_objects: TPDO-PARAMETER: ~w\n", [Obj]),
+    ?dbg("load_objects: TPDO-PARAMETER: ~w\n", [Obj]),
     load_objects(Es, [Obj|Os]);
 %%
 %% TPDO mapping
 %%
 load_objects([{tpdo_map,I,Map, Opts}|Es], Os) ->
-    ?dbg(file, "load_objects: TPDO-MAP: ~w\n", [I]),
+    ?dbg({index, I},
+	 "load_objects: TPDO-MAP: ~w\n", [I]),
     Index = ?IX_TPDO_MAPPING_FIRST + I,
     Type = proplists:get_value(pdo_type,Opts,pdo),
     N = length(Map),
@@ -174,7 +180,8 @@ load_objects([{tpdo_map,I,Map, Opts}|Es], Os) ->
 %% RPDO parameter config
 %%
 load_objects([{rpdo,I,ID,Opts}|Es],Os) ->
-    ?dbg(file, "load_objects: RPDO-PARAMETER: ~w\n", [I]),
+    ?dbg({index, I},
+	 "load_objects: RPDO-PARAMETER: ~w\n", [I]),
     Index = ?IX_RPDO_PARAM_FIRST + I,
     COBID = cobid(ID),
     Trans = proplists:get_value(transmission_type,Opts,specific),
@@ -206,7 +213,8 @@ load_objects([{rpdo,I,ID,Opts}|Es],Os) ->
 %% RPDO mapping
 %%
 load_objects([{rpdo_map,I,Map}|Es], Os) ->
-    ?dbg(file, "load_objects: RPDO-MAP: ~w\n", [I]),
+    ?dbg({index, I},
+	 "load_objects: RPDO-MAP: ~w\n", [I]),
     Index = ?IX_RPDO_MAPPING_FIRST + I,
     N = length(Map),
     Obj = {#dict_object { index = Index, type=?PDO_MAPPING,
@@ -226,7 +234,8 @@ load_objects([{rpdo_map,I,Map}|Es], Os) ->
 %% value range 1 - 16#FE 
 %%
 load_objects([{mpdo_dispatch,I,Map}|Es], Os) ->
-    ?dbg(file, "load_objects: MPDO-DISPATCH: ~w\n", [ I]),
+    ?dbg({index, I},
+	 "load_objects: MPDO-DISPATCH: ~w\n", [ I]),
     Index = ?IX_OBJECT_DISPATCH_FIRST + I,
     N = length(Map),
     Obj = {#dict_object { index = Index, type=?UNSIGNED64,
@@ -240,11 +249,12 @@ load_objects([{mpdo_dispatch,I,Map}|Es], Os) ->
 					       ?RMPDO_MAP(Bs,Li,Ls,Ri,Rs,Ni),
 					       ?UNSIGNED64) }
 		  end, lists:zip(seq(1,N), Map))]},
-    ?dbg(file, "load_objects: MPDO-DISPATCH: ~w\n", [Obj]),
+    ?dbg("load_objects: MPDO-DISPATCH: ~w\n", [Obj]),
     load_objects(Es, [Obj|Os]);
 
 load_objects([{mpdo_scanner,I,Map}|Es], Os) ->
-    ?dbg(file, "load_objects: MPDO-SCANNER: ~w\n", [I]),
+    ?dbg({index, I},
+	 "load_objects: MPDO-SCANNER: ~w\n", [I]),
     Index = ?IX_OBJECT_SCANNER_FIRST + I,
     N = length(Map),
     Obj = {#dict_object { index = Index, type=?UNSIGNED32,
@@ -257,7 +267,6 @@ load_objects([{mpdo_scanner,I,Map}|Es], Os) ->
 					data=co_codec:encode(?TMPDO_MAP(Bs,Li,Ls),
 							     ?UNSIGNED32) }
 		  end, lists:zip(seq(1,N), Map))]},
-    ?dbg(file, "load_objects: MPDO-SCANNER: ~w\n", [Obj]),
     load_objects(Es, [Obj|Os]);
 
 load_objects([], Os) ->

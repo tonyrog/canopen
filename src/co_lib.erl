@@ -1,6 +1,6 @@
-%%%---- BEGIN COPYRIGHT --------------------------------------------------------
+%%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -13,11 +13,10 @@
 %%% This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
 %%% KIND, either express or implied.
 %%%
-%%%---- END COPYRIGHT ----------------------------------------------------------
-%%%-------------------------------------------------------------------
+%%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @author Malotte W Lönne <malotte@malotte.net>
-%%% @copyright (C) 2012, Tony Rogvall
+%%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%% CANopen utilities.
 %%%
@@ -68,6 +67,7 @@
 
 %% Utilities
 -export([utc_time/0,
+	 sec/0,
          debug/1]).
 
 
@@ -293,7 +293,7 @@ encode_type({bitfield,Base,_Name}) -> encode_type(Base).
 simple_type(undefined) ->
     false; %% ??
 simple_type(T) ->
-    ?dbg(lib,"simple_type: testing ~p", [T]),
+    ?dbg("simple_type: testing ~p", [T]),
     case encode_type(T) of
 	Simple when Simple < 16#0020 -> true;
 	_Complex -> false
@@ -549,19 +549,19 @@ load_definition(File,Path) ->
 
 object(Key, DefCtx=#def_ctx {modules = Modules}) 
   when ?is_index(Key) ->
-    ?dbg(lib,"object: searching for index ~p in whole context", [Key]),
+    ?dbg("object: searching for index ~p in whole context", [Key]),
     case find_in_mods(Key, #def_mod.ixs, Modules) of
 	{error, _Error} = E -> E;
 	{ok, Id} -> object(Id, DefCtx#def_ctx.modules)
     end;
 object(Key, _DefCtx=#def_ctx {modules = Modules})  ->
-    ?dbg(lib,"object: searching for ~p in whole context", [Key]),
+    ?dbg("object: searching for ~p in whole context", [Key]),
     object(Key, Modules);
 object(_Key, []) ->
     {error, not_found};
 object(Key, [{_ModName, DefMod=#def_mod {objects = Objects}} | DefMods]) 
   when is_record(DefMod, def_mod)->
-    ?dbg(lib,"object: searching for ~p in ~p", [Key, _ModName]),
+    ?dbg("object: searching for ~p in ~p", [Key, _ModName]),
     case object(Key, Objects) of
 	Obj when is_record(Obj, objdef) ->
 	    Obj;
@@ -572,21 +572,21 @@ object(Key, [{_ModName, DefMod=#def_mod {objects = Objects}} | DefMods])
     end;
 object(Id, ObjList) 
   when is_atom(Id) andalso is_list(ObjList) ->
-    ?dbg(lib,"object: searching for ~p", [Id]),
+    ?dbg("object: searching for atom ~p", [Id]),
     case lists:keyfind(Id, #objdef.id, ObjList) of
 	false -> {error, not_found};
 	Obj -> Obj
     end;
 object(Name, ObjList)
   when is_list(Name) andalso is_list(ObjList) ->
-    ?dbg(lib,"object: searching for ~p", [Name]),
+    ?dbg("object: searching for string ~p", [Name]),
     case lists:keyfind(Name, #objdef.name, ObjList) of
 	false -> {error, not_found};
 	Obj -> Obj
     end;
 object(Index, [Obj| Objects]) 
   when ?is_index(Index) andalso is_record(Obj, objdef)->
-    ?dbg(lib,"object: searching for ~p", [Index]),
+    ?dbg("object: searching for index ~p", [Index]),
     %% Index can be a range
     case match_index(Index, Obj#objdef.index) of
 	true -> Obj;
@@ -604,18 +604,18 @@ object(Index, [Obj| Objects])
 
 entry(Key, _Obj=#objdef {entries = [], type = Type}, DefCtx) 
   when is_record(DefCtx, def_ctx) ->
-    ?dbg(lib,"entry: searching for ~p when no entries", [Key]),
+    ?dbg("entry: searching for ~p when no entries", [Key]),
     case object(Type, DefCtx) of
 	{error, _Error} = E -> E;
 	TypeObj -> entry(Key, TypeObj)
     end;
 entry(Key, Obj=#objdef {entries = _E}, DefCtx) 
   when is_record(DefCtx, def_ctx) ->
-    ?dbg(lib,"entry: searching for ~p when entries ~p", [Key,_E]),
+    ?dbg("entry: searching for ~p when entries ~p", [Key,_E]),
     entry(Key, Obj);
 entry(Index, SubInd, DefCtx) 
   when is_record(DefCtx, def_ctx)->
-    ?dbg(lib,"entry: searching for ~p:~p", [Index, SubInd]),
+    ?dbg("entry: searching for ~p:~p", [Index, SubInd]),
     case object(Index, DefCtx) of
 	{error, _Error} = E -> E;
 	Obj ->
@@ -634,19 +634,19 @@ entry(_Key, []) ->
     {error, not_found};
 entry(Name, _Obj=#objdef {entries = Entries}) 
   when is_list(Name)->
-    ?dbg(lib,"entry: searching for ~p when name", [Name]),
+    ?dbg("entry: searching for ~p when name", [Name]),
     lists:keyfind(Name, #entdef.name, Entries);
 entry(Id, _Obj=#objdef {entries = Entries}) 
   when is_atom(Id)->
-    ?dbg(lib,"entry: searching for ~p when id", [Id]),
+    ?dbg("entry: searching for ~p when id", [Id]),
     lists:keyfind(Id, #entdef.id, Entries);
 entry(SubIndex, _Obj=#objdef {entries = Entries}) 
   when ?is_subind(SubIndex) ->
-    ?dbg(lib,"entry: searching for ~p when index", [SubIndex]),
+    ?dbg("entry: searching for ~p when index", [SubIndex]),
     entry(SubIndex, Entries);
 entry(SubIndex, [Ent|Entries]) 
   when ?is_subind(SubIndex) ->
-    ?dbg(lib,"entry: searching for ~p when index", [SubIndex]),
+    ?dbg("entry: searching for ~p when index", [SubIndex]),
     %% Index can be a range
     case match_index(SubIndex, Ent#entdef.index) of
 	true -> Ent;
@@ -678,8 +678,8 @@ load_def_mod(Module, DefCtx) when is_atom(Module) ->
 		{ok, Forms} ->
 		    def_mod(Forms, undefined, DefCtx);
 		{error,Error} = E ->
-		    error_logger:error_msg("load_mod: loading ~p failed, reason ~p\n", 
-					   [PrivFile, Error]),
+		    ?ee("load_mod: loading ~p failed, reason ~p\n", 
+			[PrivFile, Error]),
 		    {E, DefCtx}
 	    end;
 	Err = {error,_} ->
@@ -737,13 +737,13 @@ def_mod([{objdef,Index,Options}|Forms],
     Obj0 = decode_obj(Options, #objdef { index=hd(NewIxs)}),
     Obj1 = verify_obj_id(Obj0, DefCtx),
     Obj2 = verify_obj(Obj1,DMod),
-    ?dbg(lib,"def_mod: obj ~p verified", [Obj1]),
+    ?dbg("def_mod: obj ~p verified", [Obj1]),
 
     %% If no entries and 'simple' type add default entry for subindex 0
     %% If 'complex' type it structure needs to be checked at runtime
     Obj3 = case {Obj2#objdef.entries, simple_type(Obj2#objdef.type)} of
 	       {[], true} ->
-		   ?dbg(lib,"def_mod: adding def entry with type ~p", 
+		   ?dbg("def_mod: adding def entry with type ~p", 
 			[Obj2#objdef.type]),
 		   DefEntry = #entdef {index = 0,
 				       type = Obj2#objdef.type,
@@ -755,7 +755,7 @@ def_mod([{objdef,Index,Options}|Forms],
 	   end,
 
     Id = Obj3#objdef.id,
-    ?dbg(lib,"def_mod: obj id ~p verified", [Id]),
+    ?dbg("def_mod: obj id ~p verified", [Id]),
     NewIxsDict =
 	lists:foldl(
 	  fun(Ix, Dict) ->
@@ -1218,7 +1218,7 @@ find_in_mods(Key, Pos, [{_ModName, DMod}|DMods]) ->
 	Found -> Found
     end;
 find_in_mods(_Key, _Pos, []) ->
-    ?dbg(lib,"find_in_mods: ~p not found", [_Key]),
+    ?dbg("find_in_mods: ~p not found", [_Key]),
     {error, not_found}.
 
 utc_time() ->
@@ -1229,6 +1229,17 @@ utc_time() ->
 			  "Aug","Sep","Oct","Nov","Dec"}),
     io_lib:format("~2w ~s ~4w ~2w:~2..0w:~2..0w.~6..0w",
 		  [Day,Mstr,Year,Hour,Minute,Second,Micro]).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Seconds utility, gives timestamp as seconds.
+%% @end
+%%--------------------------------------------------------------------
+-spec sec() -> Sec::integer().
+sec() ->
+    {MegaSec, Sec, _MilliSec} = os:timestamp(),
+    1000 * MegaSec + Sec.
+
 
 debug(true) ->
     ale:trace(on, self(), debug);
