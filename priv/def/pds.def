@@ -26,6 +26,10 @@
  [{none, 16#00},
   {backlight,16#81},
   {block,    16#82},
+  {onoff,   16#01},
+  {interval, 16#03},
+  {moment,   16#04},
+  {pulse,    16#05},
   {alarm,    16#83}
  ]}.
 
@@ -127,8 +131,8 @@
  ]}.
 
 {objdef, 16#2712,
- [{id, output_waitmax},
-  {name, "output-waitmax"},
+ [{id, output_wait},
+  {name, "output-wait"},
   {struct, array},
   {entry, {1,16},
    [{type, unsigned32},
@@ -189,6 +193,7 @@
     {access, rw}]}
 ]}.
 
+
 {objdef, 16#2718,
  [{id, output_alarm_low},
   {name, "output-arlam-low"},
@@ -233,13 +238,89 @@
     {access, rw}]}
 ]}.
 
-%% FIXME: add 2781, 2782, 2783, 2784, 2785, 2786, 2787
+{objdef, 16#2781,
+ [{id, output_step_max},
+  {name, "output-step-max"},
+  {description, "maximum encoder step value"},
+  {struct, array},
+  {entry, {1,16},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#2782,
+ [{id, output_step},
+  {name, "output-step"},
+  {description, "saved step value"},
+  {struct, array},
+  {entry, {1,16},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#2783,
+ [{id, output_control},
+  {name, "output-control"},
+  {description, "saved control value"},
+  {struct, array},
+  {entry, {1,16},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+
+{objdef, 16#2784,
+ [{id, output_ctltype},
+  {name, "output-ctltype"},
+  {description, "saved control fnction"},
+  {struct, array},
+  {entry, {1,16},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#2785,
+ [{id, output_code},
+  {name, "output-code"},
+  {description, "output alarm code"},
+  {struct, array},
+  {entry, {1,16},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#2786,
+ [{id, output_loadf},
+  {name, "output-loadf"},
+  {description, "output load factor*10"},
+  {struct, array},
+  {entry, {1,16},
+   [{type, integer8},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#2787,
+ [{id, output_ctlk},
+  {name, "output-ctlk"},
+  {description, "control k value"},
+  {struct, array},
+  {entry, {1,16},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}
+]}.
 
 {objdef, 16#271F,
  [{id, output_flags},
   {name, "output-flags"},
   {struct, array},
-  {entry, {1,32},
+  {entry, {1,16},
    [{type, {bitfield,unsigned16,oflags}},
     {category, optional},
     {access, rw}]}]}.
@@ -264,6 +345,7 @@
     {access, rw}
    ]}
   ]}.
+
 
 {objdef, 16#2722,
  [{id, input_node},
@@ -332,7 +414,34 @@
    ]}
   ]}.
 
-%% FIXME: 2728, 2729, 27AA, 27AB
+{objdef, 16#2728,
+ [{id, input_ctl},
+  {name, "input-ctl"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}
+   ]}
+  ]}.
+
+{objdef, 16#2729,
+ [{id, pamp},
+  {name, "pamp"},
+  {description, "power frame"},
+  {struct, var},
+  {type, boolean},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#272B,
+ [{id, keyout},
+  {name, "keyout"},
+  {description, "Enable sending of menu keys"},
+  {struct, var},
+  {type, unsigned32},  %% boolean fixme!!
+  {category, optional},
+  {access, rw}]}.
 
 %% TEMPORARY (none stored) objects for debugging and play
 
