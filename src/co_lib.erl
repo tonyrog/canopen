@@ -861,7 +861,7 @@ decode_ent_opt(_Kv={Key,Value}, Ent) ->
 %%
 verify_obj_id(Obj=#objdef {id = undefined, index = Index}, DefCtx) ->
     %% generate generic id
-    Id = list_to_atom("id" ++ integer_to_list(Index,10)),
+    Id = list_to_atom("id" ++ erlang:integer_to_list(Index,10)),
     verify_obj_id(Obj#objdef {id = Id}, DefCtx);
     %%erlang:error({id_required, Index});
 verify_obj_id(Obj=#objdef {id = Id}, DefCtx) when is_atom(Id) ->

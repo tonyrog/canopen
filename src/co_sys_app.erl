@@ -403,7 +403,7 @@ code_change(_OldVsn, LD, _Extra) ->
 %%% Support functions
 %%%===================================================================
 name(CoNode) when is_integer(CoNode) ->
-    list_to_atom(atom_to_list(?MODULE) ++ integer_to_list(CoNode,16));
+    list_to_atom(atom_to_list(?MODULE) ++ erlang:integer_to_list(CoNode,16));
 name({name, CoNode}) when is_atom(CoNode)->
     list_to_atom(atom_to_list(?MODULE) ++ atom_to_list(CoNode)).
 
