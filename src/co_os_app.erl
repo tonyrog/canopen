@@ -33,6 +33,9 @@
 -include("co_debug.hrl").
 
 -behaviour(gen_server).
+%% Having the co_app AND co_stream_app behaviours results in a compiler 
+%% warning since both requires an index_specification function. 
+%% This is however no issue and the warning should be ignored.
 -behaviour(co_app).
 -behaviour(co_stream_app).
 
