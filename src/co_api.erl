@@ -1197,7 +1197,8 @@ notify(CobId,Ix,Value) ->
 -spec notify(CobId::integer(), Ix::integer(), Si::integer(), Data::binary()) -> 
 		    ok | {error, Error::atom()}.
 
-notify(CobId,Ix,Si,Data) ->
+notify(CobId,Ix,Si,Data) 
+  when is_integer(CobId), ?is_index(Ix), ?is_subind(Si), is_binary(Data)->
     co_node:notify(CobId,Ix,Si,Data).
 
 %%--------------------------------------------------------------------
@@ -1252,7 +1253,8 @@ notify_from(Identity={nodeid, Nid}, Func, Ix, Si, Data) when is_atom(Func)->
 	 "Ix = ~4.16.0B, Si = ~p, Data = ~p", 
 	 [Nid, Func, Ix, Si, Data]),
     notify_from(Identity,?COB_ID(co_lib:encode_func(Func), Nid),Ix,Si,Data);
-notify_from(Identity,CobId,Ix,Si,Data) when is_integer(CobId) ->
+notify_from(Identity,CobId,Ix,Si,Data) when is_integer(CobId),
+?is_index(Ix), ?is_subind(Si),  is_binary(Data) ->
     co_node:notify_from(identity_to_pid(Identity),CobId,Ix,Si,Data).
 
 
