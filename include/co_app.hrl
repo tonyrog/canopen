@@ -97,6 +97,9 @@
 -define(INDEX_UBOOT_FLASH,      16#2654).   %% flash memory
 
 -define(INDEX_UBOOT_HOLD,       16#2656).   %% hold the boot loader 
+-define(INDEX_UBOOT_CCLK,       16#2657).   %% tweak cclk
+-define(INDEX_UBOOT_CALIB,      16#2658).   %% cclk calibration
+
 -define(INDEX_UBOOT_GO,         16#26AA).   %% run application
 
 -define(INDEX_PWM_DUTY,         16#2702).
@@ -138,6 +141,15 @@
 -define(INDEX_OUTPUT_STEP,       16#2782).  %% UNSIGNED8  - saved step value
 -define(INDEX_OUTPUT_CONTROL,    16#2783).  %% UNSIGNED8  - saved control value
 -define(INDEX_OUTPUT_CTLTYPE,    16#2784).  %% UNSIGNED8  - control function
+-define(INDEX_OUTPUT_CODE,       16#2785).  %% UNSIGNED8  - alarm code, type=ALARM
+-define(INDEX_OUTPUT_LOADF,      16#2786).  %% INTEGER8   - load 
+-define(INDEX_OUTPUT_CTLK,       16#2787).  %% UNSIGNED8  - control k value
+-define(INDEX_OUTPUT_DMX_ADDR,   16#2788).  %% UNSIGNED16
+-define(INDEX_OUTPUT_DMX_NCHAN,  16#2789).  %% UNSIGNED8
+-define(INDEX_OUTPUT_DMX_CH1,    16#278A).  %% UNSIGNED8
+-define(INDEX_OUTPUT_DMX_CH2,    16#278B).  %% UNSIGNED8
+-define(INDEX_OUTPUT_DMX_CH3,    16#278C).  %% UNSIGNED8
+-define(INDEX_OUTPUT_DMX_CH4,    16#278D).  %% UNSIGNED8
 
 %% SET/GET PDS input channels
 -define(INDEX_INPUT_FLAGS,       16#2720).
@@ -151,6 +163,9 @@
 -define(INDEX_INPUT_CTL,         16#2728).  %% UNSIGNED32 output channel mask
 %% Other
 -define(INDEX_PAMP,              16#2729).  %% BOOLEAN, enable/disable power frame
+-define(INDEX_INPUT_RFID,        16#272A).  %% UNSIGNED32 - rfid match
+-define(INDEX_KEYOUT,            16#272B).  %% BOOLEAN, enable/disable key emit
+
 
 %% Read only parameters
 -define(INDEX_VIN100,            16#2730).  %% UNSIGNED16
@@ -168,6 +183,15 @@
 -define(INDEX_VIN_MEDIUM,        16#2741).  %% Medium shut-off level
 -define(INDEX_VIN_LOW,           16#2742).  %% Low shut-off level
 -define(INDEX_VIN_WARN,          16#2743).  %% Warning level
+-define(INDEX_WNV,               16#2744).  %% UNSIGNED16 (10-bit)
+-define(INDEX_RELOAD0,           16#2745).  %% UNSIGNED32
+-define(INDEX_RELOAD1,           16#2746).  %% UNSIGNED32
+-define(INDEX_RELOAD2,           16#2747).  %% UNSIGNED32
+
+-define(INDEX_OUT_CHANGED,       16#2748).  %% UNSIGNED32
+-define(INDEX_IN_CHANGED,        16#2749).  %% UNSIGNED32
+-define(INDEX_AN_CHANGED,        16#274A).  %% UNSIGNED32
+-define(INDEX_MISC_CHANGED,      16#274B).  %% UNSIGNED32
 
 %% RFID specific 
 -define(INDEX_DISPLAY1,          16#2750).  %% character at position
@@ -199,7 +223,7 @@
 
 -define(MSG_BACKLIGHT,      16#2807).   %% Set backlight value (global)
 -define(MSG_LEDLIGHT,       16#2808).   %% Set led-light value (global)
--define(MSG_ALARM_ACK,      16#2809).   %% Alarm ack code notification
+-define(MSG_ALARM_CNFRM_ACK,16#2809).   %% Alarm ack code notification
 
 -define(MSG_NODE_ADD,       16#280A).   %% Add node to members
 -define(MSG_NODE_DEL,       16#280B).   %% Delete node from members
@@ -241,6 +265,8 @@
 -define(ALARM_CAUSE_OVERLOAD,16#02).  %% warning total overload
 -define(ALARM_CAUSE_HOT,     16#03).  %% warning hot
 -define(ALARM_CAUSE_LOW_BAT, 16#04).  %% low battery
+-define(ALARM_CAUSE_LEVEL,   16#05).  %% level too high
+
 %% Fatal alarms
 -define(ALARM_CAUSE_FATAL,   16#80).  %% Fatal bit
 -define(ALARM_CAUSE_FUSE,    16#81).  %% fuse broken
@@ -250,6 +276,10 @@
 -define(ALARM_CAUSE_VIN_LEV, 16#85).  %% fatal vin level (internal)
 -define(ALARM_CAUSE_HIS_LEV, 16#86).  %% fatal his level (internal)
 -define(ALARM_CAUSE_HIS,     16#87).  %% fatal his < vin (internal)
+
+-define(ALARM_CAUSE_PRIO_LOW, 16#88).  %% fatal vin < L
+-define(ALARM_CAUSE_PRIO_MED, 16#89).  %% fatal vin < M
+-define(ALARM_CAUSE_PRIO_HIGH, 16#8A). %% fatal vin < H
 
 %% Return to factory default, subindex to IX_RESTORE_DEFAULT_PARAMETERS
 -define(SI_FACTORY_DEFAULT, 4).

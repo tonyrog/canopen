@@ -14,13 +14,13 @@
 %%% KIND, either express or implied.
 %%%
 %%%---- END COPYRIGHT ---------------------------------------------------------
-%%% @author Malotte Westman Lönne <malotte@malotte.net>
+%%% @author Malotte Westman Lonne <malotte@malotte.net>
 %%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%%  Process dictionary.
 %%%
 %%% File: co_proc.erl
-%%% Created:  9 Feb 2012 by Malotte Westman Lönne
+%%% Created:  9 Feb 2012 by Malotte Westman Lonne
 %%% @end
 %%%-------------------------------------------------------------------
 -module(co_proc).

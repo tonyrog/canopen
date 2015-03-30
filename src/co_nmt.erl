@@ -14,13 +14,13 @@
 %%% KIND, either express or implied.
 %%%
 %%%---- END COPYRIGHT ---------------------------------------------------------
-%%% @author Malotte Westman Lönne <malotte@malotte.net>
+%%% @author Malotte Westman Lonne <malotte@malotte.net>
 %%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%%  Handles CANopen NMT protocol.
 %%%
 %%% File: co_nmt.erl
-%%% Created:  3 May 2012 by Malotte Westman Lönne
+%%% Created:  3 May 2012 by Malotte Westman Lonne
 %%% @end
 %%%-------------------------------------------------------------------
 -module(co_nmt).

@@ -15,7 +15,7 @@
 %%%
 %%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @author Marina Westman Lönne <malotte@malotte.net>
+%%% @author Marina Westman Lonne <malotte@malotte.net>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
 %%%    Supervisor for canopen application.

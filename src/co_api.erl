@@ -15,7 +15,7 @@
 %%%
 %%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @author Malotte W Lönne <malotte@malotte.net>
+%%% @author Malotte W Lonne <malotte@malotte.net>
 %%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%%   CANopen node interface.
@@ -1131,7 +1131,7 @@ state(Identity, stopped) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec dict(Identity::node_identity()) -> 
-		  Dict::dict() | {error, Error::atom()}.
+		  Dict::dict:dict() | {error, Error::atom()}.
 
 dict(Identity) ->
     gen_server:call(identity_to_pid(Identity), dict).

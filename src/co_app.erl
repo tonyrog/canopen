@@ -14,7 +14,7 @@
 %%% KIND, either express or implied.
 %%%
 %%%---- END COPYRIGHT ----------------------------------------------------------
-%%% @author Malotte Westman Lönne <malotte@malotte.net>
+%%% @author Malotte Westman Lonne <malotte@malotte.net>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
 %%% CANopen application behaviour. <br/>
@@ -23,7 +23,7 @@
 %%% CANOpen node.
 %%%
 %%% File: co_app.erl <br/>
-%%% Created:  4 Jan 2012 by Malotte Westman Lönne 
+%%% Created:  4 Jan 2012 by Malotte Westman Lonne 
 %%% @end
 
 -module(co_app).

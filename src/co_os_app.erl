@@ -15,7 +15,7 @@
 %%%
 %%%---- END COPYRIGHT ---------------------------------------------------------
 %%-----------------------------------------------------------------------------
-%% @author Malotte W Lönne <malotte@malotte.net>
+%% @author Malotte W Lonne <malotte@malotte.net>
 %% @copyright (C) 2013, Tony Rogvall
 %% @doc
 %%    OS command CANopen application.<br/>
@@ -24,7 +24,7 @@
 %%    to a CANOpen node and have it executed there. <br/>
 %%
 %% File: co_os_app.erl<br/>
-%% Created: December 2011 by Malotte W Lönne
+%% Created: December 2011 by Malotte W Lonne
 %% @end
 %%-----------------------------------------------------------------------------
 -module(co_os_app).

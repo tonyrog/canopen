@@ -14,7 +14,7 @@
 %%% KIND, either express or implied.
 %%%
 %%%---- END COPYRIGHT ---------------------------------------------------------
-%%% @author Malotte Westman Lönne <malotte@malotte.net>
+%%% @author Malotte Westman Lonne <malotte@malotte.net>
 %%% @copyright (C) 2013, Tony Rogvall
 %%% @doc
 %%% Intermediate data storage for an SDO session process.<br/>
@@ -22,7 +22,7 @@
 %%% if needed.
 %%% 
 %%% File: co_data_buf.erl <br/>
-%%% Created: 12 Dec 2011 by Malotte W Lönne
+%%% Created: 12 Dec 2011 by Malotte W Lonne
 %%% @end
 %%%-------------------------------------------------------------------
 -module(co_data_buf).

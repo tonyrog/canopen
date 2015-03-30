@@ -15,7 +15,7 @@
 %%%
 %%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @author Malotte W Lönne <malotte@malotte.net>
+%%% @author Malotte W Lonne <malotte@malotte.net>
 %%% @copyright (C) 2012, Tony Rogvall
 %%% @doc
 %%%   CANopen SDO Client Finite State Machine

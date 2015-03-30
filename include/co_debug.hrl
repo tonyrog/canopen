@@ -15,7 +15,7 @@
 %%%
 %%%---- END COPYRIGHT ----------------------------------------------------------
 %%%-------------------------------------------------------------------
-%%% @author Malotte W Lönne <malotte@malotte.net>
+%%% @author Malotte W Lonne <malotte@malotte.net>
 %%% @copyright (C) 2011, Tony Rogvall
 %%% @doc
 %%%    Defines for debugging.

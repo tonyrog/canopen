@@ -14,7 +14,7 @@
 %%% KIND, either express or implied.
 %%%
 %%%---- END COPYRIGHT ---------------------------------------------------------
-%% @author Malotte W Lönne <malotte@malotte.net>
+%% @author Malotte W Lonne <malotte@malotte.net>
 %% @copyright (C) 2013, Tony Rogvall
 %% @doc
 %%    System command CANopen application.<br/>
@@ -23,7 +23,7 @@
 %%    load - restores the CANOpen node dictionary.<br/>
 %%
 %% File: co_os_app.erl<br/>
-%% Created: December 2011 by Malotte W Lönne
+%% Created: December 2011 by Malotte W Lonne
 %% @end
 %%===================================================================
 -module(co_sys_app).
