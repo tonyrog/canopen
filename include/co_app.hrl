@@ -78,6 +78,7 @@
 
 %% General parameters
 -define(INDEX_LOCATION,         16#2604).   %%  Location ID (1..254)
+-define(INDEX_ID,               16#2605).   %%  Short node ID (1..126)
 -define(INDEX_BOOT_SERIAL,      16#2607).
 -define(INDEX_BOOT_PRODUCT,     16#2608).
 -define(INDEX_BOOT_DATETIME,    16#2609).
