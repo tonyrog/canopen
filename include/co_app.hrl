@@ -88,7 +88,6 @@
 -define(INDEX_BOOT_APP_VSN,     16#260E).   %% Application version
 -define(INDEX_BOOT_VSN,         16#260F).   %% uBoot version
 -define(INDEX_BOOT_VENDOR,      16#2610).   %% Vendor code (CANopen)
--define(INDEX_BOOT_NODE,        16#2611).   %% System nodes (1..128)
 
 %% UBOOT control interface
 -define(INDEX_UBOOT_ADDR,       16#2650).   %% set flash/eeprom start address
@@ -205,6 +204,27 @@
 -define(INDEX_LCDREG1,           16#2762).  %% write REG & ARG only 16+16 bit
 -define(INDEX_LCDDATA,           16#2763).  %% read/write DATA 16 bit
 
+%% PDI specific
+-define(INDEX_IOREG,             16#2764).  %% read/write REG 8 bit
+-define(INDEX_IODIR,             16#2765).  %% read/write direction mask
+
+%% PWM MIN/MAX for PDS
+-define(INDEX_OUTPUT_PWM_MIN,     16#2766). 
+-define(INDEX_OUTPUT_PWM_MAX,     16#2767).
+
+%% ANALOG input
+-define(INDEX_ADC_READ16,         16#6401).  %% Read unsigned 16 analog input
+-define(INDEX_ADC_FLAGS,          16#6421).  %% Trigger selection
+-define(INDEX_ADC_UPPER,          16#6424).  %% Interrupt upper limit
+-define(INDEX_ADC_LOWER,          16#6425).  %% Interrupt lower limit
+-define(INDEX_ADC_DELTA,          16#6426).  %% Delta
+-define(INDEX_ADC_NDELTA,         16#6427).  %% Negative Delta
+-define(INDEX_ADC_PDELTA,         16#6428).  %% Positive Delta
+-define(INDEX_ADC_OFFSET,         16#6431).  %% Analog Offset
+-define(INDEX_ADC_SCALE,          16#6432).  %% Analog Scale
+-define(INDEX_ADC_MIN,            16#2768).  %% Min Value (clamp)
+-define(INDEX_ADC_MAX,            16#2769).  %% Max Value (clamp)
+-define(INDEX_ADC_INHIBIT,        16#276A).  %% Inhibit after latch
 
 %% PDS - PDU's
 
@@ -225,10 +245,6 @@
 -define(MSG_BACKLIGHT,      16#2807).   %% Set backlight value (global)
 -define(MSG_LEDLIGHT,       16#2808).   %% Set led-light value (global)
 -define(MSG_ALARM_CNFRM_ACK,16#2809).   %% Alarm ack code notification
-
--define(MSG_NODE_ADD,       16#280A).   %% Add node to members
--define(MSG_NODE_DEL,       16#280B).   %% Delete node from members
--define(MSG_NODE_BACKUP,    16#280C).   %% Signal backup selection
 
 -define(MSG_OUTPUT_VALUE,   16#280D).   %% Current value update
 
@@ -258,6 +274,7 @@
 
 %% battery node PDB messages volt=V*100 (0.00 - 65.00), amp=A*100 
 -define(MSG_BATTERY,        16#6201).  %% sub=bank, data=volt:16, amp:16
+-define(MSG_LOAD,           16#6202).  %% data=amp:16   amp=A*100
 
 %% Alarm causes tied to MSG_ALARM_x notifications
 -define(ALARM_CAUSE_OK,      16#00).  %% channel ok
