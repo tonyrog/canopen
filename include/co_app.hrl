@@ -192,7 +192,9 @@
 -define(INDEX_IN_CHANGED,        16#2749).  %% UNSIGNED32
 -define(INDEX_AN_CHANGED,        16#274A).  %% UNSIGNED32
 -define(INDEX_MISC_CHANGED,      16#274B).  %% UNSIGNED32
+-define(INDEX_ADC_CHANGED,       16#274C).  %% UNSIGNED32
 
+-define(INDEX_DMX_COUNTER,       16#274D).  %% UNSIGNED32
 %% RFID specific 
 -define(INDEX_DISPLAY1,          16#2750).  %% character at position
 -define(INDEX_DISPLAY4,          16#2751).  %% write 4 bytes segment
