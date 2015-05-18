@@ -710,6 +710,7 @@ init(Opts) ->
 			 {stop, Reason::term(), Reply::term(), Mgr::#mgr{}}.
 
 handle_call({set_nid,Nid}, _From, Mgr) ->
+    ?dbg("handle_call: set_nid ~p", [Nid]),
     {reply, ok, Mgr#mgr { def_nid = Nid }};
 
 handle_call({set_mode,Mode}, _From, Mgr) ->
