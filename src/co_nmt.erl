@@ -93,7 +93,7 @@
 	start |          %% enter operational ??
 	stop |
 	enter_pre_op |
-	reset_node |
+	reset |
 	reset_com.
 	
 	
@@ -231,11 +231,11 @@ alive() ->
     ok | {error, Reason::term()}.
 
 send_nmt_command(NmtCommand)
-  when NmtCommand == start;
-       NmtCommand == stop;
-       NmtCommand == enter_pre_op;
-       NmtCommand == reset_node;
-       NmtCommand == reset_com ->
+  when NmtCommand =:= start;
+       NmtCommand =:= stop;
+       NmtCommand =:= enter_pre_op;
+       NmtCommand =:= reset;
+       NmtCommand =:= reset_com ->
     gen_server:call(?NMT_MASTER, {send_all, NmtCommand});
 send_nmt_command(_Nmt) ->
     {error, unknown_nmt_command}.
@@ -251,11 +251,11 @@ send_nmt_command(_Nmt) ->
     ok | {error, Reason::term()}.
 
 send_nmt_command(SlaveId, NmtCommand)
-  when NmtCommand == start;
-       NmtCommand == stop;
-       NmtCommand == enter_pre_op;
-       NmtCommand == reset_node;
-       NmtCommand == reset_com ->
+  when NmtCommand =:= start;
+       NmtCommand =:= stop;
+       NmtCommand =:= enter_pre_op;
+       NmtCommand =:= reset;
+       NmtCommand =:= reset_com ->
     gen_server:call(?NMT_MASTER, {send_slave, SlaveId, NmtCommand}).
 
 %%--------------------------------------------------------------------
@@ -905,8 +905,9 @@ send_to_slave(Slave=#nmt_slave {id = SlaveId}, Cmd,
     end.
 
 send_all(Cmd, Ctx=#ctx {nmt_table = NmtTable}) ->
+    send_nmt({nodeid,0}, co_lib:encode_nmt_command(Cmd)),
     ets:foldl(fun(Slave,[]) ->
-		      send_to_slave(Slave, Cmd, Ctx),
+		      update_slave_state(Slave, Cmd, NmtTable),
 		      []
 	      end, [], NmtTable).
 
@@ -1105,10 +1106,10 @@ send_nmt(_SlaveId = {_Flag, NodeId}, Cmd) ->
 send_node_guard(_SlaveId = {Flag, NodeId}, NodePid) ->
     ?dbg("send_node_guard: slave {~p, ~.16#}", [Flag, NodeId]),
     Id = 
-	if Flag == xnodeid ->
+	if Flag =:= xnodeid ->
 		?COBID_TO_CANID(?XCOB_ID(?NODE_GUARD,NodeId)) 
 		    bor ?CAN_RTR_FLAG;
-	   Flag == nodeid ->
+	   Flag =:= nodeid ->
 		?COBID_TO_CANID(?COB_ID(?NODE_GUARD,NodeId)) 
 		    bor ?CAN_RTR_FLAG
 	end,

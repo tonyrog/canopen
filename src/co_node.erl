@@ -265,12 +265,14 @@ init({Serial, NodeName, Opts}) ->
 
 	    process_flag(trap_exit, true),
 
-	    if ShortNodeId =:= 0 -> 
+	    if ShortNodeId =:= 0 ->
 		    %% CANopen manager
-		    {ok, Ctx1#co_ctx { state = ?Operational }};
+		    Ctx2 = initialization(Ctx1),
+		    {ok, Ctx2};
 	       true ->
 		    %% Standard node
-		    {ok, reset_application(Ctx1)}
+		    Ctx2 = reset_application(Ctx1),
+		    {ok, Ctx2}
 	    end;
 
 	{error, Reason} ->
@@ -318,15 +320,16 @@ reset_communication(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId})
 
 initialization(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId,
 			    nmt_role = NmtRole, supervision = Supervision}) ->
-    ?ei("Node '~s' id=~w,~w initialization\n", [_Name, _XNodeId, _SNodeId]),
+    ?ei("Node '~s' role=~w, id=~w,~w initialization\n", 
+	[_Name, NmtRole, _XNodeId, _SNodeId]),
 
     broadcast_state(?PreOperational, Ctx),
-
-    if NmtRole == master ->
+    case NmtRole of 
+	master ->
 	    activate_nmt(Ctx),
 	    broadcast_state(?Operational, Ctx),
 	    Ctx#co_ctx {state = ?Operational}; %% ??
-       NmtRole == slave ->
+	slave ->
 	    Ctx1 = Ctx#co_ctx {state = ?PreOperational},
 	    send_bootup(id(Ctx1)),
 	    if Supervision == node_guard ->
@@ -336,7 +339,7 @@ initialization(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId,
 	       true ->
 		    Ctx1
 	    end;
-       NmtRole == autonomous ->
+	autonomous ->
 	    %% ??
 	    send_bootup(id(Ctx)),
 	    broadcast_state(?Operational, Ctx),
@@ -1615,8 +1618,8 @@ handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, nmt_role = slave, name=_Name})
     <<Cs,NodeId,_/binary>> = M#can_frame.data,
     ?dbg("~s: handle_nmt: slave ~p, command ~p", 
 	 [_Name, NodeId, co_lib:decode_nmt_command(Cs)]),
-    if NodeId == 0; 
-       NodeId == SNodeId ->
+    if NodeId =:= 0; 
+       NodeId =:= SNodeId ->
 	    case Cs of
 		?NMT_RESET_NODE ->
 		    reset_application(Ctx);
@@ -1641,7 +1644,7 @@ handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, nmt_role = slave, name=_Name})
 	    Ctx
     end;
 handle_nmt(M, Ctx=#co_ctx {nmt_role = master, name = _Name}) ->
-    <<_NodeId,_Cs,_/binary>> = M#can_frame.data,
+    <<_Cs,_NodeId,_/binary>> = M#can_frame.data,
     ?dbg("~s: handle_nmt: node is nmt master, no nmt command possible. "
 	 "Command ~p is for node ~p",
 	 [_Name, co_lib:decode_nmt_command(_Cs), _NodeId]),
