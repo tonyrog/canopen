@@ -227,6 +227,7 @@
 -define(INDEX_ADC_MIN,            16#2768).  %% Min Value (clamp)
 -define(INDEX_ADC_MAX,            16#2769).  %% Max Value (clamp)
 -define(INDEX_ADC_INHIBIT,        16#276A).  %% Inhibit after latch
+-define(INDEX_ADC_DELAY,          16#276B).  %% Sample ms between samples
 
 %% PDS - PDU's
 

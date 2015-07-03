@@ -1858,9 +1858,10 @@ handle_mgr_action(Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term,TOut, From,
 	      nodeid -> NodeId;
 	      xnodeid -> co_lib:add_xflag(NodeId)
 	  end,
+    ?dbg("~s: ~p: node ~.16.0#.", [_Name, Action, Nid]),
     case lookup_sdo_server(Nid,Ctx) of
 	ID={Tx,Rx} ->
-	    ?dbg("~s: ~p: ID = ~p", [_Name,Action,ID]),
+	    ?dbg("~s: ~p: ID = {~.16.0#, ~.16.0#}", [_Name,Action,Tx,Rx]),
 	    case lists:keyfind(Nid, #sdo.dest_node, Sessions) of
 		_S=#sdo {state = active} ->
 		    ?dbg("~s: ~p: Session already in progress to ~.16.0#",
@@ -1886,8 +1887,8 @@ handle_mgr_action(Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term,TOut, From,
 			    Mon = erlang:monitor(process, Pid),
 			    %% sys:trace(Pid, true),
 			    S = #sdo {dest_node = Nid, id=ID, pid=Pid, mon=Mon},
-			    ?dbg("~s: ~p: added session id=~p", 
-				 [_Name, Action, ID]),
+			    ?dbg("~s: ~p: added session, ID={~.16.0#, ~.16.0#}",
+				 [_Name, Action, Tx, Rx]),
 			    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
 		    end
 	    end;
