@@ -254,10 +254,9 @@
 
 %%
 -define(COBID_TO_CANID(ID),
-	if ?is_cobid_extended((ID)) ->
-		((ID) band ?COBID_ENTRY_ID_MASK) bor ?CAN_EFF_FLAG;
-	   true ->
-		((ID) band ?CAN_SFF_MASK)
+	case ?is_cobid_extended((ID)) of
+	    true -> ((ID) band ?COBID_ENTRY_ID_MASK) bor ?CAN_EFF_FLAG;
+	    false -> ((ID) band ?CAN_SFF_MASK)
 	end).
 
 -define(CANID_TO_COBID(ID),
@@ -418,6 +417,7 @@
 -type uint32() :: non_neg_integer().
 
 -type nmt_role() :: slave | master | autonomous.
+-type nmt_conf() :: default | undefined | string().
 -type nid_type() :: nodeid | xnodeid.
 
 %% SDO configuration parameters
@@ -460,7 +460,7 @@
 	  last     ::uint1(),      %% Flag indicating if last segment is received
 	  node_pid :: pid(),       %% Pid of the node
 	  client   :: term(),     %% Delayed gen_server:reply caller
-	  ctx      :: record(sdo_ctx),  %% general parameters
+	  ctx      :: #sdo_ctx{},  %% general parameters
 	  buf      :: term(),      %% Data buffer
 	  mref     :: term()      %% Ref to application
       }).
@@ -530,6 +530,7 @@
 	  toggle = 0,       %% Node guard toggle for nodeid
 	  xtoggle = 0,      %% Node guard toggle for xnodeid
 	  nmt_role = autonomous, %% NMT role (master/slav/autonomous)
+	  nmt_conf = default,    %% where to read nmt slave config
 	  node_guard_timer, %% Node guard supervision of master
 	  node_guard_error = false, %% Lost contact with NMT master
 	  node_life_time = 0, %% Node guard supervision of master

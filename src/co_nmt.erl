@@ -45,7 +45,8 @@
 	 send_nmt_command/1,
 	 send_nmt_command/2,
 	 save/0,
-	 load/0]).
+	 load/0, 
+	 load/1]).
 
 %% gen_server callbacks
 -export([init/1, 
@@ -68,6 +69,7 @@
 -record(ctx, 
 	{
 	  supervision = none, %% Type of supervision
+	  conf = default,     %% config file location
 	  node_pid,           %% Pid of co_node
 	  dict,               %% co_node dictionary
 	  subscribers = [],   %% Receives error notifications
@@ -78,6 +80,7 @@
 -record(nmt_slave,
 	{
 	  id,                  %% node id (key)
+	  mode = manual :: manual | auto,
 	  guard_time = 0,
 	  life_factor = 0,
 	  heartbeat_time = 0,
@@ -301,6 +304,13 @@ save() ->
 load() ->
     gen_server:call(?NMT_MASTER, load).
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Restores saved nmt configuration (slaves to supervise).
+%% @end
+%%--------------------------------------------------------------------
+load(File) ->
+    gen_server:call(?NMT_MASTER, {load, File}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -342,6 +352,7 @@ init(Args) ->
     %% Trace output enable/disable
     Dbg = proplists:get_value(debug,Args,false),
     co_lib:debug(Dbg), 
+    Conf = proplists:get_value(conf,Args,default),
 
     case proplists:get_value(node_pid, Args) of
 	NodePid when is_pid(NodePid) ->
@@ -353,6 +364,7 @@ init(Args) ->
 	    HB =  ets:new(co_hb_table, [{keypos,1}, 
 					protected, named_table, ordered_set]),
 	    Ctx = #ctx {node_pid = NodePid, 
+			conf = Conf,
 			supervision = Supervision,
 			heartbeat_table = HB,
 			nmt_table = NMT},
@@ -360,7 +372,7 @@ init(Args) ->
 	    load_conf(Ctx),
 
 	    %% Load heartbeat if needed
-	    if Supervision == heartbeat ->
+	    if Supervision =:= heartbeat ->
 		    activate_heartbeat(Ctx);
 	       true ->
 		    do_nothing
@@ -443,7 +455,7 @@ handle_call({add_slave, SlaveId = {_Flag, _NodeId}}, _From,
     ?dbg("handle_call: add_slave {~p,~.16#}", [_Flag, _NodeId]),
     case ets:lookup(NmtTable, SlaveId) of
 	[_Slave] -> ok; %% already handled
-	[] -> add_slave(SlaveId, Ctx)
+	[] -> add_slave_(SlaveId, Ctx)
     end,
     {reply, ok, Ctx};
 
@@ -473,6 +485,20 @@ handle_call(load, _From, Ctx) ->
     ?dbg("handle_call: load nmt configuration.", []),
     Reply = load_conf(Ctx),
     {reply, Reply, Ctx};
+
+handle_call({load,Conf}, _From, Ctx) ->
+    File = if Conf =:= default;
+	      Conf =:= undefined;
+	      Conf =:= "" ->
+		   filename:join(code:priv_dir(canopen), ?NMT_CONF);
+	      true ->
+		   co_lib:text_expand(Conf, [])
+	   end,
+    Ctx1 = Ctx#ctx { conf = File },
+    case load_conf(Ctx1) of
+	ok -> {reply, ok, Ctx1};
+	Error -> {reply, Error, Ctx}
+    end;
 
 handle_call({debug, TrueOrFalse}, _From, Ctx) ->
     co_lib:debug(TrueOrFalse),
@@ -723,24 +749,87 @@ code_change(_OldVsn, Ctx, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-load_conf(_Ctx=#ctx {nmt_table = NmtTable}) ->
-    File = filename:join(code:priv_dir(canopen), ?NMT_CONF),
+load_conf(_Ctx=#ctx {nmt_table = NmtTable, conf = Conf}) ->
+    File = if Conf =:= default;
+	      Conf =:= undefined;
+	      Conf =:= "" ->
+		   filename:join(code:priv_dir(canopen), ?NMT_CONF);
+	      true ->
+		   co_lib:text_expand(Conf, [])
+	   end,
     ?dbg("load_conf: load nmt configuration from ~p", [File]),
     case filelib:is_regular(File) of
 	true ->
-	    case file:consult(File) of
-		{ok, [List]} ->
-		    ?dbg("handle_call: loading list ~p", [List]),
-		    try ets:insert(NmtTable, List) of
-			true -> ok
+	    case file:open(File, [read]) of
+		{ok, Fd} ->
+		    try load_nmt_slaves(Fd, NmtTable) of
+			ok -> ok
 		    catch
-			error:Reason -> {error, Reason}
+			error:LoadError ->
+			    {error, LoadError}
+		    after
+			file:close(Fd)
 		    end;
 		Error ->
 		    Error
 	    end;
 	false ->
 	    {error, no_nmt_conf_exists}
+    end.
+
+load_nmt_slaves(Fd, NmtTable) ->
+    case io:read(Fd, '') of
+	{ok, {ID={Flag,N}, SlaveConf}} when Flag =:= nodeid,
+					    is_integer(N), N > 0, 
+					    N < 16#7f; 
+					    Flag =:= xnodeid,
+					    is_integer(N), N > 0,
+					    N < 16#01FFFFFF ->
+	    case ets:lookup(NmtTable, ID) of
+		[] ->
+		    Slave = update_slave(#nmt_slave { id=ID }, SlaveConf),
+		    ets:insert(NmtTable, Slave),
+		    update_slave_mode(Slave, NmtTable);
+		[Slave] ->
+		    Slave1 = update_slave(Slave, SlaveConf),
+		    ets:insert(NmtTable, Slave1),
+		    update_slave_mode(Slave, NmtTable)
+	    end,
+	    load_nmt_slaves(Fd, NmtTable);
+	{ok, Conf} ->
+	    lager:error("load_nmt_slaved: bad config data ~p", [Conf]),
+	    {error, bad_nmt_conf};
+	eof ->
+	    ok
+    end.
+
+update_slave(Slave, Config) ->
+    GuardTime = proplists:get_value(guard_time, Config, 
+				    Slave#nmt_slave.guard_time),
+    LifeFactor = proplists:get_value(life_factor, Config, 
+				     Slave#nmt_slave.life_factor),
+    HeartBeatTime = proplists:get_value(heartbeat_time, Config, 
+					Slave#nmt_slave.heartbeat_time),
+    Mode = proplists:get_value(mode, Config, 
+			       Slave#nmt_slave.mode),
+    Slave#nmt_slave { mode = Mode,
+		      guard_time = GuardTime, 
+		      life_factor = LifeFactor,
+		      heartbeat_time = HeartBeatTime }.
+
+update_slave_mode(Slave, NmtTable) ->
+    if Slave#nmt_slave.mode =:= automatic,
+       Slave#nmt_slave.node_state =/= ?Operational ->
+	    Cmd = start,
+	    case send_nmt(Slave#nmt_slave.id, co_lib:encode_nmt_command(Cmd)) of
+		ok ->
+		    update_slave_state(Slave, Cmd, NmtTable),
+		    ok;
+		Error ->
+		    Error
+	    end;
+       true ->
+	    ok
     end.
 
 activate_heartbeat(Ctx=#ctx {node_pid = NodePid}) ->
@@ -756,7 +845,7 @@ activate_heartbeat(Ctx=#ctx {node_pid = NodePid}) ->
 	{error, Error} ->
 	    ?dbg("activate_heartbeat: Failed reading consumer table, "
 		 "reason ~p.", [Error]),
-	    ?ee("Failed reading hearbeat consumer table, reason ~p, "
+	    ?ee("Failed reading heartbeat consumer table, reason ~p, "
 		"no supervision possible.\n", [Error])
     end.
     
@@ -806,7 +895,7 @@ deactivate_heartbeat(SlaveId, _Ctx=#ctx {nmt_table = NmtTable}) ->
 	    ok
     end.
 
-add_slave(SlaveId = {_Flag, _NodeId}, 
+add_slave_(SlaveId = {_Flag, _NodeId}, 
 	  Ctx=#ctx {supervision = Supervision, nmt_table = NmtTable}) ->
     ?dbg("add_slave: {~p, ~.16#}", [_Flag, _NodeId]),
     Slave = #nmt_slave {id = SlaveId},
@@ -820,7 +909,7 @@ add_slave(SlaveId = {_Flag, _NodeId},
 		       %% Heartbeat is performed based on dictionary
 		       %% and thus not dynamically changed
 		       %%activate_heartbeat(Slave, Ctx)
-		       Ctx
+		       Slave %% Ctx
 	       end,
     ets:insert(NmtTable, NewSlave),
     send_to_slave(NewSlave, start, Ctx).
@@ -904,7 +993,7 @@ send_to_slave(Slave=#nmt_slave {id = SlaveId}, Cmd,
 	    Error
     end.
 
-send_all(Cmd, Ctx=#ctx {nmt_table = NmtTable}) ->
+send_all(Cmd, #ctx {nmt_table = NmtTable}) ->
     send_nmt({nodeid,0}, co_lib:encode_nmt_command(Cmd)),
     ets:foldl(fun(Slave,[]) ->
 		      update_slave_state(Slave, Cmd, NmtTable),
@@ -933,11 +1022,13 @@ handle_bootup(SlaveId = {_Flag, _NodeId},
 	[] -> 
 	    %% First message
 	    ?dbg("handle_bootup: new node, creating entry", []),
-	    add_slave(SlaveId, Ctx);
+	    add_slave_(SlaveId, Ctx);
 	[Slave] -> 
 	    %% Slave rebooted
-	    ets:insert(NmtTable, Slave#nmt_slave {node_state = ?PreOperational,
-						  contact = ok})
+	    Slave1 = Slave#nmt_slave {node_state = ?PreOperational,
+				      contact = ok},
+	    ets:insert(NmtTable, Slave1),
+	    update_slave_mode(Slave1, NmtTable)
     end.
 
 	    
@@ -956,10 +1047,10 @@ handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle,
 				       Ctx);
 	       true -> ok
 	    end,
-	    add_slave(SlaveId, Ctx);
+	    add_slave_(SlaveId, Ctx);
 	[Slave] -> 
-	    if Slave#nmt_slave.toggle == Toggle andalso
-	       Slave#nmt_slave.node_state == State ->
+	    if Slave#nmt_slave.toggle =:= Toggle andalso
+	       Slave#nmt_slave.node_state =:= State ->
 		    node_guard_ok(Slave, Toggle, State, NmtTable);
 
 	       Slave#nmt_slave.node_state =/= State ->
@@ -1017,7 +1108,7 @@ handle_heartbeat(SlaveId = {Flag, NodeId}, State,
 	    if State == ?Initialisation ->
 		    %% bootup, next state should be pre_op
 		    heartbeat_ok(Slave, ?PreOperational, NmtTable);
-	       Slave#nmt_slave.node_state == State ->
+	       Slave#nmt_slave.node_state =:= State ->
 		    heartbeat_ok(Slave, State, NmtTable);
 	       Slave#nmt_slave.node_state =/= State ->
 		    %% This can be because it is a node with both
@@ -1099,7 +1190,7 @@ send_nmt(_SlaveId = {xnodeid, _NodeId}, _Cmd) ->
        {error, xnodeid_not_possible};
 send_nmt(_SlaveId = {_Flag, NodeId}, Cmd) ->
     ?dbg("send_nmt: slave {~p, ~.16#}, ~p", [_Flag, NodeId, Cmd]),
-    can:send(#can_frame { id = ?COBID_TO_CANID(?NMT_ID),
+    can:send(#can_frame { id = ?NMT_ID,
 			  len = 2,
 			  data = <<Cmd:8, NodeId:8>>}).
 

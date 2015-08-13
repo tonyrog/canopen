@@ -228,6 +228,7 @@ init({Serial, NodeName, Opts}) ->
       state  = ?Initialisation,
       debug = Dbg,
       nmt_role = proplists:get_value(nmt_role,Opts,autonomous),
+      nmt_conf = proplists:get_value(nmt_conf,Opts,default),
       supervision = proplists:get_value(supervision,Opts,none),
       sub_table = SubTable,
       res_table = ResTable,
@@ -825,6 +826,7 @@ handle_call({option, Option}, _From, Ctx=#co_ctx {name = _Name}) ->
 		nodeid -> {Option, Ctx#co_ctx.nodeid};
 		xnodeid -> {Option, Ctx#co_ctx.xnodeid};
 		nmt_role -> {Option, Ctx#co_ctx.nmt_role};
+		nmt_conf -> {Option, Ctx#co_ctx.nmt_conf};
 		supervision -> {Option, Ctx#co_ctx.supervision};
 		inact_timeout -> {Option, Ctx#co_ctx.inact_timeout};
 		id -> id(Ctx);
@@ -881,16 +883,17 @@ handle_call({option, Option, NewValue}, _From,
 			Ctx#co_ctx {name = NewValue}; 
 
 		NodeIdChange when
-		      NodeIdChange == nodeid;
-		      NodeIdChange == xnodeid;
-		      NodeIdChange == use_serial_as_xnodeid -> 
+		      NodeIdChange =:= nodeid;
+		      NodeIdChange =:= xnodeid;
+		      NodeIdChange =:= use_serial_as_xnodeid -> 
 		    nodeid_change(NodeIdChange, NewValue, Ctx);
 
 		NmtChange when
-		      NmtChange == nmt_role;
-		      NmtChange == supervision ->
+		      NmtChange =:= nmt_role;
+		      NmtChange =:= nmt_conf;
+		      NmtChange =:= supervision ->
 		    nmt_change(NmtChange, NewValue, Ctx);
-
+		
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
 	    end,
     case Reply of
@@ -1314,6 +1317,13 @@ nodeid_change(use_serial_as_xnodeid, false, Ctx) ->
 
 %% ROLE
 %% No change
+nmt_change(nmt_conf, NewValue, Ctx) ->
+    case co_nmt:load(NewValue) of
+	ok ->
+	    Ctx#co_ctx {nmt_conf = NewValue};
+	Error ->
+	    Error
+    end;
 nmt_change(nmt_role, NewRole, Ctx=#co_ctx {nmt_role = NewRole}) ->
     Ctx;
 %% autonomous to master
@@ -1659,11 +1669,11 @@ handle_node_guard(Frame, NodeId = {TypeOfNid, _Nid},
 			       node_guard_error = NgError, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
     ?dbg("~s: handle_node_guard: node ~p request ~w, now ~p", 
-	 [_Name,NodeId,Frame, now()]),
+	 [_Name,NodeId,Frame, os:timestamp()]),
     %% Reset NMT master supervision timer
     if Timer =/= undefined ->
 	    erlang:cancel_timer(Timer);
-       true -> 
+       true ->
 	    do_nothing
     end,
     %% If NMT supervision has been down resend bootup ?? Toggle ??
@@ -2056,10 +2066,11 @@ handle_tpdo_process(T=#tpdo {pid = _Pid, offset = _Offset}, _Reason,
 
 
 
-activate_nmt(Ctx=#co_ctx {supervision = Sup, dict = Dict, 
+activate_nmt(Ctx=#co_ctx {supervision = Sup, dict = Dict, nmt_conf = Conf,
 			  name = _Name, debug = Dbg}) ->
     ?dbg("~s: activate_nmt", [_Name]),
     co_nmt:start_link([{node_pid, self()},
+		       {conf, Conf},
 		       {dict, Dict},
 		       {supervision, Sup},
 		       {debug, Dbg}]),
@@ -3117,7 +3128,7 @@ stop_timer(TimerRef) ->
 
 
 time_of_day() ->
-    now_to_time_of_day(now()).
+    now_to_time_of_day(os:timestamp()).
 
 set_time_of_day(_Time) ->
     ?dbg("set_time_of_day: ~p", [_Time]),

@@ -140,6 +140,7 @@
 	{product, integer()} | 
 	{revision, integer()} | 
 	{nmt_role, nmt_role()} | 
+	{nmt_conf, nmt_conf()} | 
 	{supervision, supervision()} | 
 	{inact_timeout, timeout() } |
 	{dict, obj_dict()} | 
@@ -247,6 +248,15 @@ verify_option(nmt_role, NewValue)
     ok;
 verify_option(nmt_role, _NewValue) ->
     {error, "Option nmt_role can only be set to slave/master/autonomous."};
+verify_option(nmt_conf, NewValue) 
+  when NewValue =:= default;
+       NewValue =:= undefined;
+       NewValue =:= "";
+       is_list(NewValue) ->
+    ok;
+verify_option(nmt_conf, _NewValue) ->
+    {error, "Option nmt_conf can only be set to default/file-name."};
+
 verify_option(supervision, NewValue) 
   when NewValue == node_guard;
        NewValue == heartbeat;
