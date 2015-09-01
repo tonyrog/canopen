@@ -319,29 +319,32 @@ reset_communication(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId})
     send_to_apps(reset_com, Ctx),
     initialization(Ctx).
 
-initialization(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId,
+initialization(Ctx=#co_ctx {name=_Name, nodeid=SNodeId, xnodeid=_XNodeId,
 			    nmt_role = NmtRole, supervision = Supervision}) ->
     ?ei("Node '~s' role=~w, id=~w,~w initialization\n", 
-	[_Name, NmtRole, _XNodeId, _SNodeId]),
+	[_Name, NmtRole, _XNodeId, SNodeId]),
 
     broadcast_state(?PreOperational, Ctx),
-    case NmtRole of 
-	master ->
+    case {NmtRole,SNodeId} of 
+	{master, _S} ->
 	    activate_nmt(Ctx),
 	    broadcast_state(?Operational, Ctx),
 	    Ctx#co_ctx {state = ?Operational}; %% ??
-	slave ->
+	{slave,_S} ->
 	    Ctx1 = Ctx#co_ctx {state = ?PreOperational},
 	    send_bootup(id(Ctx1)),
-	    if Supervision == node_guard ->
+	    if Supervision =:= node_guard ->
 		    activate_node_guard(Ctx1);
-	       Supervision == heartbeat ->
+	       Supervision =:= heartbeat ->
 		    activate_heartbeat(Ctx1);
 	       true ->
 		    Ctx1
 	    end;
-	autonomous ->
-	    %% ??
+	{autonomous, 0} ->
+	    %% Mgr
+	    broadcast_state(?Operational, Ctx),
+	    Ctx#co_ctx {state = ?Operational};
+	{autonomous, _S} ->
 	    send_bootup(id(Ctx)),
 	    broadcast_state(?Operational, Ctx),
 	    Ctx#co_ctx {state = ?Operational}
@@ -1315,8 +1318,7 @@ nodeid_change(use_serial_as_xnodeid, false, Ctx) ->
 	    Ctx
     end.
 
-%% ROLE
-%% No change
+%% New nmt configuration
 nmt_change(nmt_conf, NewValue, Ctx) ->
     case co_nmt:load(NewValue) of
 	ok ->
@@ -1324,6 +1326,8 @@ nmt_change(nmt_conf, NewValue, Ctx) ->
 	Error ->
 	    Error
     end;
+%% ROLE
+%% No change
 nmt_change(nmt_role, NewRole, Ctx=#co_ctx {nmt_role = NewRole}) ->
     Ctx;
 %% autonomous to master

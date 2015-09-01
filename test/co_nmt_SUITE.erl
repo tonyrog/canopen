@@ -1,5 +1,5 @@
 %%%---- BEGIN COPYRIGHT --------------------------------------------------------
-%%%
+%%% coding: latin-1%%%
 %%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
@@ -72,6 +72,7 @@ all() ->
      start_slave,
      {group, node_guard},
      {group, heartbeat},
+     {group, save_load},
      {group, nmt_commands}].
 %%     break].
 
@@ -98,6 +99,8 @@ groups() ->
      {manage_slave, [sequence], [add_slave, remove_slave]},
      {node_guard, [sequence], [activate_node_guard, detect_lost_slave]},
      {heartbeat, [sequence], [activate_heartbeat, detect_lost_slave]},
+     {save_load, [sequence], 
+      [add_slave, save, remove_slave, load, remove_slave]},
      {nmt_commands, [sequence], [stop_cmd, enter_pre_op_cmd, start_cmd]}
     ].
 
@@ -111,9 +114,12 @@ groups() ->
 			    {skip,Reason::term()} | 
 			    {skip_and_save,Reason::term(),Config1::list(tuple())}.
 init_per_suite(Config) ->
+    clear_conf_file(Config),
     co_test_lib:start_system(),
     co_test_lib:start_node(Config, 
-			   [{nmt_role, master}]),
+			   [{nmt_role, master},
+			    {nmt_conf, conf_file(Config)},
+			    {debug, true}]),
 
     Config.
 
@@ -156,7 +162,7 @@ init_per_group(GroupName, Config)
     ct:pal("TestGroup: ~p", [GroupName]),
     co_nmt:remove_slave(xslave_id()),
     co_nmt:remove_slave(slave_id()),
-    [] = co_nmt:slaves(),
+    [] = co_nmt:slaves(), %% Mgr is always up
     co_test_lib:start_node(Config, 
 			   ?SLAVE_NODE,
 			   [{nmt_role, slave},
@@ -186,10 +192,6 @@ end_per_group(heartbeat, _Config)->
     %% Remove slave from heartbeat list
     co_api:set_value(serial(), {?IX_CONSUMER_HEARTBEAT_TIME, 0}, 0),
     ok;
-end_per_group(nmt_commands, _Config) ->
-    co_nmt:remove_slave(slave_id()),
-    co_test_lib:stop_node(?SLAVE_NODE),
-    ok;
 end_per_group(node_guard, _Config) ->
     ok = co_api:set_option(serial(), supervision, none),
     {supervision, none} = co_api:get_option(serial(), supervision),
@@ -197,9 +199,13 @@ end_per_group(node_guard, _Config) ->
     co_nmt:remove_slave(xslave_id()),
     co_nmt:remove_slave(slave_id()),
     ok;
-end_per_group(handle_slave, _Config) ->
+end_per_group(save_load, Config) ->
     co_nmt:remove_slave(slave_id()),
-    [] = co_nmt:slaves(),
+    clear_conf_file(Config),
+    ok;
+end_per_group(nmt_commands, _Config) ->
+    co_nmt:remove_slave(slave_id()),
+    co_test_lib:stop_node(?SLAVE_NODE),
     ok;
 end_per_group(_GroupName, _Config) ->
     ok.
@@ -363,7 +369,8 @@ add_slave(_Config) ->
 remove_slave(_Config) ->
     true = co_nmt:alive(),
     SlaveId = slave_id(),
-    [{SlaveId, ?Operational, ok}] = co_nmt:slaves(),
+    %% Which state ???
+    [{SlaveId, _State, ok}] = co_nmt:slaves(),
     ok = co_nmt:remove_slave(SlaveId),
     [] = co_nmt:slaves(),
     true = co_nmt:alive(),
@@ -457,6 +464,38 @@ detect_lost_slave(_Config) ->
 
 %%--------------------------------------------------------------------
 %% @doc 
+%% Manually save configuration
+%% @end
+%%--------------------------------------------------------------------
+-spec save(Config::list(tuple())) ->  
+		       ok.
+
+save(_Config) ->
+    SlaveId = slave_id(),
+    [{SlaveId, ?Operational, ok}] = co_nmt:slaves(),    
+    ok = co_nmt:save(),
+    [{SlaveId, ?Operational, ok}] = co_nmt:slaves(),    
+    ok.
+  
+%%--------------------------------------------------------------------
+%% @doc 
+%% Manually load configuration
+%% @end
+%%--------------------------------------------------------------------
+-spec load(Config::list(tuple())) ->  
+		       ok.
+
+load(_Config) ->
+    SlaveId = slave_id(),
+    [] = co_nmt:slaves(),
+    ok = co_nmt:load(),
+    %% ???? FIXME Why PreOperational?
+    [{SlaveId, ?PreOperational, ok}] = co_nmt:slaves(),    
+    ok.
+  
+
+%%--------------------------------------------------------------------
+%% @doc 
 %% Send start command to slave through master
 %% @end
 %%--------------------------------------------------------------------
@@ -503,7 +542,7 @@ break(Config) ->
     ets:new(config, [set, public, named_table]),
     ets:insert(config, Config),
     test_server:break("Break for test development\n" ++
-		     "Get Config by ets:tab2list(config)"),
+		     "Get Config by C = ets:tab2list(config)."),
     ok.
 
 
@@ -523,3 +562,11 @@ slave_id() ->
     {nodeid, co_lib:serial_to_nodeid(?SLAVE_NODE)}.
 xslave_id() ->
     {xnodeid, co_lib:serial_to_xnodeid(?SLAVE_NODE)}.
+
+conf_file(Config) ->
+    DataDir = ?config(data_dir, Config),
+    filename:join(DataDir, "nmt.cfg").
+
+clear_conf_file(Config) ->
+    ConfFile = conf_file(Config),
+    file:write_file(ConfFile,"").

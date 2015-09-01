@@ -468,18 +468,10 @@ handle_call({remove_slave, SlaveId = {_Flag, _NodeId}}, _From,
     end,
     {reply, ok, Ctx};
 
-handle_call(save, _From, Ctx=#ctx {nmt_table = NmtTable}) ->
-    File = filename:join(code:priv_dir(canopen), ?NMT_CONF),
+handle_call(save, _From, Ctx=#ctx {nmt_table = NmtTable, conf = File}) ->
     ?dbg("handle_call: save nmt configuration to ~p", [File]),
-    case file:open(File, [write]) of
-	{ok, Fd} ->
-	    Tab = ets:tab2list(NmtTable),
-	    io:format(Fd,"~p.\n",[Tab]),
-	    file:close(Fd),
-	    {reply, ok, Ctx};
-	Error ->
-	    {reply, Error, Ctx}
-    end;
+    Reply = save_conf(File, NmtTable),
+    {reply, Reply, Ctx};
 	
 handle_call(load, _From, Ctx) ->
     ?dbg("handle_call: load nmt configuration.", []),
@@ -780,7 +772,7 @@ load_conf(_Ctx=#ctx {nmt_table = NmtTable, conf = Conf}) ->
 load_nmt_slaves(Fd, NmtTable) ->
     case io:read(Fd, '') of
 	{ok, {ID={Flag,N}, SlaveConf}} when Flag =:= nodeid,
-					    is_integer(N), N > 0, 
+					    is_integer(N), N >= 0, 
 					    N < 16#7f; 
 					    Flag =:= xnodeid,
 					    is_integer(N), N > 0,
@@ -797,10 +789,29 @@ load_nmt_slaves(Fd, NmtTable) ->
 	    end,
 	    load_nmt_slaves(Fd, NmtTable);
 	{ok, Conf} ->
-	    lager:error("load_nmt_slaved: bad config data ~p", [Conf]),
+	    lager:error("load_nmt_slaves: bad config data ~p", [Conf]),
 	    {error, bad_nmt_conf};
 	eof ->
 	    ok
+    end.
+
+save_conf(File, NmtTable) ->
+    case file:open(File, [write]) of
+	{ok, Fd} ->
+	    ets:foldl(fun(S, Acc) when is_record(S, nmt_slave)->
+			      Slave = {S#nmt_slave.id, 
+				       [{mode, S#nmt_slave.mode},
+					{guard_time, S#nmt_slave.guard_time},
+					{life_factor, S#nmt_slave.life_factor},
+					{heartbeat_time, 
+					 S#nmt_slave.heartbeat_time}]},
+			      io:format(Fd,"~p.\n",[Slave]),
+			      Acc
+		      end, [], NmtTable),
+	    file:close(Fd),
+	    ok;
+	Error ->
+	    Error
     end.
 
 update_slave(Slave, Config) ->

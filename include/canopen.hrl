@@ -529,7 +529,7 @@
 	  supervision = none, %% Type of supervision
 	  toggle = 0,       %% Node guard toggle for nodeid
 	  xtoggle = 0,      %% Node guard toggle for xnodeid
-	  nmt_role = autonomous, %% NMT role (master/slav/autonomous)
+	  nmt_role = autonomous, %% NMT role (master/slave/autonomous)
 	  nmt_conf = default,    %% where to read nmt slave config
 	  node_guard_timer, %% Node guard supervision of master
 	  node_guard_error = false, %% Lost contact with NMT master

@@ -1,3 +1,4 @@
+%%% coding: latin-1"
 %%%---- BEGIN COPYRIGHT --------------------------------------------------------
 %%%
 %%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
@@ -34,6 +35,7 @@
 
 start_system() ->
     start_system(2,0).
+%%    start_system(0,1). %% Default for can_udp.
 
 start_system(_C) ->
     start_system(2,0).
@@ -57,7 +59,7 @@ start_node(C) ->
     %% From test suite
     start_node(C, serial()).
 
-start_node(C, Opts) when is_list (Opts) andalso is_list(Opts) ->
+start_node(C, Opts) when is_list(C) andalso is_list(Opts) ->
     %% From test suite
     start_node(C, serial(), Opts);
 start_node(C, Serial) when is_list(C) ->

@@ -92,7 +92,8 @@
 %%          {nodeid, integer()}       - node id, range: 1 - 16#7e.<br/>
 %%          {xnodeid, integer()}      - extended node id, range: 1 - 16#ffffff.<br/>
 %%          {time_stamp,  timeout()}  - ( 60000 ) in msec. <br/>
-%%          {nmt_role, nmt_role()}        - ( autonomous ) slave/master/autonomous
+%%          {nmt_role, nmt_role()}    - ( autonomous ) slave/master/autonomous
+%%          {nmt_conf, nmt_conf()}    - ( default ) default/undefined/string()
 %%          {supervision, node_guard | heartbeat | none}   - ( none )
 %%          {inact_timeout, timeout()} - (infinity) in sec. <br/>
 %%                                      timeout for sending inactive event 
