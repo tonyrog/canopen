@@ -1048,23 +1048,23 @@ store(Identity, NodeId = {_TypeOfNid, _Nid}, Ix, Si,
 		   ok | {ok, Data::binary()} | {error, Error::term()}.
 
 
-fetch(Identity, NodeId = {_TypeOfNid, _Nid}, Ix, Si, 
+fetch(Identity, NodeId = {_TypeOfNid, Nid}, Ix, Si, 
       TransferMode, Term, default)
-  when ?is_index(Ix), ?is_subind(Si) ->
+  when is_integer(Nid), ?is_index(Ix), ?is_subind(Si) ->
     ?dbg({index, {Ix, Si}},
 	 "fetch: Identity = ~p, NodeId = {~p, ~.16#}, "
 	 "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p", 
-	 [Identity, _TypeOfNid, _Nid, Ix, Si, TransferMode, Term]),
+	 [Identity, _TypeOfNid, Nid, Ix, Si, TransferMode, Term]),
     gen_server:call(identity_to_pid(Identity), 
 		    {fetch,TransferMode,NodeId,Ix,Si,Term});
-fetch(Identity, NodeId = {_TypeOfNid, _Nid}, Ix, Si, 
+fetch(Identity, NodeId = {_TypeOfNid, Nid}, Ix, Si, 
       TransferMode, Term, TimeOut)
-  when ?is_index(Ix), ?is_subind(Si),
+  when is_integer(Nid), ?is_index(Ix), ?is_subind(Si),
        (is_integer(TimeOut) andalso TimeOut > 0) ->
     ?dbg({index, {Ix, Si}},
 	 "fetch: Identity = ~p, NodeId = {~p, ~.16#}, "
 	 "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p, TimeOut = ~p", 
-	 [Identity, _TypeOfNid, _Nid, Ix, Si, TransferMode, Term, TimeOut]),
+	 [Identity, _TypeOfNid, Nid, Ix, Si, TransferMode, Term, TimeOut]),
     gen_server:call(identity_to_pid(Identity), 
 		    {fetch,TransferMode,NodeId,Ix,Si,Term,TimeOut},
 		    TimeOut + 1000).
