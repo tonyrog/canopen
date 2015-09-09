@@ -102,7 +102,7 @@
 
 -define(INDEX_UBOOT_GO,         16#26AA).   %% run application
 
--define(INDEX_PWM_DUTY,         16#2702).
+-define(INDEX_OUTPUT_DUTY,      16#2702).
 -define(INDEX_PWM_RELOAD,       16#2703).
 -define(INDEX_LED_GREEN,        16#2704).
 -define(INDEX_LED_RED,          16#2705).
