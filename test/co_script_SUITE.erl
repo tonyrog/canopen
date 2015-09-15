@@ -176,7 +176,7 @@ require(_Config) ->
 %%--------------------------------------------------------------------
 %% @spec verify_def_files(Config) -> ok 
 %% @doc 
-%% Requires the manager to load a definition file
+%% Requires the manager to load all definition files
 %% @end
 %%--------------------------------------------------------------------
 verify_def_files(_Config) ->
@@ -219,6 +219,9 @@ verify_def_file(File) ->
 %% @end
 %%--------------------------------------------------------------------
 fetch_store(_Config) ->
+    %% Make sure the right context is loaded
+    co_mgr:client_require(canopen),
+
     %% Fetch
     CTS = co_mgr:client_fetch({xnodeid, co_lib:serial_to_xnodeid(serial())},
 			      cobid_time_stamp, 0),
@@ -266,7 +269,7 @@ break(Config) ->
     ets:new(conf, [set, public, named_table]),
     ets:insert(conf, Config),
     test_server:break("Break for test development\n" ++
-		     "Get Config by ets:tab2list(conf)"),
+		     "Get Config by C = ets:tab2list(conf)."),
     ok.
 
 %%--------------------------------------------------------------------
