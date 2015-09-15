@@ -547,50 +547,59 @@ load_definition(File,Path) ->
 		   list(Object::#objdef{})) ->
 		    Obj::#objdef{} | {error, Reason::term()}.
 
-object(Key, DefCtx=#def_ctx {modules = Modules}) 
+object(Key, _DefCtx=#def_ctx {modules = Modules}) 
   when ?is_index(Key) ->
-    ?dbg("object: searching for index ~p in whole context", [Key]),
+    ?dbg("object: searching for index ~p in whole context ~p", 
+	 [Key, [Mod || {Mod, _} <-  Modules]]),
     case find_in_mods(Key, #def_mod.ixs, Modules) of
 	{error, _Error} = E -> E;
-	{ok, Id} -> object(Id, DefCtx#def_ctx.modules)
+	{ok, Id} -> object_in_modlist(Id, Modules)
     end;
 object(Key, _DefCtx=#def_ctx {modules = Modules})  ->
-    ?dbg("object: searching for ~p in whole context", [Key]),
-    object(Key, Modules);
-object(_Key, []) ->
+    ?dbg("object: searching for ~p in whole context ~p", 
+	 [Key, [Mod || {Mod, _} <-  Modules]]),
+    object_in_modlist(Key, Modules).
+
+object_in_modlist(_Key, []) ->
+    ?dbg("object_in_modlist: ~p not found", [_Key]),
     {error, not_found};
-object(Key, [{_ModName, DefMod=#def_mod {objects = Objects}} | DefMods]) 
+object_in_modlist(Key, [{_ModName, DefMod=#def_mod {objects = Objects}} | 
+			DefMods]) 
   when is_record(DefMod, def_mod)->
-    ?dbg("object: searching for ~p in ~p", [Key, _ModName]),
-    case object(Key, Objects) of
+    ?dbg("object_in_modlist: searching for ~p in ~p", [Key, _ModName]),
+    case object_in_objlist(Key, Objects) of
 	Obj when is_record(Obj, objdef) ->
 	    Obj;
 	{error, not_found} ->
-	    object(Key, DefMods);
+	    object_in_modlist(Key, DefMods);
 	{error, _Error} = E -> 
 	    E
-    end;
-object(Id, ObjList) 
+    end.
+
+object_in_objlist(_Key, []) ->
+    ?dbg("object_in_objlist: ~p not found", [_Key]),
+    {error, not_found};
+object_in_objlist(Id, ObjList) 
   when is_atom(Id) andalso is_list(ObjList) ->
-    ?dbg("object: searching for atom ~p", [Id]),
+    ?dbg("object_in_objlist: searching for atom ~p", [Id]),
     case lists:keyfind(Id, #objdef.id, ObjList) of
 	false -> {error, not_found};
 	Obj -> Obj
     end;
-object(Name, ObjList)
+object_in_objlist(Name, ObjList)
   when is_list(Name) andalso is_list(ObjList) ->
-    ?dbg("object: searching for string ~p", [Name]),
+    ?dbg("object_in_objlist: searching for string ~p", [Name]),
     case lists:keyfind(Name, #objdef.name, ObjList) of
 	false -> {error, not_found};
 	Obj -> Obj
     end;
-object(Index, [Obj| Objects]) 
+object_in_objlist(Index, [Obj| Objects]) 
   when ?is_index(Index) andalso is_record(Obj, objdef)->
-    ?dbg("object: searching for index ~p", [Index]),
+    ?dbg("object_in_objlist: searching for index ~p", [Index]),
     %% Index can be a range
     case match_index(Index, Obj#objdef.index) of
 	true -> Obj;
-	false -> object(Index, Objects)
+	false -> object_in_objlist(Index, Objects)
     end.
 
 

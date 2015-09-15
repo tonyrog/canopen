@@ -1099,13 +1099,17 @@ translate_value(_, _, _) ->
 context(Nid, Mgr) ->
     case lists:keysearch(Nid, #node.nid, Mgr#mgr.nodes) of
 	false ->
+	    ?dbg("context: Node ~p not found", [Nid]),
 	    Mgr#mgr.ctx;  %% use current context
 	{value,N} ->
 	    Mod = N#node.product,
+	    ?dbg("context: Node ~p is ~p", [Nid, Mod]),
 	    case lists:keysearch(Mod, #node.nid, Mgr#mgr.ctx_list) of
 		false ->
+		    ?dbg("context: Module ~p not found", [Mod]),
 		    Mgr#mgr.ctx;  %% use current context
 		{value,{_,MCtx}} ->
+		    ?dbg("context: Module ~p found", [Mod]),
 		    MCtx
 	    end
     end.
