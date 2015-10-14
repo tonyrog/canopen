@@ -175,7 +175,7 @@ reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
 
 
 init({Serial, NodeName, Opts}) ->
-    ?ei("~p: init: serial = ~.16#, name = ~p, opts = ~p\n pid = ~p\n", 
+    ?ei("~p: init: serial = ~.16#, name = ~p, opts = ~p\n pid = ~p", 
         [?MODULE, Serial, NodeName, Opts, self()]),
 
     %% Trace output enable/disable
@@ -277,7 +277,7 @@ init({Serial, NodeName, Opts}) ->
 	    end;
 
 	{error, Reason} ->
-	    ?ee("~p: Loading of dict failed, reason = ~p, exiting.\n", 
+	    ?ee("~p: Loading of dict failed, reason = ~p, exiting.", 
                 [NodeName, Reason]),
 	    {stop, Reason}
     end.
@@ -310,18 +310,18 @@ reg(Term) ->
 %%
 %%
 reset_application(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId}) ->
-    ?ei("Node '~s' id=~w,~w reset_application\n", [_Name, _XNodeId, _SNodeId]),
+    ?ei("Node '~s' id=~w,~w reset_application", [_Name, _XNodeId, _SNodeId]),
     send_to_apps(reset_app, Ctx),
     reset_communication(Ctx).
 
 reset_communication(Ctx=#co_ctx {name=_Name, nodeid=_SNodeId, xnodeid=_XNodeId}) ->
-    ?ei("Node '~s' id=~w,~w reset_communication\n",[_Name, _XNodeId, _SNodeId]),
+    ?ei("Node '~s' id=~w,~w reset_communication",[_Name, _XNodeId, _SNodeId]),
     send_to_apps(reset_com, Ctx),
     initialization(Ctx).
 
 initialization(Ctx=#co_ctx {name=_Name, nodeid=SNodeId, xnodeid=_XNodeId,
 			    nmt_role = NmtRole, supervision = Supervision}) ->
-    ?ei("Node '~s' role=~w, id=~w,~w initialization\n", 
+    ?ei("Node '~s' role=~w, id=~w,~w initialization", 
 	[_Name, NmtRole, _XNodeId, SNodeId]),
 
     broadcast_state(?PreOperational, Ctx),
@@ -818,11 +818,6 @@ handle_call({dump, Qualifier}, _From, Ctx=#co_ctx {name = _Name}) ->
     io:format("DEBUG: ~p~n",[Ctx#co_ctx.debug]),
     {reply, ok, Ctx};
 
-%% FIXME: this can be done with sys:get_status(Pid)!
-handle_call(loop_data, _From, Ctx) ->
-    io:format("  LoopData: ~p\n", [Ctx]),
-    {reply, ok, Ctx};
-
 handle_call({option, Option}, _From, Ctx=#co_ctx {name = _Name}) ->
     Reply = case Option of
 		name -> {Option, Ctx#co_ctx.name};
@@ -1084,7 +1079,7 @@ handle_info(do_heartbeat, Ctx=#co_ctx {state = State,
 handle_info(node_guard_timeout, Ctx=#co_ctx {name=_Name}) ->
     ?dbg("~s: handle_info: node_guard timeout received", [_Name]),
     send_to_apps(lost_nmt_master_contact, Ctx),
-    ?ee("Node guard timeout, check NMT master.\n", []),
+    ?ee("Node guard timeout, check NMT master.", []),
     {noreply, Ctx#co_ctx {node_guard_error = true}};
 
 handle_info({rc_reset, Pid}, Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
@@ -1456,7 +1451,7 @@ load_dict_init(saved, Ctx=#co_ctx {serial = Serial}) ->
 	true -> 
 	    load_dict_internal(File, Ctx);
 	false -> 
-	    ?ei("No saved dictionary found, using default\n", []),
+	    ?ei("No saved dictionary found, using default", []),
 	    load_dict_init(default, Ctx)
     end;
 load_dict_init(File, Ctx) when is_list(File) ->
@@ -1721,7 +1716,7 @@ handle_node_guard(Frame, _NodeId,
     ?dbg("~s: handle_node_guard: request ~w", [_Name,Frame]),
     %% Node is nmt master and should NOT receive node_guard request
     ?ee("Illegal NMT confiuration, receiving node_guard "
-        " request even though being NMT master\n", []),
+        " request even though being NMT master", []),
     Ctx.
 
 handle_supervision(Frame, NodeId, Ctx=#co_ctx {nmt_role = master, name = _Name}) 
@@ -1786,7 +1781,7 @@ handle_rpdo(_Frame, _Offset, _CobId,
 	    Ctx=#co_ctx {state = State, name = _Name}) ->
     ?dbg("~s: handle_rpdo: offset = ~p, frame = ~w, state ~p", 
 	 [_Name, _Offset, _Frame, State]),
-    ?ew("Received pdo in state ~p, ignoring\n", [State]),
+    ?ew("Received pdo in state ~p, ignoring", [State]),
     Ctx.
 
 %% CLIENT side:
@@ -1818,7 +1813,7 @@ handle_sdo_tx(_Frame, _Tx, _Rx,
     ?dbg("~s: handle_sdo_tx: src=~p, ~s",
 	 [_Name, _Tx,
 	  co_format:format_sdo(co_sdo:decode_tx(_Frame#can_frame.data))]),
-    ?ew("Received sdo in state ~p, ignoring\n", [State]),
+    ?ew("Received sdo in state ~p, ignoring", [State]),
     Ctx.
 
 
@@ -1846,7 +1841,7 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx=#co_ctx {state = State, name = _Name})
 	    %% like late aborts etc here !!!
 	    case co_sdo_srv_fsm:start(Ctx#co_ctx.sdo,Rx,Tx) of
 		{error, Reason} ->
-		   ?ew("~p: unable to start co_sdo_srv_fsm: ~p\n",
+		   ?ew("~p: unable to start co_sdo_srv_fsm: ~p",
 		       [_Name, Reason]),
 		    Ctx;
 		{ok,Pid} ->
@@ -1863,7 +1858,7 @@ handle_sdo_rx(_Frame, _Rx, _Tx, Ctx=#co_ctx {state = State, name = _Name}) ->
     ?dbg("~s: handle_sdo_rx: ~s", 
 	      [_Name,co_format:format_sdo(
 		       co_sdo:decode_rx(_Frame#can_frame.data))]),
-    ?ew("Received sdo in state ~p, ignoring\n", [State]),
+    ?ew("Received sdo in state ~p, ignoring", [State]),
     Ctx.
 
 handle_mgr_action(Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term,TOut, From, 
@@ -1945,7 +1940,7 @@ handle_mpdo(Frame, CobId, Ctx=#co_ctx {state = ?Operational, name = _Name}) ->
 	    Ctx
     end;
 handle_mpdo(_Frame, _CobId, Ctx=#co_ctx {state = State, name = _Name}) ->
-    ?ew("Received pdo in state ~p, ignoring\n", [State]),
+    ?ew("Received pdo in state ~p, ignoring", [State]),
     Ctx.
 
 handle_sam_mpdo(SourceNid, {SourceIx, SourceSi}, Data,
@@ -2018,7 +2013,7 @@ handle_sdo_process(S, Reason, Ctx=#co_ctx {name = _Name, sdo_list = SList}) ->
 maybe_warning(normal, _Type, _Name) ->
     ok;
 maybe_warning(Reason, Type, Name) ->
-    ?ee("~s: ~s died: ~p\n", [Name, Type, Reason]).
+    ?ee("~s: ~s died: ~p", [Name, Type, Reason]).
 
 handle_app_processes(Pid, Reason, Ctx=#co_ctx {app_list = AList}) 
   when is_pid(Pid)->
@@ -2035,7 +2030,7 @@ handle_app_processes(Ref, Reason, Ctx=#co_ctx {app_list = AList}) ->
 handle_app_process(A=#app {pid = Pid}, Reason, 
 		   Ctx=#co_ctx {name = _Name, app_list = AList,
 			       sub_table = STable, res_table = RTable}) ->
-    ?ee("~s: id=~w application died:~p\n", [_Name,A#app.pid, Reason]),
+    ?ee("~s: id=~w application died:~p", [_Name,A#app.pid, Reason]),
     remove_subscriptions(STable, Pid), %% Or reset ??
     reset_reservations(RTable, Pid),
     %% FIXME: restart application? application_mod ?
@@ -2055,11 +2050,11 @@ handle_tpdo_processes(Ref, Reason, Ctx=#co_ctx {tpdo_list = TList}) ->
 
 handle_tpdo_process(T=#tpdo {pid = _Pid, offset = _Offset}, _Reason, 
 		    Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
-    ?ee("~s: id=~w tpdo process died: ~p\n", [_Name,_Pid, _Reason]),
+    ?ee("~s: id=~w tpdo process died: ~p", [_Name,_Pid, _Reason]),
     case restart_tpdo(T, Ctx) of
 	{error, _Error} ->
 	    ?ee(" ~s: not possible to restart "
-                "tpdo process for offset ~p, reason = ~p\n", 
+                "tpdo process for offset ~p, reason = ~p", 
                 [_Name,_Offset,_Error]),
 	    Ctx;
 	NewT ->
@@ -2284,7 +2279,7 @@ update_mpdo_disp(Ctx=#co_ctx {dict = Dict, name = _Name}, I) ->
     catch
 	error:_Reason ->
 	    ?ew("~s: update_mpdo_disp: reading dict, "
-		"index  ~.16#:~w failed, reason = ~w\n",  
+		"index  ~.16#:~w failed, reason = ~w",  
 		[_Name, I, 0, _Reason]),
 	    Ctx
     end.
@@ -2309,7 +2304,7 @@ update_mpdo_disp1(Ctx=#co_ctx {dict = Dict, mpdo_dispatch = MpdoDisp, name = _Na
     catch
 	error:_Reason ->
 	    ?ew("~s: update_mpdo_disp: reading dict, "
-		"index  ~.16#:~w failed, reason = ~w\n",  
+		"index  ~.16#:~w failed, reason = ~w",  
 		[_Name, _Ix, _Si, _Reason])
     end,
     update_mpdo_disp1(Ctx, Ixs).
@@ -2784,7 +2779,7 @@ tpdo_set({_Ix, _Si} = I, Data, Mode,
 	    %% "~s: tpdo_set: unknown tpdo element\n", [_Name]),
 	    %% {{error,unknown_tpdo_element}, Ctx};
 	{[{I, OldData}], append} when length(OldData) >= TCL ->
-	    ?ew("~s: tpdo_set: tpdo cache for ~.16#:~w full.\n", 
+	    ?ew("~s: tpdo_set: tpdo cache for ~.16#:~w full.", 
 		[_Name,  _Ix, _Si]),
 	    {{error, tpdo_cache_full}, Ctx};
 	{[{I, OldData}], append} ->
@@ -2798,7 +2793,7 @@ tpdo_set({_Ix, _Si} = I, Data, Mode,
 		true -> {ok, Ctx}
 	    catch
 		error:Reason -> 
-		    ?ew("~s: tpdo_set: insert of ~p failed, reason = ~w\n", 
+		    ?ew("~s: tpdo_set: insert of ~p failed, reason = ~w", 
 			[_Name, NewData, Reason]),
 		    {{error,Reason}, Ctx}
 	    end;
@@ -2824,12 +2819,12 @@ rpdo_unpack(I, Data, Ctx=#co_ctx {name = _Name}) ->
 		    ?dbg("~s: rpdo_unpack: decoded data ~p", [_Name, Ds]),
 		    rpdo_set(IL, Ds, Ctx)
 	    catch error:_Reason ->
-		    ?ew("~s: rpdo_unpack: decode failed, reason ~p\n",  
+		    ?ew("~s: rpdo_unpack: decode failed, reason ~p",  
 			[_Name, _Reason]),
 		    Ctx
 	    end;
 	_Error ->
-	    ?ew("~s: rpdo_unpack: error = ~p\n", [_Name, _Error]),
+	    ?ew("~s: rpdo_unpack: error = ~p", [_Name, _Error]),
 	    Ctx
     end.
 
@@ -2997,7 +2992,7 @@ cache_value(Cache, I = {_Ix, _Si}) ->
     case ets:lookup(Cache, I) of
 	[] ->
 	    %% How handle ???
-	    ?ew("~p: cache_value: unknown tpdo element ~.16#:~w\n", 
+	    ?ew("~p: cache_value: unknown tpdo element ~.16#:~w", 
 		 [self(), _Ix, _Si]),
 	    ?dbg("cache_value: tpdo element not found for ~.16#:~w, "
 		 "returning default value.",  [_Ix, _Si]),

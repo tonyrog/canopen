@@ -295,8 +295,8 @@ decode_e(Data, ?UNSIGNED48,S) when S=<48-> decode_unsigned(Data, S);
 decode_e(Data, ?UNSIGNED56,S) when S=<56-> decode_unsigned(Data, S);
 decode_e(Data, ?UNSIGNED64,S) when S=<64-> decode_unsigned(Data, S);
 decode_e(Data, ?BOOLEAN,S)    when S=<1 -> decode_unsigned(Data, S);
-decode_e(Data, ?REAL32, S) when S==32 -> decode_float(Data, 32);
-decode_e(Data, ?REAL64, S) when S==64 -> decode_float(Data, 64);
+decode_e(Data, ?REAL32, S) when S=:=32 -> decode_float(Data, 32);
+decode_e(Data, ?REAL64, S) when S=:=64 -> decode_float(Data, 64);
 decode_e(Data, ?VISIBLE_STRING, S) -> 
     {X, Y} = decode_binary(Data, S),
     {binary_to_list(X), Y};
@@ -340,6 +340,8 @@ decode_pdo(Data, Ts) ->
 %% split Bits in {A,B} where bit_size(A) =< Sz
 %% using CANopen encoding rules (little endian bit packing)
 %%
+split_bits(Bits, -1) ->
+    {Bits, <<>>};
 split_bits(Bits, Sz) when is_bitstring(Bits), Sz =< bit_size(Bits) ->
     N = bit_size(Bits),
     Ak = Sz band 16#7,  %% number of tail bits
@@ -371,6 +373,8 @@ decode_float(Data, Size) ->
     <<X:Size/float-little, Bits/bits>> = Data,
     {X, Bits}.
 
+decode_binary(Data, -1) ->
+    {Data, <<>>};
 decode_binary(Data, Size) ->
     <<X:Size/bits, Bits/bits>> = Data,
     {X, Bits}.

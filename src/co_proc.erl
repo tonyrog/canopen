@@ -74,7 +74,7 @@
 			{ok, Pid::pid()} | ignore | {error, Error::term()}.
 
 start_link(Opts) ->
-    ?ei("~p: start_link: args = ~p\n", [?MODULE, Opts]),
+    ?ei("~p: start_link: args = ~p", [?MODULE, Opts]),
     F =	case proplists:get_value(linked,Opts,true) of
 	    true -> start_link;
 	    false -> start
@@ -236,7 +236,7 @@ debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
 -spec init([]) -> {ok, Ctx::#ctx{}}.
 
 init([]) ->
-    ?ei("~p: init: args = [], pid = ~p\n", [?MODULE, self()]),
+    ?ei("~p: init: args = [], pid = ~p", [?MODULE, self()]),
 
     PD = ets:new(co_proc_dict, [protected, named_table, ordered_set]),
     TD = ets:new(co_term_dict, [protected, named_table, ordered_set]),
@@ -313,7 +313,7 @@ handle_call({clear, Pid}, _From, Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
 		true -> ok
 	    catch 
 		error:Reason ->
-		    ?ew("~p: Delete of terms for ~p failed, reason ~p\n", 
+		    ?ew("~p: Delete of terms for ~p failed, reason ~p", 
 			[?MODULE, Pid, Reason]),
 		    ok
 	    end,
@@ -363,7 +363,7 @@ handle_cast(_Msg, Ctx) ->
 
 handle_info({'DOWN',_Ref, process, Pid, Reason}, 
 	    Ctx=#ctx {term_dict = TD, proc_dict = PD}) ->
-    ?ew("~p: Monitored process ~p died\n", [?MODULE, Pid]),
+    ?ew("~p: Monitored process ~p died", [?MODULE, Pid]),
     ets:match_delete(TD, {'_', Pid}),
     ets:insert(PD, {Pid, {dead, Reason}, []}),
     {noreply, Ctx};

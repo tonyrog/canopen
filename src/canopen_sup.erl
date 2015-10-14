@@ -49,17 +49,17 @@
 %% @end
 %%--------------------------------------------------------------------
 start_link(Args) ->
-    ?ei("~p: start_link: args = ~p\n", [?MODULE, Args]),
+    ?ei("~p: start_link: args = ~p", [?MODULE, Args]),
     try supervisor:start_link({local, ?MODULE}, ?MODULE, Args) of
 	{ok, Pid} ->
 	    {ok, Pid, {normal, Args}};
 	Error -> 
 	    ?ee("~p: start_link: Failed to start process, "
-		"reason ~p\n",  [?MODULE, Error]),
+		"reason ~p",  [?MODULE, Error]),
 	    Error
     catch 
 	error:Reason ->
-	    ?ee("~p: start_link: Try failed, reason ~p\n", [?MODULE,Reason]),
+	    ?ee("~p: start_link: Try failed, reason ~p", [?MODULE,Reason]),
 	    Reason
 
     end.
@@ -90,7 +90,7 @@ stop() ->
 %% @end
 %%--------------------------------------------------------------------
 init(Args) ->
-    ?ei("~p: init: args = ~p,\n pid = ~p\n", [?MODULE, Args, self()]),
+    ?ei("~p: init: args = ~p,\n pid = ~p", [?MODULE, Args, self()]),
     Serial = proplists:get_value(serial, Args, 0),
     Opts = proplists:get_value(options, Args, []),
     CP = co_proc,
@@ -103,7 +103,7 @@ init(Args) ->
     SysApp = {SA, {SA, start_link, [Serial]}, permanent, 5000, worker, [SA]},
     OsApp = {OA, {OA, start_link, [Serial]}, permanent, 5000, worker, [OA]},
     Processes = [CoProc, CoNode, SysApp, OsApp],
-    ?ei("~p: About to start ~p\n", [?MODULE, Processes]),
+    ?ei("~p: About to start ~p", [?MODULE, Processes]),
     {ok, { {rest_for_one, 0, 300}, Processes} }.
 
 
