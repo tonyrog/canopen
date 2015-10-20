@@ -28,13 +28,10 @@
 
 %% Switching to lager (ale)
 -define(dbg(Format, Args),
- 	lager:debug("~s(~p): " ++ Format, 
-		    [?MODULE, self() | Args])).
+ 	lager:debug(Format, Args)).
 
 
 -define(dbg(Tag, Format, Args),
- 	lager:debug([Tag], 
-		    "~s(~p): " ++ Format, 
-		    [?MODULE, self() | Args])).
+ 	lager:debug([Tag], Format,[Args])).
 
 -endif.
