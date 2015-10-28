@@ -24,8 +24,8 @@
 %%===================================================================
 
 -module(co_test_stream_app).
--include_lib("canopen/include/canopen.hrl").
--include("co_app.hrl").
+-include("../include/canopen.hrl").
+-include("../include/co_app.hrl").
 %%-include("co_debug.hrl").
 
 -behaviour(gen_server).

@@ -24,7 +24,7 @@
 -module(co_sdo_test).
 
 -include_lib("can/include/can.hrl").
--include_lib("canopen/include/canopen.hrl").
+-include("../include/canopen.hrl").
 -include("../include/sdo.hrl").
 
 -compile(export_all).

@@ -29,7 +29,7 @@
 -compile(export_all).
 
 -include_lib("common_test/include/ct.hrl").
--include("canopen.hrl").
+-include("../include/canopen.hrl").
 
 -define(SLAVE_NODE, 16#3077701).
 

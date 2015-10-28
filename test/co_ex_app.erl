@@ -30,9 +30,9 @@
 %% @end
 %%===================================================================
 -module(co_ex_app).
--include_lib("canopen/include/canopen.hrl").
--include("co_app.hrl").
--include("co_debug.hrl").
+-include("../include/canopen.hrl").
+-include("../include/co_app.hrl").
+-include("../include/co_debug.hrl").
 
 -behaviour(gen_server).
 -behaviour(co_app).
@@ -106,7 +106,7 @@ stop() ->
 		       {error, Reason::atom()}.
 
 index_specification(_Pid, {?MY_INDEX = _Index, 255} = I) ->
-    ?dbg(?NAME,"index_specification: store type ~.16B ",[_Index]),
+    ?dbg("index_specification: store type ~.16B ",[_Index]),
     Value = ((?UNSIGNED32 band 16#ff) bsl 8) bor (?VISIBLE_STRING band 16#ff),
     reply_specification(I, ?UNSIGNED32, ?ACCESS_RO, {value, Value});
 index_specification(_Pid, {?MY_INDEX, 0} = I) ->
@@ -116,14 +116,14 @@ index_specification(_Pid, {?MY_INDEX, 1} = I) ->
 index_specification(_Pid, {?MY_INDEX, 2} = I) ->
     reply_specification(I, ?VISIBLE_STRING, ?ACCESS_RW, atomic);
 index_specification(_Pid, {?MY_INDEX, _SubInd})  ->
-    ?dbg(?NAME,"index_specification: unknown subindex ~.8B ",[_SubInd]),
+    ?dbg("index_specification: unknown subindex ~.8B ",[_SubInd]),
     {error, ?abort_no_such_subindex};
 index_specification(_Pid, {_Index, _SubInd})  ->
-    ?dbg(?NAME,"index_specification: unknown index ~.16B:~.8B ",[_Index, _SubInd]),
+    ?dbg("index_specification: unknown index ~.16B:~.8B ",[_Index, _SubInd]),
     {error, ?abort_no_such_object}.
 
 reply_specification({_Index, _SubInd} = I, Type, Access, Mode) ->
-    ?dbg(?NAME,"reply_specification: ~.16B:~.8B, "
+    ?dbg("reply_specification: ~.16B:~.8B, "
 	 "type = ~w, access = ~w, mode = ~w", 
 	 [_Index, _SubInd, Type, Access, Mode]),
     Spec = #index_spec{index = I,
@@ -146,7 +146,7 @@ reply_specification({_Index, _SubInd} = I, Type, Access, Mode) ->
 		 {error, Reason::atom()}.
 
 set(_Pid, Index = {_Ix, _Si}, NewValue) ->
-    ?dbg(?NAME," set ~.16#:~.8# to ~p",[_Ix, _Si, NewValue]),
+    ?dbg(" set ~.16#:~.8# to ~p",[_Ix, _Si, NewValue]),
     handle_set(Index, NewValue).
 
 %%--------------------------------------------------------------------
@@ -160,7 +160,7 @@ set(_Pid, Index = {_Ix, _Si}, NewValue) ->
 		 {error, Reason::atom()}.
 
 get(_Pid, Index = {_Ix, _Si}) ->
-    ?dbg(?NAME," get ~.16#:~.8#",[_Ix, _Si]),
+    ?dbg(" get ~.16#:~.8#",[_Ix, _Si]),
     handle_get(Index).
 
 
@@ -245,7 +245,7 @@ handle_call({debug, TrueOrFalse}, _From, LoopData) ->
     {reply, ok, LoopData};
 
 handle_call(stop, _From, LoopData=#loop_data {co_node = CoNode}) ->
-    ?dbg(?NAME," handle_call: stop",[]),    
+    ?dbg(" handle_call: stop",[]),    
     case co_api:alive(CoNode) of
 	true ->
 	    co_api:unreserve(CoNode, ?IX_STORE_PARAMETERS),
@@ -254,11 +254,11 @@ handle_call(stop, _From, LoopData=#loop_data {co_node = CoNode}) ->
 	false -> 
 	    do_nothing %% Not possible to detach and unsubscribe
     end,
-    ?dbg(?NAME," handle_stop: detached.",[]),
+    ?dbg(" handle_stop: detached.",[]),
     {stop, normal, ok, LoopData};
 
 handle_call(_Request, _From, LoopData) ->
-    ?dbg(?NAME," handle_call: bad call ~p.",[_Request]),
+    ?dbg(" handle_call: bad call ~p.",[_Request]),
     {reply, {error, ?abort_internal_error}, LoopData}.
 
     
@@ -276,7 +276,7 @@ handle_call(_Request, _From, LoopData) ->
 			 {stop, Reason::atom(), LoopData::#loop_data{}}.
 			 
 handle_cast(_Msg, LoopData) ->
-    ?dbg(?NAME," handle_cast: Message = ~p. ", [_Msg]),
+    ?dbg(" handle_cast: Message = ~p. ", [_Msg]),
     {noreply, LoopData}.
 
 
@@ -305,14 +305,14 @@ handle_cast(_Msg, LoopData) ->
 			 {stop, Reason::atom(), LoopData::#loop_data{}}.
 			 
 handle_info({object_event, ?SUBSCRIBED_INDEX = I}, LoopData) ->
-    ?dbg(?NAME," handle_info: object_event for ~.16#",  [I]),
+    ?dbg(" handle_info: object_event for ~.16#",  [I]),
     do_something,
     {noreply, LoopData};
 handle_info({object_event, _I}, LoopData) ->
-    ?dbg(?NAME," handle_info: object_event unknwon index ~.16#",  [_I]),
+    ?dbg(" handle_info: object_event unknwon index ~.16#",  [_I]),
     {noreply, LoopData};
 handle_info(_Info, LoopData) ->
-    ?dbg(?NAME," handle_info: Unknown Info ~p", [_Info]),
+    ?dbg(" handle_info: Unknown Info ~p", [_Info]),
     {noreply, LoopData}.
 
 %%--------------------------------------------------------------------
@@ -345,27 +345,27 @@ code_change(_OldVsn, LoopData, _Extra) ->
 %%% Support functions
 %%%===================================================================
 handle_set({?MY_INDEX, 0}, _Value) ->
-    ?dbg(?NAME," handle_set: 0 not allowed",[]),
+    ?dbg(" handle_set: 0 not allowed",[]),
     {error, ?abort_unsupported_access};
 handle_set({?MY_INDEX, 1} = Index, Value) 
   when is_integer(Value)->
-    ?dbg(?NAME," handle_set: 1 to ~p",[Value]),
+    ?dbg(" handle_set: 1 to ~p",[Value]),
     handle_set1(Index, Value);
 handle_set({?MY_INDEX, 1}, Value) ->
-    ?dbg(?NAME," handle_set: 1 to ~p",[Value]),
+    ?dbg(" handle_set: 1 to ~p",[Value]),
     {error, ?abort_parameter_error};
 handle_set({?MY_INDEX, 2} = Index, Value) 
   when is_list(Value) ->
-    ?dbg(?NAME," handle_set: 2 to ~p",[Value]),
+    ?dbg(" handle_set: 2 to ~p",[Value]),
     handle_set1(Index, Value);
 handle_set({?MY_INDEX, 2}, Value) ->
-    ?dbg(?NAME," handle_set: 2 to ~p",[Value]),
+    ?dbg(" handle_set: 2 to ~p",[Value]),
     {error, ?abort_parameter_error};
 handle_set({?MY_INDEX, _SubInd}, _Value) ->
-    ?dbg(?NAME, "handle_set: unknown subindex ~.8B ",[_SubInd]),    
+    ?dbg( "handle_set: unknown subindex ~.8B ",[_SubInd]),    
     {error, ?abort_no_such_subindex};
 handle_set({_Index, _SubInd}, _NewValue) ->
-    ?dbg(?NAME, "handle_set, unknown index ~.16B:~.8B ",[_Index, _SubInd]),    
+    ?dbg( "handle_set, unknown index ~.16B:~.8B ",[_Index, _SubInd]),    
     {error, ?abort_no_such_object};
 handle_set(Index, NewValue) 
   when is_integer(Index) ->
@@ -376,24 +376,24 @@ handle_set1(Index, Value) ->
 	true ->
 	    ok
     catch error:_Reason ->
-	    ?dbg(?NAME, "handle_set: set failed, reason = ~p ",[_Reason]),
+	    ?dbg( "handle_set: set failed, reason = ~p ",[_Reason]),
 	    {error, ?abort_hardware_failure}
     end.
 
 handle_get({?MY_INDEX, 0}) ->
-    ?dbg(?NAME, "handle_call: get object size = 1",[]),    
+    ?dbg( "handle_call: get object size = 1",[]),    
     {ok, 2};
 handle_get({?MY_INDEX, 1} = Index) ->
-    ?dbg(?NAME, "handle_call: get 1",[]),
+    ?dbg( "handle_call: get 1",[]),
     handle_get1(Index);
 handle_get({?MY_INDEX, 2} = Index) ->
-    ?dbg(?NAME, "handle_call: get 2",[]),
+    ?dbg( "handle_call: get 2",[]),
     handle_get1(Index);
 handle_get({?MY_INDEX, _SubInd}) ->
-    ?dbg(?NAME, "handle_get: unknown subindex ~.8B ",[_SubInd]),    
+    ?dbg( "handle_get: unknown subindex ~.8B ",[_SubInd]),    
     {error, ?abort_no_such_subindex};
 handle_get({_Index, _SubInd}) ->
-    ?dbg(?NAME, "handle_get: unknown index ~.16B:~.8B ",[_Index, _SubInd]),
+    ?dbg( "handle_get: unknown index ~.16B:~.8B ",[_Index, _SubInd]),
    {error, ?abort_no_such_object};
 handle_get(Index) 
   when is_integer(Index)->
@@ -404,7 +404,7 @@ handle_get1(Index) ->
 	[{Index, Value}] ->
 	    {ok, Value};
 	_Other ->
-	    ?dbg(?NAME, "handle_get: get failed, got = ~p ",[_Other]),
+	    ?dbg( "handle_get: get failed, got = ~p ",[_Other]),
 	    {error, ?abort_hardware_failure}
     end.
 
