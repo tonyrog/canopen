@@ -28,7 +28,6 @@
 -include_lib("can/include/can.hrl").
 -include("canopen.hrl").
 -include("co_app.hrl").
--include("co_debug.hrl").
 
 -behaviour(gen_server).
 
@@ -410,7 +409,7 @@ init(Args) ->
 			 {stop, Reason::term(), Reply::term(), Ctx::#ctx{}}.
 
 handle_call(slaves, _From, Ctx=#ctx {nmt_table = NmtTable}) ->
-    ?dbg("handle_call: slaves", []),
+    lager:debug("handle_call: slaves", []),
     SlaveList = 
 	ets:select(NmtTable, [{#nmt_slave{id='$1', 
 					  node_state = '$2', 
@@ -420,7 +419,7 @@ handle_call(slaves, _From, Ctx=#ctx {nmt_table = NmtTable}) ->
     {reply, SlaveList, Ctx};
 handle_call({send_slave, SlaveId = {_Flag, _NodeId}, Cmd}, _From, 
 	    Ctx=#ctx {nmt_table = NmtTable}) ->
-    ?dbg("handle_call: send_slave {~p,~.16#} ~p", [_Flag, _NodeId, Cmd]),
+    lager:debug("handle_call: send_slave {~p,~.16#} ~p", [_Flag, _NodeId, Cmd]),
     case ets:lookup(NmtTable, SlaveId) of
 	[Slave] -> 
 	    {reply, send_to_slave(Slave, Cmd, Ctx), Ctx};
@@ -429,11 +428,11 @@ handle_call({send_slave, SlaveId = {_Flag, _NodeId}, Cmd}, _From,
     end;
 
 handle_call({send_all, Cmd}, _From, Ctx) ->
-    ?dbg("handle_call: send_all ~p", [Cmd]),
+    lager:debug("handle_call: send_all ~p", [Cmd]),
     {reply, send_all(Cmd, Ctx), Ctx};
 
 handle_call({subscribe, Pid}, _From, Ctx=#ctx {subscribers = SubList}) ->
-    ?dbg("handle_call: subscribe ~p", [Pid]),
+    lager:debug("handle_call: subscribe ~p", [Pid]),
     case lists:keymember(Pid, 1, SubList) of
 	true ->
 	    {reply, ok, Ctx};
@@ -443,16 +442,16 @@ handle_call({subscribe, Pid}, _From, Ctx=#ctx {subscribers = SubList}) ->
     end;
 
 handle_call({unsubscribe, Pid}, _From, Ctx=#ctx {subscribers = SubList}) ->
-    ?dbg("handle_call: unsubscribe ~p", [Pid]),
+    lager:debug("handle_call: unsubscribe ~p", [Pid]),
     {reply, ok, Ctx#ctx {subscribers = lists:keydelete(Pid,1,SubList)}};
 
 handle_call(subscribers, _From, Ctx=#ctx {subscribers = SubList}) ->
-    ?dbg("handle_call: subscribers", []),
+    lager:debug("handle_call: subscribers", []),
     {reply, {ok, [Sub || {Sub, _Mon} <- SubList]}, Ctx};
 
 handle_call({add_slave, SlaveId = {_Flag, _NodeId}}, _From, 
 	    Ctx=#ctx {nmt_table = NmtTable}) ->
-    ?dbg("handle_call: add_slave {~p,~.16#}", [_Flag, _NodeId]),
+    lager:debug("handle_call: add_slave {~p,~.16#}", [_Flag, _NodeId]),
     case ets:lookup(NmtTable, SlaveId) of
 	[_Slave] -> ok; %% already handled
 	[] -> add_slave_(SlaveId, Ctx)
@@ -461,7 +460,7 @@ handle_call({add_slave, SlaveId = {_Flag, _NodeId}}, _From,
 
 handle_call({remove_slave, SlaveId = {_Flag, _NodeId}}, _From, 
 	    Ctx=#ctx {nmt_table = NmtTable}) ->
-    ?dbg("handle_call: remove_slave {~p,~.16#}", [_Flag, _NodeId]),
+    lager:debug("handle_call: remove_slave {~p,~.16#}", [_Flag, _NodeId]),
     case ets:lookup(NmtTable, SlaveId) of
 	[] -> ok; %% not handled
 	[Slave] -> remove_slave(Slave, Ctx)
@@ -469,12 +468,12 @@ handle_call({remove_slave, SlaveId = {_Flag, _NodeId}}, _From,
     {reply, ok, Ctx};
 
 handle_call(save, _From, Ctx=#ctx {nmt_table = NmtTable, conf = File}) ->
-    ?dbg("handle_call: save nmt configuration to ~p", [File]),
+    lager:debug("handle_call: save nmt configuration to ~p", [File]),
     Reply = save_conf(File, NmtTable),
     {reply, Reply, Ctx};
 	
 handle_call(load, _From, Ctx) ->
-    ?dbg("handle_call: load nmt configuration.", []),
+    lager:debug("handle_call: load nmt configuration.", []),
     Reply = load_conf(Ctx),
     {reply, Reply, Ctx};
 
@@ -524,7 +523,7 @@ handle_call(stop, _From, Ctx) ->
     {stop, normal, ok, Ctx};
 
 handle_call(_Call, _From, Ctx) ->
-    ?dbg("handle_call: unknown call ~p, ignored", [_Call]),
+    lager:debug("handle_call: unknown call ~p, ignored", [_Call]),
     {reply, {error, bad_call}, Ctx}.
     
 
@@ -546,7 +545,7 @@ handle_call(_Call, _From, Ctx) ->
 handle_cast({supervision_frame, SlaveId = {_Flag, _NodeId}, Frame}, 
 	    Ctx=#ctx {supervision = node_guard})
   when Frame#can_frame.len == 1 ->
-    ?dbg("handle_cast: node_guard reply ~w from {~p, ~.16#}", 
+    lager:debug("handle_cast: node_guard reply ~w from {~p, ~.16#}", 
 	 [Frame, _Flag, _NodeId]),
     case Frame#can_frame.data of
 	<<Toggle:1, State:7, _/binary>> ->
@@ -559,7 +558,7 @@ handle_cast({supervision_frame, SlaveId = {_Flag, _NodeId}, Frame},
 handle_cast({supervision_frame, SlaveId = {_Flag, _NodeId}, Frame}, 
 	    Ctx=#ctx {supervision = heartbeat}) 
   when Frame#can_frame.len == 1 ->
-    ?dbg("handle_cast: heartbeat ~w from {~p, ~.16#} ", 
+    lager:debug("handle_cast: heartbeat ~w from {~p, ~.16#} ", 
 	 [Frame, _Flag, _NodeId]),
     case Frame#can_frame.data of
 	<<0:1, State:7, _/binary>> ->
@@ -571,7 +570,7 @@ handle_cast({supervision_frame, SlaveId = {_Flag, _NodeId}, Frame},
 
 handle_cast({supervision_frame, SlaveId = {_Flag, _NodeId}, Frame}, 
 	    Ctx=#ctx {supervision = none}) ->
-    ?dbg("handle_cast: supervision frame ~w from {~p, ~.16#} "
+    lager:debug("handle_cast: supervision frame ~w from {~p, ~.16#} "
 	 "when no supervision, check if bootup", [Frame, _Flag, _NodeId]),
     case Frame#can_frame.data of
 	<<0>> -> handle_bootup(SlaveId, Ctx);
@@ -581,11 +580,11 @@ handle_cast({supervision_frame, SlaveId = {_Flag, _NodeId}, Frame},
     
 handle_cast({supervision, Supervision}, 
 	    Ctx=#ctx {supervision = Supervision}) ->
-    ?dbg(nmt," handle_cast: supervision ~p, no change.", [Supervision]),
+    lage:debug([nmt]," handle_cast: supervision ~p, no change.", [Supervision]),
     {noreply, Ctx};
 
 handle_cast({supervision, New}, Ctx=#ctx {supervision = Old}) ->
-    ?dbg(nmt," handle_cast: supervision ~p -> ~p.", [Old, New]),
+    lager:debug([nmt]," handle_cast: supervision ~p -> ~p.", [Old, New]),
     %% Activate/deactivate .. or handle in co_node ??
     case Old of
 	node_guard -> deactivate_node_guard(Ctx);
@@ -600,7 +599,7 @@ handle_cast({supervision, New}, Ctx=#ctx {supervision = Old}) ->
     {noreply, Ctx#ctx {supervision = New}};
 
 handle_cast(_Msg, Ctx) ->
-    ?dbg(nmt," handle_cast: Unknown message = ~p, ignored. ", [_Msg]),
+    lager:debug([nmt]," handle_cast: Unknown message = ~p, ignored. ", [_Msg]),
     {noreply, Ctx}.
 
 
@@ -626,13 +625,13 @@ handle_info({do_node_guard, SlaveId = {_Flag, _NodeId}},
 	    Ctx=#ctx {nmt_table = NmtTable, 
 		      node_pid = NodePid, 
 		      supervision = node_guard}) ->
-    ?dbg("handle_info: do_node_guard for {~p,~.16#}", [_Flag, _NodeId]),
+    lager:debug("handle_info: do_node_guard for {~p,~.16#}", [_Flag, _NodeId]),
     case ets:lookup(NmtTable, SlaveId) of
 	[] -> 
-	    ?dbg("handle_info: do_node_guard, slave not found!", []),
+	    lager:debug("handle_info: do_node_guard, slave not found!", []),
 	    ok;
 	[Slave=#nmt_slave {guard_time = GT, contact = Status}] -> 
-	    ?dbg("handle_info: do_node_guard, slave guard time ~p", [GT]),
+	    lager:debug("handle_info: do_node_guard, slave guard time ~p", [GT]),
 	    send_node_guard(SlaveId, NodePid),
 	    TRef = if GT =/= 0 ->
 			   erlang:send_after(GT, self(), 
@@ -649,16 +648,16 @@ handle_info({do_node_guard, SlaveId = {_Flag, _NodeId}},
     {noreply, Ctx};
 
 handle_info({do_node_guard, _SlaveId}, Ctx) ->
-    ?dbg("handle_info: do_node_guard, supervision disabled", []),
+    lager:debug("handle_info: do_node_guard, supervision disabled", []),
     {noreply, Ctx};
 
 handle_info({node_guard_timeout, SlaveId = {_Flag, _NodeId}}, 
 	    Ctx=#ctx {nmt_table = NmtTable, supervision = node_guard}) ->
-    ?dbg("handle_info: node_guard_timeout received for {~p,~.16#}", 
+    lager:debug("handle_info: node_guard_timeout received for {~p,~.16#}", 
 	 [_Flag, _NodeId]),
     case ets:lookup(NmtTable, SlaveId) of
 	[] -> 
-	    ?dbg("handle_info: node_guard_timeout, slave not found!", []),
+	    lager:debug("handle_info: node_guard_timeout, slave not found!", []),
 	    ok;
 	[Slave] -> 
 	    ?ee("Node guard timeout, check NMT slave {~p,~.16#}\n", 
@@ -669,16 +668,16 @@ handle_info({node_guard_timeout, SlaveId = {_Flag, _NodeId}},
     {noreply, Ctx};
 
 handle_info({node_guard_timeout, _SlaveId}, Ctx) ->
-    ?dbg("handle_info: node_guard_timeout, supervision disabled", []),
+    lager:debug("handle_info: node_guard_timeout, supervision disabled", []),
     {noreply, Ctx};
 
 handle_info({heartbeat_timeout, SlaveId = {_Flag, _NodeId}}, 
 	    Ctx=#ctx {nmt_table = NmtTable, supervision = heartbeat}) ->
-    ?dbg("handle_info: heartbeat_timeout received for {~p,~.16#}", 
+    lager:debug("handle_info: heartbeat_timeout received for {~p,~.16#}", 
 	 [_Flag, _NodeId]),
     case ets:lookup(NmtTable, SlaveId) of
 	[] -> 
-	    ?dbg("handle_info: heartbeat_timeout, slave not found!", []),
+	    lager:debug("handle_info: heartbeat_timeout, slave not found!", []),
 	    ok;
 	[Slave] -> 
 	    ?ee("Heartbeat timeout, check NMT slave {~p,~.16#}\n", 
@@ -690,7 +689,7 @@ handle_info({heartbeat_timeout, SlaveId = {_Flag, _NodeId}},
     {noreply, Ctx};
 
 handle_info(heartbeat_change, Ctx) ->
-    ?dbg("handle_info: heartbeat_change received.", []),
+    lager:debug("handle_info: heartbeat_change received.", []),
     %% Easy way ...
     deactivate_heartbeat(Ctx),
     activate_heartbeat(Ctx),
@@ -698,12 +697,12 @@ handle_info(heartbeat_change, Ctx) ->
 
 handle_info({'DOWN',_Ref,process,Pid,_Reason}, 
 	    Ctx=#ctx {subscribers = SubList}) ->
-    ?dbg("handle_info: DOWN for subscriber process ~p received, "
+    lager:debug("handle_info: DOWN for subscriber process ~p received, "
 	 "reason ~p", [Pid, _Reason]),
     {noreply, Ctx#ctx {subscribers = lists:keydelete(Pid,1,SubList)}};
 
 handle_info(_Info, Ctx) ->
-    ?dbg(nmt," handle_info: Unknown Info ~p, ignored.\n", [_Info]),
+    lager:debug([nmt]," handle_info: Unknown Info ~p, ignored.\n", [_Info]),
     {noreply, Ctx}.
 
 %%--------------------------------------------------------------------
@@ -720,7 +719,7 @@ handle_info(_Info, Ctx) ->
 		       no_return().
 
 terminate(_Reason, _Ctx) ->
-    ?dbg(node, "terminate: reason ~p, exiting", [_Reason]),
+    lager:debug([nmt], "terminate: reason ~p, exiting", [_Reason]),
     co_mgr:stop(),
     ok.
 
@@ -749,7 +748,7 @@ load_conf(_Ctx=#ctx {nmt_table = NmtTable, conf = Conf}) ->
 	      true ->
 		   co_lib:text_expand(Conf, [])
 	   end,
-    ?dbg("load_conf: load nmt configuration from ~p", [File]),
+    lager:debug("load_conf: load nmt configuration from ~p", [File]),
     case filelib:is_regular(File) of
 	true ->
 	    case file:open(File, [read]) of
@@ -846,15 +845,15 @@ update_slave_mode(Slave, NmtTable) ->
 activate_heartbeat(Ctx=#ctx {node_pid = NodePid}) ->
     case co_api:value(NodePid, {?IX_CONSUMER_HEARTBEAT_TIME, 0}) of
 	{ok, 0} ->
-	    ?dbg("activate_heartbeat: no entries in consumer table.", []),
+	    lager:debug("activate_heartbeat: no entries in consumer table.", []),
 	    ok;
 	{ok, Number} when is_integer(Number) ->
 	    [activate_heartbeat(N, Ctx) || N <- lists:seq(1, Number)];
 	{error, no_such_object} ->
-	    ?dbg("activate_heartbeat: No consumer table.", []),
+	    lager:debug("activate_heartbeat: No consumer table.", []),
 	    ok;
 	{error, Error} ->
-	    ?dbg("activate_heartbeat: Failed reading consumer table, "
+	    lager:debug("activate_heartbeat: Failed reading consumer table, "
 		 "reason ~p.", [Error]),
 	    ?ee("Failed reading heartbeat consumer table, reason ~p, "
 		"no supervision possible.\n", [Error])
@@ -866,7 +865,7 @@ activate_heartbeat(Entry, _Ctx=#ctx {node_pid = NodePid,
     case co_api:data(NodePid, {?IX_CONSUMER_HEARTBEAT_TIME, Entry}) of
 	{ok, Data} when is_binary(Data) ->
 	    <<_Pad:8, NodeId:8, Time:16>> = Data,
-	    ?dbg("activate_heartbeat: hearbeat consumer ~.16#, time ~p.",
+	    lager:debug("activate_heartbeat: hearbeat consumer ~.16#, time ~p.",
 		 [NodeId, Time]),
 	    %% Only short nodeid possible for heartbeat
 	    SlaveId = {nodeid, NodeId}, 
@@ -884,7 +883,7 @@ activate_heartbeat(Entry, _Ctx=#ctx {node_pid = NodePid,
 	    Timer = start_heartbeat_timer(Slave),
 	    ets:insert(NmtTable, Slave#nmt_slave {heartbeat_timer = Timer});
 	Error ->
-	    ?dbg("activate_heartbeat: Failed reading consumer table, "
+	    lager:debug("activate_heartbeat: Failed reading consumer table, "
 		 "reason ~p.", [Error]),
 	    ?ee("Failed reading heartbeat consumer table, subindex ~p, "
 		"reason ~p, no supervision possible.\n", [Entry, Error])
@@ -908,11 +907,11 @@ deactivate_heartbeat(SlaveId, _Ctx=#ctx {nmt_table = NmtTable}) ->
 
 add_slave_(SlaveId = {_Flag, _NodeId}, 
 	  Ctx=#ctx {supervision = Supervision, nmt_table = NmtTable}) ->
-    ?dbg("add_slave: {~p, ~.16#}", [_Flag, _NodeId]),
+    lager:debug("add_slave: {~p, ~.16#}", [_Flag, _NodeId]),
     Slave = #nmt_slave {id = SlaveId},
     NewSlave = case Supervision of
 		   none ->
-		       ?dbg("add_slave: no supervision", []),
+		       lager:debug("add_slave: no supervision", []),
 		       Slave;
 		   node_guard ->
 		       activate_node_guard(Slave, Ctx);
@@ -927,21 +926,21 @@ add_slave_(SlaveId = {_Flag, _NodeId},
     
 
 activate_node_guard(Slave=#nmt_slave {id = SlaveId}, Ctx) ->
-    ?dbg("activate_node_guard: slave ~p.", [SlaveId]),
+    lager:debug("activate_node_guard: slave ~p.", [SlaveId]),
     %% get node guard time and life factor
     {GuardTime, LifeFactor} = slave_guard_time(SlaveId),
     case GuardTime of
 	undefined ->
-	    ?dbg("activate_node_guard: slave not reachable", []),
+	    lager:debug("activate_node_guard: slave not reachable", []),
 	    ?ee("New slave ~p guard time could not be fetched. "
 		"No supervision possible.\n", [SlaveId]),
 	    inform_subscribers({slave_not_supervisable, SlaveId}, Ctx),
 	    Slave#nmt_slave {contact = lost}; %% ???
 	0 -> 
-	    ?dbg("activate_node_guard: guard time = 0, no node guarding", []),
+	    lager:debug("activate_node_guard: guard time = 0, no node guarding", []),
 	    Slave#nmt_slave {contact = ok};
 	_T ->
-	    ?dbg("activate_node_guard: node guarding, ~p * ~p", 
+	    lager:debug("activate_node_guard: node guarding, ~p * ~p", 
 		 [GuardTime, LifeFactor]),
 	    NewSlave = Slave#nmt_slave {guard_time = GuardTime,
 					life_factor = LifeFactor},
@@ -962,19 +961,19 @@ slave_guard_time(SlaveId) ->
 		{ok, LifeFactor} ->
 		    {GuardTime, LifeFactor};
 		{error, _Error} ->
-		    ?dbg("slave_guard_time: fetch life factor failed, "
+		    lager:debug("slave_guard_time: fetch life factor failed, "
 			 "reason ~p", [_Error]),
 		    {undefined, undefined} 
 	    end;
 	_Error ->
-	    ?dbg("slave_guard_time: fetch guard time failed, reason ~p", 
+	    lager:debug("slave_guard_time: fetch guard time failed, reason ~p", 
 		 [_Error]),
 	    {undefined, undefined} 
     end.
 
 remove_slave(Slave=#nmt_slave {id = SlaveId = {_Flag, _NodeId}},
 	     Ctx=#ctx {supervision = Supervision, nmt_table = NmtTable}) ->
-    ?dbg("remove_slave: {~p, ~.16#}", [_Flag, _NodeId]),
+    lager:debug("remove_slave: {~p, ~.16#}", [_Flag, _NodeId]),
     case Supervision of 
 	none ->
 	    ok;
@@ -988,7 +987,7 @@ remove_slave(Slave=#nmt_slave {id = SlaveId = {_Flag, _NodeId}},
 
 deactivate_node_guard(Slave=#nmt_slave {id = _SlaveId}, 
 		      _Ctx=#ctx {nmt_table = NmtTable}) ->
-    ?dbg("deactivate_node_guard: slave ~p.", [_SlaveId]),
+    lager:debug("deactivate_node_guard: slave ~p.", [_SlaveId]),
     cancel_life_timer(Slave),
     cancel_guard_timer(Slave),
     ets:insert(NmtTable, Slave#nmt_slave {guard_timer = undefined, 
@@ -1028,11 +1027,11 @@ inform_subscribers(Msg, _Ctx=#ctx {subscribers = SubList}) ->
 
 handle_bootup(SlaveId = {_Flag, _NodeId}, 
 	      Ctx=#ctx {supervision = none, nmt_table = NmtTable}) ->
-    ?dbg("handle_bootup: node {~p, ~.16#}", [_Flag, _NodeId]),
+    lager:debug("handle_bootup: node {~p, ~.16#}", [_Flag, _NodeId]),
     case ets:lookup(NmtTable, SlaveId) of
 	[] -> 
 	    %% First message
-	    ?dbg("handle_bootup: new node, creating entry", []),
+	    lager:debug("handle_bootup: new node, creating entry", []),
 	    add_slave_(SlaveId, Ctx);
 	[Slave] -> 
 	    %% Slave rebooted
@@ -1045,12 +1044,12 @@ handle_bootup(SlaveId = {_Flag, _NodeId},
 	    
 handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle, 
 		  Ctx=#ctx {supervision = node_guard, nmt_table = NmtTable}) ->
-    ?dbg("handle_node_guard: node {~p, ~.16#}, state ~p, toggle ~p", 
+    lager:debug("handle_node_guard: node {~p, ~.16#}, state ~p, toggle ~p", 
 	 [Flag, NodeId, State, Toggle]),
     case ets:lookup(NmtTable, SlaveId) of
 	[] -> 
 	    %% First message
-	    ?dbg("handle_node_guard: new node, creating entry", []),
+	    lager:debug("handle_node_guard: new node, creating entry", []),
 	    if State =/= ?Initialisation -> %% bootup
 		    ?ee("Slave ~p has unexpected state ~s\n",
 			[SlaveId, co_format:state(State)]),	    
@@ -1068,7 +1067,7 @@ handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle,
 		    %% This can be because it is a node with both
 		    %% short and extended node id and co_nmt only knows
 		    %% about state change of short node id.
-		    ?dbg("handle_node_guard: expected state ~p", 
+		    lager:debug("handle_node_guard: expected state ~p", 
 			 [Slave#nmt_slave.node_state]),
 		    %% Send error ??
 		    ?ew("Node {~p, ~.16#} answered node guard "
@@ -1077,7 +1076,7 @@ handle_node_guard(SlaveId = {Flag, NodeId}, State, Toggle,
 		    node_guard_ok(Slave, Toggle, State, NmtTable);
 
 	       Slave#nmt_slave.toggle =/= Toggle ->
-		    ?dbg("handle_node_guard: expected toggle ~p", 
+		    lager:debug("handle_node_guard: expected toggle ~p", 
 			 [Slave#nmt_slave.toggle]),
 		    %% Send error ??
 		    ?ee("Node {~p, ~.16#} answered node guard "
@@ -1099,10 +1098,10 @@ handle_heartbeat(SlaveId = {Flag, NodeId}, State,
 		  _Ctx=#ctx {supervision = heartbeat, 
 			     heartbeat_table = HbTable,
 			     nmt_table = NmtTable}) ->
-    ?dbg("handle_heart: node {~p, ~.16#}, state ~p", [Flag, NodeId, State]),
+    lager:debug("handle_heart: node {~p, ~.16#}, state ~p", [Flag, NodeId, State]),
     case ets:lookup(HbTable, SlaveId) of
 	[] -> 
-	    ?dbg("handle_heartbeat: not supervised node, ignoring", []),
+	    lager:debug("handle_heartbeat: not supervised node, ignoring", []),
 	    ok;
 	[{SlaveId, Time}] ->
 	    Slave = case ets:lookup(NmtTable, SlaveId) of
@@ -1125,7 +1124,7 @@ handle_heartbeat(SlaveId = {Flag, NodeId}, State,
 		    %% This can be because it is a node with both
 		    %% short and extended node id and co_nmt only knows
 		    %% about state change of short node id.
-		    ?dbg("handle_heartbeat: expected state ~p", 
+		    lager:debug("handle_heartbeat: expected state ~p", 
 			 [Slave#nmt_slave.node_state]),
 		    %% Send error ??
 		    ?ew("Node {~p, ~.16#} got heartbeat "
@@ -1145,9 +1144,9 @@ heartbeat_ok(Slave, State, NmtTable) ->
 					  contact = ok}).
 
 activate_node_guard(Ctx=#ctx {nmt_table = NmtTable}) ->
-    ?dbg("activate_node_guard: ", []),
+    lager:debug("activate_node_guard: ", []),
     ets:foldl(fun(Slave=#nmt_slave {id = _SlaveId},[]) ->
-		      ?dbg("activate_node_guard: slave ~p.", [_SlaveId]),
+		      lager:debug("activate_node_guard: slave ~p.", [_SlaveId]),
 		      activate_node_guard(Slave, Ctx),
 		      []
 	      end, [], NmtTable).
@@ -1196,17 +1195,17 @@ cancel_heartbeat_timer(_Slave=#nmt_slave {heartbeat_timer = Timer}) ->
     erlang:cancel_timer(Timer).
 
 send_nmt(_SlaveId = {xnodeid, _NodeId}, _Cmd) ->
-     ?dbg("send_nmt: can not send ~p to xnodeid slave ~.16#", 
+     lager:debug("send_nmt: can not send ~p to xnodeid slave ~.16#", 
 	  [_Cmd, _NodeId]),
        {error, xnodeid_not_possible};
 send_nmt(_SlaveId = {_Flag, NodeId}, Cmd) ->
-    ?dbg("send_nmt: slave {~p, ~.16#}, ~p", [_Flag, NodeId, Cmd]),
+    lager:debug("send_nmt: slave {~p, ~.16#}, ~p", [_Flag, NodeId, Cmd]),
     can:send(#can_frame { id = ?NMT_ID,
 			  len = 2,
 			  data = <<Cmd:8, NodeId:8>>}).
 
 send_node_guard(_SlaveId = {Flag, NodeId}, NodePid) ->
-    ?dbg("send_node_guard: slave {~p, ~.16#}", [Flag, NodeId]),
+    lager:debug("send_node_guard: slave {~p, ~.16#}", [Flag, NodeId]),
     Id = 
 	if Flag =:= xnodeid ->
 		?COBID_TO_CANID(?XCOB_ID(?NODE_GUARD,NodeId)) 

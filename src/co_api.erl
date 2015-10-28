@@ -29,7 +29,6 @@
 -include_lib("can/include/can.hrl").
 -include("canopen.hrl").
 -include("co_app.hrl").
--include("co_debug.hrl").
 
 %% API
 -export([start_link/2, stop/1]).
@@ -164,7 +163,7 @@
 start_link(S, Opts) ->
     %% Trace output enable/disable
     co_lib:debug(proplists:get_value(debug,Opts,false)), 
-    ?dbg("start_link: Serial = ~.16#, Opts = ~p", [S, Opts]),
+    lager:debug("start_link: Serial = ~.16#, Opts = ~p", [S, Opts]),
 
     F =	case proplists:get_value(linked,Opts,true) of
 	    true -> start_link;
@@ -175,7 +174,7 @@ start_link(S, Opts) ->
     case verify_options(Opts) of
 	ok ->
 	    Name = name(Opts, Serial),
-	    ?dbg("start_link: Starting co_node with function ~p, "
+	    lager:debug("start_link: Starting co_node with function ~p, "
 		 "Name = ~p, Serial = ~.16#", [F, Name, Serial]),
 	    gen_server:F({local, Name}, ?CO_NODE, {Serial,Name,Opts}, []);
 	E ->
@@ -363,12 +362,12 @@ get_option(Identity, Option) ->
 			ok | {error, Reason::string()}.
 
 set_option(Identity, Option, NewValue) ->
-    ?dbg("set_option: Option = ~p, NewValue = ~p",[Option, NewValue]),
+    lager:debug("set_option: Option = ~p, NewValue = ~p",[Option, NewValue]),
     case verify_option(Option, NewValue) of
 	ok ->
 	    gen_server:call(identity_to_pid(Identity), {option, Option, NewValue});	    
 	{error, _Reason} = Error ->
-	    ?dbg("set_option: option rejected, reason = ~p",[_Reason]),
+	    lager:debug("set_option: option rejected, reason = ~p",[_Reason]),
 	    Error
     end.
 
@@ -717,7 +716,7 @@ dam_mpdo_event(Identity, CobId, DestinationNode)
        (is_integer(DestinationNode) andalso DestinationNode) =< 127 ->
     gen_server:cast(identity_to_pid(Identity), {dam_mpdo_event, CobId, DestinationNode});
 dam_mpdo_event(_Identity, _CobId, _DestinationNode) ->
-    ?dbg("dam_mpdo_event: Invalid destination = ~p", [_DestinationNode]),
+    lager:debug("dam_mpdo_event: Invalid destination = ~p", [_DestinationNode]),
     {error, invalid_destination}.
 
 
@@ -1011,7 +1010,7 @@ data(Identity, Ix) when is_integer(Ix) ->
 store(Identity, NodeId = {_TypeOfNid, _Nid}, Ix, Si, 
       TransferMode, Term, default) 
   when ?is_index(Ix), ?is_subind(Si) ->
-    ?dbg({index, {Ix, Si}},
+    lager:debug([{index, {Ix, Si}}],
 	 "store: Identity = ~p, NodeId = {~p, ~.16#}, "
 	 "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p", 
 	 [Identity, _TypeOfNid, _Nid, Ix, Si, TransferMode, Term]),
@@ -1021,7 +1020,7 @@ store(Identity, NodeId = {_TypeOfNid, _Nid}, Ix, Si,
       TransferMode, Term, TimeOut) 
   when ?is_index(Ix), ?is_subind(Si),
        (is_integer(TimeOut) andalso TimeOut > 0) ->
-    ?dbg({index, {Ix, Si}},
+    lager:debug([{index, {Ix, Si}}],
 	 "store: Identity = ~p, NodeId = {~p, ~.16#}, "
 	 "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p, TimeOut = ~p", 
 	 [Identity, _TypeOfNid, _Nid, Ix, Si, TransferMode, Term, TimeOut]),
@@ -1051,7 +1050,7 @@ store(Identity, NodeId = {_TypeOfNid, _Nid}, Ix, Si,
 fetch(Identity, NodeId = {_TypeOfNid, Nid}, Ix, Si, 
       TransferMode, Term, default)
   when is_integer(Nid), ?is_index(Ix), ?is_subind(Si) ->
-    ?dbg({index, {Ix, Si}},
+    lager:debug([{index, {Ix, Si}}],
 	 "fetch: Identity = ~p, NodeId = {~p, ~.16#}, "
 	 "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p", 
 	 [Identity, _TypeOfNid, Nid, Ix, Si, TransferMode, Term]),
@@ -1061,7 +1060,7 @@ fetch(Identity, NodeId = {_TypeOfNid, Nid}, Ix, Si,
       TransferMode, Term, TimeOut)
   when is_integer(Nid), ?is_index(Ix), ?is_subind(Si),
        (is_integer(TimeOut) andalso TimeOut > 0) ->
-    ?dbg({index, {Ix, Si}},
+    lager:debug([{index, {Ix, Si}}],
 	 "fetch: Identity = ~p, NodeId = {~p, ~.16#}, "
 	 "Ix = ~4.16.0B, Si = ~p, Mode = ~p, Term = ~p, TimeOut = ~p", 
 	 [Identity, _TypeOfNid, Nid, Ix, Si, TransferMode, Term, TimeOut]),
@@ -1161,14 +1160,14 @@ dict(Identity) ->
 tpdo_set(Identity, {Ix, Si} = I, Data, Mode) 
   when ?is_index(Ix), ?is_subind(Si), is_binary(Data) andalso
        (Mode == append orelse Mode == overwrite) ->
-    ?dbg({index, {Ix, Si}},
+    lager:debug([{index, {Ix, Si}}],
 	 "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Data = ~p, Mode ~p",
 	 [Identity, Ix, Si, Data, Mode]), 
     Data64 = co_codec:encode_binary(Data, 64),
     gen_server:call(identity_to_pid(Identity), {tpdo_set,I,Data64,Mode});   
 tpdo_set(Identity, {Ix, Si} = I, {Value, Type}, Mode) 
   when ?is_index(Ix), ?is_subind(Si) ->
-    ?dbg({index, {Ix, Si}},
+    lager:debug([{index, {Ix, Si}}],
 	 "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Value = ~p, "
 	 "Type = ~p, Mode ~p", [Identity, Ix, Si, Value, Type, Mode]), 
     try co_codec:encode(Value, Type) of
@@ -1176,7 +1175,7 @@ tpdo_set(Identity, {Ix, Si} = I, {Value, Type}, Mode)
 	    tpdo_set(Identity, I, Data, Mode) 
     catch
 	error:_Reason ->
-	    ?dbg({index, {Ix, Si}},
+	    lager:debug([{index, {Ix, Si}}],
 		 "tpdo_set: encode failed, reason = ~p", [_Reason]), 
 	    {error, badarg}
     end;
@@ -1252,14 +1251,14 @@ notify({nodeid, Nid}, Func, Ix, Si, Data) ->
 		  
 
 notify_from(Identity={xnodeid, XNid}, Func, Ix, Si, Data) when is_atom(Func) ->
-    ?dbg({index, {Ix, Si}},
+    lager:debug([{index, {Ix, Si}}],
 	 "notify_from: NodeId = {xnodeid, ~.16#}, Func = ~p, " ++
 	     "Ix = ~4.16.0B, Si = ~p, Data = ~w", 
 	 [XNid, Func, Ix, Si, Data]),
     notify_from(Identity,?XCOB_ID(co_lib:encode_func(Func), co_lib:add_xflag(XNid)),
 		Ix,Si,Data);
 notify_from(Identity={nodeid, Nid}, Func, Ix, Si, Data) when is_atom(Func)->
-    ?dbg({index, {Ix, Si}},
+    lager:debug([{index, {Ix, Si}}],
 	"notify_from: NodeId = {nodeid, ~.16#}, Func = ~p, "
 	 "Ix = ~4.16.0B, Si = ~p, Data = ~p", 
 	 [Nid, Func, Ix, Si, Data]),

@@ -69,7 +69,7 @@
 %% @end
 %%--------------------------------------------------------------------
 start(App, Index = {_Ix, _Si}, Data)  ->
-    ?dbg({index, Index}, 
+    lager:debug([{index, Index}], 
 	  "start: App = ~p, Index = ~7.16.0#:~w, Data = ~w", 
 	 [App, _Ix, _Si, Data]),
     gen_fsm:start(?MODULE, [App, Index, Data], []).
@@ -90,7 +90,7 @@ start(App, Index = {_Ix, _Si}, Data)  ->
 %%--------------------------------------------------------------------
 init([App, I = {_Ix, _Si}, Data]) ->
     %% co_lib:debug(??),
-    ?dbg({index, I}, 
+    lager:debug([{index, I}], 
 	 "init: App = ~p, Index = ~7.16.0#:~w, Data = ~w", 
 	 [App, _Ix, _Si, Data]),
     LD = #loop_data{ index = I, app = App, data = Data },
@@ -119,7 +119,7 @@ write_begin({Pid, Mod}, {_Ix, _Si} = I) ->
     case Mod:index_specification(Pid, I) of
 	{spec, Spec} ->
 	    if (Spec#index_spec.access band ?ACCESS_WO) =:= ?ACCESS_WO ->
-		    ?dbg({index, I}, 
+		    lager:debug([{index, I}], 
 			 "write_begin: transfer=~p, type = ~p",
 			 [Spec#index_spec.transfer, Spec#index_spec.type]),
 		    co_data_buf:init(write, Pid, Spec);
@@ -178,21 +178,22 @@ start_writing(LD, Reply) ->
 			       {stop, Reason::atom(), NextS::#loop_data{}}.
 
 s_writing_started({Mref, Reply} = _M, LD=#loop_data {index = I})  ->
-    ?dbg({index, I}, "s_writing_started: Got event = ~p", [_M]),
+    lager:debug([{index, I}], "s_writing_started: Got event = ~p", [_M]),
     case {LD#loop_data.mref, Reply} of
 	{Mref, {ok, _Ref, _WriteSze}} ->
 	    erlang:demonitor(Mref, [flush]),
 	    {ok, Buf} = co_data_buf:update(LD#loop_data.buf, Reply),
 	    start_writing(LD#loop_data {buf = Buf}, next_state);
 	_Other ->
-	    ?dbg({index, I}, 
+	    lager:debug([{index, I}], 
 		 "s_writing_started: Got event = ~p, aborting", [_Other]),
 	    demonitor_and_abort(s_writing_started, LD, ?abort_internal_error)
     end;
 s_writing_started(timeout, LD) ->
     demonitor_and_abort(s_writing, LD, ?abort_timed_out);
 s_writing_started(_M, LD=#loop_data {index = I})  ->
-    ?dbg({index, I}, "s_writing_started: Got event = ~p, aborting", [_M]),
+    lager:debug([{index, I}], 
+		"s_writing_started: Got event = ~p, aborting", [_M]),
     demonitor_and_abort(s_writing_started, LD, ?abort_internal_error).
 
 
@@ -218,7 +219,7 @@ s_writing_started(_M, LD=#loop_data {index = I})  ->
 		       {stop, Reason::atom(), NextLD::#loop_data{}}.
 
 s_writing({Mref, Reply} = _M, LD=#loop_data {index = I})  ->
-    ?dbg({index, I}, "s_writing: Got event = ~p", [_M]),
+    lager:debug([{index, I}], "s_writing: Got event = ~p", [_M]),
     case {LD#loop_data.mref, Reply} of
 	{Mref, ok} ->
 	    %% Atomic reply
@@ -238,7 +239,8 @@ s_writing({Mref, Reply} = _M, LD=#loop_data {index = I})  ->
 s_writing(timeout, LD) ->
     demonitor_and_abort(s_writing, LD, ?abort_timed_out);
 s_writing(_M, LD=#loop_data {index = I})  ->
-    ?dbg({index, I}, "s_writing_segment: Got event = ~p, aborting", [_M]),
+    lager:debug([{index, I}], 
+		"s_writing_segment: Got event = ~p, aborting", [_M]),
     demonitor_and_abort(s_writing, LD, ?abort_internal_error).
 
 
@@ -256,7 +258,7 @@ s_writing(_M, LD=#loop_data {index = I})  ->
 %% @end
 %%--------------------------------------------------------------------
 handle_event(Event, State, LD=#loop_data {index = I}) ->
-    ?dbg({index, I}, "handle_event: Got event ~p",[Event]),
+    lager:debug([{index, I}], "handle_event: Got event ~p",[Event]),
     %% FIXME: handle abort here!!!
     apply(?MODULE, State, [Event, LD]).
 
@@ -277,7 +279,7 @@ handle_event(Event, State, LD=#loop_data {index = I}) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_sync_event(_Event, _From, State, LD=#loop_data {index = I}) ->
-    ?dbg({index, I}, "handle_sync_event: Got event ~p",[_Event]),
+    lager:debug([{index, I}], "handle_sync_event: Got event ~p",[_Event]),
     Reply = ok,
     {reply, Reply, State, LD}.
 
@@ -310,7 +312,7 @@ handle_info({_Mref, {ok, Ref}} = Info, State, S)
 handle_info({'DOWN',_Ref,process,_Pid,_Reason}, State, S) ->
     demonitor_and_abort(State, S, ?abort_internal_error);
 handle_info(Info, State, S=#loop_data {index = I}) ->
-    ?dbg({index, I}, "handle_info: Got info ~p",[Info]),
+    lager:debug([{index, I}], "handle_info: Got info ~p",[Info]),
     %% "Converting" info to event
     apply(?MODULE, State, [Info, S]).
 
@@ -351,7 +353,8 @@ demonitor_and_abort(_State, LD=#loop_data {index = I}, _Reason) ->
 	_NoRef ->
 	    do_nothing
     end,
-    ?dbg({index, I}, "Aborting in state = ~p, reason = ~p", [_State, _Reason]),
+    lager:debug([{index, I}], 
+		"Aborting in state = ~p, reason = ~p", [_State, _Reason]),
     {stop, normal, LD}.
     
 

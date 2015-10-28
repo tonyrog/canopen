@@ -30,8 +30,4 @@
 -define(dbg(Format, Args),
  	lager:debug(Format, Args)).
 
-
--define(dbg(Tag, Format, Args),
- 	lager:debug([Tag], Format,[Args])).
-
 -endif.

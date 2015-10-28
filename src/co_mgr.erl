@@ -29,7 +29,6 @@
 
 -include("canopen.hrl").
 -include("sdo.hrl").
--include("co_debug.hrl").
 
 %% regular api
 -export([start/0, start/1, stop/0]).
@@ -108,7 +107,7 @@ start() ->
 
 start(Options) ->
     co_lib:debug(proplists:get_value(debug,Options,false)), 
-    ?dbg("start: Opts = ~p", [Options]),
+    lager:debug("start: Opts = ~p", [Options]),
 
     F =	case proplists:get_value(linked,Options,true) of
 	    true -> start_link;
@@ -124,7 +123,7 @@ start(Options) ->
 	MPid when is_pid(MPid) ->
 	    ok;
 	undefined ->
-	    ?dbg("Starting co_mgr with function = ~p", [F]),
+	    lager:debug("Starting co_mgr with function = ~p", [F]),
 	    {ok, _NewMPid} = 
 		gen_server:F({local, ?CO_MGR}, ?MODULE, Options, [])
     end.
@@ -445,7 +444,7 @@ store(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode, Source)
 
 client_require(Mod) 
   when is_atom(Mod) ->
-    ?dbg("client_require: module ~p", [Mod]),
+    lager:debug("client_require: module ~p", [Mod]),
     gen_server:call(?CO_MGR, {require, Mod}).
 
 
@@ -672,7 +671,7 @@ init(Opts) ->
 	NPid when is_pid(NPid) ->
 	    ok;
 	{error, not_found} ->
-	    ?dbg("init: starting co_node with serial = 0", []),
+	    lager:debug("init: starting co_node with serial = 0", []),
 	    {ok, _NewNPid}  = co_api:start_link(?MGR_NODE,  
 						 [{nodeid, 0}] ++ Opts)
     end,
@@ -710,7 +709,7 @@ init(Opts) ->
 			 {stop, Reason::term(), Reply::term(), Mgr::#mgr{}}.
 
 handle_call({set_nid,Nid}, _From, Mgr) ->
-    ?dbg("handle_call: set_nid ~p", [Nid]),
+    lager:debug("handle_call: set_nid ~p", [Nid]),
     {reply, ok, Mgr#mgr { def_nid = Nid }};
 
 handle_call({set_mode,Mode}, _From, Mgr) ->
@@ -759,7 +758,7 @@ handle_call(stop, _From, Mgr) ->
     {stop, normal, ok, Mgr};
 
 handle_call(_Request, _From, Mgr) ->
-    ?dbg("handle_call: Unknown request ~p", [ _Request]),
+    lager:debug("handle_call: Unknown request ~p", [ _Request]),
     {reply, {error,bad_call}, Mgr}.
 
 %%--------------------------------------------------------------------
@@ -786,7 +785,7 @@ handle_cast({notify, Func, Index, SubInd, Value}, Mgr=#mgr {def_nid = DefNid})
     do_notify(DefNid, Func, Index, SubInd, Value, Mgr);
 
 handle_cast(_Msg, Mgr) ->
-    ?dbg("handle_cast: Unknown msg ~p", [_Msg]),
+    lager:debug("handle_cast: Unknown msg ~p", [_Msg]),
     {noreply, Mgr}.
 
 
@@ -805,7 +804,7 @@ handle_cast(_Msg, Mgr) ->
 			 {noreply, Mgr::#mgr{}}.
 
 handle_info({'EXIT', Pid, Reason}, Mgr=#mgr {pids = PList}) ->
-    ?dbg("handle_info: EXIT for process ~p received, reason ~p", 
+    lager:debug("handle_info: EXIT for process ~p received, reason ~p", 
 	 [Pid, Reason]),
     case lists:member(Pid, PList) of
 	true -> 
@@ -821,7 +820,7 @@ handle_info({'EXIT', Pid, Reason}, Mgr=#mgr {pids = PList}) ->
     end;
 
 handle_info(_Info, Mgr) ->
-    ?dbg("handle_info: Unknown info ~p", [_Info]),
+    lager:debug("handle_info: Unknown info ~p", [_Info]),
     {noreply, Mgr}.
 
 %%--------------------------------------------------------------------
@@ -831,10 +830,10 @@ handle_info(_Info, Mgr) ->
 		       no_return().
 
 terminate(_Reason, _Mgr) ->
-   ?dbg("terminate: reason ~p", [_Reason]),
+   lager:debug("terminate: reason ~p", [_Reason]),
     case co_proc:lookup(?MGR_NODE) of
 	Pid when is_pid(Pid) ->
-	    ?dbg("terminate: Stopping co_node 0", []),
+	    lager:debug("terminate: Stopping co_node 0", []),
 	    co_api:stop(?MGR_NODE);
 	{error, _E} ->
 	    do_nothing
@@ -853,7 +852,7 @@ terminate(_Reason, _Mgr) ->
 			 {ok, NewMgr::#mgr{}}.
 
 code_change(_OldVsn, Mgr, _Extra) ->
-    ?dbg("code_change: Old version ~p", [_OldVsn]),
+    lager:debug("code_change: Old version ~p", [_OldVsn]),
     {ok, Mgr}.
 
 
@@ -861,23 +860,23 @@ code_change(_OldVsn, Mgr, _Extra) ->
 %%% Internal functions
 %%--------------------------------------------------------------------
 load_ctx(Mod, Mgr) ->
-    ?dbg("load_ctx: Loading ~p", [Mod]),
+    lager:debug("load_ctx: Loading ~p", [Mod]),
     case lists:keyfind(Mod, 1, Mgr#mgr.ctx_list) of
 	false ->
 	    try co_lib:load_definition(Mod) of
 		{ok, DCtx} ->
-		    ?dbg("load_ctx: Loaded ~p", [Mod]),
+		    lager:debug("load_ctx: Loaded ~p", [Mod]),
 		    List = [{Mod,DCtx}|Mgr#mgr.ctx_list],
 		    {ok, DCtx, Mgr#mgr { ctx=DCtx, ctx_list = List }};
 		{Error, _} ->
-		    ?dbg("load_ctx: failed loading ~p", [Mod]),
+		    lager:debug("load_ctx: failed loading ~p", [Mod]),
 		    {Error, [], Mgr}
 	    catch
 		error:Reason ->
 		    {{error,Reason}, [], Mgr}
 	    end;
 	{Mod, DCtx} ->
-	    ?dbg("load_ctx: ~p already loaded", [Mod]),
+	    lager:debug("load_ctx: ~p already loaded", [Mod]),
 	    {ok, DCtx, Mgr#mgr { ctx = DCtx }}
     end.
     
@@ -886,7 +885,7 @@ do_store(Nid,Index,SubInd,Value,Client,
     Ctx = context(Nid, Mgr),
     case translate_index(Ctx,Index,SubInd,Value) of
 	{ok, {Ti, Tsi, Tv} = _T} ->
-	    ?dbg({index, {Ti, Tsi}},"do_store: translated  ~p", [_T]),
+	    lager:debug([{index, {Ti, Tsi}}],"do_store: translated  ~p", [_T]),
 	    Pid = 
 		spawn_request(store, 
 			      [Nid, Ti, Tsi, TransMode, Tv],
@@ -895,7 +894,7 @@ do_store(Nid,Index,SubInd,Value,Client,
 			      Dbg),
 	    {noreply, Mgr#mgr { pids = [Pid | PList] }};
 	Error ->
-	    ?dbg(mgr,"do_store: translation failed, error: ~p\n", [Error]),
+	    lager:debug([mgr],"do_store: translation failed, error: ~p\n", [Error]),
 	    {reply, Error, Mgr}
     end.
   
@@ -903,10 +902,10 @@ do_store(Nid,Index,SubInd,Value,Client,
 do_fetch(Nid,Index,SubInd, Client, 
        Mgr=#mgr {pids = PList, def_trans_mode = TransMode, debug = Dbg}) ->
     Ctx = context(Nid, Mgr),
-    ?dbg("do_fetch: translate ~p:~p", [Index, SubInd]),
+    lager:debug("do_fetch: translate ~p:~p", [Index, SubInd]),
     case translate_index(Ctx,Index,SubInd,no_value) of
 	{ok, {Ti, Tsi, Tv} = _T} ->
-	    ?dbg({index, {Ti, Tsi}},"do_fetch: translated  ~p", [_T]),
+	    lager:debug([{index, {Ti, Tsi}}],"do_fetch: translated  ~p", [_T]),
 	    Pid = 
 		spawn_request(fetch, 
 			      [Nid, Ti, Tsi, TransMode, Tv],
@@ -915,73 +914,73 @@ do_fetch(Nid,Index,SubInd, Client,
 			      Dbg),
 	    {noreply,  Mgr#mgr { pids = [Pid | PList] }};
 	Error ->
-	    ?dbg(mgr,"do_fetch: translation failed, error: ~p\n", [Error]),
+	    lager:debug([mgr],"do_fetch: translation failed, error: ~p\n", [Error]),
 	    {reply, Error, Mgr}
     end.
 
 do_translate(Nid,Index,SubInd, Mgr) ->
     Ctx = context(Nid, Mgr),
-    ?dbg("do_translate: translate ~p:~p", [Index, SubInd]),
+    lager:debug("do_translate: translate ~p:~p", [Index, SubInd]),
     case translate_index(Ctx,Index,SubInd,no_value) of
 	{ok,{Ti,Tsi,_Tv} = _T} ->
-	    ?dbg({index, {Ti, Tsi}},"do_translate: translated  ~p", [_T]),
+	    lager:debug([{index, {Ti, Tsi}}],"do_translate: translated  ~p", [_T]),
 	    {reply, {Ti,Tsi}, Mgr};
 	Error ->
-	    ?dbg( "do_translate: translation failed, error: ~p\n", [Error]),
+	    lager:debug( "do_translate: translation failed, error: ~p\n", [Error]),
 	    {reply, Error, Mgr}
     end.
 
 spawn_request(F, Args, Client, Request, Dbg) ->
     Pid = proc_lib:spawn_link(?MODULE, execute_request, 
 			      [F, Args, Client, Request, Dbg]),
-    ?dbg("spawn_request: spawned  ~p", [Pid]),
+    lager:debug("spawn_request: spawned  ~p", [Pid]),
     Pid.
 
 %% @private
 execute_request(F, Args, Client, Request, Dbg) ->
     co_lib:debug(Dbg),
-    ?dbg("execute_request: F = ~p Args = ~w)", [F, Args]),
+    lager:debug("execute_request: F = ~p Args = ~w)", [F, Args]),
     Reply = apply(?MODULE,F,Args),
-    ?dbg("execute_request: reply  ~p", [Reply]),
+    lager:debug("execute_request: reply  ~p", [Reply]),
     handle_reply(Reply, Client, Request).
 
 handle_reply({ok, Value}, Client, 
 	     {fetch, _Nid, _Index, _SubInd, {value, Type}, Ctx}) ->
     Reply = format_value(Value, co_lib:decode_type(Type), Ctx),
-    ?dbg("handle_reply: Format ~p, type ~p => ~p", [Value, Type, Reply]),
+    lager:debug("handle_reply: Format ~p, type ~p => ~p", [Value, Type, Reply]),
     gen_server:reply(Client, Reply);
 handle_reply({ok, Data}, Client, 
 	     {fetch, _Nid, _Index, _SubInd, data, _Ctx}) ->
-    ?dbg("handle_reply: Formatting ~p, not possible", [Data]),
+    lager:debug("handle_reply: Formatting ~p, not possible", [Data]),
     gen_server:reply(Client, Data);
 handle_reply({error, ECode}, Client, _Request) ->
     gen_server:reply(Client, {error, co_sdo:decode_abort_code(ECode)});
 handle_reply(ok, Client, _Request) -> 
-    ?dbg("handle_reply: ok", []),
+    lager:debug("handle_reply: ok", []),
     gen_server:reply(Client, ok);
 handle_reply(Other, Client, _Request) -> %% ok ???
-    ?dbg("handle_reply: Other ~p", [Other]),
+    lager:debug("handle_reply: Other ~p", [Other]),
     gen_server:reply(Client, Other).
 
 do_notify(Nid, Func,Index,SubInd, Value, Mgr) ->
     Ctx = context(Nid, Mgr),
     case translate_index(Ctx,Index,SubInd,Value) of
 	{ok,{Ti,Tsi,{value, Tv, Type}} = _T} ->
-	    ?dbg({index, {Ti, Tsi}},"do_notify: translated  ~p", [_T]),
+	    lager:debug([{index, {Ti, Tsi}}],"do_notify: translated  ~p", [_T]),
 	    try co_codec:encode(Tv, {Type, 32}) of
 		Data ->
-		    ?dbg({index, {Ti, Tsi}},
+		    lager:debug([{index, {Ti, Tsi}}],
 			 "do_notify: ~w ~w ~.16.0#:~w ~w\n", 
 			 [Nid,Func,Ti,Tsi,Data]),
 		    co_api:notify_from(Nid,Func,Ti,Tsi,Data)
 	    catch error:_Reason ->
-		    ?dbg({index, {Ti, Tsi}},
+		    lager:debug([{index, {Ti, Tsi}}],
 			 "do_notify: encode failed ~w ~w ~.16.0#~w ~w, "
 			 "reason ~p\n", 
 			 [Nid, Func, Index, SubInd, Value, _Reason])
 	    end;
 	_Error ->
-	    ?dbg("do_notify: translation failed, error: ~p\n", [_Error]),
+	    lager:debug("do_notify: translation failed, error: ~p\n", [_Error]),
 	    error
     end,
     {noreply, Mgr}.
@@ -1001,13 +1000,13 @@ translate_index(Ctx,Index,SubInd,Value)
   when is_atom(Index);
        is_list(Index) ->
     Res = co_lib:object(Index, Ctx),
-    ?dbg("translate_index: found ~p\n", [Res]),
+    lager:debug("translate_index: found ~p\n", [Res]),
     translate_index1(Ctx, Res, Index, SubInd, Value);
 translate_index(_Ctx,_Index,_Subind,_Value) ->
     {error,argument}.
 
 translate_index1(_Ctx, {error, _Error} = _E ,_Index,_SubInd,_Value) ->
-    ?dbg("translate_index1: not found ~p\n", [_E]),
+    lager:debug("translate_index1: not found ~p\n", [_E]),
     {error, argument};
 translate_index1(Ctx, Obj,_Index,SubInd,Value) 
   when ?is_subind(SubInd);
@@ -1015,32 +1014,32 @@ translate_index1(Ctx, Obj,_Index,SubInd,Value)
        is_atom(SubInd) ->
     Ti = Obj#objdef.index,
     Res = co_lib:entry(SubInd, Obj, Ctx), 
-    ?dbg("translate_index1: found ~p\n", [Res]),
+    lager:debug("translate_index1: found ~p\n", [Res]),
     translate_index2(Ctx, Res, Ti, SubInd, Value).
 
 translate_index2(_Ctx, {error, _Error} = _E, Index, SubInd, no_value) ->
-    ?dbg("translate_index2: not found ~p\n", [_E]),
+    lager:debug("translate_index2: not found ~p\n", [_E]),
     %% For fetch 
     {ok, {Index, SubInd, data}};
 translate_index2(_Ctx, {error, _Error} = _E, _Index, _SubInd, _Value) ->
-    ?dbg("translate_index2: not found ~p\n", [_E]),
+    lager:debug("translate_index2: not found ~p\n", [_E]),
     {error,argument};
 translate_index2(Ctx, E=#entdef {index = S}, Index, SubInd, Value) 
   when ?is_subind(SubInd) andalso not is_integer(S) ->
-    ?dbg("translate_index2: found entry with index as range use "
+    lager:debug("translate_index2: found entry with index as range use "
 	 "original sub_index",[]),
     translate_index2(Ctx, E#entdef {index = SubInd}, Index, SubInd, Value);
 translate_index2(_Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, 
 		 no_value) ->
-    ?dbg("translate_index2: for fetch, found entry, type ~p ",[Type]),
+    lager:debug("translate_index2: for fetch, found entry, type ~p ",[Type]),
     {ok,{Index,SubInd,{value, co_lib:encode_type(Type)}}};
 translate_index2(Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, 
 		 Value) ->
-    ?dbg("translate_index2: found entry, type ~p, value ~p ",
+    lager:debug("translate_index2: found entry, type ~p, value ~p ",
 	 [Type, Value]),
     case translate_value(Type, Value, Ctx) of
 	{ok,TValue} ->
-	    ?dbg("translate_index2: translated value ~p ", [TValue]),
+	    lager:debug("translate_index2: translated value ~p ", [TValue]),
 	    {ok,{Index,SubInd,{value, TValue, co_lib:encode_type(Type)}}};
 	error ->
 	    {error,argument}
@@ -1099,24 +1098,24 @@ translate_value(_, _, _) ->
 context(Nid, Mgr) ->
     case lists:keysearch(Nid, #node.nid, Mgr#mgr.nodes) of
 	false ->
-	    ?dbg("context: Node ~p not found", [Nid]),
+	    lager:debug("context: Node ~p not found", [Nid]),
 	    Mgr#mgr.ctx;  %% use current context
 	{value,N} ->
 	    Mod = N#node.product,
-	    ?dbg("context: Node ~p is ~p", [Nid, Mod]),
+	    lager:debug("context: Node ~p is ~p", [Nid, Mod]),
 	    case lists:keysearch(Mod, #node.nid, Mgr#mgr.ctx_list) of
 		false ->
-		    ?dbg("context: Module ~p not found", [Mod]),
+		    lager:debug("context: Module ~p not found", [Mod]),
 		    Mgr#mgr.ctx;  %% use current context
 		{value,{_,MCtx}} ->
-		    ?dbg("context: Module ~p found", [Mod]),
+		    lager:debug("context: Module ~p found", [Mod]),
 		    MCtx
 	    end
     end.
 
 
 format_value(Value, Type, _DCtx) ->
-   ?dbg("format_value: Formatting ~p, type ~p", [Value, Type]),
+   lager:debug("format_value: Formatting ~p, type ~p", [Value, Type]),
     case Type of
 	boolean    -> ite(Value==0, "false", "true");
 	unsigned8  -> unsigned(Value,16#ff);

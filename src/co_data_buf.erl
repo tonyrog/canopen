@@ -29,7 +29,6 @@
 
 -include("canopen.hrl").
 -include("co_app.hrl").
--include("co_debug.hrl").
 
 %% API
 -export([init/3, init/4, init/5,
@@ -132,7 +131,7 @@ init(Access, Pid, E, BSize) ->
 		  {error, Error::atom()}.
 
 init(Access, Pid, E, BSize, LLevel) ->
-    ?dbg("init: e = ~w,\n access = ~p, blocksize = ~p, load_level ~p",
+    lager:debug("init: e = ~w,\n access = ~p, blocksize = ~p, load_level ~p",
 	 [E, Access, BSize, LLevel]),
     init_i(Access, Pid, E, BSize, LLevel).
 
@@ -154,7 +153,7 @@ init_i(read, Pid,
 				     timeout = Tout})
     catch
 	error:_Reason ->
-	    ?dbg({index, I}, "init: encode of = ~p, ~p failed, Reason = ~p", 
+	    lager:debug([{index, I}], "init: encode of = ~p, ~p failed, Reason = ~p", 
 		 [Value,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
@@ -180,7 +179,7 @@ init_i(read, Pid,
 				     timeout = Tout})
     catch
 	error:_Reason ->
-	    ?dbg({index, I}, "init: encode of = ~p, ~p failed, Reason = ~p", 
+	    lager:debug([{index, I}], "init: encode of = ~p, ~p failed, Reason = ~p", 
 		 [Value,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
@@ -252,7 +251,7 @@ init_i(Access, Pid, {Data, I}, BSize, LLevel) when is_binary(Data) ->
 						 {error, Error::atom()}. 
 
 open(Access, Buf=#co_data_buf {pid = _Pid, i = _I, mode = _M})  ->
-    ?dbg({index, _I}, "open: access = ~p, pid = ~p, i = ~p, mode = ~w", 
+    lager:debug([{index, _I}], "open: access = ~p, pid = ~p, i = ~p, mode = ~w", 
 	 [Access, _Pid, _I, _M]),
     open_i(Access, Buf).
 
@@ -274,7 +273,7 @@ open_i(read, Buf=#co_data_buf {pid = Pid, i = I, type = Type,
 					  eof = true}}
 	    catch
 		error:_Reason ->
-		    ?dbg({index, I}, 
+		    lager:debug([{index, I}], 
 			 "open: encode of = ~p, ~p failed, Reason = ~p", 
 			 [Value,  Type, _Reason]),
 		    {error, ?abort_value_range_error}
@@ -326,12 +325,12 @@ open_i(write, Buf) ->
 				   {error, Error::atom()}.
 		  
 load(Buf=#co_data_buf {i = _I})  ->
-    ?dbg({index, _I}, "load: available data = ~w, load_level = ~p", 
+    lager:debug([{index, _I}], "load: available data = ~w, load_level = ~p", 
 	 [size(Buf#co_data_buf.data),  Buf#co_data_buf.load_level]),
     if size(Buf#co_data_buf.data) =< Buf#co_data_buf.load_level andalso
        Buf#co_data_buf.eof =/= true ->
 	    %% Time to fech more data
-	    ?dbg({index, _I}, "load: loading",[]), 
+	    lager:debug([{index, _I}], "load: loading",[]), 
 	    read_app_call(Buf);
        true ->
 	    {ok, Buf}
@@ -351,18 +350,18 @@ load(Buf=#co_data_buf {i = _I})  ->
 		  {error, Error::atom()}.
 
 read(Buf=#co_data_buf {i = _I}, Bytes) ->
-    ?dbg({index, _I}, "read: Bytes = ~p", [Bytes]),
+    lager:debug([{index, _I}], "read: Bytes = ~p", [Bytes]),
     if Bytes =< size(Buf#co_data_buf.data) ->
 	    %% Enough data is available
 	    <<Data:Bytes/binary, NewData/binary>> = Buf#co_data_buf.data,
-	    ?dbg({index, _I}, "read: Data = ~w", [Data]),
+	    lager:debug([{index, _I}], "read: Data = ~w", [Data]),
 	    {ok, Data, Buf#co_data_buf.eof andalso (size(NewData) =:= 0),
 	     Buf#co_data_buf {data = NewData, size = size(NewData)}};
        true ->
 	    %% More data is asked for
 	    if Buf#co_data_buf.eof =:= true ->
 		    %% No more data to fetch
-		    ?dbg({index, _I}, "read: Data = ~w, Eod = true", 
+		    lager:debug([{index, _I}], "read: Data = ~w, Eod = true", 
 			 [Buf#co_data_buf.data]),
 		    {ok, Buf#co_data_buf.data, true, 
 		     Buf#co_data_buf {data = (<<>>), size = 0}};
@@ -409,18 +408,18 @@ read_app_call(_Buf) ->
 write(Buf=#co_data_buf {mode = atomic, pid = Pid, type = Type, data = OldData, 
 		     tmp = TmpData, i = I}, 
       Data, true, segment) ->
-    ?dbg({index, I}, 
+    lager:debug([{index, I}], 
 	 "write: mode = atomic, Data = ~w, Eod = ~p", [Data, true]),
     %% All data received, time to transfer to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     try co_codec:decode(DataToSend, Type) of
 	{Value, _} ->
-	    ?dbg({index, I}, "write: set Value = ~p", [Value]),
+	    lager:debug([{index, I}], "write: set Value = ~p", [Value]),
 	    app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true},
 		     Pid, {set, I, Value})
     catch
 	error:_Reason ->
-	    ?dbg({index, I}, "write: decode of = ~p, ~p failed, Reason = ~p", 
+	    lager:debug([{index, I}], "write: decode of = ~p, ~p failed, Reason = ~p", 
 		 [DataToSend,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
@@ -428,19 +427,19 @@ write(Buf=#co_data_buf {mode = atomic, pid = Pid, type = Type, data = OldData,
 write(Buf=#co_data_buf {mode = atomic = _Mode, pid = Pid, type = Type, 
 			data = Data, tmp = TmpData, i = I}, 
       N, true, block) ->
-    ?dbg({index, I}, "write: mode = ~w, N = ~p, Eod = ~p", [_Mode, N, true]),
+    lager:debug([{index, I}], "write: mode = ~w, N = ~p, Eod = ~p", [_Mode, N, true]),
     %% All data received, time to transfer to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<Data/binary, DataToAdd/binary>>,
     try co_codec:decode(DataToSend, Type) of
 	{Value, _} ->
-	    ?dbg({index, I}, "write: set  Value = ~p", [Value]),
+	    lager:debug([{index, I}], "write: set  Value = ~p", [Value]),
 	    app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true},
 		     Pid, {set, I, Value})
    catch
 	error:_Reason ->
-	    ?dbg({index, I}, "write: decode of = ~p, ~p failed, Reason = ~p", 
+	    lager:debug([{index, I}], "write: decode of = ~p, ~p failed, Reason = ~p", 
 		 [DataToSend,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
@@ -448,12 +447,12 @@ write(Buf=#co_data_buf {mode = atomic = _Mode, pid = Pid, type = Type,
 write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type, 
 		     data = OldData, tmp = TmpData, i = I}, 
       Data, true, segment) ->
-    ?dbg({index, I}, "write: mode = ~w, Data = ~w, Eod = ~p", 
+    lager:debug([{index, I}], "write: mode = ~w, Data = ~w, Eod = ~p", 
 	 [_Mode, Data, true]),
     %% All data received, time to transfer to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     {Value, _} = co_codec:decode(DataToSend, Type),
-    ?dbg({index, I}, "write: set Value = ~p", [Value]),
+    lager:debug([{index, I}], "write: set Value = ~p", [Value]),
     case Module:set(Pid, I, Value) of
 	ok ->
 	    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
@@ -463,14 +462,14 @@ write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type,
 write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type, 
 		     data = Data, tmp = TmpData, i = I}, 
       N, true, block) ->
-    ?dbg({index, I}, "write: mode = ~w, N = ~p, Eod = ~p", [_Mode, N, true]),
+    lager:debug([{index, I}], "write: mode = ~w, N = ~p, Eod = ~p", [_Mode, N, true]),
     %% All data received, time to transfer to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<Data/binary, DataToAdd/binary>>,
     try co_codec:decode(DataToSend, Type) of
 	{Value, _} ->
-	    ?dbg({index, I}, "write: set  Value = ~p", [Value]),
+	    lager:debug([{index, I}], "write: set  Value = ~p", [Value]),
 	    case Module:set(Pid, I, Value) of
 		ok ->
 		    {ok, Buf#co_data_buf {data = (<<>>), 
@@ -481,7 +480,7 @@ write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type,
 	    end
    catch
 	error:_Reason ->
-	    ?dbg({index, I}, "write: decode of = ~p, ~p failed, Reason = ~p", 
+	    lager:debug([{index, I}], "write: decode of = ~p, ~p failed, Reason = ~p", 
 		 [DataToSend,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
@@ -490,32 +489,32 @@ write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type,
 write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = OldData, 
 			ref = Ref, tmp = TmpData, i = I}, 
       Data, true, segment) ->
-    ?dbg({index, I}, "write: mode = ~p,  Data = ~p, Eod = ~p", 
+    lager:debug([{index, I}], "write: mode = ~p,  Data = ~p, Eod = ~p", 
 	 [_Mode, Data, true]),
     %% All data received, time to transfer rest to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
-    ?dbg({index, I}, "write: send Data = ~p", [DataToSend]),
+    lager:debug([{index, I}], "write: send Data = ~p", [DataToSend]),
     app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}, Pid, 
 	     {write, Ref, DataToSend, true});
 write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = Data, 
 			ref = Ref, tmp = TmpData, i = I}, 
       N, true, block) ->
-    ?dbg({index, I}, "write: mode = ~w,  N = ~p, Eod = ~p", [_Mode, N, true]),
+    lager:debug([{index, I}], "write: mode = ~w,  N = ~p, Eod = ~p", [_Mode, N, true]),
     %% All data received, time to transfer rest to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<Data/binary, DataToAdd/binary>>,
-    ?dbg({index, I}, "write: send Data = ~w", [DataToSend]),
+    lager:debug([{index, I}], "write: send Data = ~w", [DataToSend]),
     app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}, Pid, 
 	     {write, Ref, DataToSend, true});
 write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, 
 			data = OldData,  ref = Ref, tmp = TmpData, i = I}, 
       Data, true, segment) ->
-    ?dbg({index, I}, "write: mode = ~w,  Data = ~w, Eod = ~p", 
+    lager:debug([{index, I}], "write: mode = ~w,  Data = ~w, Eod = ~p", 
 	 [_Mode, Data, true]),
     %% All data received, time to transfer rest to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
-    ?dbg({index, I}, "write: send Data = ~w", [DataToSend]),
+    lager:debug([{index, I}], "write: send Data = ~w", [DataToSend]),
     case Module:write(Pid, Ref, DataToSend, true) of
 	{ok ,Ref} ->
 	    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
@@ -525,13 +524,13 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid,
 write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid, 
 			data = Data, ref = Ref, tmp = TmpData, i = I}, 
       N, true, block) ->
-    ?dbg({index, I}, "write: mode = ~w,  N = ~p, TmpData = ~w, Eod = ~p", 
+    lager:debug([{index, I}], "write: mode = ~w,  N = ~p, TmpData = ~w, Eod = ~p", 
 	 [_Mode, N, TmpData, true]),
     %% All data received, time to transfer rest to app
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<Data/binary, DataToAdd/binary>>,
-    ?dbg({index, I}, "write: send Data = ~w", [DataToSend]),
+    lager:debug([{index, I}], "write: send Data = ~w", [DataToSend]),
     case Module:write(Pid, Ref, DataToSend, true) of
 	{ok ,Ref} ->
 	    {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
@@ -542,7 +541,7 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid,
 write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, data = OldData, 
 		     i = {Index, SubInd} = I, tmp = TmpData}, 
       Data, true, segment) -> 
-    ?dbg({index, I}, "write: mode = ~w, Data = ~w, Eod = ~p", 
+    lager:debug([{index, I}], "write: mode = ~w, Data = ~w, Eod = ~p", 
 	 [_Mode, Data, true]),
     DataToSave = <<OldData/binary, TmpData/binary, Data/binary>>,
     co_dict:direct_set_data(Dict, Index, SubInd, DataToSave),
@@ -551,7 +550,7 @@ write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, data = OldData,
 write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, data = OldData, 
 			i = {Index, SubInd} = I, tmp = TmpData}, 
       N, true, block) -> 
-    ?dbg({index, I}, "write: mode = ~w, N = ~p, TmpData = ~w, Eod = ~p", 
+    lager:debug([{index, I}], "write: mode = ~w, N = ~p, TmpData = ~w, Eod = ~p", 
 	 [_Mode, N, TmpData, true]),
     Size = size(TmpData) - N,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
@@ -562,10 +561,10 @@ write(Buf=#co_data_buf {mode = {dict, Dict} = _Mode, data = OldData,
 write(Buf=#co_data_buf {mode = {data, Client} = _Mode, data = OldData, 
 			i = {_Index, _SubInd} = I, tmp = TmpData}, 
       Data, true, segment) -> 
-    ?dbg({index, I}, "write: mode = ~w, Data = ~w, Eod = ~p", 
+    lager:debug([{index, I}], "write: mode = ~w, Data = ~w, Eod = ~p", 
 	 [_Mode, Data, true]),
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
-    ?dbg({index, I}, "write: reply to ~w I = ~.16B:~.8B, Data = ~p", 
+    lager:debug([{index, I}], "write: reply to ~w I = ~.16B:~.8B, Data = ~p", 
 	 [Client, _Index, _SubInd, DataToSend]),
     gen_server:reply(Client, {ok, DataToSend}),
     {ok, Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true}};
@@ -575,14 +574,14 @@ write(Buf=#co_data_buf {mode = {data, Client} = _Mode, data = OldData,
 write(Buf=#co_data_buf {mode = streamed = _Mode, pid = Pid, data = OldData, 
 			write_size = WSize, ref = Ref, tmp = TmpData, i = I}, 
       Data, false, _DownloadMode) ->
-    ?dbg({index, I}, "write: mode = ~w, Data = ~w, Eod = ~p", 
+    lager:debug([{index, I}], "write: mode = ~w, Data = ~w, Eod = ~p", 
 	 [_Mode, Data, false]),
     %% Not the last data, store it
     NewData = <<OldData/binary, TmpData/binary>>,
     if size(NewData) >= WSize ->
 	    %% Time to send to app
 	    <<TransferData:WSize/binary, RestData/binary>> = NewData,
-	    ?dbg({index, I}, "write: send Data = ~w", [TransferData]),
+	    lager:debug([{index, I}], "write: send Data = ~w", [TransferData]),
 	    app_call(Buf#co_data_buf {data = RestData, tmp = Data}, Pid, 
 		     {write, Ref, TransferData, false});
        true ->
@@ -592,14 +591,14 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid,
 			data = OldData,  write_size = WSize, ref = Ref, 
 			tmp = TmpData, i = I}, 
       Data, false, _DownloadMode) ->
-    ?dbg({index, I}, "write: mode = ~w, Data = ~w, Eod = ~p", 
+    lager:debug([{index, I}], "write: mode = ~w, Data = ~w, Eod = ~p", 
 	 [_Mode, Data, false]),
     %% Not the last data, store it
     NewData = <<OldData/binary, TmpData/binary>>,
     if size(NewData) >= WSize ->
 	    %% Time to send to app
 	    <<TransferData:WSize/binary, RestData/binary>> = NewData,
-	    ?dbg({index, I}, "write: send Data = ~w", [TransferData]),
+	    lager:debug([{index, I}], "write: send Data = ~w", [TransferData]),
 	    case Module:write(Pid, Ref, TransferData, false) of
 		{ok, Ref} ->
 		    {ok, Buf#co_data_buf {data = RestData, tmp = Data}};
@@ -612,7 +611,7 @@ write(Buf=#co_data_buf {mode = {streamed, Module} = _Mode, pid = Pid,
 %% Transfer =/= streamed => check size limit and store if OK
 write(Buf=#co_data_buf {mode = _Mode, data = OldData, tmp = TmpData, i = I}, 
       Data, false, BlockOrSegment) ->
-    ?dbg({index, I}, "write: mode = ~w, Data = ~w, Eod = ~p, storing", 
+    lager:debug([{index, I}], "write: mode = ~w, Data = ~w, Eod = ~p, storing", 
 	 [_Mode, Data, false]),
     CheckLimitResult = check_limit(Buf, Data, BlockOrSegment),
     if CheckLimitResult == ok ->
@@ -672,13 +671,13 @@ check_limit_i(Buf=#co_data_buf {data = OldData, tmp = TmpData},
     
 
 update(Buf=#co_data_buf {i = I}, {ok, Ref}) when is_reference(Ref) ->
-    ?dbg({index, I}, "update: Ref = ~p", [Ref]),
+    lager:debug([{index, I}], "update: Ref = ~p", [Ref]),
     case Buf#co_data_buf.ref of
 	Ref ->  {ok, Buf};
 	_OtherRef -> {error, ?abort_internal_error}
     end;
 update(Buf=#co_data_buf {access = read, type = Type, i = I}, {ok, Value}) ->
-    ?dbg({index, I}, "update: Value = ~p", [Value]),
+    lager:debug([{index, I}], "update: Value = ~p", [Value]),
     try co_codec:encode(Value, Type) of
 	Data ->
 	    {ok, Buf#co_data_buf {data = Data, 
@@ -686,28 +685,28 @@ update(Buf=#co_data_buf {access = read, type = Type, i = I}, {ok, Value}) ->
 				  eof = true}}
    catch
 	error:_Reason ->
-	    ?dbg({index, I}, "update: decode of = ~p, ~p failed, Reason = ~p", 
+	    lager:debug([{index, I}], "update: decode of = ~p, ~p failed, Reason = ~p", 
 		 [Value,  Type, _Reason]),
 	    {error, ?abort_value_range_error}
     end;
 		
 update(Buf=#co_data_buf {access = write, i = I}, {ok, Size}) ->
-    ?dbg({index, I}, "update: Size = ~p", [Size]),
+    lager:debug([{index, I}], "update: Size = ~p", [Size]),
     {ok, Buf#co_data_buf {size = Size}};
 update(Buf=#co_data_buf {access = read, i = I}, {ok, Ref, Size}) ->
-    ?dbg({index, I}, "update: Ref = ~p, Size = ~p", [Ref, Size]),
+    lager:debug([{index, I}], "update: Ref = ~p, Size = ~p", [Ref, Size]),
     case Buf#co_data_buf.ref of
 	Ref ->  {ok, Buf#co_data_buf {size=Size}};
 	_OtherRef -> {error, ?abort_internal_error}
     end;
 update(Buf=#co_data_buf {access = write, i = I}, {ok, Ref, WSize}) ->
-    ?dbg({index, I}, "update: Ref = ~p, WSize = ~p", [Ref, WSize]),
+    lager:debug([{index, I}], "update: Ref = ~p, WSize = ~p", [Ref, WSize]),
     case Buf#co_data_buf.ref of
 	Ref ->  {ok, Buf#co_data_buf {write_size=WSize}};
 	_OtherRef -> {error, ?abort_internal_error}
     end;
 update(Buf=#co_data_buf {data = OldData, i = I}, {ok, Ref, Data, Eod}) ->
-    ?dbg({index, I}, "update: Ref = ~p, Data ~w, Eod = ~p", [Ref, Data, Eod]),
+    lager:debug([{index, I}], "update: Ref = ~p, Data ~w, Eod = ~p", [Ref, Data, Eod]),
     case Buf#co_data_buf.ref of
 	Ref -> 
 	    NewData = <<OldData/binary, Data/binary>>,
@@ -718,7 +717,7 @@ update(Buf=#co_data_buf {data = OldData, i = I}, {ok, Ref, Data, Eod}) ->
 update(Buf, ok) ->
     {ok, Buf};
 update(_Buf=#co_data_buf {i = I}, Other) ->
-    ?dbg({index, I}, "update: Buf = ~w, Other = ~p", [_Buf, Other]),
+    lager:debug([{index, I}], "update: Buf = ~w, Other = ~p", [_Buf, Other]),
     %% Error replies
     Other.
 
@@ -734,12 +733,12 @@ update(_Buf=#co_data_buf {i = I}, Other) ->
 
 abort(_Buf=#co_data_buf {mode = streamed, pid = Pid, ref = Ref, i = I}, 
       Reason) -> 
-    ?dbg({index, I}, "abort: Buf = ~w, Reason = ~p", [_Buf, Reason]),
+    lager:debug([{index, I}], "abort: Buf = ~w, Reason = ~p", [_Buf, Reason]),
     gen_server:cast(Pid, {abort, Ref, Reason});
 abort(_Buf=#co_data_buf {mode = {streamed, Module}, pid = Pid, 
 			 ref = Ref, i = I}, 
       Reason) -> 
-    ?dbg({index, I}, "abort: Buf = ~w, Reason = ~p", [_Buf, Reason]),
+    lager:debug([{index, I}], "abort: Buf = ~w, Reason = ~p", [_Buf, Reason]),
     Module:abort(Pid, Ref, Reason);
 abort(_Buf, _Reason) -> 
     ok.

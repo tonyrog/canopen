@@ -26,7 +26,6 @@
 -module(co_file).
 
 -include("canopen.hrl").
--include("co_debug.hrl").
 
 -export([load/1]).
 -export([load_objects/2]).
@@ -63,7 +62,7 @@ load(File) ->
 %% @private
 load_objects([{object,Index,Options}|Es],Os) 
   when ?is_index(Index), is_list(Options) ->
-    ?dbg({index, Index},
+    lager:debug([{index, Index}],
 	 "load_objects: object ~.16.0# (~p)\n", [Index, Index]),
     Obj = load_object(Options,#dict_object { index=Index },undefined,[]),
     load_objects(Es, [Obj|Os]);
@@ -71,7 +70,7 @@ load_objects([{object,Index,Options}|Es],Os)
 %% Simplified SDO server config
 %%
 load_objects([{sdo_server,I,ClientID}|Es],Os) ->
-    ?dbg({index, I},
+    lager:debug([{index, I}],
 	 "load_objects: SDO-SERVER: ~w\n", [I]),
     Access = if I==0 -> ?ACCESS_RO; true -> ?ACCESS_RW end,
     Index = ?IX_SDO_SERVER_FIRST+I,
@@ -82,7 +81,7 @@ load_objects([{sdo_server,I,ClientID}|Es],Os) ->
     load_objects(Es, [Obj|Os]);
 
 load_objects([{sdo_server,I,Rx,Tx}|Es],Os) ->
-    ?dbg({index, I},
+    lager:debug([{index, I}],
 	 "load_objects: SDO-SERVER: ~w\n", [I]),
     Access = if I==0 -> ?ACCESS_RO; true -> ?ACCESS_RW end,
     Index = ?IX_SDO_SERVER_FIRST,
@@ -95,7 +94,7 @@ load_objects([{sdo_server,I,Rx,Tx}|Es],Os) ->
 %% Load general SDO server config
 %%
 load_objects([{sdo_server,I,Rx,Tx,ClientID}|Es],Os) ->
-    ?dbg({index, I},
+    lager:debug([{index, I}],
 	 "load_objects: SDO-SERVER: ~w\n", [I]),
     Access = if I==0 -> ?ACCESS_RO; true -> ?ACCESS_RW end,
     Index = ?IX_SDO_SERVER_FIRST+I,
@@ -108,7 +107,7 @@ load_objects([{sdo_server,I,Rx,Tx,ClientID}|Es],Os) ->
 %% SDO - client spec
 %%
 load_objects([{sdo_client,I,Tx,Rx,ServerID}|Es],Os) ->
-    ?dbg({index, I},
+    lager:debug([{index, I}],
 	 "load_objects: SDO-CLIENT: ~w\n", [I]),
     Index = ?IX_SDO_CLIENT_FIRST + I,
     SDORx = cobid(Rx),
@@ -120,7 +119,7 @@ load_objects([{sdo_client,I,Tx,Rx,ServerID}|Es],Os) ->
 %% TPDO parameter config
 %%
 load_objects([{tpdo,I,ID,Opts}|Es],Os) ->
-    ?dbg({index, I},
+    lager:debug([{index, I}],
 	 "load_objects: TPDO-PARAMETER: ~w\n", [I]),
     Index = ?IX_TPDO_PARAM_FIRST + I,
     COBID = cobid(ID),
@@ -147,13 +146,13 @@ load_objects([{tpdo,I,ID,Opts}|Es],Os) ->
 	    #dict_entry { index={Index,5}, type=?UNSIGNED16,
 			  access=?ACCESS_RW, 
 			  data=co_codec:encode(EventTimer,?UNSIGNED16) }]},
-    ?dbg("load_objects: TPDO-PARAMETER: ~w\n", [Obj]),
+    lager:debug("load_objects: TPDO-PARAMETER: ~w\n", [Obj]),
     load_objects(Es, [Obj|Os]);
 %%
 %% TPDO mapping
 %%
 load_objects([{tpdo_map,I,Map, Opts}|Es], Os) ->
-    ?dbg({index, I},
+    lager:debug([{index, I}],
 	 "load_objects: TPDO-MAP: ~w\n", [I]),
     Index = ?IX_TPDO_MAPPING_FIRST + I,
     Type = proplists:get_value(pdo_type,Opts,pdo),
@@ -180,7 +179,7 @@ load_objects([{tpdo_map,I,Map, Opts}|Es], Os) ->
 %% RPDO parameter config
 %%
 load_objects([{rpdo,I,ID,Opts}|Es],Os) ->
-    ?dbg({index, I},
+    lager:debug([{index, I}],
 	 "load_objects: RPDO-PARAMETER: ~w\n", [I]),
     Index = ?IX_RPDO_PARAM_FIRST + I,
     COBID = cobid(ID),
@@ -213,7 +212,7 @@ load_objects([{rpdo,I,ID,Opts}|Es],Os) ->
 %% RPDO mapping
 %%
 load_objects([{rpdo_map,I,Map}|Es], Os) ->
-    ?dbg({index, I},
+    lager:debug([{index, I}],
 	 "load_objects: RPDO-MAP: ~w\n", [I]),
     Index = ?IX_RPDO_MAPPING_FIRST + I,
     N = length(Map),
@@ -234,7 +233,7 @@ load_objects([{rpdo_map,I,Map}|Es], Os) ->
 %% value range 1 - 16#FE 
 %%
 load_objects([{mpdo_dispatch,I,Map}|Es], Os) ->
-    ?dbg({index, I},
+    lager:debug([{index, I}],
 	 "load_objects: MPDO-DISPATCH: ~w\n", [ I]),
     Index = ?IX_OBJECT_DISPATCH_FIRST + I,
     N = length(Map),
@@ -249,11 +248,11 @@ load_objects([{mpdo_dispatch,I,Map}|Es], Os) ->
 					       ?RMPDO_MAP(Bs,Li,Ls,Ri,Rs,Ni),
 					       ?UNSIGNED64) }
 		  end, lists:zip(seq(1,N), Map))]},
-    ?dbg("load_objects: MPDO-DISPATCH: ~w\n", [Obj]),
+    lager:debug("load_objects: MPDO-DISPATCH: ~w\n", [Obj]),
     load_objects(Es, [Obj|Os]);
 
 load_objects([{mpdo_scanner,I,Map}|Es], Os) ->
-    ?dbg({index, I},
+    lager:debug([{index, I}],
 	 "load_objects: MPDO-SCANNER: ~w\n", [I]),
     Index = ?IX_OBJECT_SCANNER_FIRST + I,
     N = length(Map),

@@ -31,7 +31,6 @@
 -include_lib("can/include/can.hrl").
 -include("canopen.hrl").
 -include("co_app.hrl").
--include("co_debug.hrl").
 
 %% gen_server callbacks
 -export([init/1, 
@@ -74,7 +73,7 @@ notify(CobId,Index,Subind,Data)
     FrameID = ?COBID_TO_CANID(CobId),
     Frame = #can_frame { id=FrameID, len=8, 
 			 data=(<<16#80,Index:16/little,Subind:8,Data:4/binary>>) },
-    ?dbg("notify: Sending frame ~p from CobId = ~.16#, CanId = ~.16#)",
+    lager:debug("notify: Sending frame ~p from CobId = ~.16#, CanId = ~.16#)",
 	 [Frame, CobId, FrameID]),
     can:send(Frame).
 
@@ -86,7 +85,8 @@ notify(CobId,Index,Subind,Data)
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec notify_from(NodePid::pid(),CobId::integer(), Ix::integer(), Si::integer(), Data::binary()) -> 
+-spec notify_from(NodePid::pid(),CobId::integer(), Ix::integer(), Si::integer(), 
+		  Data::binary()) -> 
 		    ok | {error, Error::atom()}.
 
 notify_from(NodePid, CobId,Index,Subind,Data)
@@ -94,7 +94,7 @@ notify_from(NodePid, CobId,Index,Subind,Data)
     FrameID = ?COBID_TO_CANID(CobId),
     Frame = #can_frame { id=FrameID, len=8, 
 			 data=(<<16#80,Index:16/little,Subind:8,Data:4/binary>>) },
-    ?dbg("notify: Sending frame ~p from CobId = ~.16#, CanId = ~.16#)",
+    lager:debug("notify: Sending frame ~p from CobId = ~.16#, CanId = ~.16#)",
 	 [Frame, CobId, FrameID]),
     can:send_from(NodePid, Frame).
 
@@ -257,7 +257,7 @@ init({Serial, NodeName, Opts}) ->
     case load_dict_init(proplists:get_value(dict, Opts, saved), Ctx) of
 	{ok, Ctx1} ->
 	    %% Update dict identity object
-	    ?dbg("~s: init: dict loaded, udating id.",  [NodeName]),
+	    lager:debug("~s: init: dict loaded, udating id.",  [NodeName]),
 	    Dict = Ctx1#co_ctx.dict,
 	    update_id(Dict, ?SI_IDENTITY_VENDOR, Ctx1#co_ctx.vendor),
 	    update_id(Dict, ?SI_IDENTITY_PRODUCT, Ctx1#co_ctx.product),
@@ -283,11 +283,11 @@ init({Serial, NodeName, Opts}) ->
     end.
 
 update_id(_Dict, _Any, undefined) ->
-    ?dbg("~p: update_id: not setting ~.16.0#:~w to undefined.", 
+    lager:debug("~p: update_id: not setting ~.16.0#:~w to undefined.", 
 	 [self(), ?IX_IDENTITY_OBJECT, _Any]),
     ok;
 update_id(Dict, SubIndex, Value) ->
-    ?dbg("~p: update_id: setting ~.16.0#:~w to ~w.", 
+    lager:debug("~p: update_id: setting ~.16.0#:~w to ~w.", 
 	 [self(), ?IX_IDENTITY_OBJECT, SubIndex, Value]),
     ok = co_dict:direct_set_value(Dict, 
 				  ?IX_IDENTITY_OBJECT,
@@ -352,38 +352,39 @@ initialization(Ctx=#co_ctx {name=_Name, nodeid=SNodeId, xnodeid=_XNodeId,
     
 
 activate_node_guard(Ctx=#co_ctx {nmt_role = autonomous, name = _Name}) ->
-    ?dbg("~s: activate_node_guard: autonomous, no node guarding.", [_Name]),
+    lager:debug("~s: activate_node_guard: autonomous, no node guarding.", [_Name]),
     Ctx;
 activate_node_guard(Ctx=#co_ctx {nmt_role = master, name = _Name}) ->
-    ?dbg("~s: activate_node_guard: nmt master, node guarding "
+    lager:debug("~s: activate_node_guard: nmt master, node guarding "
 	 "handled by nmt master process.", [_Name]),
     Ctx;
 activate_node_guard(Ctx=#co_ctx {nmt_role = slave, dict = Dict, name = _Name}) ->
-    ?dbg("~s: activate_node_guard: nmt slave.", [_Name]),
+    lager:debug("~s: activate_node_guard: nmt slave.", [_Name]),
     case co_dict:value(Dict, ?IX_GUARD_TIME) of
 	{ok, NodeGuardTime} ->
 	    case co_dict:value(Dict, ?IX_LIFE_TIME_FACTOR) of
 		{ok, LifeTimeFactor} ->
 		    case NodeGuardTime * LifeTimeFactor of
 			0 -> 
-			    ?dbg("~s: activate_node_guard: no node guarding.", 
-				 [_Name]),
+			    lager:debug(
+			      "~s: activate_node_guard: no node guarding.", 
+			      [_Name]),
 			    Ctx; %% No node guarding
 			NodeLifeTime -> 
 			    Timer = erlang:send_after(NodeLifeTime, self(), 
 						    node_guard_timeout),
-			    ?dbg("~s: activate_node_guard time ~p", 
+			    lager:debug("~s: activate_node_guard time ~p", 
 				 [_Name,NodeLifeTime]),
 			    Ctx#co_ctx {node_guard_timer = Timer, 
 					node_life_time = NodeLifeTime}
 		    end;
 		_NotFound2 ->
-		    ?dbg("~s: activate_node_guard: no life_time_factor", 
+		    lager:debug("~s: activate_node_guard: no life_time_factor", 
 			 [_Name]),
 		    Ctx
 	    end;
 	_NotFound1 ->
-	    ?dbg("~s: activate_node_guard: no node_guard_time", [_Name]),
+	    lager:debug("~s: activate_node_guard: no node_guard_time", [_Name]),
 	    Ctx
     end.
 			    
@@ -396,25 +397,25 @@ deactivate_node_guard(Ctx=#co_ctx {node_guard_timer = Timer}) ->
 
 activate_heartbeat(Ctx=#co_ctx {nmt_role = autonomous, name = _Name}) ->
     %% ???
-    ?dbg("~s: activate_heartbeat: autonomous, no heartbeat.", [_Name]),
+    lager:debug("~s: activate_heartbeat: autonomous, no heartbeat.", [_Name]),
     Ctx;
 activate_heartbeat(Ctx=#co_ctx {nmt_role = master, name = _Name}) ->
-    ?dbg("~s: activate_heartbeat: nmt master/heartbeat consumer, heart "
+    lager:debug("~s: activate_heartbeat: nmt master/heartbeat consumer, heart "
 	 "handled by nmt master process.", [_Name]),
     Ctx;
 activate_heartbeat(Ctx=#co_ctx {nmt_role = slave, dict = Dict, name = _Name}) ->
-    ?dbg("~s: activate_heartbeat: nmt slave.", [_Name]),
+    lager:debug("~s: activate_heartbeat: nmt slave.", [_Name]),
     case co_dict:value(Dict, ?IX_PRODUCER_HEARTBEAT_TIME) of
 	{ok, 0} ->
-	    ?dbg("~s: activate_heartbeat: no heartbeat.", [_Name]),
+	    lager:debug("~s: activate_heartbeat: no heartbeat.", [_Name]),
 	    Ctx; 
 	{ok, HeartBeatTime} ->
 	    Timer = erlang:send_after(HeartBeatTime, self(), do_heartbeat),
-	    ?dbg("~s: activate_heartbeat time ~p", [_Name,HeartBeatTime]),
+	    lager:debug("~s: activate_heartbeat time ~p", [_Name,HeartBeatTime]),
 	    Ctx#co_ctx {heartbeat_timer = Timer, 
 			heartbeat_time = HeartBeatTime};
 	_NotFound1 ->
-	    ?dbg("~s: activate_heartbeat: no heartbeat_time", [_Name]),
+	    lager:debug("~s: activate_heartbeat: no heartbeat_time", [_Name]),
 	    Ctx
     end.
 			    
@@ -427,24 +428,26 @@ deactivate_heartbeat(Ctx=#co_ctx {heartbeat_timer = Timer}) ->
 
 %% If ShortNodeId defined use it, otherwise XNodeId
 send_bootup({_TypeOfNid, undefined}) ->
-    ?dbg("~p: send_bootup: ~p not defined, no bootup sent.", 
+    lager:debug("~p: send_bootup: ~p not defined, no bootup sent.", 
 	 [self(), _TypeOfNid]),
     ok;
 send_bootup(NodeId) ->
-    ?dbg("~p: send_bootup: nmt slave, sending bootup to master.", [self()]),
+    lager:debug("~p: send_bootup: nmt slave, sending bootup to master.", [self()]),
     %% Bootup uses same CobId as NodeGuard
     send_node_guard(NodeId, 1, <<0>>).
 
 send_node_guard({nodeid, SNodeId} = _S, Len, Data) ->
-    ?dbg("~p: send_node_guard: nmt slave, sending ~p to master.", [_S, Data]),
+    lager:debug("~p: send_node_guard: nmt slave, sending ~p to master.", 
+		[_S, Data]),
     CobId = ?COB_ID(?NODE_GUARD,SNodeId),
-    ?dbg("~p: send_node_guard: nmt slave, cobid ~p.", [self(), CobId]),
+    lager:debug("~p: send_node_guard: nmt slave, cobid ~p.", [self(), CobId]),
     can:send_from(self(), #can_frame { id = ?COBID_TO_CANID(CobId),
 				       len = Len, data = Data });
 send_node_guard({xnodeid, XNodeId} = _X, Len, Data) ->
-    ?dbg("~p: send_node_guard: nmt slave, sending ~p to master.", [_X, Data]),
+    lager:debug("~p: send_node_guard: nmt slave, sending ~p to master.", 
+		[_X, Data]),
     XCobId = ?XCOB_ID(?NODE_GUARD,co_lib:add_xflag(XNodeId)),
-    ?dbg("~p: send_node_guard: nmt slave, xcobid ~p.", [_X, XCobId]),
+    lager:debug("~p: send_node_guard: nmt slave, xcobid ~p.", [_X, XCobId]),
     can:send_from(self(), #can_frame { id = ?COBID_TO_CANID(XCobId),
 				       len = Len, data = Data }).
 
@@ -548,7 +551,7 @@ handle_call(load_dict, From, Ctx=#co_ctx {serial = Serial}) ->
 			 co_lib:serial_to_string(Serial) ++ ?LAST_SAVED_DICT),
     handle_call({load_dict, File}, From, Ctx);
 handle_call({load_dict, File}, _From, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_call: load_dict, file = ~p", [_Name, File]),    
+    lager:debug("~s: handle_call: load_dict, file = ~p", [_Name, File]),    
     case load_dict_internal(File, Ctx) of
 	{ok, Ctx1} ->
 	    %% Inform applications (or only reservers ??)
@@ -564,7 +567,7 @@ handle_call(save_dict, From, Ctx=#co_ctx {serial = Serial}) ->
     handle_call({save_dict, File}, From, Ctx);
 handle_call({save_dict, File}, _From, 
 	    Ctx=#co_ctx {dict = Dict, name = _Name}) ->
-    ?dbg("~s: handle_call: save_dict, file = ~p", [_Name, File]),    
+    lager:debug("~s: handle_call: save_dict, file = ~p", [_Name, File]),    
     case co_dict:to_file(Dict, File) of
 	ok ->
 	    %% Inform applications (or only reservers ??)
@@ -668,14 +671,15 @@ handle_call({reservers}, _From, Ctx)  ->
 handle_call({xnot_subscribe,{Ix1, Ix2},Pid}, _From, 
 	    Ctx=#co_ctx {name = _Name}) 
   when is_pid(Pid) ->
-    ?dbg("~s: handle_call: xnot_subscribe index = ~.16.0#-~.16.0# pid = ~p",  
-	 [_Name, Ix1, Ix2, Pid]),    
+    lager:debug(
+      "~s: handle_call: xnot_subscribe index = ~.16.0#-~.16.0# pid = ~p",  
+      [_Name, Ix1, Ix2, Pid]),    
     Res = add_subscription(Ctx#co_ctx.xnot_table, Ix1, Ix2, Pid),
     {reply, Res, Ctx};
 
 handle_call({xnot_subscribe,Ix,Pid}, _From, Ctx=#co_ctx {name = _Name})
   when is_pid(Pid) ->
-    ?dbg("~s: handle_call: xnot_subscribe index = ~.16.0# pid = ~p",  
+    lager:debug("~s: handle_call: xnot_subscribe index = ~.16.0# pid = ~p",  
 	 [_Name, Ix, Pid]),    
     Res = add_subscription(Ctx#co_ctx.xnot_table, Ix, Ix, Pid),
     {reply, Res, Ctx};
@@ -706,7 +710,7 @@ handle_call({xnot_subscribers}, _From, Ctx)  ->
 handle_call({inactive_subscribe, Pid}, _From, 
 	    Ctx=#co_ctx {name = _Name, inact_subs = [], inact_timeout = IT})
   when is_pid(Pid), IT =/= infinity ->
-    ?dbg("~s: handle_call: first inactive subscribe pid = ~p", 
+    lager:debug("~s: handle_call: first inactive subscribe pid = ~p", 
 	 [_Name, Pid]),
     %% Timer must be activated
     Ref = start_timer(IT * 1000, inactive),
@@ -715,7 +719,7 @@ handle_call({inactive_subscribe, Pid}, _From,
 handle_call({inactive_subscribe, Pid}, _From, 
 	    Ctx=#co_ctx {name = _Name, inact_subs = IS})
   when is_pid(Pid) ->
-    ?dbg("~s: handle_call: inactive subscribe pid = ~p", [_Name, Pid]),
+    lager:debug("~s: handle_call: inactive subscribe pid = ~p", [_Name, Pid]),
     {reply, ok, Ctx#co_ctx {inact_subs = lists:usort([Pid | IS])}};
 
 handle_call({inactive_unsubscribe, Pid}, _From, 
@@ -757,7 +761,8 @@ handle_call({dump, Qualifier}, _From, Ctx=#co_ctx {name = _Name}) ->
 		fun(Ixs) ->
 			case Ixs of
 			    {IxStart, IxEnd} ->
-				io:format("[~7.16.0#-~7.16.0#]\n", [IxStart, IxEnd]);
+				io:format("[~7.16.0#-~7.16.0#]\n", 
+					  [IxStart, IxEnd]);
 			    Ix ->
 				io:format("~7.16.0#\n",[Ix])
 			end
@@ -777,7 +782,8 @@ handle_call({dump, Qualifier}, _From, Ctx=#co_ctx {name = _Name}) ->
 		fun(Ixs) ->
 			case Ixs of
 			    {IxStart, IxEnd} ->
-				io:format("[~7.16.0#-~7.16.0#]\n", [IxStart, IxEnd]);
+				io:format("[~7.16.0#-~7.16.0#]\n", 
+					  [IxStart, IxEnd]);
 			    Ix ->
 				io:format("~7.16.0#\n",[Ix])
 			end
@@ -841,12 +847,12 @@ handle_call({option, Option}, _From, Ctx=#co_ctx {name = _Name}) ->
 		debug -> {Option, Ctx#co_ctx.debug};
 		_Other -> {error, "Unknown option " ++ atom_to_list(Option)}
 	    end,
-    ?dbg("~s: handle_call: option = ~p, reply = ~w", 
+    lager:debug("~s: handle_call: option = ~p, reply = ~w", 
 	 [_Name, Option, Reply]),    
     {reply, Reply, Ctx};
 handle_call({option, Option, NewValue}, _From, 
 	    Ctx=#co_ctx {name = _Name, sdo = SDO}) ->
-    ?dbg("~s: handle_call: option = ~p, new value = ~p", 
+    lager:debug("~s: handle_call: option = ~p, new value = ~p", 
 	 [_Name, Option, NewValue]),    
     Reply = case Option of
 		sdo_timeout -> 
@@ -927,14 +933,14 @@ handle_call(_Request, _From, Ctx) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast({object_event, {Ix, _Si}}, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_cast: object_event, index = ~.16B:~p", 
+    lager:debug("~s: handle_cast: object_event, index = ~.16B:~p", 
 	 [_Name, Ix, _Si]),
     inform_subscribers(Ix, Ctx),
     {noreply, Ctx};
 
 handle_cast({session_over, Pid, _Reason}, 
 	    Ctx=#co_ctx {name = _Name, sdo_list = SList}) ->
-    ?dbg("~s: handle_cast: session_over, pid ~p, reason ~p", 
+    lager:debug("~s: handle_cast: session_over, pid ~p, reason ~p", 
 	 [_Name, Pid, _Reason]),
     NewSList = 
 	case lists:keysearch(Pid, #sdo.pid, SList) of
@@ -942,40 +948,40 @@ handle_cast({session_over, Pid, _Reason},
 		lists:keyreplace(Pid, #sdo.pid, SList, 
 				 S#sdo {state = zombie});
 	    false ->  
-		?dbg("~s: handle_cast: session_over, no sdo process found", 
+		lager:debug("~s: handle_cast: session_over, no sdo process found", 
 		 [_Name]),
 		SList
 	end,
     {noreply, Ctx#co_ctx {sdo_list = NewSList}};
 
 handle_cast({pdo_event, CobId}, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_cast: pdo_event, CobId = ~.16B", 
+    lager:debug("~s: handle_cast: pdo_event, CobId = ~.16B", 
 	 [_Name, CobId]),
     case lists:keysearch(CobId, #tpdo.cob_id, Ctx#co_ctx.tpdo_list) of
 	{value, T} ->
 	    co_tpdo:transmit(T#tpdo.pid),
 	    {noreply,Ctx};
 	_ ->
-	    ?dbg("~s: handle_cast: pdo_event, no tpdo process found", 
+	    lager:debug("~s: handle_cast: pdo_event, no tpdo process found", 
 		 [_Name]),
 	    {noreply,Ctx}
     end;
 
 handle_cast({dam_mpdo_event, CobId, Destination}, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_cast: dam_mpdo_event, CobId = ~.16B", 
+    lager:debug("~s: handle_cast: dam_mpdo_event, CobId = ~.16B", 
 	 [_Name, CobId]),
     case lists:keysearch(CobId, #tpdo.cob_id, Ctx#co_ctx.tpdo_list) of
 	{value, T} ->
 	    co_tpdo:transmit(T#tpdo.pid, Destination), %% ??
 	    {noreply,Ctx};
 	_ ->
-	    ?dbg("~s: handle_cast: pdo_event, no tpdo process found", 
+	    lager:debug("~s: handle_cast: pdo_event, no tpdo process found", 
 		 [_Name]),
 	    {noreply,Ctx}
     end;
 
 handle_cast(_Msg, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_cast: unknown message ~p.",  [_Name, _Msg]),
+    lager:debug("~s: handle_cast: unknown message ~p.",  [_Name, _Msg]),
     {noreply, Ctx}.
 
 %%--------------------------------------------------------------------
@@ -988,7 +994,7 @@ handle_cast(_Msg, Ctx=#co_ctx {name = _Name}) ->
 %%--------------------------------------------------------------------
 handle_info(Frame, Ctx=#co_ctx {name = _Name}) 
   when is_record(Frame, can_frame) ->
-    ?dbg("~s: handle_info: CAN frame received", [_Name]),
+    lager:debug("~s: handle_info: CAN frame received", [_Name]),
     Ctx1 = handle_can(Frame, 
 		      Ctx#co_ctx {can_timestamp = co_lib:sec(),
 				  inact_sent = false}),
@@ -998,32 +1004,33 @@ handle_info({timeout,Ref,sync}, Ctx=#co_ctx {name = _Name})
   when Ref =:= Ctx#co_ctx.sync_tmr ->
     %% Send a SYNC frame
     %% FIXME: check that we still are sync producer?
-    ?dbg("~s: handle_info: sync timeout received", [_Name]),
+    lager:debug("~s: handle_info: sync timeout received", [_Name]),
     FrameID = ?COBID_TO_CANID(Ctx#co_ctx.sync_id),
     Frame = #can_frame { id=FrameID, len=0, data=(<<>>) },
     can:send(Frame),
-    ?dbg("~s: handle_info: Sent sync", [_Name]),
+    lager:debug("~s: handle_info: Sent sync", [_Name]),
     Ctx1 = Ctx#co_ctx { sync_tmr = start_timer(Ctx#co_ctx.sync_time, sync) },
     {noreply, Ctx1};
 
 handle_info({timeout,Ref,time_stamp}, Ctx=#co_ctx {name = _Name}) 
   when Ref =:= Ctx#co_ctx.time_stamp_tmr ->
     %% FIXME: Check that we still are time stamp producer
-    ?dbg("~s: handle_info: time_stamp timeout received", [_Name]),
+    lager:debug("~s: handle_info: time_stamp timeout received", [_Name]),
     FrameID = ?COBID_TO_CANID(Ctx#co_ctx.time_stamp_id),
     Time = time_of_day(),
     Data = co_codec:encode(Time, ?TIME_OF_DAY),
     Size = byte_size(Data),
     Frame = #can_frame { id=FrameID, len=Size, data=Data },
     can:send(Frame),
-    ?dbg("~s: handle_info: Sent time stamp ~p", [_Name, Time]),
-    Ctx1 = Ctx#co_ctx { time_stamp_tmr = start_timer(Ctx#co_ctx.time_stamp_time, time_stamp) },
+    lager:debug("~s: handle_info: Sent time stamp ~p", [_Name, Time]),
+    Ctx1 = Ctx#co_ctx { time_stamp_tmr = 
+			    start_timer(Ctx#co_ctx.time_stamp_time, time_stamp) },
     {noreply, Ctx1};
 
 handle_info({timeout, Ref, inactive}, Ctx=#co_ctx {name = _Name, 
 						   inact_subs = [], 
 						   inact_timer = Ref}) ->
-    ?dbg("~s: handle_info: inactive timeout, no one to send to.", 
+    lager:debug("~s: handle_info: inactive timeout, no one to send to.", 
 	 [_Name]),
     %% No subscribers, timer should not be restarted
     {noreply, Ctx#co_ctx {inact_timer = undefined, inact_sent = false}};
@@ -1036,10 +1043,10 @@ handle_info({timeout, Ref, inactive}, Ctx=#co_ctx {name = _Name,
 						   inact_sent = false}) 
   when is_integer(IT) ->
     %% Send an inactive event
-    ?dbg("~s: handle_info: inactive timeout received.", [_Name]),
+    lager:debug("~s: handle_info: inactive timeout received.", [_Name]),
     Now = co_lib:sec(),
     if Now - CT >= IT ->
-	    ?dbg("~s: handle_info: sending inactive event to ~p.", 
+	    lager:debug("~s: handle_info: sending inactive event to ~p.", 
 		 [_Name, IS]),
 	    lists:foldl(
 	      fun(Pid, _Acc) ->
@@ -1050,7 +1057,7 @@ handle_info({timeout, Ref, inactive}, Ctx=#co_ctx {name = _Name,
        true ->
 	    %% Restart timer with the time left minus 1 to be on safe side
 	    NewTimeOut = max(IT - (Now - CT)  - 1, 1),
-	    ?dbg("~s: handle_info: restart timer with ~p.", 
+	    lager:debug("~s: handle_info: restart timer with ~p.", 
 		 [_Name, NewTimeOut]),
 	    NewRef = start_timer(NewTimeOut * 1000, inactive),
 	    {noreply, Ctx#co_ctx {inact_timer = NewRef}}
@@ -1061,7 +1068,7 @@ handle_info({timeout, Ref, inactive}, Ctx=#co_ctx {name = _Name,
 						   inact_timer = Ref, 
 						   inact_sent = true}) 
   when is_integer(IT) ->
-    ?dbg("~s: handle_info: inactive timeout received, restart timer.", 
+    lager:debug("~s: handle_info: inactive timeout received, restart timer.", 
 	 [_Name]),
     NewRef = start_timer(IT * 1000, inactive),
     {noreply, Ctx#co_ctx {
@@ -1070,33 +1077,34 @@ inact_timer = NewRef}};
 handle_info(do_heartbeat, Ctx=#co_ctx {state = State, 
 				       heartbeat_time = HeartBeatTime, 
 				       name=_Name}) ->
-    ?dbg("~s: handle_info: do_heartbeat ", [_Name]),
+    lager:debug("~s: handle_info: do_heartbeat ", [_Name]),
     Data = <<0:1, State:7>>,
     send_node_guard(id(Ctx), 1, Data),
     Timer = erlang:send_after(HeartBeatTime, self(), do_heartbeat),
     {noreply, Ctx#co_ctx {heartbeat_timer = Timer}};
 
 handle_info(node_guard_timeout, Ctx=#co_ctx {name=_Name}) ->
-    ?dbg("~s: handle_info: node_guard timeout received", [_Name]),
+    lager:debug("~s: handle_info: node_guard timeout received", [_Name]),
     send_to_apps(lost_nmt_master_contact, Ctx),
     ?ee("Node guard timeout, check NMT master.", []),
     {noreply, Ctx#co_ctx {node_guard_error = true}};
 
 handle_info({rc_reset, Pid}, Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
-    ?dbg("~s: handle_info: rc_reset for process ~p received",  [_Name, Pid]),
+    lager:debug("~s: handle_info: rc_reset for process ~p received",  
+		[_Name, Pid]),
     case lists:keysearch(Pid, #tpdo.pid, TList) of
 	{value,T} -> 
 	    NewT = T#tpdo {rc = 0},
-	    ?dbg("~s: handle_info: rc counter cleared",  [_Name]),
+	    lager:debug("~s: handle_info: rc counter cleared",  [_Name]),
 	    {noreply, Ctx#co_ctx { tpdo_list = [NewT | TList]--[T]}};
 	false -> 
-	    ?dbg("~s: handle_info: rc_reset no process found", [_Name]),
+	    lager:debug("~s: handle_info: rc_reset no process found", [_Name]),
 	    {noreply, Ctx}
     end;
 
     
 handle_info({'DOWN',Ref,process,_Pid,Reason}, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_info: DOWN for process ~p received", 
+    lager:debug("~s: handle_info: DOWN for process ~p received", 
 	 [_Name, _Pid]),
     Ctx1 = handle_sdo_processes(Ref, Reason, Ctx),
     Ctx2 = handle_app_processes(Ref, Reason, Ctx1),
@@ -1104,7 +1112,7 @@ handle_info({'DOWN',Ref,process,_Pid,Reason}, Ctx=#co_ctx {name = _Name}) ->
     {noreply, Ctx3};
 
 handle_info({'EXIT', Pid, Reason}, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_info: EXIT for process ~p received", 
+    lager:debug("~s: handle_info: EXIT for process ~p received", 
 	 [_Name, Pid]),
     Ctx1 = handle_sdo_processes(Pid, Reason, Ctx),
     Ctx2 = handle_app_processes(Pid, Reason, Ctx1),
@@ -1114,7 +1122,7 @@ handle_info({'EXIT', Pid, Reason}, Ctx=#co_ctx {name = _Name}) ->
 	Ctx ->
 	    %% No 'normal' linked process died, we should termiate ??
 	    %% co_nmt ??
-	    ?dbg("~s: handle_info: linked process ~p died, reason ~p, "
+	    lager:debug("~s: handle_info: linked process ~p died, reason ~p, "
 		 "terminating\n", [_Name, Pid, Reason]),
 	    {stop, Reason, Ctx};
 	_ChangedCtx ->
@@ -1123,7 +1131,7 @@ handle_info({'EXIT', Pid, Reason}, Ctx=#co_ctx {name = _Name}) ->
     end;
 
 handle_info(_Info, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_info: unknown info ~p received", [_Name, _Info]),
+    lager:debug("~s: handle_info: unknown info ~p received", [_Name, _Info]),
     {noreply, Ctx}.
 
 %%--------------------------------------------------------------------
@@ -1148,7 +1156,7 @@ terminate(_Reason, Ctx=#co_ctx {name = _Name}) ->
       fun(A) ->
 	      case A#app.pid of
 		  Pid -> 
-		      ?dbg("~s: terminate: Killing app with pid = ~p", 
+		      lager:debug("~s: terminate: Killing app with pid = ~p", 
 			   [_Name, Pid]),
 			  %% Or gen_server:cast(Pid, co_node_terminated) ?? 
 		      exit(Pid, co_node_terminated)
@@ -1161,7 +1169,7 @@ terminate(_Reason, Ctx=#co_ctx {name = _Name}) ->
       fun(T) ->
 	      case T#tpdo.pid of
 		  Pid -> 
-		      ?dbg("~s: terminate: Killing TPDO with pid = ~p", 
+		      lager:debug("~s: terminate: Killing TPDO with pid = ~p", 
 			   [_Name, Pid]),
 			  %% Or gen_server:cast(Pid, co_node_terminated) ?? 
 		      exit(Pid, co_node_terminated)
@@ -1173,7 +1181,7 @@ terminate(_Reason, Ctx=#co_ctx {name = _Name}) ->
 	true -> co_proc:clear();
 	false -> do_nothing
     end,
-   ?dbg("~s: terminate: cleaned up, exiting", [_Name]),
+   lager:debug("~s: terminate: cleaned up, exiting", [_Name]),
     ok.
 
 %%--------------------------------------------------------------------
@@ -1235,19 +1243,21 @@ add_to_cob_table(T, xnodeid, ExtNid)
     ets:insert(T, {XSDORx, {sdo_rx, XSDOTx}}),
     ets:insert(T, {XSDOTx, {sdo_tx, XSDORx}}),
     ets:insert(T, {?XCOB_ID(?NMT, 0), nmt}),
-    ets:insert(T, {?XCOB_ID(?NODE_GUARD,ExtNid), {supervision, {xnodeid, ExtNid}}}),
-    ?dbg("add_to_cob_table: XNid=~w, XSDORx=~w, XSDOTx=~w", 
+    ets:insert(T, {?XCOB_ID(?NODE_GUARD,ExtNid), 
+		   {supervision, {xnodeid, ExtNid}}}),
+    lager:debug("add_to_cob_table: XNid=~w, XSDORx=~w, XSDOTx=~w", 
 	 [ExtNid,XSDORx,XSDOTx]);
 add_to_cob_table(T, nodeid, ShortNid) 
   when ShortNid =/= undefined->
-    ?dbg("add_to_cob_table: ShortNid=~w", [ShortNid]),
+    lager:debug("add_to_cob_table: ShortNid=~w", [ShortNid]),
     SDORx = ?COB_ID(?SDO_RX,ShortNid),
     SDOTx = ?COB_ID(?SDO_TX,ShortNid),
     ets:insert(T, {SDORx, {sdo_rx, SDOTx}}),
     ets:insert(T, {SDOTx, {sdo_tx, SDORx}}),
     ets:insert(T, {?COB_ID(?NMT, 0), nmt}),
-    ets:insert(T, {?COB_ID(?NODE_GUARD,ShortNid), {supervision, {nodeid, ShortNid}}}),
-    ?dbg("add_to_cob_table: SDORx=~w, SDOTx=~w", [SDORx,SDOTx]).
+    ets:insert(T, {?COB_ID(?NODE_GUARD,ShortNid), 
+		   {supervision, {nodeid, ShortNid}}}),
+    lager:debug("add_to_cob_table: SDORx=~w, SDOTx=~w", [SDORx,SDOTx]).
 
 
 delete_from_cob_table(_T, _NidType, undefined) ->
@@ -1261,7 +1271,7 @@ delete_from_cob_table(T, xnodeid, Nid)
     ets:delete(T, XSDOTx),
     ets:delete(T, ?XCOB_ID(?NMT,0)),
     ets:delete(T, ?XCOB_ID(?NODE_GUARD,ExtNid)),
-    ?dbg("delete_from_cob_table: XNid=~w, XSDORx=~w, XSDOTx=~w", 
+    lager:debug("delete_from_cob_table: XNid=~w, XSDORx=~w, XSDOTx=~w", 
 	 [ExtNid,XSDORx,XSDOTx]);
 delete_from_cob_table(T, nodeid, ShortNid)
   when ShortNid =/= undefined->
@@ -1271,7 +1281,7 @@ delete_from_cob_table(T, nodeid, ShortNid)
     ets:delete(T, SDOTx),
     ets:delete(T, ?COB_ID(?NMT,0)),
     ets:delete(T, ?COB_ID(?NODE_GUARD,ShortNid)),
-   ?dbg("delete_from_cob_table: ShortNid=~w, SDORx=~w, SDOTx=~w", 
+   lager:debug("delete_from_cob_table: ShortNid=~w, SDORx=~w, SDOTx=~w", 
 	 [ShortNid,SDORx,SDOTx]).
 
 
@@ -1387,7 +1397,7 @@ nmt_change(supervision, none,
 
 
 execute_change(NidType, NewNid, OldNid, Ctx=#co_ctx {cob_table = T}) ->  
-    ?dbg("execute_change: NidType = ~p, OldNid = ~p, NewNid = ~p", 
+    lager:debug("execute_change: NidType = ~p, OldNid = ~p, NewNid = ~p", 
 	 [NidType, OldNid, NewNid]),
     delete_from_cob_table(T, NidType, OldNid),
     co_proc:unreg({NidType, OldNid}),
@@ -1457,10 +1467,12 @@ load_dict_init(saved, Ctx=#co_ctx {serial = Serial}) ->
 load_dict_init(File, Ctx) when is_list(File) ->
     load_dict_internal(filename:join(code:priv_dir(canopen), File), Ctx); 
 load_dict_init(File, Ctx) when is_atom(File) ->
-    load_dict_internal(filename:join(code:priv_dir(canopen), atom_to_list(File)), Ctx). 
+    load_dict_internal(filename:join(code:priv_dir(canopen), 
+				     atom_to_list(File)), 
+		       Ctx). 
 
 load_dict_internal(File, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: load_dict_internal: Loading file = ~p", [_Name, File]),
+    lager:debug("~s: load_dict_internal: Loading file = ~p", [_Name, File]),
     case filelib:is_regular(File) of
 	true -> load_dict_internal1(File, Ctx);
 	false -> {error, no_dict_available}
@@ -1470,7 +1482,7 @@ load_dict_internal(File, Ctx=#co_ctx {name = _Name}) ->
 load_dict_internal1(File, Ctx=#co_ctx {dict = Dict, name = _Name}) ->
     try co_file:load(File) of
 	{ok,Os} ->
-	    ?dbg("~s: load_dict_internal1: Loaded file = ~p", [_Name, File]),
+	    lager:debug("~s: load_dict_internal1: Loaded file = ~p", [_Name, File]),
 
 	    %% Install all new/changed objects
 	    ChangedIxs =
@@ -1496,7 +1508,7 @@ load_dict_internal1(File, Ctx=#co_ctx {dict = Dict, name = _Name}) ->
 	    %% What about removed entries ???
 
 	    %% Now take action if needed
-	    ?dbg("~s: load_dict_internal: changed entries ~p", 
+	    lager:debug("~s: load_dict_internal: changed entries ~p", 
 		 [_Name, ChangedIxs]),
 	    Ctx1 = 
 		foldl(fun(I, Ctx0) ->
@@ -1505,12 +1517,12 @@ load_dict_internal1(File, Ctx=#co_ctx {dict = Dict, name = _Name}) ->
 
 	    {ok, Ctx1};
 	Error ->
-	    ?dbg("~s: load_dict_internal: Failed loading file, error = ~p", 
+	    lager:debug("~s: load_dict_internal: Failed loading file, error = ~p", 
 		 [_Name, Error]),
 	    Error
     catch
 	error:Reason ->
-	    ?dbg("~s: load_dict_internal: Failed loading file, reason = ~p", 
+	    lager:debug("~s: load_dict_internal: Failed loading file, reason = ~p", 
 		 [_Name, Reason]),
 
 	    {error, Reason}
@@ -1568,7 +1580,7 @@ set(Func, Ix,Si,ValueOrData,Ctx) ->
 handle_can(Frame, Ctx=#co_ctx {name = _Name}) 
   when ?is_can_frame_rtr(Frame) ->
     CobId = ?CANID_TO_COBID(Frame#can_frame.id),
-    ?dbg("~s: handle_can: (rtr) CobId=~8.16.0B", [_Name, CobId]),
+    lager:debug("~s: handle_can: (rtr) CobId=~8.16.0B", [_Name, CobId]),
     case lookup_cobid(CobId, Ctx) of
 	nmt  -> Ctx;
 	{supervision, NodeId} -> handle_node_guard(Frame, NodeId, Ctx);
@@ -1578,18 +1590,18 @@ handle_can(Frame, Ctx=#co_ctx {name = _Name})
 		    co_tpdo:rtr(T#tpdo.pid),
 		    Ctx;
 		_ -> 
-		    ?dbg("~s: handle_can: frame ~w, cobid undefined not "
+		    lager:debug("~s: handle_can: frame ~w, cobid undefined not "
 			 "handled", [_Name, Frame]),
 		    Ctx
 	    end;
 	_Other ->
-	    ?dbg("~s: handle_can: frame ~w, cobid ~w not handled", 
+	    lager:debug("~s: handle_can: frame ~w, cobid ~w not handled", 
 		 [_Name, Frame, _Other]),
 	    Ctx
     end;
 handle_can(Frame, Ctx=#co_ctx {state = _State, name = _Name}) ->
     CobId = ?CANID_TO_COBID(Frame#can_frame.id),
-    ?dbg("~s: handle_can: CobId=~8.16.0B", [_Name, CobId]),
+    lager:debug("~s: handle_can: CobId=~8.16.0B", [_Name, CobId]),
     case lookup_cobid(CobId, Ctx) of
 	nmt        -> handle_nmt(Frame, Ctx);
 	lss        -> handle_lss(Frame, Ctx);
@@ -1601,7 +1613,7 @@ handle_can(Frame, Ctx=#co_ctx {state = _State, name = _Name}) ->
 	{sdo_tx,Rx} -> handle_sdo_tx(Frame, CobId, Rx, Ctx);
 	{sdo_rx,Tx} -> handle_sdo_rx(Frame, CobId, Tx, Ctx);
 	{sdo_rx, not_receiver, _Tx} -> 
-	    ?dbg("~s: handle_can: sdo_rx frame ~w to ~.16# ignored", 
+	    lager:debug("~s: handle_can: sdo_rx frame ~w to ~.16# ignored", 
 		 [_Name, Frame, _Tx]),
 	    Ctx; %% ignored
 	_AssumedMpdo -> handle_mpdo(Frame, CobId, Ctx) 
@@ -1613,19 +1625,20 @@ handle_can(Frame, Ctx=#co_ctx {state = _State, name = _Name}) ->
 %%
 handle_nmt(M, Ctx=#co_ctx {nmt_role = autonomous, name=_Name}) ->
     <<_NodeId,_Cs,_/binary>> = M#can_frame.data,
-    ?dbg("~s: handle_nmt: node is autonomous, nmt command ~p to ~p ignored. ",
-	 [_Name, co_lib:decode_nmt_command(_Cs), _NodeId]),
+    lager:debug(
+      "~s: handle_nmt: node is autonomous, nmt command ~p to ~p ignored. ",
+      [_Name, co_lib:decode_nmt_command(_Cs), _NodeId]),
     Ctx;
 handle_nmt(M, Ctx=#co_ctx {nodeid=undefined, nmt_role = slave, name=_Name}) ->
     <<_NodeId,_Cs,_/binary>> = M#can_frame.data,
-    ?dbg("~s: handle_nmt: node has no short id, no nmt possible. "
+    lager:debug("~s: handle_nmt: node has no short id, no nmt possible. "
 	 "Command ~p is for node ~p",
 	 [_Name, co_lib:decode_nmt_command(_Cs), _NodeId]),
     Ctx;
 handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, nmt_role = slave, name=_Name}) 
   when M#can_frame.len >= 2 andalso SNodeId =/= undefined ->
     <<Cs,NodeId,_/binary>> = M#can_frame.data,
-    ?dbg("~s: handle_nmt: slave ~p, command ~p", 
+    lager:debug("~s: handle_nmt: slave ~p, command ~p", 
 	 [_Name, NodeId, co_lib:decode_nmt_command(Cs)]),
     if NodeId =:= 0; 
        NodeId =:= SNodeId ->
@@ -1644,7 +1657,7 @@ handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, nmt_role = slave, name=_Name})
 		    broadcast_state(?Stopped, Ctx),
 		    Ctx#co_ctx { state = ?Stopped };
 		_ ->
-		    ?dbg("~s: handle_nmt: unknown cs=~w", 
+		    lager:debug("~s: handle_nmt: unknown cs=~w", 
 			 [_Name, Cs]),
 		    Ctx
 	    end;
@@ -1654,7 +1667,7 @@ handle_nmt(M, Ctx=#co_ctx {nodeid=SNodeId, nmt_role = slave, name=_Name})
     end;
 handle_nmt(M, Ctx=#co_ctx {nmt_role = master, name = _Name}) ->
     <<_Cs,_NodeId,_/binary>> = M#can_frame.data,
-    ?dbg("~s: handle_nmt: node is nmt master, no nmt command possible. "
+    lager:debug("~s: handle_nmt: node is nmt master, no nmt command possible. "
 	 "Command ~p is for node ~p",
 	 [_Name, co_lib:decode_nmt_command(_Cs), _NodeId]),
     Ctx.
@@ -1667,7 +1680,7 @@ handle_node_guard(Frame, NodeId = {TypeOfNid, _Nid},
 			       node_guard_timer = Timer, node_life_time = NLT,
 			       node_guard_error = NgError, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
-    ?dbg("~s: handle_node_guard: node ~p request ~w, now ~p", 
+    lager:debug("~s: handle_node_guard: node ~p request ~w, now ~p", 
 	 [_Name,NodeId,Frame, os:timestamp()]),
     %% Reset NMT master supervision timer
     if Timer =/= undefined ->
@@ -1683,12 +1696,14 @@ handle_node_guard(Frame, NodeId = {TypeOfNid, _Nid},
 	    do_nothing
     end,
     %% Reply
-    ?dbg("~s: handle_node_guard: toggle ~p, xtoggle ~p", [_Name,Toggle,XToggle]),
-    {Data, NewToggle, NewXToggle} = if TypeOfNid == nodeid ->
-					    {<<Toggle:1, State:7>>, 1 - Toggle, XToggle};
-				       TypeOfNid == xnodeid ->
-					    {<<XToggle:1, State:7>>, Toggle, 1 - XToggle}
-				    end,
+    lager:debug("~s: handle_node_guard: toggle ~p, xtoggle ~p", 
+		[_Name,Toggle,XToggle]),
+    {Data, NewToggle, NewXToggle} = 
+	if TypeOfNid == nodeid ->
+		{<<Toggle:1, State:7>>, 1 - Toggle, XToggle};
+	   TypeOfNid == xnodeid ->
+		{<<XToggle:1, State:7>>, Toggle, 1 - XToggle}
+	end,
     send_node_guard(NodeId, 1, Data),
     %% Restart NMT master supervision
     NewTimer = if NLT =/= 0 ->
@@ -1702,18 +1717,18 @@ handle_node_guard(Frame, NodeId = {TypeOfNid, _Nid},
 handle_node_guard(_Frame, _NodeId, 
 		  Ctx=#co_ctx {supervision = Super, name=_Name}) 
   when Super == none orelse Super == hearbeat ->
-    ?dbg("~s: handle_node_guard: node has supervision ~p, "
+    lager:debug("~s: handle_node_guard: node has supervision ~p, "
 	 "node_guard request ~w  ignored. ",[_Name, Super, _Frame]),
     Ctx;
 handle_node_guard(_Frame, _NodeId, 
 		  Ctx=#co_ctx {nmt_role = autonomous, name=_Name}) ->
-    ?dbg("~s: handle_node_guard: node is autonomous, "
+    lager:debug("~s: handle_node_guard: node is autonomous, "
 	 "node_guard request ~w  ignored. ",[_Name, _Frame]),
     Ctx;
 handle_node_guard(Frame, _NodeId, 
 		  Ctx=#co_ctx {nmt_role = master, name=_Name}) 
   when ?is_can_frame_rtr(Frame) ->
-    ?dbg("~s: handle_node_guard: request ~w", [_Name,Frame]),
+    lager:debug("~s: handle_node_guard: request ~w", [_Name,Frame]),
     %% Node is nmt master and should NOT receive node_guard request
     ?ee("Illegal NMT confiuration, receiving node_guard "
         " request even though being NMT master", []),
@@ -1721,26 +1736,27 @@ handle_node_guard(Frame, _NodeId,
 
 handle_supervision(Frame, NodeId, Ctx=#co_ctx {nmt_role = master, name = _Name}) 
   when Frame#can_frame.len >= 1 ->
-    ?dbg("~s: handle_supervision: reply ~w", [_Name,Frame]),
+    lager:debug("~s: handle_supervision: reply ~w", [_Name,Frame]),
     gen_server:cast(co_nmt_master, {supervision_frame, NodeId, Frame}),
     Ctx;
 handle_supervision(_Frame, _NodeId, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_supervision: reply ~w from ~p", [_Name, _Frame, _NodeId]),
-    ?dbg("~s: not nmt master, ignored", [_Name]),
+    lager:debug("~s: handle_supervision: reply ~w from ~p", 
+		[_Name, _Frame, _NodeId]),
+    lager:debug("~s: not nmt master, ignored", [_Name]),
     Ctx.
 
 %%
 %% LSS
 %% 
 handle_lss(_M, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_lss: ~w", [_Name,_M]),
+    lager:debug("~s: handle_lss: ~w", [_Name,_M]),
     Ctx.
 
 %%
 %% SYNC
 %%
 handle_sync(_Frame, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_sync: ~w", [_Name,_Frame]),
+    lager:debug("~s: handle_sync: ~w", [_Name,_Frame]),
     lists:foreach(
       fun(T) -> co_tpdo:sync(T#tpdo.pid) end, Ctx#co_ctx.tpdo_list),
     Ctx.
@@ -1749,10 +1765,10 @@ handle_sync(_Frame, Ctx=#co_ctx {name = _Name}) ->
 %% TIME STAMP - update local time offset
 %%
 handle_time_stamp(Frame, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_timestamp: ~w", [_Name,Frame]),
+    lager:debug("~s: handle_timestamp: ~w", [_Name,Frame]),
     try co_codec:decode(Frame#can_frame.data, ?TIME_OF_DAY) of
 	{T, _Bits} when is_record(T, time_of_day) ->
-	    ?dbg("~s: Got timestamp: ~p", [_Name, T]),
+	    lager:debug("~s: Got timestamp: ~p", [_Name, T]),
 	    set_time_of_day(T),
 	    Ctx;
 	_ ->
@@ -1766,7 +1782,7 @@ handle_time_stamp(Frame, Ctx=#co_ctx {name = _Name}) ->
 %% EMERGENCY - this is the consumer side detecting emergency
 %%
 handle_emcy(_Frame, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_emcy: ~w", [_Name,_Frame]),
+    lager:debug("~s: handle_emcy: ~w", [_Name,_Frame]),
     Ctx.
 
 %%
@@ -1774,12 +1790,12 @@ handle_emcy(_Frame, Ctx=#co_ctx {name = _Name}) ->
 %%
 handle_rpdo(Frame, Offset, _CobId, 
 	    Ctx=#co_ctx {state = ?Operational, name = _Name}) ->
-    ?dbg("~s: handle_rpdo: offset = ~p, frame = ~w", 
+    lager:debug("~s: handle_rpdo: offset = ~p, frame = ~w", 
 	 [_Name, Offset, Frame]),
     rpdo_unpack(?IX_RPDO_MAPPING_FIRST + Offset, Frame#can_frame.data, Ctx);
 handle_rpdo(_Frame, _Offset, _CobId, 
 	    Ctx=#co_ctx {state = State, name = _Name}) ->
-    ?dbg("~s: handle_rpdo: offset = ~p, frame = ~w, state ~p", 
+    lager:debug("~s: handle_rpdo: offset = ~p, frame = ~w, state ~p", 
 	 [_Name, _Offset, _Frame, State]),
     ?ew("Received pdo in state ~p, ignoring", [State]),
     Ctx.
@@ -1791,11 +1807,11 @@ handle_rpdo(_Frame, _Offset, _CobId,
 handle_sdo_tx(Frame, Tx, Rx, Ctx=#co_ctx {state = State, name = _Name}) 
   when State == ?Operational;
        State == ?PreOperational ->
-    ?dbg("~s: handle_sdo_tx: src=~p, ~s",
+    lager:debug("~s: handle_sdo_tx: src=~p, ~s",
 	      [_Name, Tx,
 	       co_format:format_sdo(co_sdo:decode_tx(Frame#can_frame.data))]),
     ID = {Tx,Rx},
-    ?dbg("~s: handle_sdo_tx: session id=~p", [_Name, ID]),
+    lager:debug("~s: handle_sdo_tx: session id=~p", [_Name, ID]),
     Sessions = Ctx#co_ctx.sdo_list,
     case lists:keysearch(ID,#sdo.id,Sessions) of
 	{value, S=#sdo {state = active}} ->
@@ -1804,13 +1820,13 @@ handle_sdo_tx(Frame, Tx, Rx, Ctx=#co_ctx {state = State, name = _Name})
 	_Other ->
 	    %% state = zombie;
 	    %% false
-	    ?dbg("~s: handle_sdo_tx: session not found", [_Name]),
+	    lager:debug("~s: handle_sdo_tx: session not found", [_Name]),
 	    %% no such session active
 	    Ctx
     end;
 handle_sdo_tx(_Frame, _Tx, _Rx, 
 	      Ctx=#co_ctx {state = State, name = _Name}) ->
-    ?dbg("~s: handle_sdo_tx: src=~p, ~s",
+    lager:debug("~s: handle_sdo_tx: src=~p, ~s",
 	 [_Name, _Tx,
 	  co_format:format_sdo(co_sdo:decode_tx(_Frame#can_frame.data))]),
     ?ew("Received sdo in state ~p, ignoring", [State]),
@@ -1824,13 +1840,13 @@ handle_sdo_tx(_Frame, _Tx, _Rx,
 handle_sdo_rx(Frame, Rx, Tx, Ctx=#co_ctx {state = State, name = _Name})
   when State == ?Operational;
        State == ?PreOperational ->
-    ?dbg("~s: handle_sdo_rx: ~s", 
+    lager:debug("~s: handle_sdo_rx: ~s", 
 	      [_Name,co_format:format_sdo(co_sdo:decode_rx(Frame#can_frame.data))]),
     ID = {Rx,Tx},
     Sessions = Ctx#co_ctx.sdo_list,
     case lists:keysearch(ID,#sdo.id,Sessions) of
 	{value, S=#sdo {state = active}} ->
-	    ?dbg("~s: handle_sdo_rx: Frame sent to old process ~p", 
+	    lager:debug("~s: handle_sdo_rx: Frame sent to old process ~p", 
 		 [_Name,S#sdo.pid]),
 	    gen_fsm:send_event(S#sdo.pid, Frame),
 	    Ctx;
@@ -1847,7 +1863,7 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx=#co_ctx {state = State, name = _Name})
 		{ok,Pid} ->
 		    Mon = erlang:monitor(process, Pid),
 		    %% sys:trace(Pid, true),
-		    ?dbg("~s: handle_sdo_rx: Frame sent to new process ~p", 
+		    lager:debug("~s: handle_sdo_rx: Frame sent to new process ~p", 
 			 [_Name,Pid]),		    
 		    gen_fsm:send_event(Pid, Frame),
 		    S = #sdo { id=ID, pid=Pid, mon=Mon },
@@ -1855,7 +1871,7 @@ handle_sdo_rx(Frame, Rx, Tx, Ctx=#co_ctx {state = State, name = _Name})
 	    end
     end;
 handle_sdo_rx(_Frame, _Rx, _Tx, Ctx=#co_ctx {state = State, name = _Name}) ->
-    ?dbg("~s: handle_sdo_rx: ~s", 
+    lager:debug("~s: handle_sdo_rx: ~s", 
 	      [_Name,co_format:format_sdo(
 		       co_sdo:decode_rx(_Frame#can_frame.data))]),
     ?ew("Received sdo in state ~p, ignoring", [State]),
@@ -1867,13 +1883,13 @@ handle_mgr_action(Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term,TOut, From,
 	      nodeid -> NodeId;
 	      xnodeid -> co_lib:add_xflag(NodeId)
 	  end,
-    ?dbg("~s: ~p: node ~.16.0#.", [_Name, Action, Nid]),
+    lager:debug("~s: ~p: node ~.16.0#.", [_Name, Action, Nid]),
     case lookup_sdo_server(Nid,Ctx) of
 	ID={Tx,Rx} ->
-	    ?dbg("~s: ~p: ID = {~.16.0#, ~.16.0#}", [_Name,Action,Tx,Rx]),
+	    lager:debug("~s: ~p: ID = {~.16.0#, ~.16.0#}", [_Name,Action,Tx,Rx]),
 	    case lists:keyfind(Nid, #sdo.dest_node, Sessions) of
 		_S=#sdo {state = active} ->
-		    ?dbg("~s: ~p: Session already in progress to ~.16.0#",
+		    lager:debug("~s: ~p: Session already in progress to ~.16.0#",
 			 [_Name, Action, Nid]),
 		    {reply, {error, session_already_in_progress}, Ctx};
 		_Other ->
@@ -1889,20 +1905,22 @@ handle_mgr_action(Action,Mode,{TypeOfNode,NodeId},Ix,Si,Term,TOut, From,
 					       end},
 					       Mode,From,Tx,Rx,Ix,Si,Term) of
 			{error, Reason} ->
-			    ?dbg(node,"~s: ~p: unable to start co_sdo_cli_fsm, "
-				 "reason ~p",  [_Name, Action, Reason]),
+			    lager:debug([node],
+					"~s: ~p: unable to start co_sdo_cli_fsm, "
+					"reason ~p",  [_Name, Action, Reason]),
 			    {reply, Reason, Ctx};
 			{ok, Pid} ->
 			    Mon = erlang:monitor(process, Pid),
 			    %% sys:trace(Pid, true),
 			    S = #sdo {dest_node = Nid, id=ID, pid=Pid, mon=Mon},
-			    ?dbg("~s: ~p: added session, ID={~.16.0#, ~.16.0#}",
-				 [_Name, Action, Tx, Rx]),
+			    lager:debug("~s: ~p: added session, "
+					"ID={~.16.0#, ~.16.0#}",
+					[_Name, Action, Tx, Rx]),
 			    {noreply, Ctx#co_ctx { sdo_list = [S|Sessions]}}
 		    end
 	    end;
 	undefined ->
-	    ?dbg("~s: ~p: No sdo server found for node ~.16.0#.", 
+	    lager:debug("~s: ~p: No sdo server found for node ~.16.0#.", 
 		 [_Name, Action, Nid]),
 	    {reply, {error, badarg}, Ctx}
     end.
@@ -1923,19 +1941,19 @@ handle_mpdo(Frame, CobId, Ctx=#co_ctx {state = ?Operational, name = _Name}) ->
 		    extended_notify(Ix, Frame, Ctx);
 		{1, _OtherNid} ->
 		    %% DAM-MPDO, destination is some other node
-		    ?dbg("~s: handle_mpdo: DAM-MPDO: destination is "
+		    lager:debug("~s: handle_mpdo: DAM-MPDO: destination is "
 			 "other node = ~.16.0#", [_Name, _OtherNid]),
 		    Ctx;
 		{0, 0} ->
 		    %% Reserved
-		    ?dbg("~s: handle_mpdo: SAM-MPDO: Addr = 0, reserved "
+		    lager:debug("~s: handle_mpdo: SAM-MPDO: Addr = 0, reserved "
 			 "Frame = ~w", [_Name, Frame]),
 		    Ctx;
 		{0, SourceNid} ->
 		    handle_sam_mpdo(SourceNid, {Ix, Si}, Data, Ctx)
 	    end;
 	_Other ->
-	    ?dbg("~s: handle_mpdo: frame not handled: Frame = ~w", 
+	    lager:debug("~s: handle_mpdo: frame not handled: Frame = ~w", 
 		 [_Name, Frame]),
 	    Ctx
     end;
@@ -1945,17 +1963,17 @@ handle_mpdo(_Frame, _CobId, Ctx=#co_ctx {state = State, name = _Name}) ->
 
 handle_sam_mpdo(SourceNid, {SourceIx, SourceSi}, Data,
 		Ctx=#co_ctx {mpdo_dispatch = MpdoDispatch, name = _Name}) ->
-    ?dbg("~s: handle_sam_mpdo: Index = ~.16#:~w, Nid = ~.16.0#, Data = ~w", 
+    lager:debug("~s: handle_sam_mpdo: Index = ~.16#:~w, Nid = ~.16.0#, Data = ~w", 
 	 [_Name,SourceIx,SourceSi,SourceNid,Data]),
     case ets:lookup(MpdoDispatch, {SourceIx, SourceSi, SourceNid}) of
 	[{{SourceIx, SourceSi, SourceNid}, LocalIndex = {_LocalIx, _LocalSi}}] ->
-	    ?dbg("~s: handle_sam_mpdo: Found Index = ~.16#:~w, updating", 
+	    lager:debug("~s: handle_sam_mpdo: Found Index = ~.16#:~w, updating", 
 		 [_Name,_LocalIx,_LocalSi]),
 	    rpdo_value(LocalIndex,Data,Ctx);
 	[] ->
 	    Ctx;
 	_Other ->
-	    ?dbg("~s: handle_sam_mpdo: Found other ~p ", [_Name, _Other]),
+	    lager:debug("~s: handle_sam_mpdo: Found other ~p ", [_Name, _Other]),
 	    Ctx
     end.
 
@@ -1963,7 +1981,7 @@ handle_sam_mpdo(SourceNid, {SourceIx, SourceSi}, Data,
 %% DAM-MPDO
 %%
 handle_dam_mpdo(_CobId, Index = {_Ix, _Si}, Data, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_dam_mpdo: Index = ~.16#:~w", [_Name,_Ix,_Si]),
+    lager:debug("~s: handle_dam_mpdo: Index = ~.16#:~w", [_Name,_Ix,_Si]),
     %% Enough ??
     rpdo_value(Index,Data,Ctx).
 
@@ -1971,7 +1989,7 @@ extended_notify(Ix, Frame,
 		Ctx=#co_ctx {xnot_table = XNotTable, name = _Name}) ->
     case lists:usort(subscribers(XNotTable, Ix)) of
 	[] ->
-	    ?dbg("~s: extended_notify: No xnot subscribers for index ~.16#", 
+	    lager:debug("~s: extended_notify: No xnot subscribers for index ~.16#", 
 		 [_Name, Ix]);
 	PidList ->
 	    lists:foreach(
@@ -1979,11 +1997,13 @@ extended_notify(Ix, Frame,
 		      case Pid of
 			  dead ->
 			      %% Warning ??
-			      ?dbg("~s: extended_notify: Process subscribing "
-				   "to index ~.16# is dead", [_Name, Ix]);
+			      lager:debug(
+				"~s: extended_notify: Process subscribing "
+				"to index ~.16# is dead", [_Name, Ix]);
 			  P when is_pid(P)->
-			      ?dbg("~s: extended_notify: Process ~p subscribes "
-				   "to index ~.16#", [_Name, Pid, Ix]),
+			      lager:debug(
+				"~s: extended_notify: Process ~p subscribes "
+				"to index ~.16#", [_Name, Pid, Ix]),
 			      gen_server:cast(Pid, {extended_notify, Ix, Frame})
 		      end
 	      end, PidList)
@@ -2058,7 +2078,7 @@ handle_tpdo_process(T=#tpdo {pid = _Pid, offset = _Offset}, _Reason,
                 [_Name,_Offset,_Error]),
 	    Ctx;
 	NewT ->
-	    ?dbg("~s: handle_tpdo_processes: new tpdo process ~p started", 
+	    lager:debug("~s: handle_tpdo_processes: new tpdo process ~p started", 
 		 [_Name, NewT#tpdo.pid]),
 	    Ctx#co_ctx { tpdo_list = [NewT | TList]--[T]}
     end.
@@ -2067,7 +2087,7 @@ handle_tpdo_process(T=#tpdo {pid = _Pid, offset = _Offset}, _Reason,
 
 activate_nmt(Ctx=#co_ctx {supervision = Sup, dict = Dict, nmt_conf = Conf,
 			  name = _Name, debug = Dbg}) ->
-    ?dbg("~s: activate_nmt", [_Name]),
+    lager:debug("~s: activate_nmt", [_Name]),
     co_nmt:start_link([{node_pid, self()},
 		       {conf, Conf},
 		       {dict, Dict},
@@ -2076,17 +2096,17 @@ activate_nmt(Ctx=#co_ctx {supervision = Sup, dict = Dict, nmt_conf = Conf,
     Ctx.
 
 deactivate_nmt(Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: deactivate_nmt", [_Name]),
+    lager:debug("~s: deactivate_nmt", [_Name]),
     co_nmt:stop(),
     Ctx.
 
 
 broadcast_state(State, #co_ctx {state = State, name = _Name}) ->
     %% No change
-    ?dbg("~s: broadcast_state: no change state = ~p", [_Name, State]),
+    lager:debug("~s: broadcast_state: no change state = ~p", [_Name, State]),
     ok;
 broadcast_state(State, Ctx=#co_ctx { name = _Name}) ->
-    ?dbg("~s: broadcast_state: new state = ~p", [_Name, State]),
+    lager:debug("~s: broadcast_state: new state = ~p", [_Name, State]),
 
     %% To all tpdo processes
     send_to_tpdos({state, State}, Ctx),
@@ -2099,7 +2119,7 @@ send_to_apps(Msg, _Ctx=#co_ctx {name = _Name, app_list = AList}) ->
       fun(A) ->
 	      case A#app.pid of
 		  Pid -> 
-		      ?dbg("~s: handle_call: sending ~w to app "
+		      lager:debug("~s: handle_call: sending ~w to app "
 			   "with pid = ~p", [_Name, Msg, Pid]),
 		      gen_server:cast(Pid, Msg) 
 	      end
@@ -2111,7 +2131,7 @@ send_to_tpdos(Msg, _Ctx=#co_ctx {name = _Name, tpdo_list = TList}) ->
       fun(T) ->
 	      case T#tpdo.pid of
 		  Pid -> 
-		      ?dbg("~s: handle_call: sending ~w to tpdo "
+		      lager:debug("~s: handle_call: sending ~w to tpdo "
 			   "with pid = ~p", [_Name, Msg, Pid]),
 		      gen_server:cast(Pid, Msg) 
 	      end
@@ -2129,7 +2149,7 @@ handle_notify(I, Ctx) ->
     NewCtx.
 
 handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
-    ?dbg("~s: handle_notify: Index=~.16#",[_Name, I]),
+    lager:debug("~s: handle_notify: Index=~.16#",[_Name, I]),
     case I of
 	?IX_COB_ID_SYNC_MESSAGE ->
 	    update_sync(Ctx);
@@ -2165,7 +2185,7 @@ handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
 		    Ctx
 	    end;
 	_ when I >= ?IX_RPDO_PARAM_FIRST, I =< ?IX_RPDO_PARAM_LAST ->
-	    ?dbg("~s: handle_notify: update RPDO offset=~.16#", 
+	    lager:debug("~s: handle_notify: update RPDO offset=~.16#", 
 		 [_Name, (I-?IX_RPDO_PARAM_FIRST)]),
 	    case load_pdo_parameter(I, (I-?IX_RPDO_PARAM_FIRST), Ctx) of
 		undefined -> 
@@ -2182,35 +2202,35 @@ handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
 		    Ctx
 	    end;
 	_ when I >= ?IX_TPDO_PARAM_FIRST, I =< ?IX_TPDO_PARAM_LAST ->
-	    ?dbg("~s: handle_notify: update TPDO: offset=~.16#",
+	    lager:debug("~s: handle_notify: update TPDO: offset=~.16#",
 		 [_Name, I - ?IX_TPDO_PARAM_FIRST]),
 	    case load_pdo_parameter(I, (I-?IX_TPDO_PARAM_FIRST), Ctx) of
 		undefined -> Ctx;
 		Param ->
 		    case update_tpdo(Param, Ctx) of
 			{new, {_T,Ctx1}} ->
-			    ?dbg("~s: handle_notify: TPDO:new",
+			    lager:debug("~s: handle_notify: TPDO:new",
 				 [_Name]),
 			    
 			    Ctx1;
 			{existing,T} ->
-			    ?dbg("~s: handle_notify: TPDO:existing",
+			    lager:debug("~s: handle_notify: TPDO:existing",
 				 [_Name]),
 			    co_tpdo:update_param(T#tpdo.pid, Param),
 			    Ctx;
 			{deleted,Ctx1} ->
-			    ?dbg("~s: handle_notify: TPDO:deleted",
+			    lager:debug("~s: handle_notify: TPDO:deleted",
 				 [_Name]),
 			    Ctx1;
 			none ->
-			    ?dbg("~s: handle_notify: TPDO:none",
+			    lager:debug("~s: handle_notify: TPDO:none",
 				 [_Name]),
 			    Ctx
 		    end
 	    end;
 	_ when I >= ?IX_TPDO_MAPPING_FIRST, I =< ?IX_TPDO_MAPPING_LAST ->
 	    Offset = I - ?IX_TPDO_MAPPING_FIRST,
-	    ?dbg("~s: handle_notify: update TPDO-MAP: offset=~w", 
+	    lager:debug("~s: handle_notify: update TPDO-MAP: offset=~w", 
 		 [_Name, Offset]),
 	    J = ?IX_TPDO_PARAM_FIRST + Offset,
 	    CobId = co_dict:direct_value(Ctx#co_ctx.dict,J,?SI_PDO_COB_ID),
@@ -2222,8 +2242,9 @@ handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
 		    Ctx
 	    end;
 	_ when I >= ?IX_OBJECT_DISPATCH_FIRST, I =< ?IX_OBJECT_DISPATCH_LAST ->
-	    ?dbg("~s: handle_notify: update SAM-MPDO-Dispatch for index ~.16.0# ", 
-		 [_Name, I]),
+	    lager:debug(
+	      "~s: handle_notify: update SAM-MPDO-Dispatch for index ~.16.0# ", 
+	      [_Name, I]),
 	    update_mpdo_disp(Ctx, I);
 	_ ->
 	    Ctx
@@ -2231,41 +2252,41 @@ handle_notify1(I, Ctx=#co_ctx {name = _Name}) ->
 
 update_node_guard(Ctx=#co_ctx {supervision = S, name = _Name}) 
   when S == none orelse S == heartbeat ->
-    ?dbg("~s: update_node_guard: no node guarding.", [_Name]),
+    lager:debug("~s: update_node_guard: no node guarding.", [_Name]),
     Ctx;
 update_node_guard(Ctx=#co_ctx {nmt_role = autonomous, name = _Name}) ->
-    ?dbg("~s: update_node_guard: autonomous, no node guarding.", [_Name]),
+    lager:debug("~s: update_node_guard: autonomous, no node guarding.", [_Name]),
     Ctx;
 update_node_guard(Ctx=#co_ctx {nmt_role = master, name = _Name}) ->
-    ?dbg("~s: update_node_guard: nmt master, node guarding "
+    lager:debug("~s: update_node_guard: nmt master, node guarding "
 	 "handled by nmt master process.", [_Name]),
     Ctx;
 update_node_guard(Ctx=#co_ctx {nmt_role = slave, name = _Name}) ->
-    ?dbg("~s: update_node_guard: nmt slave.", [_Name]),
+    lager:debug("~s: update_node_guard: nmt slave.", [_Name]),
     Ctx1 = deactivate_node_guard(Ctx),
     activate_node_guard(Ctx1).
 
 
 update_heartbeat(Ctx=#co_ctx {supervision = S, name = _Name}, _I) 
   when S == none orelse S == node_guard ->
-    ?dbg("~s: update_heartbeat: no heartbeat.", [_Name]),
+    lager:debug("~s: update_heartbeat: no heartbeat.", [_Name]),
     Ctx;
 update_heartbeat(Ctx=#co_ctx {nmt_role = autonomous, name = _Name}, _I) ->
-    ?dbg("~s: update_heartbeat: autonomous, no heartbeat.", [_Name]),
+    lager:debug("~s: update_heartbeat: autonomous, no heartbeat.", [_Name]),
     Ctx;
 update_heartbeat(Ctx=#co_ctx {nmt_role = master, name = _Name}, 
 		 ?IX_CONSUMER_HEARTBEAT_TIME) ->
-    ?dbg("~s: update_heartbeat: nmt master, heartbeat "
+    lager:debug("~s: update_heartbeat: nmt master, heartbeat "
 	 "handled by nmt master process.", [_Name]),
     gen_server:cast(co_nmt_master, heartbeat_change),    
     Ctx;
 update_heartbeat(Ctx=#co_ctx {nmt_role = slave, name = _Name}, 
 		?IX_PRODUCER_HEARTBEAT_TIME) ->
-    ?dbg("~s: update_heartbeat: nmt slave.", [_Name]),
+    lager:debug("~s: update_heartbeat: nmt slave.", [_Name]),
     Ctx1 = deactivate_heartbeat(Ctx),
     activate_heartbeat(Ctx1);
 update_heartbeat(Ctx=#co_ctx {name = _Name}, _I) ->
-    ?dbg("~s: update_heartbeat: no change.", [_Name]),
+    lager:debug("~s: update_heartbeat: no change.", [_Name]),
     Ctx.
 
 
@@ -2274,7 +2295,7 @@ update_mpdo_disp(Ctx=#co_ctx {dict = Dict, name = _Name}, I) ->
    try co_dict:direct_value(Dict,{I,0}) of
 	NoOfEntries ->
 	    Ixs = [{I, Si} || Si <- lists:seq(1, NoOfEntries)],
-	   ?dbg("~s: update_mpdo_disp: index list ~w ", [_Name, Ixs]),
+	   lager:debug("~s: update_mpdo_disp: index list ~w ", [_Name, Ixs]),
  	    update_mpdo_disp1(Ctx, Ixs)
     catch
 	error:_Reason ->
@@ -2288,18 +2309,21 @@ update_mpdo_disp1(Ctx, []) ->
     Ctx;
 update_mpdo_disp1(Ctx=#co_ctx {dict = Dict, mpdo_dispatch = MpdoDisp, name = _Name}, 
 		 [Index = {_Ix, _Si} | Ixs]) ->
-    ?dbg("~s: update_mpdo_disp: index ~.16#:~w ", [_Name, _Ix, _Si]),
+    lager:debug("~s: update_mpdo_disp: index ~.16#:~w ", [_Name, _Ix, _Si]),
     try co_dict:direct_value(Dict,Index) of
 	Map ->
 	    {SourceIx, SourceSi, SourceNid} = 
-		{?RMPDO_MAP_RINDEX(Map), ?RMPDO_MAP_RSUBIND(Map), ?RMPDO_MAP_RNID(Map)},
+		{?RMPDO_MAP_RINDEX(Map), 
+		 ?RMPDO_MAP_RSUBIND(Map), 
+		 ?RMPDO_MAP_RNID(Map)},
 	    {LocalIx, LocalSi} = 
-		{?RMPDO_MAP_INDEX(Map), ?RMPDO_MAP_SUBIND(Map)},
+		{?RMPDO_MAP_INDEX(Map), 
+		 ?RMPDO_MAP_SUBIND(Map)},
 	    Size = ?RMPDO_MAP_SIZE(Map),
 	    EntryList = 
 		[{{SourceIx, SourceSi + I, SourceNid}, {LocalIx,LocalSi + I}} ||
 		    I <- lists:seq(0, Size - 1)],
-	    ?dbg("~s: update_mpdo_disp: entry list ~w ", [_Name, EntryList]),
+	    lager:debug("~s: update_mpdo_disp: entry list ~w ", [_Name, EntryList]),
 	    insert_mpdo_disp(MpdoDisp,EntryList)
     catch
 	error:_Reason ->
@@ -2322,7 +2346,7 @@ update_time_stamp(Ctx=#co_ctx {name = _Name}) ->
 	    CobId = ID band (?COBID_ENTRY_ID_MASK bor ?COBID_ENTRY_EXTENDED),
 	    if ID band ?COBID_ENTRY_TIME_PRODUCER =/= 0 ->
 		    Time = Ctx#co_ctx.time_stamp_time,
-		    ?dbg("~s: update_time_stamp: Timestamp server time=~p", 
+		    lager:debug("~s: update_time_stamp: Timestamp server time=~p", 
 			 [_Name, Time]),
 		    if Time > 0 ->
 			    Tmr = start_timer(Ctx#co_ctx.time_stamp_time,
@@ -2336,7 +2360,7 @@ update_time_stamp(Ctx=#co_ctx {name = _Name}) ->
 		    end;
 	       ID band ?COBID_ENTRY_TIME_CONSUMER =/= 0 ->
 		    %% consumer
-		    ?dbg("~s: update_time_stamp: Timestamp consumer", 
+		    lager:debug("~s: update_time_stamp: Timestamp consumer", 
 			 [_Name]),
 		    Tmr = stop_timer(Ctx#co_ctx.time_stamp_tmr),
 		    %% FIXME: delete old CobId!!!
@@ -2402,12 +2426,12 @@ update_sync(Ctx) ->
 update_tpdo(P=#pdo_parameter {offset = Offset, cob_id = CId, valid = Valid}, 
 	    Ctx=#co_ctx { tpdo_list = TList, tpdo = TpdoCtx, 
 			  name = _Name, debug = Dbg }) ->
-    ?dbg("~s: update_tpdo: pdo param for ~p", [_Name, Offset]),
+    lager:debug("~s: update_tpdo: pdo param for ~p", [_Name, Offset]),
     case lists:keytake(CId, #tpdo.cob_id, TList) of
 	false ->
 	    if Valid ->
 		    {ok,Pid} = co_tpdo:start(TpdoCtx#tpdo_ctx {debug = Dbg}, P),
-		    ?dbg("~s: update_tpdo: starting tpdo process ~p for ~p", 
+		    lager:debug("~s: update_tpdo: starting tpdo process ~p for ~p", 
 			 [_Name, Pid, Offset]),
 		    %%co_tpdo:debug(Pid, Dbg),
 		    gen_server:cast(Pid, {state, Ctx#co_ctx.state}),
@@ -2435,13 +2459,14 @@ restart_tpdo(T=#tpdo {offset = Offset, rc = RC},
 			  name = _Name, debug = Dbg}) ->
     case load_pdo_parameter(?IX_TPDO_PARAM_FIRST + Offset, Offset, Ctx) of
 	undefined -> 
-	    ?dbg("~s: restart_tpdo: pdo param for ~p not found", 
+	    lager:debug("~s: restart_tpdo: pdo param for ~p not found", 
 		 [_Name, Offset]),
 	    {error, not_found};
 	Param ->
 	    case RC >= TRL of
 		true ->
-		    ?dbg("~s: restart_tpdo: restart counter exceeded",  [_Name]),
+		    lager:debug("~s: restart_tpdo: restart counter exceeded",  
+				[_Name]),
 		    {error, restart_not_allowed};
 		false ->
 		    {ok,Pid} = 
@@ -2460,7 +2485,7 @@ restart_tpdo(T=#tpdo {offset = Offset, rc = RC},
 
 
 load_pdo_parameter(I, Offset, _Ctx=#co_ctx {dict = Dict, name = _Name}) ->
-    ?dbg("~s: load_pdo_parameter ~p + ~p", [_Name, I, Offset]),
+    lager:debug("~s: load_pdo_parameter ~p + ~p", [_Name, I, Offset]),
     case load_list(Dict, [{I, ?SI_PDO_COB_ID}, 
 			  {I,?SI_PDO_TRANSMISSION_TYPE, 255},
 			  {I,?SI_PDO_INHIBIT_TIME, 0},
@@ -2513,16 +2538,19 @@ load_list(_Dict, [], Acc) ->
 
 index_defined([], _Ctx) ->
     true;
-index_defined([Ix | Rest], Ctx=#co_ctx {dict = Dict, res_table = RTable, name = _Name}) ->
+index_defined([Ix | Rest], 
+	      Ctx=#co_ctx {dict = Dict, res_table = RTable, name = _Name}) ->
     case co_dict:lookup_object(Dict, Ix) of
 	{ok, _Obj} -> 
 	    true,
 	    index_defined(Rest, Ctx);
 	{error, _Reason} ->
-	    ?dbg("~s: index_defined: index ~.16# not in dictionary",  [_Name, Ix]),
+	    lager:debug("~s: index_defined: index ~.16# not in dictionary",  
+			[_Name, Ix]),
 	    case reserver_pid(RTable, Ix) of
 		[] -> 
-		    ?dbg("~s: index_defined: index ~.16# not reserved",  [_Name, Ix]),
+		    lager:debug("~s: index_defined: index ~.16# not reserved",  
+				[_Name, Ix]),
 		    false;
 		[_Any] ->
 		    true,
@@ -2538,7 +2566,7 @@ add_subscription(Tab, Ix, Key) ->
 add_subscription(Tab, Ix1, Ix2, Key) 
   when ?is_index(Ix1), ?is_index(Ix2), 
        Ix1 =< Ix2 ->
-    ?dbg("add_subscription: ~.16#:~.16# for ~w", 
+    lager:debug("add_subscription: ~.16#:~.16# for ~w", 
 	 [Ix1, Ix2, Key]),
     I = co_iset:new(Ix1, Ix2),
     case ets:lookup(Tab, Key) of
@@ -2555,18 +2583,18 @@ remove_subscription(Tab, Ix, Key) ->
     remove_subscription(Tab, Ix, Ix, Key).
 
 remove_subscription(Tab, Ix1, Ix2, Key) when Ix1 =< Ix2 ->
-    ?dbg("remove_subscription: ~.16#:~.16# for ~w", 
+    lager:debug("remove_subscription: ~.16#:~.16# for ~w", 
 	 [Ix1, Ix2, Key]),
     case ets:lookup(Tab, Key) of
 	[] -> ok;
 	[{Key,ISet}] -> 
 	    case co_iset:difference(ISet, co_iset:new(Ix1, Ix2)) of
 		[] ->
-		    ?dbg("remove_subscription: last index for ~w", 
+		    lager:debug("remove_subscription: last index for ~w", 
 			 [Key]),
 		    ets:delete(Tab, Key);
 		ISet1 -> 
-		    ?dbg("remove_subscription: new index set ~p for ~w", 
+		    lager:debug("remove_subscription: new index set ~p for ~w", 
 			 [ISet1,Key]),
 		    ets:insert(Tab, {Key,ISet1})
 	    end
@@ -2589,7 +2617,7 @@ inform_subscribers(I, _Ctx=#co_ctx {name = _Name, sub_table = STable}) ->
 	      case Pid of
 		  Self -> do_nothing;
 		  _OtherPid ->
-		      ?dbg("~s: inform_subscribers: "
+		      lager:debug("~s: inform_subscribers: "
 			   "Sending object event to ~p", [_Name, Pid]),
 		      gen_server:cast(Pid, {object_event, I}) 
 	      end
@@ -2606,19 +2634,19 @@ add_reservation(_Tab, [], _Mod, _Pid) ->
 add_reservation(Tab, [Ix | Tail], Mod, Pid) ->
     case ets:lookup(Tab, Ix) of
 	[] -> 
-	    ?dbg("add_reservation: ~.16# for ~w",[Ix, Pid]), 
+	    lager:debug("add_reservation: ~.16# for ~w",[Ix, Pid]), 
 	    ets:insert(Tab, {Ix, Mod, Pid}), 
 	    add_reservation(Tab, Tail, Mod, Pid);
 	[{Ix, Mod, dead}] ->  %% M or Mod ???
 	    ok, 
-	    ?dbg("add_reservation: renewing ~.16# for ~w",[Ix, Pid]), 
+	    lager:debug("add_reservation: renewing ~.16# for ~w",[Ix, Pid]), 
 	    ets:insert(Tab, {Ix, Mod, Pid}), 
 	    add_reservation(Tab, Tail, Mod, Pid);
 	[{Ix, _M, Pid}] -> 
 	    ok, 
 	    add_reservation(Tab, Tail, Mod, Pid);
 	[{Ix, _M, _OtherPid}] ->        
-	    ?dbg("add_reservation: index already reserved  by ~p", 
+	    lager:debug("add_reservation: index already reserved  by ~p", 
 		 [_OtherPid]),
 	    {error, index_already_reserved}
     end.
@@ -2626,13 +2654,13 @@ add_reservation(Tab, [Ix | Tail], Mod, Pid) ->
 
 add_reservation(_Tab, Ix1, Ix2, _Mod, _Pid) when Ix1 < ?MAN_SPEC_MIN;
 						 Ix2 < ?MAN_SPEC_MIN->
-    ?dbg("add_reservation: not possible for ~.16#:~w for ~w", 
+    lager:debug("add_reservation: not possible for ~.16#:~w for ~w", 
 	 [Ix1, Ix2, _Pid]),
     {error, not_possible_to_reserve};
 add_reservation(Tab, Ix1, Ix2, Mod, Pid) when ?is_index(Ix1), ?is_index(Ix2), 
 					      Ix1 =< Ix2, 
 					      is_pid(Pid) ->
-    ?dbg("add_reservation: ~.16#:~w for ~w", 
+    lager:debug("add_reservation: ~.16#:~w for ~w", 
 	 [Ix1, Ix2, Pid]),
     add_reservation(Tab, lists:seq(Ix1, Ix2), Mod, Pid).
 	    
@@ -2644,7 +2672,7 @@ remove_reservations(Tab, Pid) ->
 remove_reservation(_Tab, [], _Pid) ->
     ok;
 remove_reservation(Tab, [Ix | Tail], Pid) ->
-    ?dbg("remove_reservation: ~.16# for ~w", [Ix, Pid]),
+    lager:debug("remove_reservation: ~.16# for ~w", [Ix, Pid]),
     case ets:lookup(Tab, Ix) of
 	[] -> 
 	    ok, 
@@ -2653,13 +2681,13 @@ remove_reservation(Tab, [Ix | Tail], Pid) ->
 	    ets:delete(Tab, Ix), 
 	    remove_reservation(Tab, Tail, Pid);
 	[{Ix, _M, _OtherPid}] -> 	    
-	    ?dbg("remove_reservation: index reserved by other pid ~p", 
+	    lager:debug("remove_reservation: index reserved by other pid ~p", 
 		 [_OtherPid]),
 	    {error, index_reservered_by_other}
     end.
 
 remove_reservation(Tab, Ix1, Ix2, Pid) when Ix1 =< Ix2 ->
-    ?dbg("remove_reservation: ~.16#:~.16# for ~w", 
+    lager:debug("remove_reservation: ~.16#:~.16# for ~w", 
 	 [Ix1, Ix2, Pid]),
     remove_reservation(Tab, lists:seq(Ix1, Ix2), Pid).
 
@@ -2669,7 +2697,7 @@ reset_reservations(Tab, Pid) ->
 reset_reservation(_Tab, [], _Pid) ->
     ok;
 reset_reservation(Tab, [Ix | Tail], Pid) ->
-    ?dbg("reset_reservation: ~.16# for ~w", [Ix, Pid]),
+    lager:debug("reset_reservation: ~.16# for ~w", [Ix, Pid]),
     case ets:lookup(Tab, Ix) of
 	[] -> 
 	    ok, 
@@ -2679,7 +2707,7 @@ reset_reservation(Tab, [Ix | Tail], Pid) ->
 	    ets:insert(Tab, {Ix, M, dead}),
 	    reset_reservation(Tab, Tail, Pid);
 	[{Ix, _M, _OtherPid}] -> 	    
-	    ?dbg("reset_reservation: index reserved by other pid ~p", 
+	    lager:debug("reset_reservation: index reserved by other pid ~p", 
 		 [_OtherPid]),
 	    {error, index_reservered_by_other}
     end.
@@ -2699,7 +2727,7 @@ inform_reserver(Ix, _Ctx=#co_ctx {name = _Name, res_table = RTable}) ->
 	[Self] -> do_nothing;
 	[] -> do_nothing;
 	[Pid] when is_pid(Pid) -> 
-	    ?dbg("~s: inform_reservers: "
+	    lager:debug("~s: inform_reservers: "
 		 "Sending object event to ~p", [_Name, Pid]),
 	    gen_server:cast(Pid, {object_event, Ix})
     end.
@@ -2716,7 +2744,7 @@ lookup_sdo_server(Nid, _Ctx=#co_ctx {name = _Name}) ->
 	    Rx = ?COB_ID(?SDO_RX,NodeID),
 	    {Tx,Rx};
        true ->
-	    ?dbg("~s: lookup_sdo_server: Nid  ~12.16.0# "
+	    lager:debug("~s: lookup_sdo_server: Nid  ~12.16.0# "
 		 "neither extended nor short ???", [_Name, Nid]),
 	    undefined
     end.
@@ -2763,14 +2791,14 @@ lookup_cobid(CobId, Ctx) ->
 %%
 tpdo_set({_Ix, _Si} = I, Data, Mode,
 	 Ctx=#co_ctx {tpdo_cache = Cache, tpdo_cache_limit = TCL, name = _Name}) ->
-    ?dbg("~s: tpdo_set: Ix = ~.16#:~w, Data = ~w, Mode ~p",
+    lager:debug("~s: tpdo_set: Ix = ~.16#:~w, Data = ~w, Mode ~p",
 	 [_Name, _Ix, _Si, Data, Mode]), 
     case {ets:lookup(Cache, I), Mode} of
 	{[], _} ->
 	    %% Previously unknown tpdo element, probably in sam_mpdo
 	    %% with block size > 1
 	    %% Insert ??
-	    ?dbg("~s: tpdo_set: inserting first value for "
+	    lager:debug("~s: tpdo_set: inserting first value for "
 		 "previously unknown tpdo element.",
 		 [_Name]), 
 	    ets:insert(Cache, {I, [Data]}),
@@ -2787,7 +2815,7 @@ tpdo_set({_Ix, _Si} = I, Data, Mode,
 			    [(<<>>)] -> [Data]; %% remove default
 			    _List -> OldData ++ [Data]
 			end,
-	    ?dbg("~s: tpdo_set: append, old = ~p, new = ~p",
+	    lager:debug("~s: tpdo_set: append, old = ~p, new = ~p",
 		 [_Name, OldData, NewData]), 
 	    try ets:insert(Cache,{I,NewData}) of
 		true -> {ok, Ctx}
@@ -2798,7 +2826,7 @@ tpdo_set({_Ix, _Si} = I, Data, Mode,
 		    {{error,Reason}, Ctx}
 	    end;
 	{[{I, _OldData}], overwrite} ->
-	    ?dbg("~s: tpdo_set: overwrite, old = ~p, new = ~p",
+	    lager:debug("~s: tpdo_set: overwrite, old = ~p, new = ~p",
 		 [_Name, _OldData, Data]), 
 	    ets:insert(Cache, {I, [Data]}),
 	    {ok, Ctx}
@@ -2812,11 +2840,11 @@ rpdo_unpack(I, Data, Ctx=#co_ctx {name = _Name}) ->
 		     Ctx#co_ctx.tpdo_cache, self()) of
 	{rpdo,IL} ->
 	    BitLenList = [BitLen || {_Ix, BitLen} <- IL],
-	    ?dbg("~s: rpdo_unpack: data = ~w, il = ~w, bl = ~w", 
+	    lager:debug("~s: rpdo_unpack: data = ~w, il = ~w, bl = ~w", 
 		 [_Name, Data, IL, BitLenList]),
 	    try co_codec:decode_pdo(Data, BitLenList) of
 		{Ds, _} -> 
-		    ?dbg("~s: rpdo_unpack: decoded data ~p", [_Name, Ds]),
+		    lager:debug("~s: rpdo_unpack: decoded data ~p", [_Name, Ds]),
 		    rpdo_set(IL, Ds, Ctx)
 	    catch error:_Reason ->
 		    ?ew("~s: rpdo_unpack: decode failed, reason ~p",  
@@ -2846,10 +2874,10 @@ pdo_mapping(Ix, _TpdoCtx=#tpdo_ctx {dict = Dict,
 				    res_table = ResTable, 
 				    tpdo_cache = TpdoCache,
 				    node_pid = NodePid}) ->
-    ?dbg("pdo_mapping: api call for ~.16#", [Ix]),
+    lager:debug("pdo_mapping: api call for ~.16#", [Ix]),
     pdo_mapping(Ix, ResTable, Dict, TpdoCache, NodePid).
 pdo_mapping(Ix, ResTable, Dict, TpdoCache, NodePid) ->
-    ?dbg("pdo_mapping: ~.16#", [Ix]),
+    lager:debug("pdo_mapping: ~.16#", [Ix]),
     case co_dict:value(Dict, Ix, 0) of
 	{ok,N} when N >= 0, N =< 64 -> %% Standard tpdo/rpdo
 	    MType = case Ix of
@@ -2860,13 +2888,13 @@ pdo_mapping(Ix, ResTable, Dict, TpdoCache, NodePid) ->
 				   Ix =< ?IX_RPDO_MAPPING_LAST ->
 			    rpdo
 		    end,
-	    ?dbg("pdo_mapping: Standard pdo of size ~p found", [N]),
+	    lager:debug("pdo_mapping: Standard pdo of size ~p found", [N]),
 	    pdo_mapping(MType,Ix,1,N,ResTable,Dict,TpdoCache,NodePid);
 	{ok,?SAM_MPDO} -> %% SAM-MPDO
-	    ?dbg("pdo_mapping: sam_mpdo identified look for value", []),
+	    lager:debug("pdo_mapping: sam_mpdo identified look for value", []),
 	    mpdo_mapping(sam_mpdo,Ix,ResTable,Dict,TpdoCache,NodePid);
 	{ok,?DAM_MPDO} -> %% DAM-MPDO
-	    ?dbg("pdo_mapping: dam_mpdo found", []),
+	    lager:debug("pdo_mapping: dam_mpdo found", []),
 	    pdo_mapping(dam_mpdo,Ix,1,1,ResTable,Dict,TpdoCache,NodePid);
 	Error ->
 	    Error
@@ -2877,36 +2905,36 @@ pdo_mapping(MType,Ix,Si,Sn,ResTable,Dict,TpdoCache,NodePid) ->
     pdo_mapping(MType,Ix,Si,Sn,[],ResTable,Dict,TpdoCache,NodePid).
 
 pdo_mapping(MType,_Ix,Si,Sn,Is,_ResTable,_Dict,_TpdoCache,_NodePid) when Si > Sn ->
-    ?dbg("pdo_mapping: ~p all entries mapped, result ~p", 
+    lager:debug("pdo_mapping: ~p all entries mapped, result ~p", 
 	 [MType, Is]),
     {MType, reverse(Is)};
 pdo_mapping(MType,Ix,Si,Sn,Is,ResTable,Dict,TpdoCache,NodePid) -> 
-    ?dbg("pdo_mapping: type = ~p, index = ~.16#:~w", [MType,Ix,Si]),
+    lager:debug("pdo_mapping: type = ~p, index = ~.16#:~w", [MType,Ix,Si]),
     case co_dict:value(Dict, Ix, Si) of
 	{ok,Map} ->
-	    ?dbg("pdo_mapping: map = ~.16#", [Map]),
+	    lager:debug("pdo_mapping: map = ~.16#", [Map]),
 	    Index = {_I,_S} = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
-	    ?dbg("pdo_mapping: entry[~w] = {~.16#:~w}", 
+	    lager:debug("pdo_mapping: entry[~w] = {~.16#:~w}", 
 		 [Si,_I,_S]),
 	    maybe_inform_reserver(MType, Index, ResTable, Dict, TpdoCache, NodePid),
 	    pdo_mapping(MType,Ix,Si+1,Sn,
 			[{Index, ?PDO_MAP_BITS(Map)}|Is], 
 			ResTable, Dict, TpdoCache, NodePid);
 	Error ->
-	    ?dbg("pdo_mapping: ~.16#:~w = Error ~w", 
+	    lager:debug("pdo_mapping: ~.16#:~w = Error ~w", 
 		 [Ix,Si,Error]),
 	    Error
     end.
 
 mpdo_mapping(MType,Ix,ResTable,Dict,TpdoCache,NodePid) 
   when MType == sam_mpdo andalso is_integer(Ix) ->
-    ?dbg("mpdo_mapping: index = ~.16#", [Ix]),
+    lager:debug("mpdo_mapping: index = ~.16#", [Ix]),
     case co_dict:value(Dict, Ix, 1) of
 	{ok,Map} ->
 	   Index = {?PDO_MAP_INDEX(Map),?PDO_MAP_SUBIND(Map)},
 	   mpdo_mapping(MType,Index,ResTable,Dict,TpdoCache,NodePid);
 	Error ->
-	    ?dbg("mpdo_mapping: ~.16# = Error ~w", [Ix,Error]),
+	    lager:debug("mpdo_mapping: ~.16# = Error ~w", [Ix,Error]),
 	    Error
     end;
 mpdo_mapping(MType,{IxInScanList,SiInScanList},ResTable,Dict,TpdoCache,NodePid) 
@@ -2915,32 +2943,36 @@ mpdo_mapping(MType,{IxInScanList,SiInScanList},ResTable,Dict,TpdoCache,NodePid)
        IxInScanList =< ?IX_OBJECT_SCANNER_LAST  ->
     %% MPDO Producer mapping
     %% The entry in PDO Map has been read, now read the entry in MPDO Scan List
-    ?dbg("mpdo_mapping: sam_mpdo, scan index = ~.16#:~w", 
+    lager:debug("mpdo_mapping: sam_mpdo, scan index = ~.16#:~w", 
 	 [IxInScanList,SiInScanList]),
     case co_dict:value(Dict, IxInScanList, SiInScanList) of
 	{ok, Map} ->
-	    ?dbg("mpdo_mapping: map = ~.16#", [Map]),
+	    lager:debug("mpdo_mapping: map = ~.16#", [Map]),
 	    Index = {_Ix,_Si} = {?TMPDO_MAP_INDEX(Map),?TMPDO_MAP_SUBIND(Map)},
 	    BlockSize = ?TMPDO_MAP_SIZE(Map), %% TODO ????
-	    ?dbg("mpdo_mapping: sam_mpdo, local index = ~.16#:~w", [_Ix,_Si]),
+	    lager:debug("mpdo_mapping: sam_mpdo, local index = ~.16#:~w", 
+			[_Ix,_Si]),
 	    maybe_inform_reserver(MType, Index, ResTable, Dict, TpdoCache, NodePid),
 	    {MType, [{{Index, BlockSize}, ?MPDO_DATA_SIZE}]};
 	Error ->
 	    Error %%??
     end.
        
-maybe_inform_reserver(MType, {Ix, _Si} = Index, ResTable, _Dict, TpdoCache, NodePid) ->
+maybe_inform_reserver(MType, {Ix, _Si} = Index, ResTable, 
+		      _Dict, TpdoCache, NodePid) ->
     case reserver_with_module(ResTable, Ix) of
 	[] ->
-	    ?dbg("maybe_inform_reserver: No reserver for index ~.16#", [Ix]),
+	    lager:debug("maybe_inform_reserver: No reserver for index ~.16#", [Ix]),
 	    ok;
 	{NodePid, _Mod} when is_pid(NodePid)->
-	    ?dbg("maybe_inform_reserver: co_node ~p has reserved index ~.16#", 
-		 [NodePid, Ix]),
+	    lager:debug(
+	      "maybe_inform_reserver: co_node ~p has reserved index ~.16#", 
+	      [NodePid, Ix]),
 	    ok;
 	{Pid, _Mod} when is_pid(Pid)->
-	    ?dbg("maybe_inform_reserver: Process ~p has reserved index ~.16#", 
-		 [Pid, Ix]),
+	    lager:debug(
+	      "maybe_inform_reserver: Process ~p has reserved index ~.16#", 
+	      [Pid, Ix]),
 
 	    %% Handle differently when TPDO and RPDO
 	    case MType of
@@ -2959,7 +2991,7 @@ maybe_inform_reserver(MType, {Ix, _Si} = Index, ResTable, _Dict, TpdoCache, Node
 		    ok
 	    end;
 	{dead, _Mod} ->
-	    ?dbg("maybe_inform_reserver: "
+	    lager:debug("maybe_inform_reserver: "
 		 "Reserver process for index ~.16# dead.", [Ix]),
 	    {error, ?abort_internal_error}
     end.
@@ -2970,19 +3002,19 @@ tpdo_data({Ix, Si} = I, #tpdo_ctx {res_table = ResTable,
 				   node_pid = NodePid}) ->
     case reserver_with_module(ResTable, Ix) of
 	[] ->
-	    ?dbg("tpdo_data: No reserver for index ~.16#", [Ix]),
+	    lager:debug("tpdo_data: No reserver for index ~.16#", [Ix]),
 	    co_dict:data(Dict, Ix, Si);
 	{NodePid, _Mod} when is_pid(NodePid)->
-	    ?dbg("tpdo_data: co_node ~p has reserved index ~.16#", 
+	    lager:debug("tpdo_data: co_node ~p has reserved index ~.16#", 
 		 [NodePid, Ix]),
 	    co_dict:data(Dict, Ix, Si);
 	{Pid, _Mod} when is_pid(Pid)->
-	    ?dbg("tpdo_data: Process ~p has reserved index ~.16#", 
+	    lager:debug("tpdo_data: Process ~p has reserved index ~.16#", 
 		 [Pid, Ix]),
 	    %% Value cached ??
 	    cache_value(TpdoCache, I);
 	{dead, _Mod} ->
-	    ?dbg("tpdo_data: Reserver process for index ~.16# dead.", 
+	    lager:debug("tpdo_data: Reserver process for index ~.16# dead.", 
 		 [Ix]),
 	    %% Value cached??
 	    cache_value(TpdoCache, I)
@@ -2994,16 +3026,16 @@ cache_value(Cache, I = {_Ix, _Si}) ->
 	    %% How handle ???
 	    ?ew("~p: cache_value: unknown tpdo element ~.16#:~w", 
 		 [self(), _Ix, _Si]),
-	    ?dbg("cache_value: tpdo element not found for ~.16#:~w, "
+	    lager:debug("cache_value: tpdo element not found for ~.16#:~w, "
 		 "returning default value.",  [_Ix, _Si]),
 	    {error, no_value};
 	[{I,[LastValue | []]}]  ->
 	    %% Leave last value in cache
-	    ?dbg("cache_value: Last value = ~p.", [LastValue]),
+	    lager:debug("cache_value: Last value = ~p.", [LastValue]),
 	    {ok, LastValue};
 	[{I, [FirstValue | Rest]}] ->
 	    %% Remove first value from list
-	    ?dbg("cache_value: First value = ~p, rest = ~p.", 
+	    lager:debug("cache_value: First value = ~p, rest = ~p.", 
 		 [FirstValue, Rest]),
 	    ets:insert(Cache, {I, Rest}),
 	    {ok, FirstValue}
@@ -3020,37 +3052,37 @@ rpdo_value({Ix,Si},Data,Ctx=#co_ctx {res_table = RTable}) ->
 	{Pid, Mod} when is_pid(Pid)->
 	    rpdo_value_app({Ix,Si}, Data, {Pid, Mod}, Ctx);
 	{dead, _Mod} ->
-	    ?dbg("rpdo_value: Reserver process for index ~.16# dead.", 
+	    lager:debug("rpdo_value: Reserver process for index ~.16# dead.", 
 		 [Ix]),
 	    Ctx
     end.
 
 rpdo_value_dict({Ix,Si}, Data, Ctx=#co_ctx {dict = Dict}) ->
-    ?dbg("rpdo_value: No reserver for index ~.16#", [Ix]),
+    lager:debug("rpdo_value: No reserver for index ~.16#", [Ix]),
     try co_dict:set_data(Dict, Ix, Si, Data) of
 	ok -> 
 	    handle_notify(Ix, Ctx);
 	_Error -> 
-	    ?dbg("rpdo_value: set_data failed,error ~p", [_Error]),
+	    lager:debug("rpdo_value: set_data failed,error ~p", [_Error]),
 	    Ctx
     catch
 	error:_Reason -> 
-	    ?dbg("rpdo_value: set_data failed, reason ~p", [_Reason]),
+	    lager:debug("rpdo_value: set_data failed, reason ~p", [_Reason]),
 	    Ctx
     end.
 
 rpdo_value_app({Ix,Si}, Data, {Pid, Mod}, Ctx) ->
-    ?dbg("rpdo_value: Process ~p has reserved index ~.16#", [Pid, Ix]),
+    lager:debug("rpdo_value: Process ~p has reserved index ~.16#", [Pid, Ix]),
     case co_set_fsm:start({Pid, Mod}, {Ix, Si}, Data) of
 	{ok, _FsmPid} -> 
-	    ?dbg(node,"Started set session ~p", [_FsmPid]),
+	    lager:debug([node],"Started set session ~p", [_FsmPid]),
 	    handle_notify(Ix, Ctx);
 	ignore ->
-	    ?dbg(node,"Complete set session executed", []),
+	    lager:debug([node],"Complete set session executed", []),
 	    handle_notify(Ix, Ctx);
 	{error, _Reason} -> 	
 	    %% io:format ??
-	    ?dbg(node,"Failed starting set session, reason ~p", [_Reason]),
+	    lager:debug([node],"Failed starting set session, reason ~p", [_Reason]),
 	    Ctx
     end.
 
@@ -3063,7 +3095,8 @@ set_error(Error, Code, Ctx) ->
 	    Ctx;  %% condition already reported, do NOT send
 	false ->
 	    co_dict:direct_set_value(Ctx#co_ctx.dict,?IX_ERROR_REGISTER, 0, Error),
-	    NewErrorList = update_error_list([Code | Ctx#co_ctx.error_list], 1, Ctx),
+	    NewErrorList = 
+		update_error_list([Code | Ctx#co_ctx.error_list], 1, Ctx),
 	    if Ctx#co_ctx.emcy_id =:= 0 ->
 		    ok;
 	       true ->
@@ -3130,7 +3163,7 @@ time_of_day() ->
     now_to_time_of_day(os:timestamp()).
 
 set_time_of_day(_Time) ->
-    ?dbg("set_time_of_day: ~p", [_Time]),
+    lager:debug("set_time_of_day: ~p", [_Time]),
     ok.
 
 now_to_time_of_day({Sm,S0,Us}) ->
