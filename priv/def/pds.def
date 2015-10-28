@@ -18,6 +18,7 @@
   {pulse,    16#05},
   {external, 16#06},
   {alwayson, 16#07},
+  {dmx,      16#08},
   {input,    16#ff}
  ]}.
 
@@ -26,10 +27,11 @@
  [{none, 16#00},
   {backlight,16#81},
   {block,    16#82},
-  {onoff,   16#01},
+  {onoff,    16#01},
   {interval, 16#03},
   {moment,   16#04},
   {pulse,    16#05},
+  {dmx,      16#08},
   {alarm,    16#83}
  ]}.
 
@@ -103,7 +105,7 @@
    [{type, {enum,unsigned8,otype}},
     {category, optional},
     {access, rw}]},
-  {entry, {9, 16},
+  {entry, {9, 32},
    [{type, {enum,unsigned8,votype}},
     {category, optional},
     {access, rw}]}
@@ -114,7 +116,7 @@
   {name, "output-delay"},
   {description, "pulse start delay in milliseconds"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned32},
     {category, optional},
     {access, rw}]}
@@ -134,7 +136,7 @@
  [{id, output_wait},
   {name, "output-wait"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned32},
     {category, optional},
     {access, rw}]}
@@ -144,7 +146,7 @@
  [{id, output_waitmult},
   {name, "output-waitmult"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned32},
     {category, optional},
     {access, rw}]}
@@ -154,7 +156,7 @@
  [{id, output_repeat},
   {name, "output-repeat"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned16},
     {category, optional},
     {access, rw}]}
@@ -165,7 +167,7 @@
   {name, "output-rampup"},
   {description, "rampup time in milliseconds"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned32},
     {category, optional},
     {access, rw}]}
@@ -176,7 +178,7 @@
   {name, "output-rampdown"},
   {description, "rampdown time in milliseconds"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned32},
     {category, optional},
     {access, rw}]}
@@ -187,7 +189,7 @@
   {name, "output-sustain"},
   {description, "sustain time in milliseconds when using pulse"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned32},
     {category, optional},
     {access, rw}]}
@@ -225,14 +227,58 @@
     {access, rw}]}
  ]}.
 
-%% FIXME: add 271B, 271C, 271D, 271E
+{objdef, 16#271B,
+ [{id, output_block_nid},
+  {name, "output-block-nid"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}]}]}.
+
+{objdef, 16#271C,
+ [{id, output_block_mask},
+  {name, "output-block-mask"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}]}]}.
+
+{objdef, 16#271D,
+ [{id, output_block_def},
+  {name, "output-block-def"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, boolean},
+    {category, optional},
+    {access, rw}]}]}.
+
+{objdef, 16#271E,
+ [{id, output_location},
+  {name, "output-location"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}]}.
+
+
+{objdef, 16#271F,
+ [{id, output_flags},
+  {name, "output-flags"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, {bitfield,unsigned16,oflags}},
+    {category, optional},
+    {access, rw}]}]}.
 
 {objdef, 16#2780,
  [{id, output_deact},
   {name, "output-deact"},
   {description, "deactivation delay in milliseconds"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned32},
     {category, optional},
     {access, rw}]}
@@ -243,7 +289,7 @@
   {name, "output-step-max"},
   {description, "maximum encoder step value"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned8},
     {category, optional},
     {access, rw}]}
@@ -254,7 +300,7 @@
   {name, "output-step"},
   {description, "saved step value"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned8},
     {category, optional},
     {access, rw}]}
@@ -265,7 +311,7 @@
   {name, "output-control"},
   {description, "saved control value"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned8},
     {category, optional},
     {access, rw}]}
@@ -277,7 +323,7 @@
   {name, "output-ctltype"},
   {description, "saved control fnction"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned8},
     {category, optional},
     {access, rw}]}
@@ -288,7 +334,7 @@
   {name, "output-code"},
   {description, "output alarm code"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned8},
     {category, optional},
     {access, rw}]}
@@ -299,7 +345,7 @@
   {name, "output-loadf"},
   {description, "output load factor*10"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, integer8},
     {category, optional},
     {access, rw}]}
@@ -310,21 +356,77 @@
   {name, "output-ctlk"},
   {description, "control k value"},
   {struct, array},
-  {entry, {1,16},
+  {entry, {1,32},
    [{type, unsigned8},
     {category, optional},
     {access, rw}]}
 ]}.
 
-{objdef, 16#271F,
- [{id, output_flags},
-  {name, "output-flags"},
+{objdef, 16#2788,
+ [{id, output_dmx_addr},
+  {name, "output-dmx-addr"},
+  {description, "dmx address"},
   {struct, array},
-  {entry, {1,16},
-   [{type, {bitfield,unsigned16,oflags}},
+  {entry, {1,32},
+   [{type, unsigned16},
     {category, optional},
-    {access, rw}]}]}.
+    {access, rw}]}
+]}.
 
+{objdef, 16#2789,
+ [{id, output_dmx_nchan},
+  {name, "output-dmx-nchan"},
+  {description, "dmx number of channels"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#278A,
+ [{id, output_dmx_ch1},
+  {name, "output-dmx-ch1"},
+  {description, "dmx channel 1"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}
+ ]}.
+
+{objdef, 16#278B,
+ [{id, output_dmx_ch2},
+  {name, "output-dmx-ch2"},
+  {description, "dmx channel 2"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#278C,
+ [{id, output_dmx_ch3},
+  {name, "output-dmx-ch3"},
+  {description, "dmx channel 3"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#278D,
+ [{id, output_dmx_ch4},
+  {name, "output-dmx-ch4"},
+  {description, "dmx channel 4"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}]}
+]}.
 
 {objdef, 16#2720,
  [{id, input_flags},
