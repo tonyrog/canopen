@@ -183,7 +183,7 @@ verify_def_files(_Config) ->
     DefDir = filename:join(code:priv_dir(canopen), "def/"),
     ResList = case filelib:is_dir(DefDir) of
 		  true ->
-		      filelib:fold_files(DefDir, "[*.def]", false, 
+		      filelib:fold_files(DefDir, "[*.def]$", false, 
 					 fun(F, FList) -> 
 						 [{F, verify_def_file(F)} | FList]
 					 end, []);
