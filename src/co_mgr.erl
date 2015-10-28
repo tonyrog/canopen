@@ -39,8 +39,8 @@
 -export([client_require/1]).
 -export([client_set_nid/1]).
 -export([client_set_mode/1]).
--export([client_store/4, client_store/3, client_store/2]).
--export([client_fetch/3, client_fetch/2, client_fetch/1]).
+-export([client_store/5, client_store/4, client_store/3, client_store/2]).
+-export([client_fetch/4, client_fetch/3, client_fetch/2, client_fetch/1]).
 -export([client_notify/5, client_notify/4, client_notify/3]).
 -export([translate/1, translate/2]).
 
@@ -477,6 +477,7 @@ client_set_mode(Mode)
        Mode == segment ->
     gen_server:call(?CO_MGR, {set_mode, Mode}).
 
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Stores Value at object specified by Index, Subind at remote CANOpen
@@ -488,15 +489,30 @@ client_set_mode(Mode)
 -spec client_store({TypeOfNid::nodeid | xnodeid, Nid::integer()},
 		   Index::integer() | atom(), 
 		   SubInd::integer() | atom(), 
+		   Value::term(),
+		   Timeout::integer()) ->
+			  ok | {error, Reason::term()}.
+
+client_store(Nid, Index, SubInd, Value, Timeout) ->
+    gen_server:call(?CO_MGR, {store,Nid,Index,SubInd,Value,Timeout}, Timeout).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link  client_store/5}.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_store({TypeOfNid::nodeid | xnodeid, Nid::integer()},
+		   Index::integer() | atom(), 
+		   SubInd::integer() | atom(), 
 		   Value::term()) ->
 			    ok | {error, Reason::term()}.
 
 client_store(Nid, Index, SubInd, Value) ->
-    gen_server:call(?CO_MGR, {store, Nid, Index, SubInd, Value}).
+    gen_server:call(?CO_MGR, {store,Nid,Index,SubInd,Value,default}).
 
 %%--------------------------------------------------------------------
 %% @doc
-%% See {@link  client_store/4}.
+%% See {@link  client_store/5}.
 %% @end
 %%--------------------------------------------------------------------
 -spec client_store(Index::integer() | atom(), 
@@ -505,11 +521,11 @@ client_store(Nid, Index, SubInd, Value) ->
 			    ok | {error, Reason::term()}.
 
 client_store(Index, SubInd, Value) ->
-    gen_server:call(?CO_MGR, {store, Index, SubInd, Value}).
+    gen_server:call(?CO_MGR, {store,Index,SubInd,Value,default}).
 
 %%--------------------------------------------------------------------
 %% @doc
-%% See {@link  client_store4}.
+%% See {@link  client_store/5}.
 %% SubInd = 0.
 %% @end
 %%--------------------------------------------------------------------
@@ -518,7 +534,7 @@ client_store(Index, SubInd, Value) ->
 			    ok | {error, Reason::term()}.
 
 client_store(Index, Value) ->
-    gen_server:call(?CO_MGR, {store, Index, 0, Value}).
+    gen_server:call(?CO_MGR, {store,Index,0,Value,default}).
 
 
 %%--------------------------------------------------------------------
@@ -533,23 +549,37 @@ client_store(Index, Value) ->
 %%--------------------------------------------------------------------
 -spec client_fetch({TypeOfNid::nodeid | xnodeid, Nid::integer()},
 		   Index::integer() | atom(),
+		   SubInd::integer() | atom(),
+		   Timeout::integer()) ->
+			  Value::term() | {error, Reason::term()}.
+
+client_fetch(Nid,Index,SubInd,Timeout) ->
+    gen_server:call(?CO_MGR, {fetch,Nid,Index,SubInd,Timeout},Timeout).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% See {@link  client_fetch/4}.
+%% @end
+%%--------------------------------------------------------------------
+-spec client_fetch({TypeOfNid::nodeid | xnodeid, Nid::integer()},
+		   Index::integer() | atom(),
 		   SubInd::integer() | atom()) -> 
 			  Value::term() | {error, Reason::term()}.
 
 client_fetch(Nid, Index, SubInd) ->
-    gen_server:call(?CO_MGR, {fetch, Nid, Index, SubInd}).
+    gen_server:call(?CO_MGR, {fetch,Nid,Index,SubInd,default}).
 
 %%--------------------------------------------------------------------
 %% @doc
-%% See {@link  client_fetch/3}.
+%% See {@link  client_fetch/4}.
 %% @end
 %%--------------------------------------------------------------------
 -spec client_fetch(Index::integer() | atom(),
-		   SubInd::integer() | atom()) -> 
+		   SubInd::integer() | atom()) ->
 			  Value::term() | {error, Reason::term()}.
 
 client_fetch(Index, SubInd)  ->
-    gen_server:call(?CO_MGR, {fetch, Index, SubInd}).
+    gen_server:call(?CO_MGR, {fetch,Index,SubInd,default}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -561,7 +591,7 @@ client_fetch(Index, SubInd)  ->
 			  Value::term() | {error, Reason::term()}.
 
 client_fetch(Index)  ->
-    gen_server:call(?CO_MGR, {fetch, Index, 0}).
+    gen_server:call(?CO_MGR, {fetch,Index,0,default}).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -693,11 +723,14 @@ init(Opts) ->
 	{setnid, {TypeOfNid::nodeid | xnodeid, Nid::integer()}} |
 	{setmode, Mode:: block | segment} |
 	{store, {TypeOfNid::nodeid | xnodeid, Nid::integer()},
-	 Ix::integer(), Si::integer(), Value::term()} |
-	{store, Ix::integer(), Si::integer(), Value::term()} |
+	 Ix::integer(), Si::integer(), Value::term(),
+	 Timeout::integer()|default } |
+	{store, Ix::integer(), Si::integer(), Value::term(), 
+	 Timeout::integer()|default } |
 	{fetch, {TypeOfNid::nodeid | xnodeid, Nid::integer()},
-	 Ix::integer() | atom(), Si::integer() | atom()} |
-	{fetch, Ix::integer(), Si::integer()} |
+	 Ix::integer() | atom(), Si::integer() | atom(),
+	 Timeout::integer()|default} |
+	{fetch, Ix::integer(), Si::integer(),Timeout::integer()|default} |
 	{translate, Ix::atom(), Si::atom()} |
 	{debug, TrueOrFalse::boolean()} |
 	{loop_data, Qual:: all | no_ctx}.
@@ -719,17 +752,18 @@ handle_call({require,Mod}, _From, Mgr) ->
     {Reply,_DCtx,Mgr1} = load_ctx(Mod, Mgr),
     {reply, Reply, Mgr1};
 
-handle_call({store,Nid,Index,SubInd,Value}, From, Mgr) ->
-    do_store(Nid,Index,SubInd,Value, From, Mgr);
-handle_call({store,Index,SubInd,Value}, From, Mgr=#mgr {def_nid = DefNid}) 
+handle_call({store,Nid,Index,SubInd,Value,Timeout}, From, Mgr) ->
+    do_store(Nid,Index,SubInd,Value,Timeout,From,Mgr);
+handle_call({store,Index,SubInd,Value,Timeout},From,
+	    Mgr=#mgr {def_nid = DefNid}) 
   when DefNid =/= 0 ->
-    do_store(DefNid, Index, SubInd, Value, From, Mgr);
+    do_store(DefNid,Index,SubInd,Value,Timeout,From,Mgr);
 
-handle_call({fetch,Nid,Index,SubInd}, From, Mgr) ->
-    do_fetch(Nid,Index,SubInd, From, Mgr);
-handle_call({fetch,Index,SubInd}, From, Mgr=#mgr {def_nid = DefNid})
+handle_call({fetch,Nid,Index,SubInd,Timeout}, From, Mgr) ->
+    do_fetch(Nid,Index,SubInd,Timeout, From, Mgr);
+handle_call({fetch,Index,SubInd,Timeout}, From, Mgr=#mgr {def_nid = DefNid})
   when DefNid =/= 0 ->
-    do_fetch(DefNid, Index, SubInd, From, Mgr);
+    do_fetch(DefNid,Index,SubInd,Timeout, From, Mgr);
 
 handle_call({translate,Index,SubInd}, _From, Mgr=#mgr {def_nid = DefNid})
   when DefNid =/= 0 ->
@@ -880,7 +914,7 @@ load_ctx(Mod, Mgr) ->
 	    {ok, DCtx, Mgr#mgr { ctx = DCtx }}
     end.
     
-do_store(Nid,Index,SubInd,Value,Client, 
+do_store(Nid,Index,SubInd,Value,Timeout,Client, 
        Mgr=#mgr {pids = PList, def_trans_mode = TransMode, debug = Dbg}) ->
     Ctx = context(Nid, Mgr),
     case translate_index(Ctx,Index,SubInd,Value) of
@@ -888,7 +922,7 @@ do_store(Nid,Index,SubInd,Value,Client,
 	    lager:debug([{index, {Ti, Tsi}}],"do_store: translated  ~p", [_T]),
 	    Pid = 
 		spawn_request(store, 
-			      [Nid, Ti, Tsi, TransMode, Tv],
+			      [Nid, Ti, Tsi, TransMode, Tv, Timeout],
 			      Client,
 			      {store, Nid, Index, SubInd, Value, Tv, Ctx},
 			      Dbg),
@@ -899,7 +933,7 @@ do_store(Nid,Index,SubInd,Value,Client,
     end.
   
 
-do_fetch(Nid,Index,SubInd, Client, 
+do_fetch(Nid,Index,SubInd,Timeout, Client, 
        Mgr=#mgr {pids = PList, def_trans_mode = TransMode, debug = Dbg}) ->
     Ctx = context(Nid, Mgr),
     lager:debug("do_fetch: translate ~p:~p", [Index, SubInd]),
@@ -908,7 +942,7 @@ do_fetch(Nid,Index,SubInd, Client,
 	    lager:debug([{index, {Ti, Tsi}}],"do_fetch: translated  ~p", [_T]),
 	    Pid = 
 		spawn_request(fetch, 
-			      [Nid, Ti, Tsi, TransMode, Tv],
+			      [Nid, Ti, Tsi, TransMode, Tv, Timeout],
 			      Client,
 			      {fetch, Nid, Index, SubInd, Tv, Ctx},
 			      Dbg),
