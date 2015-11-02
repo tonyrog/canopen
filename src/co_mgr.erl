@@ -752,15 +752,25 @@ handle_call({require,Mod}, _From, Mgr) ->
     {Reply,_DCtx,Mgr1} = load_ctx(Mod, Mgr),
     {reply, Reply, Mgr1};
 
-handle_call({store,Nid,Index,SubInd,Value,Timeout}, From, Mgr) ->
-    do_store(Nid,Index,SubInd,Value,Timeout,From,Mgr);
-handle_call({store,Index,SubInd,Value,Timeout},From,
-	    Mgr=#mgr {def_nid = DefNid}) 
+handle_call({store,default,Index,SubInd,Value,Timeout}, From, 
+	    Mgr=#mgr {def_nid = DefNid})
   when DefNid =/= 0 ->
     do_store(DefNid,Index,SubInd,Value,Timeout,From,Mgr);
+handle_call({store,Nid,Index,SubInd,Value,Timeout}, From, Mgr) ->
+    do_store(Nid,Index,SubInd,Value,Timeout,From,Mgr);
+%% fixme handle this with nid = atom = default
+handle_call({store,Index,SubInd,Value,Timeout},From,
+	    Mgr=#mgr {def_nid = DefNid}) 
+when DefNid =/= 0 ->  
+    do_store(DefNid,Index,SubInd,Value,Timeout,From,Mgr);
 
+handle_call({fetch,default,Index,SubInd,Timeout}, From, 
+	    Mgr=#mgr {def_nid = DefNid}) 
+  when DefNid =/= 0 ->
+    do_fetch(DefNid,Index,SubInd,Timeout, From, Mgr);
 handle_call({fetch,Nid,Index,SubInd,Timeout}, From, Mgr) ->
     do_fetch(Nid,Index,SubInd,Timeout, From, Mgr);
+%% fixme handle this with nid = atom = default
 handle_call({fetch,Index,SubInd,Timeout}, From, Mgr=#mgr {def_nid = DefNid})
   when DefNid =/= 0 ->
     do_fetch(DefNid,Index,SubInd,Timeout, From, Mgr);
