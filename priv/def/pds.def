@@ -18,11 +18,10 @@
   {pulse,    16#05},
   {external, 16#06},
   {alwayson, 16#07},
-  {dmx,      16#08},
   {input,    16#ff}
  ]}.
 
-%% "output-type" for virtual output 9-16
+%% "output-type" for virtual output 9-32
 {enum, votype,
  [{none, 16#00},
   {backlight,16#81},
@@ -37,25 +36,15 @@
 
 %% "output-done" function
 {enum, done_fn,
- [{stop,16#00},
-  {restart,16#01},
-  {repeat,16#02},
-  {start_1,16#03},
-  {start_2,16#04},
-  {start_3,16#05},
-  {start_4,16#06},
-  {start_5,16#07},
-  {start_6,16#08},
-  {start_7,16#09},
-  {start_8,16#0A},
-  {start_9,16#0B},
-  {start_10,16#0C},
-  {start_11,16#0D},
-  {start_12,16#0E},
-  {start_13,16#0F},
-  {start_14,16#10},
-  {start_15,16#11},
-  {start_16,16#12}
+ [{stop,16#00}, {restart,16#01}, {repeat,16#02},
+  {start_1,16#03}, {start_2,16#04}, {start_3,16#05}, {start_4,16#06},
+  {start_5,16#07}, {start_6,16#08}, {start_7,16#09}, {start_8,16#0A},
+  {start_9,16#0B}, {start_10,16#0C}, {start_11,16#0D}, {start_12,16#0E},
+  {start_13,16#0F}, {start_14,16#10}, {start_15,16#11}, {start_16,16#12},
+  {start_17,16#13}, {start_18,16#14}, {start_19,16#15}, {start_20,16#16},
+  {start_21,16#17}, {start_22,16#18}, {start_23,16#19}, {start_24,16#1A},
+  {start_25,16#1B}, {start_26,16#1C}, {start_27,16#1D}, {start_28,16#1E},
+  {start_29,16#1F}, {start_30,16#20}, {start_31,16#21}, {start_32,16#22}
  ]}.
 
 {enum, ramp_fn,
@@ -90,7 +79,9 @@
   {ancan,  16#0080},    %% output duty to can bus MSG_ANALOG
   {scale1a,16#0100},    %% power in range 0-1.5A,normal 0-15A
   {ondef,  16#0200},    %% output is ON by default
-  {onmem,  16#0400}     %% output state is saved/restored
+  {onmem,  16#0400},    %% output state is saved/restored
+  {anload, 16#0800},    %% send current output "load"
+  {value,  16#1000}     %% send current output "output-value"
  ]}.
 
 
