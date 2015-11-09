@@ -196,7 +196,7 @@ init({Serial, NodeName, Opts}) ->
     TpdoCache = ets:new(co_tpdo_cache, [public,ordered_set]),
     MpdoDispatch = ets:new(co_mpdo_dispatch, [public,ordered_set]),
     SdoCtx = #sdo_ctx {
-      timeout         = proplists:get_value(sdo_timeout,Opts,1000),
+      timeout         = proplists:get_value(sdo_timeout,Opts,3000),
       blk_timeout     = proplists:get_value(blk_timeout,Opts,500),
       pst             = proplists:get_value(pst,Opts,16),
       max_blksize     = proplists:get_value(max_blksize,Opts,74),
