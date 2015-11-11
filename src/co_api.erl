@@ -1191,11 +1191,11 @@ tpdo_set(Identity, Ix, Term, Mode)
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec notify(CobId::integer(), Ix::integer(), Value::term()) -> 
+-spec notify(CobId::integer(), Ix::integer(), Data::binary()) -> 
 		    ok | {error, Error::atom()}.
 
-notify(CobId,Ix,Value) ->
-    notify(CobId,Ix,0,Value).
+notify(CobId,Ix,Data) ->
+    notify(CobId,Ix,0,Data).
 
 %%--------------------------------------------------------------------
 %% @doc
