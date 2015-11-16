@@ -228,6 +228,8 @@
 -define(INDEX_ADC_MAX,            16#2769).  %% Max Value (clamp)
 -define(INDEX_ADC_INHIBIT,        16#276A).  %% Inhibit after latch
 -define(INDEX_ADC_DELAY,          16#276B).  %% Sample ms between samples
+-define(INDEX_OUTPUT_ALARM_STATUS, 16#276C). %% Read alarm status (debug)
+-define(INDEX_OUTPUT_STATE,        16#276D). %% Read output state
 
 %% PDS - PDU's
 
@@ -252,12 +254,14 @@
 -define(MSG_OUTPUT_VALUE,   16#280D).   %% Current value update
 
 -define(MSG_ALARM_CNFRM,    16#280E).   %% Confirm larm condition (from client)
+-define(MSG_REFRESH,        16#280F).   %% send output-active/output-value match
 
 -define(MSG_BLOCK,          16#2810).   %% Block input from a node (in value)
 -define(MSG_UNBLOCK,        16#2811).   %% Unblock input from a node (in value)
 
 -define(MSG_ECHO_REQUEST,   16#2812).   %% Expect echo reply from matching node
 -define(MSG_ECHO_REPLY,     16#2813).   %% This is the reply
+-define(MSG_OUTPUT_STATE,   16#2814).   %% send output-active/output-value match
 
 -define(MSG_RESET,          16#28AA).   %%  Reset the node 
 
