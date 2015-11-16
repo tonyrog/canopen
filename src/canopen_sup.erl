@@ -49,7 +49,7 @@
 %% @end
 %%--------------------------------------------------------------------
 start_link(Args) ->
-    ?ei("~p: start_link: args = ~p", [?MODULE, Args]),
+    lager:debug("args = ~p", [Args]),
     try supervisor:start_link({local, ?MODULE}, ?MODULE, Args) of
 	{ok, Pid} ->
 	    {ok, Pid, {normal, Args}};
@@ -90,7 +90,7 @@ stop() ->
 %% @end
 %%--------------------------------------------------------------------
 init(Args) ->
-    ?ei("~p: init: args = ~p,\n pid = ~p", [?MODULE, Args, self()]),
+    lager:debug("args = ~p,\n pid = ~p", [Args, self()]),
     Serial = proplists:get_value(serial, Args, 0),
     Opts = proplists:get_value(options, Args, []),
     CP = co_proc,
@@ -103,7 +103,7 @@ init(Args) ->
     SysApp = {SA, {SA, start_link, [Serial]}, permanent, 5000, worker, [SA]},
     OsApp = {OA, {OA, start_link, [Serial]}, permanent, 5000, worker, [OA]},
     Processes = [CoProc, CoNode, SysApp, OsApp],
-    ?ei("~p: About to start ~p", [?MODULE, Processes]),
+    lager:debug("About to start ~p", [Processes]),
     {ok, { {rest_for_one, 0, 300}, Processes} }.
 
 
