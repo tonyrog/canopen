@@ -158,6 +158,24 @@
 %%
 {enum, powermode, [{off, 0}, {powerdown, 1}, {idle, 2}]}.
   
+{enum, node_location,
+[{left, 16#1},
+ {right, 16#2},
+ {center, 16#3},
+ {front, 16#4},
+ {rear, 16#8},
+ {mid, 16#c},
+ {front_left, 16#5},
+ {front_center, 16#7},
+ {front_right, 16#6},
+ {mid_left, 16#d},
+ {mid_center, 16#f},
+ {mid_right, 16#e},
+ {rear_left, 16#9},
+ {rear_center, 16#b},
+ {rear_right, 16#a}
+]}.
+
 {objdef, 16#270E,
  [{id, powerdown},
   {name, "powerdown"},
@@ -170,7 +188,7 @@
   {name, "location"},
   {description, "Node location id"},
   {struct, var},
-  {type, unsigned8},
+  {type, {enum,unsigned8,node_location}},
   {access, rw}]}.  
 
 %%

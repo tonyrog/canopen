@@ -202,7 +202,7 @@
 
 {objdef, 16#2718,
  [{id, output_alarm_low},
-  {name, "output-arlam-low"},
+  {name, "output-alarm-low"},
   {description, "Low current alarm, given as percent of deviation from normal current."},
   {struct, array},
   {entry, {1,8},
