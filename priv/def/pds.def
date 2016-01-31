@@ -432,6 +432,17 @@
     {access, rw}]}
 ]}.
 
+{objdef, 16#276C,
+ [{id, output_alarm_status},
+  {name, "output-alarm-status"},
+  {description, "alarm status"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}]}
+ ]}.
+
 {objdef, 16#276D,
  [{id, output_state},
   {name, "output-state"},
