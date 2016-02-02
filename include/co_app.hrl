@@ -262,6 +262,7 @@
 -define(MSG_ECHO_REQUEST,   16#2812).   %% Expect echo reply from matching node
 -define(MSG_ECHO_REPLY,     16#2813).   %% This is the reply
 -define(MSG_OUTPUT_STATE,   16#2814).   %% send output-active/output-value match
+-define(MSG_OUTPUT_ALARM,   16#2815).   %% send output-alarm on match
 
 -define(MSG_RESET,          16#28AA).   %%  Reset the node 
 
@@ -282,6 +283,11 @@
 %% battery node PDB messages volt=V*100 (0.00 - 65.00), amp=A*100 
 -define(MSG_BATTERY,        16#6201).  %% sub=bank, data=volt:16, amp:16
 -define(MSG_LOAD,           16#6202).  %% data=amp:16   amp=A*100
+
+-define(ALARM_STAT_OK,       0).
+-define(ALARM_STAT_PEND,     1).
+-define(ALARM_STAT_SET,      2).
+-define(ALARM_STAT_ACK,      3).
 
 %% Alarm causes tied to MSG_ALARM_x notifications
 -define(ALARM_CAUSE_OK,      16#00).  %% channel ok
