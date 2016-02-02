@@ -19,6 +19,7 @@ canopen also requires the following applications to be installed:
 <li>dthread - https://github.com/tonyrog/dthread</li>
 <li>uart - https://github.com/tonyrog/uart</li>
 <li>can - https://github.com/tonyrog/can</li>
+<li>lager - https://github.com/basho/lager</li>
 </ul>
 
 
