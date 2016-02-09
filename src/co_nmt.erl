@@ -828,7 +828,7 @@ update_slave(Slave, Config) ->
 		      heartbeat_time = HeartBeatTime }.
 
 update_slave_mode(Slave, NmtTable) ->
-    if Slave#nmt_slave.mode =:= automatic,
+    if Slave#nmt_slave.mode =:= auto,
        Slave#nmt_slave.node_state =/= ?Operational ->
 	    Cmd = start,
 	    case send_nmt(Slave#nmt_slave.id, co_lib:encode_nmt_command(Cmd)) of
