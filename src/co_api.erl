@@ -27,8 +27,10 @@
 -module(co_api).
 
 -include_lib("can/include/can.hrl").
--include("canopen.hrl").
--include("co_app.hrl").
+-include("../include/canopen.hrl").
+-include("../include/co_app.hrl").
+
+-define(DICT_T(), term()). %% dict:dict()
 
 %% API
 -export([start_link/2, stop/1]).
@@ -1141,7 +1143,7 @@ state(Identity, stopped) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec dict(Identity::node_identity()) -> 
-		  Dict::dict:dict() | {error, Error::atom()}.
+		  Dict::?DICT_T() | {error, Error::atom()}.
 
 dict(Identity) ->
     gen_server:call(identity_to_pid(Identity), dict).
