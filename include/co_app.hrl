@@ -150,7 +150,7 @@
 -define(INDEX_OUTPUT_DMX_CH2,    16#278B).  %% UNSIGNED8
 -define(INDEX_OUTPUT_DMX_CH3,    16#278C).  %% UNSIGNED8
 -define(INDEX_OUTPUT_DMX_CH4,    16#278D).  %% UNSIGNED8
-
+-define(INDEX_OUTPUT_WDT,        16#278E).  %% UNSIGNED32
 %% SET/GET PDS input channels
 -define(INDEX_INPUT_FLAGS,       16#2720).
 -define(INDEX_INPUT_OUT,         16#2721).  %% UNSIGNED32 output channel mask
@@ -261,10 +261,11 @@
 
 -define(MSG_ECHO_REQUEST,   16#2812).   %% Expect echo reply from matching node
 -define(MSG_ECHO_REPLY,     16#2813).   %% This is the reply
--define(MSG_OUTPUT_STATE,   16#2814).   %% send output-active/output-value match
--define(MSG_OUTPUT_ALARM,   16#2815).   %% send output-alarm on match
-
--define(MSG_RESET,          16#28AA).   %%  Reset the node 
+-define(MSG_OUTPUT_STATE,   16#2814).   %% Send output-active/output-value match
+-define(MSG_OUTPUT_ALARM,   16#2815).   %% Send output-alarm on match
+-define(MSG_OUTPUT_STEP,    16#2816).   %% Send output-step value & max
+-define(MSG_FEED,           16#2817).   %% Feed output watch dog
+-define(MSG_RESET,          16#28AA).   %% Reset the node 
 
 %%
 %% Device specific indexes and subindexes

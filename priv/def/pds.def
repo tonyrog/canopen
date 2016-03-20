@@ -81,7 +81,8 @@
   {ondef,  16#0200},    %% output is ON by default
   {onmem,  16#0400},    %% output state is saved/restored
   {anload, 16#0800},    %% send current output "load"
-  {anval,  16#1000}     %% send current output "output-value"
+  {anval,  16#1000},    %% send current output "output-value"
+  {outstp, 16#2000}     %% send current output "output-step"
  ]}.
 
 {enum, ostate,
@@ -192,6 +193,17 @@
  [{id, output_sustain},
   {name, "output-sustain"},
   {description, "sustain time in milliseconds when using pulse"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#278e,
+ [{id, output_wdt},
+  {name, "output-wdt"},
+  {description, "watch dog time in milliseconds"},
   {struct, array},
   {entry, {1,32},
    [{type, unsigned32},
