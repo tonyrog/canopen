@@ -42,7 +42,7 @@
  [{id, cobid_sync_message},
   {name,"COB-ID SYNC-message"},
   {struct,var},
-  {type,unsigned32}, 
+  {type,unsigned32},
   {category,optional},
   {access,rw}]}.
 
