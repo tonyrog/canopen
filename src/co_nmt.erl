@@ -580,7 +580,8 @@ handle_cast({supervision_frame, SlaveId = {_Flag, _NodeId}, Frame},
     
 handle_cast({supervision, Supervision}, 
 	    Ctx=#ctx {supervision = Supervision}) ->
-    lage:debug([nmt]," handle_cast: supervision ~p, no change.", [Supervision]),
+    lager:debug([nmt]," handle_cast: supervision ~p, no change.",
+		[Supervision]),
     {noreply, Ctx};
 
 handle_cast({supervision, New}, Ctx=#ctx {supervision = Old}) ->
