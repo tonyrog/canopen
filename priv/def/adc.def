@@ -1,0 +1,166 @@
+%% -*- erlang -*-
+%% 
+%%  ADC definition
+%% 
+%%
+{module, adc}.
+
+{enum, trigger,
+ [{upper_limit_exceeded,          16#01},
+  {below_lower_limit,             16#02},
+  {changed_by_more_than_delta,    16#04},
+  {changed_by_more_than_negative_delta, 16#08},
+  {changed_by_more_than_positive_delta, 16#10},
+  {always,                              16#20},
+  {analog_to_digital,                   16#80}
+ ]}.
+
+{objdef, 16#6401,
+ [{id, adc_read16},
+  {name, "adc-read16"},
+  {description, "Read Analogue Input 16 Bit"},
+  {struct, array},
+  {entry, {1,254},
+   [{type, unsigned16},
+    {category, optional},
+    {access, ro}
+   ]}
+  ]}.
+
+{objdef, 16#6421,
+ [{id, adc_flags},
+  {name, "adc-flags"},
+  {description, "Interrupt Trigger Selection"},
+  {struct, array},
+  {entry, {1,254},
+   [{type, {bitfield,unsigned8,trigger}},
+    {category, optional},
+    {access, rw}
+   ]}
+  ]}.
+
+{objdef, 16#6424,
+ [{id, adc_upper},
+  {name, "adc-upper"},
+  {description, "Analogue Input Interrupt Upper Limit Interger"},
+  {entry, {1,254},
+   [{type, integer32},
+    {category, optional},
+    {access, rw}
+   ]}
+ ]}.
+
+{objdef, 16#6425,
+ [{id, adc_lower},
+  {name, "adc-lower"},
+  {description, "Analogue Input Interrupt Lower Limit Interger"},
+  {entry, {1,254},
+   [{type, integer32},
+    {category, optional},
+    {access, rw}
+   ]}
+ ]}.
+
+{objdef, 16#6426,
+ [{id, adc_delta},
+  {name, "adc-delta"},
+  {description, "Analogue Input Interrupt Delta Unsigned"},
+  {entry, {1,254},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}
+   ]}
+ ]}.
+
+{objdef, 16#6427,
+ [{id, adc_negative_delta},
+  {name, "adc-negative-delta"},
+  {description, "Analogue Input Interrupt Negative Delta Unsigned"},
+  {entry, {1,254},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}
+   ]}
+ ]}.
+
+{objdef, 16#6428,
+ [{id, adc_positive_delta},
+  {name, "adc-positive-delta"},
+  {description, "Analogue Input Interrupt Positive Delta Unsigned"},
+  {entry, {1,254},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}
+   ]}
+ ]}.
+
+{objdef, 16#6431,
+ [{id, adc_offset},
+  {name, "adc-offset"},
+  {description, "Analogue Input Offset Integer"},
+  {entry, {1,254},
+   [{type, integer32},
+    {category, optional},
+    {access, rw}
+   ]}
+ ]}.
+
+{objdef, 16#6432,
+ [{id, adc_scale},
+  {name, "adc-scale"},
+  {description, "Analogue Input Scaling Integer"},
+  {entry, {1,254},
+   [{type, integer32},
+    {category, optional},
+    {access, rw}
+   ]}
+ ]}.
+
+%% seazone extension limit below ( clamp )
+{objdef, 16#2768,
+ [{id, adc_min},
+  {name, "adc-min"},
+  {description, "Analogue Range Min Integer"},
+  {entry, {1,254},
+   [{type, integer32},
+    {category, optional},
+    {access, rw}
+   ]}
+ ]}.
+
+%% seazone extension limit above ( clamp )
+{objdef, 16#2769,
+ [{id, adc_max},
+  {name, "adc-max"},
+  {description, "Analogue Range Max Integer"},
+  {entry, {1,254},
+   [{type, integer32},
+    {category, optional},
+    {access, rw}
+   ]}
+ ]}.
+
+
+%% seazone extension adc inhibit
+{objdef, 16#276A,
+ [{id, adc_inhibit},
+  {name, "adc-inhibit"},
+  {description, "Analogue Inhibit Transmission in Milli seconds"},
+  {entry, {1,254},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}
+   ]}
+ ]}.
+
+%% seazone extension adc scan delay
+{objdef, 16#276B,
+ [{id, adc_delay},
+  {name, "adc-delay"},
+  {description, "Analogue Milli seconds between samples"},
+  {entry, {1,254},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}
+   ]}
+ ]}.

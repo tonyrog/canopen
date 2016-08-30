@@ -6,6 +6,7 @@
 {module, pds}.
 {require, seazone}.
 {require, adc}.
+{require, dig}.
 
 %% General configurations.
 
@@ -770,7 +771,7 @@
     {access, rw}]}
 ]}.
 
-%% wna - analog nomial load value is used together with 
+%% wna - analog nominal load value is used together with 
 %% output_alarm_low to detect under-load (broken components)
 %%
 {objdef, 16#2739,

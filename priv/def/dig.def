@@ -1,0 +1,126 @@
+%% -*- erlang -*-
+%% 
+%%  DIGITAL input/output definition
+%%
+{module, dig}.
+
+{objdef,16#6000,
+ [{id, dig_read_input8},
+  {name, "dig-read-input8"},
+  {description,"Read Inputs 8 Bit"},
+  {struct,rec},
+  {category,optional},
+  {entry,{1,254},
+   [{type,unsigned8},
+    {access,ro}
+   ]}
+ ]}.
+
+{objdef,16#6002,
+ [{id, dig_polarity_input8},
+  {name, "dig-polarity-input8"},
+  {description,"Polarity Input 8 Bit"},
+  {struct,rec},
+  {category,optional},
+  {entry,{1,254},
+   [{type,unsigned8},
+    {access,rw}
+   ]}
+ ]}.
+
+{objdef,16#6003,
+ [{id, dig_filter_constant_input8},
+  {name, "dig-filter-constant-input8"},
+  {description,"Filter Constant Input 8 Bit"},
+  {struct,rec},
+  {category,optional},
+  {entry,{1,254},
+   [{type,unsigned8},
+    {access,rw}
+   ]}
+ ]}.
+
+{objdef,16#6005,
+ [{id, dig_global_interrupt},
+  {name, "dig-global-interrupt"},
+  {description,"Global Interrupt Enable Digital"},
+  {struct,var},
+  {category,optional},
+  {type,boolean},
+  {access,rw}
+ ]}.
+
+{objdef,16#6006,
+ [{id, dig_interrupt_mask_any_change8},
+  {name, "dig-interrupt-mask-any-change8"},
+  {description,"Interrupt Mask Any Change 8 Bit"},
+  {struct,rec},
+  {category,optional},
+  {entry,{1,254},
+   [{type,unsigned8},
+    {access,rw}
+   ]}
+ ]}.
+
+{objdef,16#6007,
+ [{id, dig_interrupt_mask_low_to_high8},
+  {name, "dig-interrupt-mask-low-to_high8"},  
+  {description,"Interrupt Mask Low to High 8 Bit"},
+  {struct,rec},
+  {category,optional},
+  {entry,{1,254},
+   [{type,unsigned8},
+    {access,rw}
+   ]}
+ ]}.
+
+{objdef,16#6008,
+ [{id, dig_interrupt_mask_high_to_low8},
+  {name, "dig-interrupt-mask-high-to-low8"},
+  {description,"Interrupt Mask High to Low 8 Bit"},
+  {struct,rec},
+  {category,optional},
+  {entry,{1,254},
+   [{type,unsigned8},
+    {access,rw}
+   ]}
+ ]}.
+
+{objdef,16#6200,
+ [{id, dig_write_output8},
+  {name, "dig-write-output8"},
+  {description,"Write Outputs 8 Bit"},
+  {struct,rec},
+  {category,optional},
+  {entry,{1,254},
+   [
+    {type,unsigned8},
+    {access,rw}
+   ]}
+ ]}.
+
+{objdef,16#6202,
+ [{id, dig_change_polarity_output8},
+  {name, "dig-change-polarity-output8"},
+  {description,"Change Polarity Outputs 8 Bit"},
+  {struct,rec},
+  {category,optional},
+  {entry,{1,254},
+   [
+    {type,unsigned8},
+    {access,rw}
+   ]}
+ ]}.
+
+{objdef,16#6208,
+ [{id, dig_filter_constant_output8},
+  {name, "dig-filter-constant-output8"},
+  {description,"Filter Mask Outputs 8 Bit"},
+  {struct,rec},
+  {category,optional},
+  {entry,{1,254},
+   [
+    {type,unsigned8},
+    {access,rw}
+   ]}
+ ]}.
