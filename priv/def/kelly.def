@@ -1,0 +1,221 @@
+%% -*- erlang -*-
+%% 
+%%  KELLY Controller defintions
+%%
+{module, kelly}.
+
+{objdef, 16#2770,
+ [{id, kelly_on_delay},
+  {name, "kelly-on-delay"},
+  {description, "Wait before turn on"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2771,
+ [{id, kelly_off_delay},
+  {name, "kelly-off-delay"},
+  {description, "Wait before turn off"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2772,
+ [{id, kelly_max_wait_time},
+  {name, "kelly-max-wait-time"},
+  {description, "Wait before switch direction"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2773,
+ [{id, kelly_hold_ignore_time},
+  {name, "kelly-hold-ignore-time"},
+  {description, "Time to ignore in milli seconds before check joystick"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2774,
+ [{id, kelly_hot_time},
+  {name, "kelly-hot-time"},
+  {description, "Time before engine is hot"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2775,
+ [{id, kelly_cold_time},
+  {name, "kelly-cold-time"},
+  {description, "Time to wait before engine can run again after over heat"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2776,
+ [{id, kelly_auto_shut_off_time},
+  {name, "kelly-auto-shut-off-time"},
+  {description, "Inactivity auto shut off, zero means disabled"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2777,
+ [{id, kelly_an_hot},
+  {name, "kelly-an-hot"},
+  {description, "Analog value to regard as hot when sensor is connected"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2778,
+ [{id, kelly_an_cold},
+  {name, "kelly-an-cold"},
+  {description, "Analog value to use enable engine after overheat"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2779,
+ [{id, kelly_an_precharge},
+  {name, "kelly-an-precharge"},
+  {description, "Analog value to check for when precharge sensor is connecte"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#277A,
+ [{id, kelly_an_port_min},
+  {name, "kelly-an-port-min"},
+  {description, "Minimum joystick value on port side"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#277B,
+ [{id, kelly_an_port_max},
+  {name, "kelly-an-port-max"},
+  {description, "Maximum joystick value on port side"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#277C,
+ [{id, kelly_temp_sensor_connected},
+  {name, "kelly-temp-sensor-connected"},
+  {description, "True if there is a temperature sensor connected"},
+  {struct, var},
+  {type, unsigned8},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#277D,
+ [{id, kelly_run_sensor_connected},
+  {name, "kelly-run-sensor-connected"},
+  {description, "True if there is a rotary sensor connected"},
+  {struct, var},
+  {type, unsigned8},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#277E,
+ [{id, kelly_precharge_sensor_connected},
+  {name, "kelly-precharge-sensor-connected"},
+  {description, "True if there is a precharge sensor connected"},
+  {struct, var},
+  {type, unsigned8},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#277F,
+ [{id, kelly_precharge_time},
+  {name, "kelly-precharge-time"},
+  {description, "Time to use if no precharge sensor is connected"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2790,
+ [{id, kelly_an_starb_min},
+  {name, "kelly-an-starb-min"},
+  {description, "Minimum joystick value on starboard side"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2791,
+ [{id, kelly_an_starb_max},
+  {name, "kelly-an-starb-max"},
+  {description, "Maximum joystick value on starboard side"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2792,
+ [{id, kelly_throttle_scale},
+  {name, "kelly-throttle-scale"},
+  {description, "Throttle Scale factor 8.8 signed fix point format"},
+  {struct, var},
+  {type, integer16},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2793,
+ [{id, kelly_throttle_offs},
+  {name, "kelly-throttle-offs"},
+  {description, "Throttle offset value"},
+  {struct, var},
+  {type, integer16},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2794,
+ [{id, kelly_throttle_max},
+  {name, "kelly-throttle-max"},
+  {description, "Throttle limiting value"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2795,
+ [{id, kelly_an_invalid_min},
+  {name, "kelly-an-invalid-min"},
+  {description, "Value for which the joystick is disconnected"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2796,
+ [{id, kelly_an_invalid_max},
+  {name, "kelly-an-invalid-max"},
+  {description, "Value for which the joystick is disconnected"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#2797,
+ [{id, kelly_always_on},
+  {name, "kelly-always-on"},
+  {description, "True if controller always is enabled"},
+  {struct, var},
+  {type, unsigned8},
+  {category, optional},
+  {access, rw}]}.
