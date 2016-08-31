@@ -151,7 +151,9 @@
 -define(INDEX_OUTPUT_DMX_CH3,    16#278C).  %% UNSIGNED8
 -define(INDEX_OUTPUT_DMX_CH4,    16#278D).  %% UNSIGNED8
 -define(INDEX_OUTPUT_WDT,        16#278E).  %% UNSIGNED32
+-define(INDEX_OUTPUT_FLAGS2,     16#278F).  %% UNSIGNED16
 %% SET/GET PDS input channels
+
 -define(INDEX_INPUT_FLAGS,       16#2720).
 -define(INDEX_INPUT_OUT,         16#2721).  %% UNSIGNED32 output channel mask
 -define(INDEX_INPUT_NODE,        16#2722).  %% UNSIGEND32 input node id
