@@ -123,8 +123,8 @@
 %%            TPDO options
 %%          {tpdo_cache_limit, integer()} - (512) limits number of cached tpdo values
 %%                                      for an index.<br/>
-%%          {tpdo_restart_limit, integer()} - (10) limits number of restart attempts for 
-%%                                      tpdo processes.<br/>
+%%          {tpdo_restart_limit, integer()} - (10) limits number of restart  
+%%                                      attempts for tpdo processes.<br/>
 %%
 %%            Testing
 %%          {debug, boolean()}        - Enable/Disable trace output.<br/>
@@ -156,13 +156,14 @@
 	{load_ratio, float()} | 
 	{atomic_limit, integer()} | 
 	{tpdo_cache_limit, integer()} |
+	{os_commands_enabled, boolean()} |
 	{debug, boolean()} | 
 	{linked, boolean()}.
 	
--spec start_link(Serial::integer(), list(Option::option())) ->
+-spec start_link(Serial::integer(), Opts::list(option())) ->
 			{ok, Pid::pid()} |
 			{error, Reason::term()}.
-start_link(S, Opts) ->
+start_link(S, Opts) when is_integer(S) ->
     %% Trace output enable/disable
     co_lib:debug(proplists:get_value(debug,Opts,false)), 
     lager:debug("start_link: Serial = ~.16#, Opts = ~p", [S, Opts]),
@@ -300,6 +301,7 @@ verify_option(Option, NewValue)
   when Option == use_serial_as_xnodeid;
        Option == use_crc;
        Option == load_last_saved;
+       Option == os_commands_enabled;
        Option == debug;
        Option == linked ->
     if is_boolean(NewValue) ->

@@ -175,8 +175,8 @@ reserver_with_module(Tab, Ix) when ?is_index(Ix) ->
 
 
 init({Serial, NodeName, Opts}) ->
-    ?ei("~p: init: serial = ~.16#, name = ~p, opts = ~p\n pid = ~p", 
-        [?MODULE, Serial, NodeName, Opts, self()]),
+    lager:debug("serial = ~.16#, name = ~p, opts = ~p\n pid = ~p", 
+		[Serial, NodeName, Opts, self()]),
 
     %% Trace output enable/disable
     Dbg = proplists:get_value(debug,Opts,false),

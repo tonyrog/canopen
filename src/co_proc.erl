@@ -74,7 +74,7 @@
 			{ok, Pid::pid()} | ignore | {error, Error::term()}.
 
 start_link(Opts) ->
-    ?ei("~p: start_link: args = ~p", [?MODULE, Opts]),
+    lager:debug("opts = ~p, pid = ~p", [Opts, self()]),
     F =	case proplists:get_value(linked,Opts,true) of
 	    true -> start_link;
 	    false -> start
@@ -236,7 +236,7 @@ debug(TrueOrFalse) when is_boolean(TrueOrFalse) ->
 -spec init([]) -> {ok, Ctx::#ctx{}}.
 
 init([]) ->
-    ?ei("~p: init: args = [], pid = ~p", [?MODULE, self()]),
+    lager:debug("args = [], pid = ~p", [self()]),
 
     PD = ets:new(co_proc_dict, [protected, named_table, ordered_set]),
     TD = ets:new(co_term_dict, [protected, named_table, ordered_set]),
