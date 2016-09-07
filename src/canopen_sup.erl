@@ -106,7 +106,7 @@ init([Serial]) ->
     SysApp = {SA, 
 	      {SA, start_link, [Serial]},
 	      permanent, 5000, worker, [SA]},
-    OsApps = case application:get_env(canopen, os_commands_enabled, true) of
+    OsApps = case application:get_env(canopen, os_commands_enabled, false) of
 		 true ->
 		     [{OA, 
 		       {OA, start_link, [Serial]}, 
