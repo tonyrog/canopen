@@ -460,6 +460,28 @@
     {access, rw}]}
 ]}.
 
+{objdef, 16#274E,
+ [{id, output_dmx_color},
+  {name, "output-dmx-color"},
+  {description, "set temporary DMX color"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#274F,
+ [{id, output_dmx_fade_time},
+  {name, "output-dmx-fade-time"},
+  {description, "fade to output-dmx-color, over fade time milliseconds"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}]}
+]}.
+
 {objdef, 16#2766,
  [{id, output_pwm_min},
   {name, "output-pwm-min"},

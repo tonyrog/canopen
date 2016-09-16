@@ -197,6 +197,9 @@
 -define(INDEX_ADC_CHANGED,       16#274C).  %% UNSIGNED32
 
 -define(INDEX_DMX_COUNTER,       16#274D).  %% UNSIGNED32
+-define(INDEX_OUTPUT_DMX_COLOR,  16#274E).  %% UNSIGNED32 set all colors
+-define(INDEX_OUTPUT_DMX_FADE_TIME, 16#274F). %% UNSIGNED32 set fade time
+
 %% RFID specific 
 -define(INDEX_DISPLAY1,          16#2750).  %% character at position
 -define(INDEX_DISPLAY4,          16#2751).  %% write 4 bytes segment
