@@ -48,11 +48,10 @@
 %%   Args = [{serial, Serial}, {options, Options}]
 %% @end
 %%--------------------------------------------------------------------
-start_link(Args) ->
-    lager:debug("args = ~p", [Args]),
-    try supervisor:start_link({local, ?MODULE}, ?MODULE, Args) of
+start_link(Serial) ->
+    try supervisor:start_link({local, ?MODULE}, ?MODULE, [Serial]) of
 	{ok, Pid} ->
-	    {ok, Pid, {normal, Args}};
+	    {ok, Pid, {normal, [Serial]}};
 	Error -> 
 	    ?ee("~p: start_link: Failed to start process, "
 		"reason ~p",  [?MODULE, Error]),
@@ -89,21 +88,35 @@ stop() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
-init(Args) ->
-    lager:debug("args = ~p,\n pid = ~p", [Args, self()]),
-    Serial = proplists:get_value(serial, Args, 0),
-    Opts = proplists:get_value(options, Args, []),
+init([Serial]) ->
+    lager:debug("serial = ~p,\n pid = ~p", [Serial, self()]),
+    Opts = application:get_env(canopen, options, []),
+    lager:debug("options = ~p", [Opts]),
     CP = co_proc,
     CN = co_api,
     SA = co_sys_app,
     OA = co_os_app,
     %% can_router started by can application
-    CoProc = {CP, {CP, start_link, [[]]}, permanent, 5000, worker, [CP]},
-    CoNode = {co_node, {CN, start_link, [Serial, Opts]}, permanent, 5000, worker, [CN]},
-    SysApp = {SA, {SA, start_link, [Serial]}, permanent, 5000, worker, [SA]},
-    OsApp = {OA, {OA, start_link, [Serial]}, permanent, 5000, worker, [OA]},
-    Processes = [CoProc, CoNode, SysApp, OsApp],
-    lager:debug("About to start ~p", [Processes]),
+    CoProc = {CP, 
+	      {CP, start_link, [[]]}, 
+	      permanent, 5000, worker, [CP]},
+    CoNode = {co_node, 
+	      {CN, start_link, [Serial, Opts]}, 
+	      permanent, 5000, worker, [CN]},
+    SysApp = {SA, 
+	      {SA, start_link, [Serial]},
+	      permanent, 5000, worker, [SA]},
+    OsApps = case application:get_env(canopen, os_commands_enabled, false) of
+		 true ->
+		     [{OA, 
+		       {OA, start_link, [Serial]}, 
+		       permanent, 5000, worker, [OA]}];
+		 false ->
+		     lager:debug("no os command app"),
+		     []
+	     end,
+    Processes = [CoProc, CoNode, SysApp] ++ OsApps,
+    lager:debug("about to start ~p", [Processes]),
     {ok, { {rest_for_one, 0, 300}, Processes} }.
 
 

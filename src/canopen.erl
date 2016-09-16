@@ -53,17 +53,11 @@
 		   {error, Reason::term()}.
 
 start(_StartType, _StartArgs) ->
-    error_logger:info_msg("~p: start: arguments ignored.\n", [?MODULE]),
     case application:get_env(canopen, serial) of
 	undefined -> 
 	    {error, no_serial_specified};
 	{ok,Serial} ->
-	    Opts = case application:get_env(canopen, options) of
-		       undefined -> [];
-		       {ok, O} -> O
-		   end,
-	    Args = [{serial, Serial}, {options, Opts}],
-	    canopen_sup:start_link(Args)
+	    canopen_sup:start_link(Serial)
     end.
 
 
@@ -80,8 +74,13 @@ stop(_State) ->
 
 %% @private
 start() ->
-    call([sasl, lager, ale, eapi, uart, can, canopen], 
-	 start).
+    try application:ensure_all_started(canopen)
+    catch 
+	%% Old OTP version
+	error:undef ->
+	    call([sasl, lager, ale, eapi, uart, can, canopen], 
+		 start)
+    end.
 
 %% @private
 stop() ->

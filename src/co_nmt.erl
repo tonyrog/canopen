@@ -114,7 +114,7 @@
 			{ok, Pid::pid()} | ignore | {error, Error::term()}.
 
 start_link(Args) ->
-    ?ei("~p: start_link: args = ~p\n", [?MODULE, Args]),
+    lager:debug("args = ~p\n", [Args]),
     F =	case proplists:get_value(linked,Args,true) of
 	    true -> start_link;
 	    false -> start
@@ -346,7 +346,7 @@ dump()  ->
 -spec init(list(term())) -> {ok, Ctx::#ctx{}}.
 
 init(Args) ->
-    ?ei("~p: init: args = ~p, pid = ~p\n", [?MODULE, Args, self()]),
+    lager:debug("args = ~p, pid = ~p\n", [Args, self()]),
 
     %% Trace output enable/disable
     Dbg = proplists:get_value(debug,Args,false),
