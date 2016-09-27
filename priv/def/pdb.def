@@ -66,7 +66,8 @@
   {inc_encoder, 16#0080},    %% increment push encoder
   {dec_encoder, 16#0100},    %% decrement push encoder
   {off_only, 16#0200},       %% match for "off" events only
-  {on_only,  16#0400}         %% match for "on" events only
+  {on_only,  16#0400},       %% match for "on" events only
+  {digital_encoder,16#0800}  %% convert digital to step value
  ]}.
 
 {enum, oflags,
@@ -90,7 +91,8 @@
 
 {enum, oflags2,
  [{cutact, 16#0001},    %% cut power (with priority) by activate output
-  {stpwrap, 16#0002}    %% step will wrap with for encoder
+  {stpwrap, 16#0002},   %% step will wrap with for encoder
+  {stpoff,  16#0004}    %% step 0 will deactivate output
  ]}.
 
 {enum, ostate,

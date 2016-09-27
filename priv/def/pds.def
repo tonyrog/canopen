@@ -55,17 +55,18 @@
  ]}.
 
 {enum, iflags,
- [{active, 16#0001},  %% input channel is active
-  {analog, 16#0002},  %% accept analog values
-  {digital,16#0004},  %% accept digital values
-  {encoder,16#0008},  %% accept encoder values
+ [{active, 16#0001},         %% input channel is active
+  {analog, 16#0002},         %% accept analog values
+  {digital,16#0004},         %% accept digital values
+  {encoder,16#0008},         %% accept encoder values
   {analog_digital, 16#0010}, %% convert analog to digital
   {springback, 16#0020},     %% switch is springback
   {push_encoder,16#0040},    %% implements push encoder (when springback!)
   {inc_encoder, 16#0080},    %% increment push encoder
   {dec_encoder, 16#0100},    %% decrement push encoder
   {off_only, 16#0200},       %% match for "off" events only
-  {on_only,  16#0400}         %% match for "on" events only
+  {on_only,  16#0400},       %% match for "on" events only
+  {digital_encoder,16#0800}  %% convert digital to step value
  ]}.
 
 {enum, oflags,
@@ -87,9 +88,11 @@
   {stpmld, 16#4000}     %% restore step value
  ]}.
 
+%% Please update seazone_scripts.erl/FLAGS2 when adding a new flag
 {enum, oflags2,
  [{cutact, 16#0001},    %% cut power (with priority) by activate output
-  {stpwrap, 16#0002}    %% step will wrap with for encoder
+  {stpwrap, 16#0002},   %% step will wrap with for encoder
+  {stpoff,  16#0004}    %% step 0 will deactivate output
  ]}.
 
 {enum, ostate,
