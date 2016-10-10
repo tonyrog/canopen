@@ -236,6 +236,50 @@
 -define(INDEX_OUTPUT_ALARM_STATUS, 16#276C). %% Read alarm status (debug)
 -define(INDEX_OUTPUT_STATE,        16#276D). %% Read output state
 
+-define(INDEX_I2C_STATE_COUNTER,  16#276E).  %% UNSIGNED32
+-define(INDEX_NODE_NAME,          16#276F).  %% UNSIGNED32: 1 and 2
+
+%% Kelly controller params
+-define(INDEX_KELLY_ON_DELAY,           16#2770).
+-define(INDEX_KELLY_OFF_DELAY,          16#2771).
+-define(INDEX_KELLY_MAX_WAIT_TIME,      16#2772).
+-define(INDEX_KELLY_HOLD_IGNORE_TIME,   16#2773).
+-define(INDEX_KELLY_HOT_TIME,           16#2774).
+-define(INDEX_KELLY_COLD_TIME,          16#2775).
+-define(INDEX_KELLY_AUTO_SHUT_OFF_TIME, 16#2776).
+-define(INDEX_KELLY_AN_HOT,             16#2777).
+-define(INDEX_KELLY_AN_COLD,            16#2778).
+-define(INDEX_KELLY_AN_PRECHARGE,       16#2779).
+-define(INDEX_KELLY_AN_PORT_MIN,        16#277A).
+-define(INDEX_KELLY_AN_PORT_MAX,        16#277B).
+-define(INDEX_KELLY_TEMP_SENSOR_CONNECTED, 16#277C).
+-define(INDEX_KELLY_RUN_SENSOR_CONNECTED,  16#277D).
+-define(INDEX_KELLY_PRECHARGE_SENSOR_CONNECTED,  16#277E).
+-define(INDEX_KELLY_PRECHARGE_TIME,     16#277F).
+
+-define(INDEX_KELLY_AN_STARB_MIN,        16#2790).
+-define(INDEX_KELLY_AN_STARB_MAX,        16#2791).
+-define(INDEX_KELLY_THROTTLE_SCALE,      16#2792).
+-define(INDEX_KELLY_THROTTLE_OFFS,       16#2793).
+-define(INDEX_KELLY_THROTTLE_MAX,        16#2794).
+-define(INDEX_KELLY_AN_INVALID_MIN,      16#2795).
+-define(INDEX_KELLY_AN_INVALID_MAX,      16#2796).
+-define(INDEX_KELLY_ALWAYS_ON,           16#2797).
+
+%% DIGITAL input
+-define(INDEX_READ_INPUT8,                      16#6000).  %% UNSIGNED8:1-n
+-define(INDEX_POLARITY_INPUT8,                  16#6002).  %% UNSIGNED8:1-n
+-define(INDEX_FILTER_CONSTANT_INPUT8,           16#6003).  %% UNSIGNED8:1-n
+-define(INDEX_GLOBAL_INTERRUPT_ENABLED_DIGITAL, 16#6005).  %% BOOLEAN
+-define(INDEX_INTERRUPT_MASK_ANY_CHANGE8,       16#6006).  %% UNSIGNED8:1-n
+-define(INDEX_INTERRUPT_MASK_LOW_TO_HIGH8,      16#6007).  %% UNSIGNED8:1-n
+-define(INDEX_INTERRUPT_MASK_HIGH_TO_LOW8,      16#6008).  %% UNSIGNED8:1-n
+
+%% DIGITAL output
+-define(INDEX_WRITE_OUTPUT8,                    16#6200).  %% UNSIGNED8:1-n
+-define(INDEX_CHANGE_POLARITY_OUTPUT8,          16#6202).  %% UNSIGNED8:1-n
+-define(INDEX_FILTER_CONSTANT_OUTPUT8,          16#6208).  %% UNSIGNED8:1-n
+
 %% PDS - PDU's
 
 %% UBOOT notification messages - switched to uboot mode
