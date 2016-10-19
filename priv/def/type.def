@@ -3,7 +3,7 @@
 %%
 %%  Basic types
 %%
-{module, type}.
+{definitions, type}.
 
 {objdef, 16#0001, 
  [{id, boolean},{name, "BOOLEAN"},{struct,deftype},

@@ -1,8 +1,8 @@
 %% -*- erlang -*-
 %% 
-%%  KELLY Controller defintions
+%%  KELLY Controller definitions
 %%
-{module, kelly}.
+{definitions, kelly}.
 
 {objdef, 16#2770,
  [{id, kelly_on_delay},

@@ -1,7 +1,7 @@
 %%
 %% DS-406	Encoders
 %%
-{module, 'DS-406'}.
+{definitions, 'DS-406'}.
 
 {require, type}.
 

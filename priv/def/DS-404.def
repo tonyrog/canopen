@@ -1,7 +1,7 @@
 %%
 %% DS-404 Measuring devices and closed loop controllers
 %%
-{module, 'DS-404'}.
+{definitions, 'DS-404'}.
 
 {require, type}.
 

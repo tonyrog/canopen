@@ -1,7 +1,7 @@
 %%
 %% DS-419	Battery Chargers
 %%
-{module, 'DS-419'}.
+{definitions, 'DS-419'}.
 
 {require, type}.
 

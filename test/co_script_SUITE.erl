@@ -208,7 +208,11 @@ verify_def_file(File) ->
     %% ct:pal("Verifying ~p",[File]),
     case filename:basename(File, ".def") of
 	"README" -> ok; %% do_nothing
-	F -> co_mgr:client_require(list_to_atom(F))
+	F -> 
+	    case co_mgr:client_require(list_to_atom(F)) of
+		{error, already_loaded} -> ok;
+		Result -> Result
+	    end
     end.
 	
 

@@ -58,6 +58,7 @@
 %% Test functions
 -export([debug/1]).
 -export([loop_data/0, loop_data/1]).
+-export([translate_index/5]).
 
 
 -define(CO_MGR, co_mgr).
@@ -66,9 +67,9 @@
 	  nid,             %% CAN node id
 	  serial=0,        %% serial 
 	  product=unknown, %% product code
+	  app_vsn=0,       %% application version
 	  state=up         %% up/down/sleep
 	}).
-
 
 -record(mgr,
 	{
@@ -76,8 +77,6 @@
 	  def_trans_mode = segment, %% default transfer mode
 	  nodes = [],      %% nodes detected
 	  pids = [],       %% list of outstanding operations
-	  ctx,             %% current context
-	  ctx_list =[],    %% [{mod,<ctx>}] 
 	  debug           
 	}).
 
@@ -343,8 +342,8 @@ store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode,
        (TransferMode == block orelse TransferMode == segment),
        is_atom(Type),
        ((is_integer(TimeOut) andalso TimeOut > 0) orelse TimeOut == default)  ->
- store(NodeId, Ix, Si, TransferMode, 
-       {value, Value, co_lib:encode_type(Type)}, TimeOut);
+    store(NodeId, Ix, Si, TransferMode, 
+	  {value, Value, co_lib:encode_type(Type)}, TimeOut);
 store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, 
       {value, Value, Type}, TimeOut) 
   when is_integer(Nid), 
@@ -695,6 +694,8 @@ init(Opts) ->
     Dbg = proplists:get_value(debug,Opts,false),
     co_lib:debug(Dbg), 
 
+    co_objdef:start_link(),
+
     co_proc:reg(?CO_MGR),
 
     case co_proc:lookup(?MGR_NODE) of
@@ -708,7 +709,7 @@ init(Opts) ->
 
     process_flag(trap_exit, true),
     
-    {ok, #mgr {def_nid = 0, ctx = undefined, debug = Dbg}}.
+    {ok, #mgr {def_nid = 0, debug = Dbg}}.
 
 
 %%--------------------------------------------------------------------
@@ -746,8 +747,13 @@ handle_call({set_mode,Mode}, _From, Mgr) ->
     {reply, ok, Mgr#mgr { def_trans_mode = Mode }};
 
 handle_call({require,Mod}, _From, Mgr) ->
-    {Reply,_DCtx,Mgr1} = load_ctx(Mod, Mgr),
-    {reply, Reply, Mgr1};
+    try co_objdef:load(Mod) of
+	Result ->
+	    {reply, Result, Mgr}
+    catch
+	error:Reason ->
+	    {reply, {error,Reason}, Mgr}
+    end;
 
 handle_call({store,default,Index,SubInd,Value,Timeout}, From,
 	    Mgr=#mgr {def_nid = DefNid})
@@ -789,10 +795,9 @@ handle_call({loop_data, no_ctx}, _From, Mgr) ->
 	      "Default nid = ~.16.0#\n"
 	      "Default transfer mode = ~p\n"
 	      "Nodes ~p\n"
-	      "Pids ~p\n"
-	      "Ctxs ~p\n",
-	      [Mgr#mgr.def_nid, Mgr#mgr.def_trans_mode,  Mgr#mgr.nodes, Mgr#mgr.pids, 
-	       [Mod || {Mod, _} <-  Mgr#mgr.ctx_list]]),
+	      "Pids ~p\n",
+	      [Mgr#mgr.def_nid, Mgr#mgr.def_trans_mode, 
+	       Mgr#mgr.nodes, Mgr#mgr.pids]),
     {reply, ok, Mgr};
 
 handle_call(stop, _From, Mgr) ->
@@ -900,38 +905,18 @@ code_change(_OldVsn, Mgr, _Extra) ->
 %%--------------------------------------------------------------------
 %%% Internal functions
 %%--------------------------------------------------------------------
-load_ctx(Mod, Mgr) ->
-    lager:debug("load_ctx: Loading ~p", [Mod]),
-    case lists:keyfind(Mod, 1, Mgr#mgr.ctx_list) of
-	false ->
-	    try co_lib:load_definition(Mod) of
-		{ok, DCtx} ->
-		    lager:debug("load_ctx: Loaded ~p", [Mod]),
-		    List = [{Mod,DCtx}|Mgr#mgr.ctx_list],
-		    {ok, DCtx, Mgr#mgr { ctx=DCtx, ctx_list = List }};
-		{Error, _} ->
-		    lager:debug("load_ctx: failed loading ~p", [Mod]),
-		    {Error, [], Mgr}
-	    catch
-		error:Reason ->
-		    {{error,Reason}, [], Mgr}
-	    end;
-	{Mod, DCtx} ->
-	    lager:debug("load_ctx: ~p already loaded", [Mod]),
-	    {ok, DCtx, Mgr#mgr { ctx = DCtx }}
-    end.
-    
+
 do_store(Nid,Index,SubInd,Value,Timeout,Client, 
        Mgr=#mgr {pids = PList, def_trans_mode = TransMode, debug = Dbg}) ->
-    Ctx = context(Nid, Mgr),
-    case translate_index(Ctx,Index,SubInd,Value) of
+    {Mod,AppVsn} = context(Nid, Mgr),
+    case translate_index(Mod,AppVsn,Index,SubInd,Value) of
 	{ok, {Ti, Tsi, Tv} = _T} ->
 	    lager:debug([{index, {Ti, Tsi}}],"do_store: translated  ~p", [_T]),
 	    Pid = 
 		spawn_request(store, 
 			      [Nid, Ti, Tsi, TransMode, Tv, Timeout],
 			      Client,
-			      {store, Nid, Index, SubInd, Value, Tv, Ctx},
+			      {store,Nid,Index,SubInd,Value,Tv,Mod,AppVsn},
 			      Dbg),
 	    {noreply, Mgr#mgr { pids = [Pid | PList] }};
 	Error ->
@@ -942,16 +927,16 @@ do_store(Nid,Index,SubInd,Value,Timeout,Client,
 
 do_fetch(Nid,Index,SubInd,Timeout, Client,
        Mgr=#mgr {pids = PList, def_trans_mode = TransMode, debug = Dbg}) ->
-    Ctx = context(Nid, Mgr),
+    {Mod,AppVsn} = context(Nid, Mgr),
     lager:debug("do_fetch: translate ~p:~p", [Index, SubInd]),
-    case translate_index(Ctx,Index,SubInd,no_value) of
+    case translate_index(Mod,AppVsn,Index,SubInd,no_value) of
 	{ok, {Ti, Tsi, Tv} = _T} ->
 	    lager:debug([{index, {Ti, Tsi}}],"do_fetch: translated  ~p", [_T]),
 	    Pid = 
 		spawn_request(fetch,
 			      [Nid, Ti, Tsi, TransMode, Tv, Timeout],
 			      Client,
-			      {fetch, Nid, Index, SubInd, Tv, Ctx},
+			      {fetch,Nid,Index,SubInd,Tv,Mod,AppVsn},
 			      Dbg),
 	    {noreply,  Mgr#mgr { pids = [Pid | PList] }};
 	Error ->
@@ -960,9 +945,9 @@ do_fetch(Nid,Index,SubInd,Timeout, Client,
     end.
 
 do_translate(Nid,Index,SubInd, Mgr) ->
-    Ctx = context(Nid, Mgr),
+    {Mod,AppVsn} = context(Nid, Mgr),
     lager:debug("do_translate: translate ~p:~p", [Index, SubInd]),
-    case translate_index(Ctx,Index,SubInd,no_value) of
+    case translate_index(Mod,AppVsn,Index,SubInd,no_value) of
 	{ok,{Ti,Tsi,_Tv} = _T} ->
 	    lager:debug([{index, {Ti, Tsi}}],"do_translate: translated  ~p", [_T]),
 	    {reply, {Ti,Tsi}, Mgr};
@@ -972,7 +957,7 @@ do_translate(Nid,Index,SubInd, Mgr) ->
     end.
 
 spawn_request(F, Args, Client, Request, Dbg) ->
-    Pid = proc_lib:spawn_link(?MODULE, execute_request, 
+    Pid = proc_lib:spawn_link(?MODULE, execute_request,
 			      [F, Args, Client, Request, Dbg]),
     lager:debug("spawn_request: spawned  ~p", [Pid]),
     Pid.
@@ -986,12 +971,12 @@ execute_request(F, Args, Client, Request, Dbg) ->
     handle_reply(Reply, Client, Request).
 
 handle_reply({ok, Value}, Client, 
-	     {fetch, _Nid, _Index, _SubInd, {value, Type}, Ctx}) ->
-    Reply = format_value(Value, co_lib:decode_type(Type), Ctx),
+	     {fetch,_Nid,_Index,_SubInd, {value, Type},Mod,AppVsn}) ->
+    Reply = format_value(Value, co_lib:decode_type(Type),Mod,AppVsn),
     lager:debug("handle_reply: Format ~p, type ~p => ~p", [Value, Type, Reply]),
     gen_server:reply(Client, Reply);
 handle_reply({ok, Data}, Client, 
-	     {fetch, _Nid, _Index, _SubInd, data, _Ctx}) ->
+	     {fetch, _Nid, _Index, _SubInd, data, _Mod,_AppVsn}) ->
     lager:debug("handle_reply: Formatting ~p, not possible", [Data]),
     gen_server:reply(Client, Data);
 handle_reply({error, ECode}, Client, _Request) ->
@@ -1004,8 +989,8 @@ handle_reply(Other, Client, _Request) -> %% ok ???
     gen_server:reply(Client, Other).
 
 do_notify(Nid, Func,Index,SubInd, Value, Mgr) ->
-    Ctx = context(Nid, Mgr),
-    case translate_index(Ctx,Index,SubInd,Value) of
+    {Mod,AppVsn} = context(Nid, Mgr),
+    case translate_index(Mod,AppVsn,Index,SubInd,Value) of
 	{ok,{Ti,Tsi,{value, Tv, Type}} = _T} ->
 	    lager:debug([{index, {Ti, Tsi}}],"do_notify: translated  ~p", [_T]),
 	    try co_codec:encode(Tv, {Type, 32}) of
@@ -1028,57 +1013,54 @@ do_notify(Nid, Func,Index,SubInd, Value, Mgr) ->
     
 
 %% try translate symbolic index and Value
-translate_index(undefined,_Index,_SubInd,_Value) ->
-    {error, no_context};
-translate_index(_Ctx,Index,SubInd,Value) 
+translate_index(_Mod,_AppVsn,Index,SubInd,Value) 
   when ?is_index(Index), ?is_subind(SubInd),is_integer(Value) ->
     {ok,{Index,SubInd,{value, Value, integer}}};
-translate_index(Ctx,Index,SubInd,Value) 
+translate_index(Mod,AppVsn,Index,SubInd,Value) 
   when  ?is_index(Index), ?is_subind(SubInd) ->
-    Res = co_lib:entry(Index, SubInd, Ctx),
-    translate_index2(Ctx, Res, Index, SubInd, Value);
-translate_index(Ctx,Index,SubInd,Value) 
+    Res = co_objdef:entry(Mod,AppVsn,Index,SubInd),
+    translate_index2(Mod,AppVsn, Res, Index, SubInd, Value);
+translate_index(Mod,AppVsn,Index,SubInd,Value) 
   when is_atom(Index);
        is_list(Index) ->
-    Res = co_lib:object(Index, Ctx),
+    Res = co_objdef:object(Mod,AppVsn,Index),
     lager:debug("translate_index: found ~p\n", [Res]),
-    translate_index1(Ctx, Res, Index, SubInd, Value);
-translate_index(_Ctx,_Index,_Subind,_Value) ->
+    translate_index1(Mod,AppVsn,Res,Index,SubInd,Value);
+translate_index(_Mod,_AppVsn,_Index,_Subind,_Value) ->
     {error,argument}.
 
-translate_index1(_Ctx, {error, _Error} = _E ,_Index,_SubInd,_Value) ->
-    lager:debug("translate_index1: not found ~p\n", [_E]),
+translate_index1(_Mod,_AppVsn,false,_Index,_SubInd,_Value) ->
+    lager:debug("translate_index1: not found\n", []),
     {error, argument};
-translate_index1(Ctx, Obj,_Index,SubInd,Value) 
+translate_index1(Mod,AppVsn,#objdef{index=Ti},_Index,SubInd,Value) 
   when ?is_subind(SubInd);
        is_list(SubInd);
        is_atom(SubInd) ->
-    Ti = Obj#objdef.index,
-    Res = co_lib:entry(SubInd, Obj, Ctx), 
+    Res = co_objdef:entry(Mod,AppVsn,Ti,SubInd), 
     lager:debug("translate_index1: found ~p\n", [Res]),
-    translate_index2(Ctx, Res, Ti, SubInd, Value).
+    translate_index2(Mod,AppVsn,Res,Ti,SubInd,Value).
 
-translate_index2(_Ctx, {error, _Error} = _E, Index, SubInd, no_value) ->
-    lager:debug("translate_index2: not found ~p\n", [_E]),
-    %% For fetch 
+translate_index2(_Mod,_AppVsn,false,Index,SubInd,no_value) ->
+    lager:debug("translate_index2: not found\n", []),
+    %% For fetch
     {ok, {Index, SubInd, data}};
-translate_index2(_Ctx, {error, _Error} = _E, _Index, _SubInd, _Value) ->
-    lager:debug("translate_index2: not found ~p\n", [_E]),
+translate_index2(_Mod,_AppVsn,false,_Index,_SubInd,_Value) ->
+    lager:debug("translate_index2: not found\n", []),
     {error,argument};
-translate_index2(Ctx, E=#entdef {index = S}, Index, SubInd, Value) 
+translate_index2(Mod,AppVsn, E=#entdef {index = S},Index,SubInd,Value) 
   when ?is_subind(SubInd) andalso not is_integer(S) ->
     lager:debug("translate_index2: found entry with index as range use "
 	 "original sub_index",[]),
-    translate_index2(Ctx, E#entdef {index = SubInd}, Index, SubInd, Value);
-translate_index2(_Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, 
+    translate_index2(Mod,AppVsn,E#entdef{index=SubInd},Index,SubInd,Value);
+translate_index2(_Mod,_AppVsn,_E=#entdef {type=Type,index=SubInd}, Index, _S, 
 		 no_value) ->
     lager:debug("translate_index2: for fetch, found entry, type ~p ",[Type]),
     {ok,{Index,SubInd,{value, co_lib:encode_type(Type)}}};
-translate_index2(Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S, 
+translate_index2(Mod,AppVsn,_E=#entdef {type=Type, index=SubInd}, Index, _S, 
 		 Value) ->
     lager:debug("translate_index2: found entry, type ~p, value ~p ",
-	 [Type, Value]),
-    case translate_value(Type, Value, Ctx) of
+		[Type, Value]),
+    case translate_value(Type,Value,Mod,AppVsn) of
 	{ok,TValue} ->
 	    lager:debug("translate_index2: translated value ~p ", [TValue]),
 	    {ok,{Index,SubInd,{value, TValue, co_lib:encode_type(Type)}}};
@@ -1088,34 +1070,34 @@ translate_index2(Ctx, _E=#entdef {type = Type, index = SubInd}, Index, _S,
 
    
 
-translate_value({enum,Base,_Id},Value,Ctx) when is_integer(Value) ->    
-    translate_value(Base, Value, Ctx);
-translate_value({enum,Base,Id},Value,Ctx) when is_atom(Value) ->
-    case co_lib:enum_by_id(Id, Ctx) of
-	{error, _E} -> error;
-	{ok,Enums} ->
+translate_value({enum,Base,_Id},Value,Mod,AppVsn) when is_integer(Value) ->    
+    translate_value(Base, Value, Mod,AppVsn);
+translate_value({enum,Base,Id},Value,Mod,AppVsn) when is_atom(Value) ->
+    case co_objdef:enum(Mod,AppVsn,Id) of
+	false -> error;
+	{enum,Id,Enums} ->
 	    case lists:keysearch(Value, 1, Enums) of
 		false -> error;
 		{value,{_,IValue}} ->
-		    translate_value(Base, IValue, Ctx)
+		    translate_value(Base,IValue,Mod,AppVsn)
 	    end
     end;
-translate_value({bitfield,Base,_Id},Value,Ctx) when is_integer(Value) ->    
-    translate_value(Base, Value, Ctx);
-translate_value({bitfield,Base,Id},Value,Ctx) when is_atom(Value) ->
-    case co_lib:enum_by_id(Id, Ctx) of
-	{error, _E} -> error;
-	{ok,Enums} ->
+translate_value({bitfield,Base,_Id},Value,Mod,AppVsn) when is_integer(Value) ->
+    translate_value(Base, Value, Mod,AppVsn);
+translate_value({bitfield,Base,Id},Value,Mod,AppVsn) when is_atom(Value) ->
+    case co_objdef:enum(Mod,AppVsn,Id) of
+	false -> error;
+	{enum,Id,Enums} ->
 	    case lists:keysearch(Value, 1, Enums) of
 		false -> error;
 		{value,{_,IValue}} ->
-		    translate_value(Base, IValue, Ctx)
+		    translate_value(Base, IValue, Mod,AppVsn)
 	    end
     end;
-translate_value({bitfield,Base,Id},Value,Ctx) when is_list(Value) ->
-    case co_lib:enum_by_id(Id, Ctx) of
-	{error, _E} -> error;
-	{ok,Enums} ->
+translate_value({bitfield,Base,Id},Value,Mod,AppVsn) when is_list(Value) ->
+    case co_objdef:enum(Mod,AppVsn,Id) of
+	false -> error;
+	{enum,Id,Enums} ->
 	    IValue = 
 		lists:foldl(
 		  fun(V, Bits) ->
@@ -1124,38 +1106,30 @@ translate_value({bitfield,Base,Id},Value,Ctx) when is_list(Value) ->
 			      {value,{_,Val}} -> Bits bor Val
 			  end
 		  end, 0, Value),
-	    translate_value(Base, IValue, Ctx)
+	    translate_value(Base, IValue,Mod,AppVsn)
     end;
-translate_value(boolean, true, _)  -> {ok, 1};
-translate_value(boolean, false, _) -> {ok, 0};
-translate_value(Type, Value, _Ctx) when is_atom(Type), is_integer(Value) ->
+translate_value(boolean, true, _,_)  -> {ok, 1};
+translate_value(boolean, false, _,_) -> {ok, 0};
+translate_value(Type, Value, _Mod,_AppVsn) when
+      is_atom(Type), is_integer(Value) ->
     %% FIXME
     {ok, Value};
-translate_value(_, _, _) ->
+translate_value(_Type, _Value, _Mod, _AppVsn) ->
     error.
-
 
 %% translate Node ID to dctx
 context(Nid, Mgr) ->
     case lists:keysearch(Nid, #node.nid, Mgr#mgr.nodes) of
 	false ->
 	    lager:debug("context: Node ~p not found", [Nid]),
-	    Mgr#mgr.ctx;  %% use current context
+	    {default,0};
 	{value,N} ->
 	    Mod = N#node.product,
-	    lager:debug("context: Node ~p is ~p", [Nid, Mod]),
-	    case lists:keysearch(Mod, #node.nid, Mgr#mgr.ctx_list) of
-		false ->
-		    lager:debug("context: Module ~p not found", [Mod]),
-		    Mgr#mgr.ctx;  %% use current context
-		{value,{_,MCtx}} ->
-		    lager:debug("context: Module ~p found", [Mod]),
-		    MCtx
-	    end
+	    {Mod,N#node.app_vsn}
     end.
 
 
-format_value(Value, Type, _DCtx) ->
+format_value(Value, Type, _Mod, _AppVsn) ->
    lager:debug("format_value: Formatting ~p, type ~p", [Value, Type]),
     case Type of
 	boolean    -> ite(Value==0, "false", "true");
@@ -1176,45 +1150,6 @@ format_value(Value, Type, _DCtx) ->
 
 ite(true,Then,_Else) -> Then;
 ite(false,_Then,Else) -> Else.
-
-%% To be done ??
-%% output_value(Value, Type, DCtx) ->
-%%     case Type of
-%% 	{enum,Type1,EId} ->
-%% 	    case co_lib:enum_by_id(EId, DCtx) of
-%% 		{ok,Enums} ->
-%% 		    case lists:keysearch(Value, 2, Enums) of
-%% 			false ->
-%% 			    format_value(Value, Type1, DCtx);
-%% 			{value,{Key,_}} ->
-%% 			    atom_to_list(Key)
-%% 		    end;
-%% 		{error, _E} ->
-%% 		    format_value(Value, Type1, DCtx)
-%% 	    end;
-%% 	{bitfield,Type1,EId} ->
-%% 	    case co_lib:enum_by_id(EId, DCtx) of
-%% 		{ok,Enums} ->
-%% 		    Fields = bitfield(Value, Enums),
-%% 		    io_lib:format("~p", [Fields]);
-%% 		{error, _E} ->
-%% 		    format_value(Value, Type1, DCtx)
-%% 	    end.
-
-%% bitfield(Value,Enums) ->
-%%     bitfield(Value,Enums,[]).
-
-%% bitfield(0,_,Acc) ->
-%%     Acc;
-%% bitfield(Value,[{Key,Val}|Enums],Acc) ->
-%%     if (Val band Value) == Val ->
-%% 	    bitfield(Value band (bnot Val), Enums, [Key|Acc]);
-%%        true ->
-%% 	    bitfield(Value, Enums, Acc)
-%%     end;
-%% bitfield(_, [], Acc) ->
-%%     Acc.
-
 
 unsigned(V, Mask) ->
     %%integer_to_list(V band Mask).

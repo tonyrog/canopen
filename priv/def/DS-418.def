@@ -2,7 +2,7 @@
 %% DS-418	Battery Modules
 %%
 %%
-{module, 'DS-418'}.
+{definitions, 'DS-418'}.
 
 {require, type}.
 

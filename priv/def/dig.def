@@ -2,7 +2,7 @@
 %% 
 %%  DIGITAL input/output definition
 %%
-{module, dig}.
+{definitions, dig}.
 
 {objdef,16#6000,
  [{id, dig_read_input8},

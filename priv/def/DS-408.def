@@ -1,7 +1,7 @@
 %%
 %% DS-408  Fluid Power Technology - Hydraulic drives and proportional valves
 %%
-{module, 'DS-408'}.
+{definitions, 'DS-408'}.
 
 {require, type}.
 

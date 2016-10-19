@@ -222,6 +222,7 @@
 %% ANALOG input
 -define(INDEX_ADC_READ16,         16#6401).  %% Read unsigned 16 analog input
 -define(INDEX_ADC_FLAGS,          16#6421).  %% Trigger selection
+-define(INDEX_GLOBAL_INTERRUPT_ENABLED_ANALOG, 16#6423).  %% BOOLEAN
 -define(INDEX_ADC_UPPER,          16#6424).  %% Interrupt upper limit
 -define(INDEX_ADC_LOWER,          16#6425).  %% Interrupt lower limit
 -define(INDEX_ADC_DELTA,          16#6426).  %% Delta

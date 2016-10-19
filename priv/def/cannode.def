@@ -1,0 +1,92 @@
+%% -*- erlang -*-
+%%  Common node objects
+%%
+{definitions, cannode}.
+
+%%
+%% buzzer:
+%% buzzer=off means that buzzer will not be used to signal alarm
+%%
+{objdef,16#270D,
+ [{id, buzzer},
+  {name, "buzzer"},
+  {struct, var},
+  {type, boolean},
+  {category, optional},
+  {access, rw}
+]}.
+
+%%
+%% frequency:
+%% Alarm freuqency for leds and buzzer
+%% ON-TIME:16, PERIOD:16
+%%
+{objdef,16#270B,
+ [{id, frequency},
+  {name, "frequency"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}
+]}.
+
+%% Set green led  1-24
+{version, pdc, 0, 
+ [
+  {objdef, 16#2704,
+   [{id, led_green},
+    {name, "led-green"},
+    {struct, array},
+    {entry, {1,8},
+     [{type, boolean},
+      {category, optional},
+      {access, rw}]}
+   ]}]}.
+
+{version, pdb, 0, 
+ [
+  {objdef, 16#2704,
+   [{id, led_green},
+    {name, "led-green"},
+    {struct, array},
+    {entry, {1,4},
+     [{type, boolean},
+      {category, optional},
+      {access, rw}]}
+   ]}
+  ]}.
+
+
+%% Set green mask 0x00 0xFF
+{objdef, 16#2706,
+ [{id, led_green_mask},
+  {name, "led-green-mask"},
+  {struct, var},
+  {type, unsigned32},
+  {access, rw}]}.
+
+%% only defined for pdc control panel
+{version, pdc, 0,
+ [
+  %% Set red led  1-8
+  {objdef, 16#2705,
+   [{id, led_red},
+    {name, "led-red"},
+    {struct, array},
+    {entry, {1,8},
+     [{type, boolean},
+      {category, optional},
+      {access, rw}]}
+   ]},
+  %% Set red mask 0x00-0xFF
+  {objdef, 16#2707,
+   [{id, led_red_mask},
+    {name, "led-red-mask"},
+    {struct, var},
+    {type, unsigned16},
+    {category, optional},
+    {access, rw}]}
+ ]}.
+
+
+

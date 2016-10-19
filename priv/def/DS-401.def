@@ -23,7 +23,7 @@
 %%                            00    No specifc function
 %%                            01    Joy stick
 %%                            _     Reserved
-{module, 'DS-401'}.
+{definitions, 'DS-401'}.
 
 {require, type}.
 

@@ -1,9 +1,7 @@
 %% -*- erlang -*-
-%% 
-%%  ADC definition
-%% 
+%%  ADC definitions
 %%
-{module, adc}.
+{definitions, adc}.
 
 {enum, trigger,
  [{upper_limit_exceeded,          16#01},
@@ -38,6 +36,16 @@
     {access, rw}
    ]}
   ]}.
+
+{objdef,16#6423,
+ [{id, adc_global_interrupt},
+  {name, "adc-global-interrupt"},
+  {description,"Global Interrupt Enable Analog"},
+  {struct,var},
+  {category,optional},
+  {type,boolean},
+  {access,rw}
+ ]}.
 
 {objdef, 16#6424,
  [{id, adc_upper},

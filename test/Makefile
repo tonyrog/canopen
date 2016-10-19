@@ -51,6 +51,9 @@ clean:
 test:
 	$(ERLDIR)/bin/ct_run -include ../include -config co_test.cfg -suite co_node_SUITE
 
+test_all:
+	$(ERLDIR)/bin/ct_run -include ../include -config co_test.cfg
+
 -include depend.mk
 
 ./%.beam:	%.erl

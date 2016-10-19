@@ -1,5 +1,5 @@
-%% coding: latin-1
 %% -*- erlang -*-
+%% coding: latin-1
 %%
 %% CANopen standard object definitions
 %%
@@ -8,7 +8,7 @@
 %% SDO TYPE description
 %% mapped => #sdo_parameter
 %%
-{module, canopen}.
+{definitions, canopen}.
 
 {require, type}.
 
@@ -202,6 +202,3 @@
   {access, rw}]}.
 
 %% SDO TYPE description
-
-
-%% end of module canopen

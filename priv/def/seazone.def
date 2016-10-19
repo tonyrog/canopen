@@ -2,7 +2,7 @@
 %%
 %% General Seazone node  definitions
 %%
-{module, seazone}.
+{definitions, seazone}.
 
 {require, canopen}.
 %%

@@ -57,19 +57,13 @@
          decode_pdo_mapping/1,
          decode_nmt_command/1]).
 
-%% Definition file decoding
--export([load_definition/1,
-         load_definition/2,
-         object/2,
-         entry/2,
-         entry/3,
-         enum_by_id/2]).
-
 %% Utilities
 -export([utc_time/0,
 	 sec/0,
          debug/1,
 	 text_expand/2]).
+-export([decode_obj/2, verify_obj/1, simple_type/1]).
+
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -487,311 +481,6 @@ decode_nmt_command(?NMT_RESET_NODE) -> reset;
 decode_nmt_command(?NMT_RESET_COMMUNICATION) -> reset_com;
 decode_nmt_command(Other) -> Other.
 
--record(def_mod,
-	{
-	  require = [],  %% modules required [atom()]
-	  name,    %% module name
-	  enums,   %% dictionary of enums
-	  ixs,     %% dictionary Index -> ID
-	  objects  %% list of objdefs
-	  }).
-
--record(def_ctx,
-	{
-	  module,       %% module loading
-	  modules = [], %% loaded modules [{atom(),#def_mod}]
-	  loading = [], %% loading stack [atom()] 
-	  path=[]       %% search path for require
-	}).
-
-new_def_mod(Module) ->
-    #def_mod { require = [],
-	       enums   = dict:new(),
-	       ixs     = dict:new(),
-	       name    = Module,
-	       objects = [] }.
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Load all description objects in a def file
-%% @end
-%%--------------------------------------------------------------------
--spec load_definition(File::string()) -> 
-			     {ok, DefinitionContext::#def_ctx{}} |
-			     {{error, Reason::term()}, DefinitionContext::#def_ctx{}}.
-
-load_definition(File) ->
-    load_definition(filename:basename(File),[filename:dirname(File)]).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Load all description objects in a def file
-%% @end
-%%--------------------------------------------------------------------
--spec load_definition(File::string(), Path::list(Dir::string())) -> 
-			     {ok, DefinitionContext::term()} |
-			     {{error, Reason::term()}, DefinitionContext::#def_ctx{}}.
-
-load_definition(File,Path) ->
-    load_def_mod(list_to_atom(File), #def_ctx { path=Path }).
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Locate object in a def context.
-%% @end
-%%--------------------------------------------------------------------
--spec object(Key::integer() | atom() | string(), 
-	     Term::#def_ctx{} | 
-		   list({ModName::atom(), Mod::#def_mod{}}) |
-		   list(Object::#objdef{})) ->
-		    Obj::#objdef{} | {error, Reason::term()}.
-
-object(Key, _DefCtx=#def_ctx {modules = Modules}) 
-  when ?is_index(Key) ->
-    ?dbg("object: searching for index ~p in whole context ~p", 
-	 [Key, [Mod || {Mod, _} <-  Modules]]),
-    case find_in_mods(Key, #def_mod.ixs, Modules) of
-	{error, _Error} = E -> E;
-	{ok, Id} -> object_in_modlist(Id, Modules)
-    end;
-object(Key, _DefCtx=#def_ctx {modules = Modules})  ->
-    ?dbg("object: searching for ~p in whole context ~p", 
-	 [Key, [Mod || {Mod, _} <-  Modules]]),
-    object_in_modlist(Key, Modules).
-
-object_in_modlist(_Key, []) ->
-    ?dbg("object_in_modlist: ~p not found", [_Key]),
-    {error, not_found};
-object_in_modlist(Key, [{_ModName, DefMod=#def_mod {objects = Objects}} | 
-			DefMods]) 
-  when is_record(DefMod, def_mod)->
-    ?dbg("object_in_modlist: searching for ~p in ~p", [Key, _ModName]),
-    case object_in_objlist(Key, Objects) of
-	Obj when is_record(Obj, objdef) ->
-	    Obj;
-	{error, not_found} ->
-	    object_in_modlist(Key, DefMods);
-	{error, _Error} = E -> 
-	    E
-    end.
-
-object_in_objlist(_Key, []) ->
-    ?dbg("object_in_objlist: ~p not found", [_Key]),
-    {error, not_found};
-object_in_objlist(Id, ObjList) 
-  when is_atom(Id) andalso is_list(ObjList) ->
-    ?dbg("object_in_objlist: searching for atom ~p", [Id]),
-    case lists:keyfind(Id, #objdef.id, ObjList) of
-	false -> {error, not_found};
-	Obj -> Obj
-    end;
-object_in_objlist(Name, ObjList)
-  when is_list(Name) andalso is_list(ObjList) ->
-    ?dbg("object_in_objlist: searching for string ~p", [Name]),
-    case lists:keyfind(Name, #objdef.name, ObjList) of
-	false -> {error, not_found};
-	Obj -> Obj
-    end;
-object_in_objlist(Index, [Obj| Objects]) 
-  when ?is_index(Index) andalso is_record(Obj, objdef)->
-    ?dbg("object_in_objlist: searching for index ~p", [Index]),
-    %% Index can be a range
-    case match_index(Index, Obj#objdef.index) of
-	true -> Obj;
-	false -> object_in_objlist(Index, Objects)
-    end.
-
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Locate entry in a def context.
-%% @end
-%%--------------------------------------------------------------------
--spec entry(Key::integer() | atom(), Obj::#objdef{}, DefCtx::term()) ->
-		    Entry::#entdef{} | {error, Reason::term()}.
-
-entry(Key, _Obj=#objdef {entries = [], type = Type}, DefCtx) 
-  when is_record(DefCtx, def_ctx) ->
-    ?dbg("entry: searching for ~p when no entries", [Key]),
-    case object(Type, DefCtx) of
-	{error, _Error} = E -> E;
-	TypeObj -> entry(Key, TypeObj)
-    end;
-entry(Key, Obj=#objdef {entries = _E}, DefCtx) 
-  when is_record(DefCtx, def_ctx) ->
-    ?dbg("entry: searching for ~p when entries ~p", [Key,_E]),
-    entry(Key, Obj);
-entry(Index, SubInd, DefCtx) 
-  when is_record(DefCtx, def_ctx)->
-    ?dbg("entry: searching for ~p:~p", [Index, SubInd]),
-    case object(Index, DefCtx) of
-	{error, _Error} = E -> E;
-	Obj ->
-	   entry(SubInd, Obj, DefCtx)
-    end.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Locate entry in a def context.
-%% @end
-%%--------------------------------------------------------------------
--spec entry(Key::integer() | atom(), DefCtx::term()) ->
-		    Entry::#entdef{} | {error, Reason::term()}.
-
-entry(_Key, []) ->
-    {error, not_found};
-entry(Name, _Obj=#objdef {entries = Entries}) 
-  when is_list(Name)->
-    ?dbg("entry: searching for ~p when name", [Name]),
-    lists:keyfind(Name, #entdef.name, Entries);
-entry(Id, _Obj=#objdef {entries = Entries}) 
-  when is_atom(Id)->
-    ?dbg("entry: searching for ~p when id", [Id]),
-    lists:keyfind(Id, #entdef.id, Entries);
-entry(SubIndex, _Obj=#objdef {entries = Entries}) 
-  when ?is_subind(SubIndex) ->
-    ?dbg("entry: searching for ~p when index", [SubIndex]),
-    entry(SubIndex, Entries);
-entry(SubIndex, [Ent|Entries]) 
-  when ?is_subind(SubIndex) ->
-    ?dbg("entry: searching for ~p when index", [SubIndex]),
-    %% Index can be a range
-    case match_index(SubIndex, Ent#entdef.index) of
-	true -> Ent;
-	false -> entry(SubIndex, Entries)
-    end.
-
-%%--------------------------------------------------------------------
-%% @doc
-%% Locate enum definition in a def context.
-%% @end
-%%--------------------------------------------------------------------
--spec enum_by_id(Key::atom(), DefCtx::term()) ->
-			list(Enums::{Name::atom(), Value::integer()}) | 
-			{error, Reason::term()}.
-
-enum_by_id(Id, DefCtx) when is_atom(Id) ->
-    find_in_mods(Id, #def_mod.enums, DefCtx#def_ctx.modules).    
-
-%% @private
-load_def_mod(Module, DefCtx) when is_atom(Module) ->
-    File = atom_to_list(Module) ++ ".def",
-    case file:path_consult(DefCtx#def_ctx.path, File) of
-	{ok, Forms,_} ->
-	    def_mod(Forms, undefined, DefCtx);
-	{error, enoent} ->
-	    %% Check the priv/def dir
-	    PrivFile = filename:join(code:priv_dir(canopen) ++ "/def", File),
-	    case file:consult(PrivFile) of
-		{ok, Forms} ->
-		    def_mod(Forms, undefined, DefCtx);
-		{error,Error} = E ->
-		    ?ee("load_mod: loading ~p failed, reason ~p\n", 
-			[PrivFile, Error]),
-		    {E, DefCtx}
-	    end;
-	Err = {error,_} ->
-	    {Err, DefCtx}
-    end.
-
-%% {module, abc}  - define module
-def_mod([{module, Module}|Forms], DMod, DefCtx) when is_atom(Module) ->
-    case lists:keyfind(Module, 1, DefCtx#def_ctx.modules) of
-	false ->
-	    DMod1 = new_def_mod(Module),
-	    DefCtx1 = add_module(DefCtx, DMod),	    
-	    def_mod(Forms, DMod1, DefCtx1#def_ctx { module = Module });
-	_DefMod ->
-	    erlang:error({module_already_defined, Module}) 
-    end;
-def_mod([_AnyButModule|_Forms], undefined, _DefCtx) ->
-    erlang:error(module_tag_required);
-%% {require, def} - load a module
-def_mod([{require, Module}|Forms], DMod, DefCtx) when is_atom(Module) ->
-    case lists:keyfind(Module, 1, DefCtx#def_ctx.modules) of
-	false ->
-	    case lists:member(Module, DefCtx#def_ctx.loading) of
-		true ->
-		    erlang:error({circular_definition, Module});
-		false ->
-		    DefCtx1 =  DefCtx#def_ctx { loading=[Module|DefCtx#def_ctx.loading]},
-		    {_, DefCtx2} = load_def_mod(Module, DefCtx1),
-		    Require = [Module|DMod#def_mod.require],
-		    def_mod(Forms, DMod#def_mod { require=Require},
-			 DefCtx2#def_ctx { module = DefCtx#def_ctx.module,
-					 loading = DefCtx#def_ctx.loading })
-	    end;
-	_DefMod ->
-	    %% Already loaded, continue
-	    def_mod(Forms, DMod, DefCtx)
-    end;
-%% {enum, atom(), [{atom(),value()}]}
-def_mod([{enum,Id,Enums}|Forms], DMod=#def_mod {enums = EnumDict}, DefCtx) ->
-    NewDict = dict:store(Id, Enums, EnumDict),
-    def_mod(Forms, DMod#def_mod {enums = NewDict}, DefCtx);
-def_mod([{objdef,Index,Options}|Forms], 
-	DMod=#def_mod {objects = Objects, ixs = IxsDict}, 
-	DefCtx) ->
-    NewIxs = 
-	case Index of
-	    I when I > 0, I =< 16#ffff ->
-		[I];
-	    {I,J} when I > 0, I =< 16#ffff, I =< J, J =< 16#ffff ->
-		lists:seq(I,J,1);
-	    {I,J,S} when I > 0, I =< 16#ffff, I =< J, J =< 16#ffff,
-	                 S > 0, S < 16#ffff ->
-		lists:seq(I,J,S)
-	end,
-    Obj0 = decode_obj(Options, #objdef { index=hd(NewIxs)}),
-    Obj1 = verify_obj_id(Obj0, DefCtx),
-    Obj2 = verify_obj(Obj1,DMod),
-    ?dbg("def_mod: obj ~p verified", [Obj1]),
-
-    %% If no entries and 'simple' type add default entry for subindex 0
-    %% If 'complex' type it structure needs to be checked at runtime
-    Obj3 = case {Obj2#objdef.entries, simple_type(Obj2#objdef.type)} of
-	       {[], true} ->
-		   ?dbg("def_mod: adding def entry with type ~p", 
-			[Obj2#objdef.type]),
-		   DefEntry = #entdef {index = 0,
-				       type = Obj2#objdef.type,
-				       range = Obj2#objdef.range,
-				       access = Obj2#objdef.access},
-		   Obj2#objdef {entries = [DefEntry]};
-	       _Other ->
-		   Obj2
-	   end,
-
-    Id = Obj3#objdef.id,
-    ?dbg("def_mod: obj id ~p verified", [Id]),
-    NewIxsDict =
-	lists:foldl(
-	  fun(Ix, Dict) ->
-		  store_one(Ix, Id, Dict)
-	  end, IxsDict, NewIxs),
-    def_mod(Forms, DMod#def_mod {objects = [Obj3 | Objects], ixs = NewIxsDict}, DefCtx);
-def_mod([], DMod, DefCtx) ->
-    NewDefCtx = add_module(DefCtx, DMod),
-    {ok, NewDefCtx}.
-
-
-%% Insert a module into the module list
-add_module(DefCtx, undefined) ->
-    DefCtx;
-add_module(DefCtx=#def_ctx {module = Module, modules = Modules}, DMod) ->
-    DefCtx#def_ctx { module = undefined,
-		     modules=[{Module, DMod}|Modules]}.
-
-store_one(Key, Value, Dict) ->
-    case dict:find(Key, Dict) of
-	error ->
-	    dict:store(Key, Value, Dict);
-	_ -> %% just store first instance 
-	    Dict
-    end.
-
-
 decode_obj([Opt|Options], Obj) ->
     Obj1 = decode_obj_opt(Opt, Obj),
     decode_obj(Options, Obj1);
@@ -865,56 +554,38 @@ decode_ent_opt(_Kv={Key,Value}, Ent) ->
     end.
 
 %%
-%% Verify object id
-%% Check that id is uniq
-%%
-verify_obj_id(Obj=#objdef {id = undefined, index = Index}, DefCtx) ->
-    %% generate generic id
-    Id = list_to_atom("id" ++ erlang:integer_to_list(Index,10)),
-    verify_obj_id(Obj#objdef {id = Id}, DefCtx);
-    %%erlang:error({id_required, Index});
-verify_obj_id(Obj=#objdef {id = Id}, DefCtx) when is_atom(Id) ->
-    case object(Id, DefCtx) of
-	{error, _} -> Obj;
-	Obj2 -> erlang:error({id_not_uniq,Id,Obj2#objdef.index})
-    end;
-verify_obj_id(_Obj=#objdef {id = Id}, _DefCtx) ->
-    %% Not atom
-    erlang:error({bad_entry_id, Id}).
-
-%%
 %% Verify object
 %%
-verify_obj(Obj,Def) ->    
-    verify([fun verify_obj_name/2,
-	    fun verify_obj_type/2,
-	    fun verify_obj_struct/2,
-	    fun verify_obj_category/2,
-	    fun verify_obj_entries/2], Obj, Def).
+verify_obj(Obj) ->
+    verify([fun verify_obj_name/1,
+	    fun verify_obj_type/1,
+	    fun verify_obj_struct/1,
+	    fun verify_obj_category/1,
+	    fun verify_obj_entries/1], Obj).
 	    
 %%
 %% Verify entry
 %%	    
 	
-verify_ent(Ent, Def) ->
-    verify([fun verify_ent_id/2,
-	    fun verify_ent_name/2,
-	    fun verify_ent_category/2,
-	    fun verify_ent_access/2,
-	    fun verify_ent_type/2,
-	    fun verify_ent_pdo_mapping/2,
-	    fun verify_ent_range/2,
-	    fun verify_ent_default/2,
-	    fun verify_ent_substitute/2],
-	   Ent, Def).
+verify_ent(Ent) ->
+    verify([fun verify_ent_id/1,
+	    fun verify_ent_name/1,
+	    fun verify_ent_category/1,
+	    fun verify_ent_access/1,
+	    fun verify_ent_type/1,
+	    fun verify_ent_pdo_mapping/1,
+	    fun verify_ent_range/1,
+	    fun verify_ent_default/1,
+	    fun verify_ent_substitute/1],
+	   Ent).
 
-verify([V|Vs], Data, Def) ->
-    verify(Vs, V(Data, Def), Def);
-verify([], Data, _Def) ->
-    Data.
+verify([V|Vs], Obj) ->
+    verify(Vs, V(Obj));
+verify([], Obj) ->
+    Obj.
 
 %% Verify object name
-verify_obj_name(Obj,_Def) ->
+verify_obj_name(Obj) ->
     case Obj#objdef.name of
 	undefined -> 
 	    Obj#objdef { name=atom_to_list(Obj#objdef.id) };
@@ -926,7 +597,7 @@ verify_obj_name(Obj,_Def) ->
     end.
 
 %% Verify object category
-verify_obj_category(Obj,_Def) ->
+verify_obj_category(Obj) ->
     case Obj#objdef.category of
 	undefined -> %% default
 	    Obj#objdef { category=optional};	
@@ -939,7 +610,7 @@ verify_obj_category(Obj,_Def) ->
 	    end
     end.
 
-verify_obj_struct(Obj,_Def) ->
+verify_obj_struct(Obj) ->
     case Obj#objdef.struct of
 	undefined -> %% default
 	    Obj#objdef { struct=var };
@@ -1027,7 +698,7 @@ verify_value(Type, Value) ->
     end.
 
 %% FIXME: handle deftype! when Type=Index! or special id
-verify_type(Type, _Def) ->
+verify_type(Type) ->
     case catch encode_type(Type) of
 	{'EXIT',_} ->
 	    erlang:error({bad_type,Type});
@@ -1052,44 +723,51 @@ verify_enum_values(Base, [{Key,Value}|KVs], Ks, Vs) ->
 verify_enum_values(_Base, [], _Ks, _Vs) ->
     true.
 
-
-verify_enum(Base, Name, Def) when is_atom(Name) ->
-    case dict:find(Name, Def#def_mod.enums) of
-	error -> erlang:error({enum_type_not_defined, Name});
-	{ok,Enums} -> verify_enum_values(Base, Enums, [], [])
+verify_enum(Base, Name) when is_atom(Name) ->
+    case co_objdef:prev({enum,Name,'\377',1}) of
+	Key={enum,Name,_Mod,_Version} ->
+	    case co_objdef:lookup_object(Key) of
+		false ->
+		    erlang:error({enum_type_not_defined, Name});
+		{enum,_,Enums} ->
+		    verify_enum_values(Base, Enums, [], [])
+	    end;
+	_Key ->
+	    io:format("Key = ~p\n", [_Key]),
+	    erlang:error({enum_type_not_defined, Name})
     end;
-verify_enum(Base, Enums, _Def) when is_list(Enums) ->
+verify_enum(Base, Enums) when is_list(Enums) ->
     verify_enum_values(Base, Enums, [], []).
 
 
 %% Verify object type (default type for array entries)
-verify_obj_type(Obj,Def) ->
+verify_obj_type(Obj) ->
     case Obj#objdef.type of
 	undefined ->
 	    Obj;
 	{enum,Base,Name} ->
-	    verify_type(Base, Def),
-	    verify_enum(Base,Name,Def),
+	    verify_type(Base),
+	    verify_enum(Base,Name),
 	    Obj;
 	{bitfield,Base,Name} ->
-	    verify_type(Base, Def),
+	    verify_type(Base),
 	    %% FIXME: check that enum bits are non overlapping!?
-	    verify_enum(Base,Name,Def),
+	    verify_enum(Base,Name),
 	    Obj;
 	Type ->
-	    verify_type(Type, Def),
+	    verify_type(Type),
 	    Obj
     end.
 
-verify_obj_entries(Obj,Def) ->
+verify_obj_entries(Obj) ->
     %% Verify all entries
-    Ents0 = map(fun(Ent) -> verify_ent(Ent,Def) end, Obj#objdef.entries),
+    Ents0 = map(fun(Ent) -> verify_ent(Ent) end, Obj#objdef.entries),
     %% Sort according to index range, detect overlap
     Ents1 = range_sort(#entdef.index, Ents0),
     Obj#objdef { entries = Ents1 }.
 
 %% Verify entry id
-verify_ent_id(Ent,_Def) ->
+verify_ent_id(Ent) ->
     case Ent#entdef.id of
 	undefined ->
 	    Ent;
@@ -1100,7 +778,7 @@ verify_ent_id(Ent,_Def) ->
     end.
 
 %% Verify entry name
-verify_ent_name(Ent,_Def) ->
+verify_ent_name(Ent) ->
     case Ent#entdef.name of
 	undefined -> 
 	    Ent;
@@ -1113,7 +791,7 @@ verify_ent_name(Ent,_Def) ->
     end.
 
 %% Verify entry category
-verify_ent_category(Ent,_Def) ->
+verify_ent_category(Ent) ->
     case Ent#entdef.category of
 	undefined -> %% default
 	    Ent#entdef { category=optional};	
@@ -1127,7 +805,7 @@ verify_ent_category(Ent,_Def) ->
     end.
 
 %% Verify access type	    
-verify_ent_access(Ent,_Def) ->
+verify_ent_access(Ent) ->
     case Ent#entdef.access of
 	undefined -> %% default
 	    Ent#entdef { access=ro };	
@@ -1141,24 +819,24 @@ verify_ent_access(Ent,_Def) ->
     end.
 
 %% Verify entry type
-verify_ent_type(Ent,Def) ->
+verify_ent_type(Ent) ->
     case Ent#entdef.type of
 	{enum,Base,Name} ->
-	    verify_type(Base, Def),
-	    verify_enum(Base,Name,Def),
+	    verify_type(Base),
+	    verify_enum(Base,Name),
 	    Ent;
 	{bitfield,Base,Name} ->
-	    verify_type(Base, Def),
+	    verify_type(Base),
 	    %% FIXME: check that enum bits are non overlapping!?
-	    verify_enum(Base,Name,Def),
+	    verify_enum(Base,Name),
 	    Ent;
 	Type ->
-	    verify_type(Type, Def),
+	    verify_type(Type),
 	    Ent
     end.
 
 %% Verify pdo mapping
-verify_ent_pdo_mapping(Ent,_Def) ->
+verify_ent_pdo_mapping(Ent) ->
     case Ent#entdef.pdo_mapping of
 	undefined -> %% default
 	    Ent#entdef { pdo_mapping=no };	
@@ -1172,16 +850,16 @@ verify_ent_pdo_mapping(Ent,_Def) ->
     end.
 
 %% Verify that range values are consistent with type
-verify_ent_range(Ent,_Def) ->
+verify_ent_range(Ent) ->
     Ent.
 
 %% Verify that default value is consistent with type and in range
-verify_ent_default(Ent,_Def) ->
+verify_ent_default(Ent) ->
     Ent.
 
 %% Verify that substitute value is consistent with type, possibly not
 %% with range
-verify_ent_substitute(Ent,_Def) ->
+verify_ent_substitute(Ent) ->
     Ent.
 
 %% Sort accoring to A={A,A} or {A,B}
@@ -1201,34 +879,6 @@ in_range(A, [{B,_}|_]) when A < B -> false;
 in_range(A, [_ | Rs]) -> in_range(A, Rs);
 in_range(_A, _) -> false.
 
-
-%% Check if index match object index
-match_index(Index, Index) -> 
-    true;
-match_index(Index, {From,To}) when Index >= From, Index =< To -> 
-    true;
-match_index(Index, {From,To,Step}) when Index >= From, Index =< To, (Index-From) rem Step == 0 ->
-    true;
-match_index(_, _) -> false.
-
-%% Convert index to offset idx
-%% To be used ??
-%% object_idx(Index, Index) -> 
-%%     1;
-%% object_idx(Index, {From,To}) when Index >= From, Index =< To ->
-%%     (Index - From)+1;
-%% object_idx(Index, {From,To,Step}) when Index >= From, Index =< To, (Index-From) rem Step == 0 ->
-%%     (Index - From)+1.
-
-
-find_in_mods(Key, Pos, [{_ModName, DMod}|DMods]) ->
-    case dict:find(Key, element(Pos, DMod)) of
-	error -> find_in_mods(Key, Pos, DMods);
-	Found -> Found
-    end;
-find_in_mods(_Key, _Pos, []) ->
-    ?dbg("find_in_mods: ~p not found", [_Key]),
-    {error, not_found}.
 
 utc_time() ->
     TS = {_,_,Micro} = os:timestamp(),

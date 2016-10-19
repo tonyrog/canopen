@@ -1,0 +1,239 @@
+%% -*- erlang -*-
+%% 
+%%  misc definitions
+%% 
+{definitions, misc}.
+
+%% OBSOLETE
+{objdef, 16#2729,
+ [{id, pamp},
+  {name, "pamp"},
+  {description, "power frame"},
+  {struct, var},
+  {type, boolean},
+  {category, optional},
+  {access, rw}]}.
+
+%% TEMPORARY (none stored) objects for debugging and play
+
+{objdef, 16#2702,
+ [{id, pwm},
+  {name, "output-pwm"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned16},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#2703,
+ [{id, reload},
+  {name, "output-reload"},
+  {description, "Set the PWM reload value"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned32},
+    {range, {0, 15000000}},
+    {category, optional},
+    {access, rw}]}
+]}.
+
+{objdef, 16#2708,
+ [{id, backlight},
+  {name, "backlight"},
+  {description, "Set the PWM value for the backlight"},
+  {struct, var},
+  {range, {0, 16#FFFF}},
+  {category, optional},
+  {access, wo}]}.
+
+{objdef, 16#2709,
+ [{id, ledlight},
+  {name, "ledlight"},
+  {description, "Set the PWM value for the ledlight"},
+  {struct, var},
+  {range, {0, 16#FFFF}},
+  {category, optional},
+  {access, wo}]}.
+
+{objdef, 16#2730,
+ [{id, vin},
+  {name, "vin"},
+  {description, "Input voltage in volts*100"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, ro}]}.
+
+{objdef, 16#2731,
+ [{id, his},
+  {name, "his"},
+  {description, "Highside level voltage in volts*100"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, ro}]}.
+
+{objdef, 16#2732,
+ [{id, temp},
+  {name, "temp"},
+  {description, "Internal temperature in celsius*10"},
+  {struct, var},
+  {type, integer16},
+  {category, optional},
+  {access, ro}]}.
+
+{objdef, 16#2733,
+ [{id, load},
+  {name, "load"},
+  {description, "Current load in Ampere*100"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, ro}]}.
+
+{objdef, 16#2734,
+ [{id, an0},
+  {name, "an0"},
+  {description, "Analog-0 input"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned16},
+    {access, ro}]}
+]}.
+
+{objdef, 16#2735,
+ [{id, an1},
+  {name, "an1"},
+  {description, "Analog-1 input"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned16},
+    {access, ro}]}
+]}.
+
+{objdef, 16#2736,
+ [{id, an2},
+  {name, "an2"},
+  {description, "Analog-2 input"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned16},
+    {access, ro}]}
+]}.
+
+%% First calibration value at 1A to convert analog to ampare
+{objdef, 16#2737,
+ [{id, w1a},
+  {name, "w1a"},
+  {description, "Analog calibration value at 1A"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned16},
+    {access, rw}]}
+]}.
+
+%% Second calibration value at 10A to convert analog to ampare
+{objdef, 16#2738,
+ [{id, w10a},
+  {name, "w10a"},
+  {description, "Analog calibration value at 10A"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned16},
+    {access, rw}]}
+]}.
+
+%% wna - analog nominal load value is used together with 
+%% output_alarm_low to detect under-load (broken components)
+%%
+{objdef, 16#2739,
+ [{id, wna},
+  {name, "wna"},
+  {description, "Analog nominal load value"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned16},
+    {access, rw}]}
+]}.
+
+{objdef, 16#2744,
+ [{id, wnv},
+  {name, "wnv"},
+  {description, "Voltage nominal level"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned16},
+    {access, rw}]}
+]}.
+
+{objdef, 16#2740,
+ [{id, vin_high},
+  {name, "vin-high"},
+  {description, "High shut-off level"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}
+]}.
+
+{objdef, 16#2741,
+ [{id, vin_medium},
+  {name, "vin-medium"},
+  {description, "Medium shut-off level"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}
+]}.
+
+{objdef, 16#2742,
+ [{id, vin_low},
+  {name, "vin-low"},
+  {description, "Low shut-off level"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}
+]}.
+
+{objdef, 16#2743,
+ [{id, vin_warn},
+  {name, "vin-warn"},
+  {description, "Warning level"},
+  {struct, var},
+  {type, unsigned16},
+  {category, optional},
+  {access, rw}
+]}.
+
+
+{objdef, 16#2745,
+ [{id, reload0},
+  {name, "reload0"},
+  {description, "PWM Reload group 0"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}
+]}.
+
+{objdef, 16#2746,
+ [{id, reload1},
+  {name, "reload1"},
+  {description, "PWM Reload group 1"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}
+]}.
+
+{objdef, 16#2747,
+ [{id, reload2},
+  {name, "reload2"},
+  {description, "PWM Reload group 2"},
+  {struct, var},
+  {type, unsigned32},
+  {category, optional},
+  {access, rw}
+]}.

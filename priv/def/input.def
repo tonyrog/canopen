@@ -1,0 +1,119 @@
+%% -*- erlang -*-
+%%  input objects
+
+{definitions, input}.
+
+{enum, iflags,
+ [{active, 16#0001},  %% input channel is active
+  {analog, 16#0002},  %% accept analog values
+  {digital,16#0004},  %% accept digital values
+  {encoder,16#0008},  %% accept encoder values
+  {analog_digital, 16#0010}, %% convert analog to digital
+  {springback, 16#0020},     %% switch is springback
+  {push_encoder,16#0040},    %% implements push encoder (when springback!)
+  {inc_encoder, 16#0080},    %% increment push encoder
+  {dec_encoder, 16#0100},    %% decrement push encoder
+  {off_only, 16#0200},       %% match for "off" events only
+  {on_only,  16#0400},       %% match for "on" events only
+  {digital_encoder,16#0800}  %% convert digital to step value
+ ]}.
+
+{objdef, 16#2720,
+ [{id, input_flags},
+  {name, "input-flags"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, {bitfield,unsigned16,iflags}},
+    {category, optional},
+    {access, rw}]}]}.
+
+{objdef, 16#2721,
+ [{id, input_out},
+  {name, "input-out"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}
+   ]}
+  ]}.
+
+
+{objdef, 16#2722,
+ [{id, input_node},
+  {name, "input-node"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}
+   ]}
+  ]}.
+
+{objdef, 16#2723,
+ [{id, input_channel},
+  {name, "input-channel"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned8},
+    {category, optional},
+    {access, rw}
+   ]}
+  ]}.
+
+{objdef, 16#2724,
+ [{id, input_an_min},
+  {name, "input-an-min"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned16},
+    {category, optional},
+    {access, rw}
+   ]}
+  ]}.
+
+{objdef, 16#2725,
+ [{id, input_an_max},
+  {name, "input-an-max"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned16},
+    {category, optional},
+    {access, rw}
+   ]}
+  ]}.
+
+{objdef, 16#2726,
+ [{id, input_an_offset},
+  {name, "input-an-offset"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned16},
+    {category, optional},
+    {access, rw}
+   ]}
+  ]}.
+
+{objdef, 16#2727,
+ [{id, input_an_scale},
+  {name, "input-an-scale"},
+  {description, "Scale input with a 8.8 fixnum"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, integer16},
+    {category, optional},
+    {access, rw}
+   ]}
+  ]}.
+
+{objdef, 16#2728,
+ [{id, input_ctl},
+  {name, "input-ctl"},
+  {struct, array},
+  {entry, {1,32},
+   [{type, unsigned32},
+    {category, optional},
+    {access, rw}
+   ]}
+  ]}.
+

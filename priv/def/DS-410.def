@@ -1,7 +1,7 @@
 %%
 %% DS-410	Declinometers
 %%
-{module, 'DS-410'}.
+{definitions, 'DS-410'}.
 
 {require, type}.
 

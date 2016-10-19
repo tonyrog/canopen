@@ -1,4 +1,4 @@
-{module, 'DS-302'}.
+{definitions, 'DS-302'}.
 
 {require, type}.
 
