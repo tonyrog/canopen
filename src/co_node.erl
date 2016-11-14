@@ -2050,7 +2050,10 @@ handle_app_processes(Ref, Reason, Ctx=#co_ctx {app_list = AList}) ->
 handle_app_process(A=#app {pid = Pid}, Reason, 
 		   Ctx=#co_ctx {name = _Name, app_list = AList,
 			       sub_table = STable, res_table = RTable}) ->
-    ?ee("~s: id=~w application died:~p", [_Name,A#app.pid, Reason]),
+    if Reason =/= normal ->
+	    ?ee("~s: id=~w application died:~p", [_Name,A#app.pid, Reason]);
+       true -> ok
+    end,
     remove_subscriptions(STable, Pid), %% Or reset ??
     reset_reservations(RTable, Pid),
     %% FIXME: restart application? application_mod ?
