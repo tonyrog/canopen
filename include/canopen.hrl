@@ -200,6 +200,7 @@
 -define(MAPPING_DEFAULT,      2).
 
 %% External description entries (could be mapped to XML etc)
+-define(OBJDEF_TABLE, co_objdef_db).
 -record(objdef,
 	{
 	  index,       %% default index

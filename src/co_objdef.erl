@@ -28,7 +28,7 @@
 -include_lib("canopen/include/canopen.hrl").
 -include("co_debug.hrl").
 
--define(TABLE, co_objdef_db).
+-define(TABLE, ?OBJDEF_TABLE).
 -define(SERVER, ?MODULE).
 
 -define(table_t(Record_t), term()).
