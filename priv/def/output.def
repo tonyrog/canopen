@@ -13,20 +13,11 @@
   {pulse,    16#05},
   {external, 16#06},
   {alwayson, 16#07},
-  {input,    16#ff}
- ]}.
-
-%% "output-type" for virtual output 9-32
-{enum, votype,
- [{none, 16#00},
+  {dmx,      16#08},
   {backlight,16#81},
   {block,    16#82},
-  {onoff,    16#01},
-  {interval, 16#03},
-  {moment,   16#04},
-  {pulse,    16#05},
-  {dmx,      16#08},
-  {alarm,    16#83}
+  {alarm,    16#83},
+  {input,    16#ff}
  ]}.
 
 %% "output-done" function
@@ -94,12 +85,8 @@
   {name, "output-type"},
   {description, "Output channel type"},
   {struct, array},
-  {entry, {1, 8},
+  {entry, {1, 32},
    [{type, {enum,unsigned8,otype}},
-    {category, optional},
-    {access, rw}]},
-  {entry, {9, 32},
-   [{type, {enum,unsigned8,votype}},
     {category, optional},
     {access, rw}]}
 ]}.
