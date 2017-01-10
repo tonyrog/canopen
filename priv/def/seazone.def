@@ -5,6 +5,20 @@
 {definitions, seazone}.
 
 {require, canopen}.
+
+%%
+%% id:
+%%  Short node id, default 0 = off
+%%
+{objdef, 16#2605,
+ [{id, id},
+  {name, "id"},
+  {description, "Short Node ID"},
+  {struct, var},
+  {type, unsigned8},
+  {access, rw}
+]}.
+
 %%
 %% serial:
 %%  Product serial number
@@ -53,11 +67,11 @@
 
 {objdef, 16#260B,
  [{id, id},
-  {name, "id"},
-  {description, "Node ID"},
+  {name, "boot-id"},
+  {description, "Boot Node ID"},
   {struct, var},
-  {type, unsigned24},
-  {access, ro}
+  {type, unsigned32},
+  {access, rw}
 ]}.
 
 %% uBoot items
@@ -190,6 +204,15 @@
   {struct, var},
   {type, {enum,unsigned8,node_location}},
   {access, rw}]}.  
+
+{objdef, 16#276F,
+ [{id, 'node-name'},
+  {name, "node-name"},
+  {description, "Node name"},
+  {struct, var},
+  %%{type, visible_string},
+  {entry, {1,2}, [{type, visible_string}]},
+  {access, rw}]}.
 
 %%
 %% PDO definitions
