@@ -1,6 +1,6 @@
 %%%-------------------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
-%%% @copyright (C) 2016, Tony Rogvall
+%%% @copyright (C) 2017, Tony Rogvall
 %%% @doc
 %%%     object definition database
 %%% @end
@@ -22,8 +22,16 @@
 -export([load_file/1, load/1, load/2]).
 
 %% gen_server callbacks
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-	 terminate/2, code_change/3]).
+-export([init/1,
+	 handle_call/3,
+	 handle_cast/2,
+	 handle_info/2,
+	 terminate/2,
+	 code_change/3]).
+
+%% test
+-export([clear/0]).
+-export([clear/1]).
 
 -include_lib("canopen/include/canopen.hrl").
 -include("co_debug.hrl").
@@ -204,6 +212,11 @@ load(Module, Path) when is_list(Module) ->
 load(Module, Path) when is_atom(Module) ->
     load_path(Module, Path).
 
+clear(Table) ->
+    gen_server:call(?SERVER, {clear, Table}).
+clear() ->
+    gen_server:call(?SERVER, {clear, ?TABLE}).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -260,6 +273,9 @@ handle_call(commit, From, State) ->
     {Pid,_} = From,
     Result = commit_from_(State#state.pidtab,Pid),
     {reply, Result, State};
+handle_call({clear, Table}, _From, State) ->
+    ets:delete_all_objects(Table),
+    {reply, ok, State};
 handle_call(_Request, _From, State) ->
     {reply, {error,bad_call}, State}.
 
