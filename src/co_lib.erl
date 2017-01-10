@@ -1,6 +1,6 @@
 %%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2017, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -16,7 +16,7 @@
 %%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @author Malotte W Lonne <malotte@malotte.net>
-%%% @copyright (C) 2013, Tony Rogvall
+%%% @copyright (C) 2017, Tony Rogvall
 %%% @doc
 %%% CANopen utilities.
 %%%
@@ -26,6 +26,7 @@
 %%%-------------------------------------------------------------------
 -module(co_lib).
 
+-include_lib("can/include/can.hrl").
 -include("canopen.hrl").
 -include("co_debug.hrl").
 
@@ -36,6 +37,7 @@
          string_to_serial/1,
          serial_to_xnodeid/1,
          serial_to_nodeid/1,
+	 canid_to_nodeid/1,
          cobid_to_nodeid/1,
          cobid/2,
          add_xflag/1]).
@@ -115,10 +117,28 @@ serial_to_nodeid(Serial) when is_integer(Serial) ->
 
 %%--------------------------------------------------------------------
 %% @doc
+%% Retreive nodeid from canid.
+%% @end
+%%--------------------------------------------------------------------
+-spec canid_to_nodeid(CanId::integer()) ->
+			     NodeId::integer().
+
+canid_to_nodeid(CanId) when is_integer(CanId) ->
+    CobId = ?CANID_TO_COBID(CanId),
+    if ?is_cobid_extended((CobId)) ->
+	    ?XNODE_ID(CobId);
+       ?is_not_cobid_extended((CobId)) ->
+	    ?NODE_ID(CobId);
+       true ->
+	    undefined
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc
 %% Retreive nodeid from cobid.
 %% @end
 %%--------------------------------------------------------------------
--spec cobid_to_nodeid(Cobid::integer()) ->
+-spec cobid_to_nodeid(CobId::integer()) ->
 			     NodeId::integer().
 
 cobid_to_nodeid(CobId) when is_integer(CobId)->
