@@ -1,6 +1,6 @@
 %%%---- BEGIN COPYRIGHT -------------------------------------------------------
 %%%
-%%% Copyright (C) 2007 - 2013, Rogvall Invest AB, <tony@rogvall.se>
+%%% Copyright (C) 2007 - 2017, Rogvall Invest AB, <tony@rogvall.se>
 %%%
 %%% This software is licensed as described in the file COPYRIGHT, which
 %%% you should have received as part of this distribution. The terms
@@ -16,7 +16,7 @@
 %%%---- END COPYRIGHT ---------------------------------------------------------
 %%% @author Tony Rogvall <tony@rogvall.se>
 %%% @author Malotte W Lonne <malotte@malotte.net>
-%%% @copyright (C) 2013, Tony Rogvall
+%%% @copyright (C) 2017, Tony Rogvall
 %%% @doc
 %%%  CANopen manager interface.
 %%%  A co_mgr and a co_node with serial number 0 are started.
@@ -761,11 +761,6 @@ handle_call({store,default,Index,SubInd,Value,Timeout}, From,
     do_store(DefNid,Index,SubInd,Value,Timeout,From,Mgr);
 handle_call({store,Nid,Index,SubInd,Value,Timeout}, From, Mgr) ->
     do_store(Nid,Index,SubInd,Value,Timeout,From,Mgr);
-%% fixme handle this with nid = atom = default
-%% handle_call({store,Index,SubInd,Value,Timeout},From,
-%%	    Mgr=#mgr {def_nid = DefNid}) 
-%%  when DefNid =/= 0 ->  
-%%    do_store(DefNid,Index,SubInd,Value,Timeout,From,Mgr);
 
 handle_call({fetch,default,Index,SubInd,Timeout}, From, 
 	    Mgr=#mgr {def_nid = DefNid}) 
@@ -773,10 +768,6 @@ handle_call({fetch,default,Index,SubInd,Timeout}, From,
     do_fetch(DefNid,Index,SubInd,Timeout, From, Mgr);
 handle_call({fetch,Nid,Index,SubInd,Timeout}, From, Mgr) ->
     do_fetch(Nid,Index,SubInd,Timeout, From, Mgr);
-%% fixme handle this with nid = atom = default
-%% handle_call({fetch,Index,SubInd,Timeout}, From, Mgr=#mgr {def_nid = DefNid})
-%%  when DefNid =/= 0 ->
-%%    do_fetch(DefNid,Index,SubInd,Timeout, From, Mgr);
 
 handle_call({translate,Index,SubInd}, _From, Mgr=#mgr {def_nid = DefNid})
   when DefNid =/= 0 ->
@@ -1110,8 +1101,11 @@ translate_value({bitfield,Base,Id},Value,Mod,AppVsn) when is_list(Value) ->
     end;
 translate_value(boolean, true, _,_)  -> {ok, 1};
 translate_value(boolean, false, _,_) -> {ok, 0};
-translate_value(Type, Value, _Mod,_AppVsn) when
-      is_atom(Type), is_integer(Value) ->
+translate_value(visible_string, Value, _Mod,_AppVsn)
+  when is_list(Value) ->
+    {ok, Value ++ [0]};
+translate_value(Type, Value, _Mod,_AppVsn)
+  when is_atom(Type), is_integer(Value) ->
     %% FIXME
     {ok, Value};
 translate_value(_Type, _Value, _Mod, _AppVsn) ->
@@ -1142,7 +1136,9 @@ format_value(Value, Type, _Mod, _AppVsn) ->
 	integer16 -> signed(Value, 16#7fff);
 	integer24 -> signed(Value, 16#7fffff);
 	integer32 -> signed(Value, 16#7fffffff);
-
+	visible_string -> lists:takewhile(fun(C) when C =/= 0 ->true;
+					     (0) -> false
+					  end, Value);
 	_ ->
 	    %% integer_to_list(Value)
 	    Value
