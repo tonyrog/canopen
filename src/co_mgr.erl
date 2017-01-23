@@ -159,7 +159,7 @@ stop() ->
 %% </ul>
 %% @end
 %%--------------------------------------------------------------------
--spec fetch({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
+-spec fetch({TypeOfNid::nodeid | xnodeid, Nid::integer()} | integer(),
 	    Ix::integer(), Si::integer(),
 	    TransferMode:: block | segment,
 	    Destination:: {app, Pid::pid(), Mod::atom()} | 
@@ -171,6 +171,9 @@ stop() ->
 		   {ok, Data::binary()} |
 		   {error, Reason::term()}.
 		   
+fetch(Nid, Ix, Si, TransferMode, Destination, TimeOut)
+  when is_integer(Nid) ->
+    fetch(co_lib:add_tag(Nid), Ix, Si, TransferMode, Destination, TimeOut);
 fetch(NodeId = {_TypeOfNid, Nid}, 
       Ix, Si, TransferMode,
       {app, Pid, Mod} = Destination,
@@ -226,7 +229,7 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode,
 %% See {@link fetch/6}.
 %% @end
 %%--------------------------------------------------------------------
--spec fetch({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
+-spec fetch({TypeOfNid::nodeid | xnodeid, Nid::integer()} | integer(),
 	    {Ix::integer(), Si::integer()} | integer(),
 	    TransferMode:: block | segment,
 	    Destination:: {app, Pid::pid(), Mod::atom()} | 
@@ -248,6 +251,9 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode,
 		   {ok, Data::binary()} |
 		   {error, Reason::term()}.
 	  	   
+fetch(Nid, {Ix, Si}, TransferMode, Destination, TimeOut)
+  when is_integer(Nid) ->
+    fetch(co_lib:add_tag(Nid), Ix, Si, TransferMode, Destination, TimeOut);
 fetch(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode, Destination, Timeout) 
   when is_integer(Nid), 
        is_integer(Ix), 
@@ -271,7 +277,7 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, Destination)
 %% See {@link fetch/6}.
 %% @end
 %%--------------------------------------------------------------------
--spec fetch({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
+-spec fetch({TypeOfNid::nodeid | xnodeid, Nid::integer()} | integer(),
 	    {Ix::integer(), Si::integer()} | integer(),
 	    TransferMode:: block | segment,
 	    Destination:: {app, Pid::pid(), Mod::atom()} | 
@@ -282,6 +288,9 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, Destination)
 		   {ok, Data::binary()} |
 		   {error, Reason::term()}.
 		   
+fetch(Nid, Ix, TransferMode, Destination)
+  when is_integer(Nid) ->
+    fetch(co_lib:add_tag(Nid), Ix, TransferMode, Destination);
 fetch(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode, Destination) 
   when is_integer(Nid), 
        is_integer(Ix), 
@@ -310,7 +319,7 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode, Destination)
 %% </ul>
 %% @end
 %%--------------------------------------------------------------------
--spec store({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
+-spec store({TypeOfNid::nodeid | xnodeid, Nid::integer()} | integer(),
 	    Ix::integer(), Si::integer(),
 	    TransferMode:: block | segment,
 	    Source:: {app, Pid::pid(), Mod::atom()} | 
@@ -320,6 +329,9 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, TransferMode, Destination)
 		   ok | 
 		   {error, Reason::term()}.
 
+store(Nid, Ix, Si, TransferMode, Source, Timeout)
+  when is_integer(Nid) ->
+    store(co_lib:add_tag(Nid), Ix, Si, TransferMode, Source, Timeout);
 store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, 
       {app, Pid, Mod} = Source, TimeOut) 
   when is_integer(Nid), 
@@ -369,7 +381,7 @@ store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode,
 %% See {@link  store/6}.
 %% @end
 %%--------------------------------------------------------------------
--spec store({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
+-spec store({TypeOfNid::nodeid | xnodeid, Nid::integer()} | integer(),
 	    {Ix::integer(), Si::integer()} | integer(),
 	    TransferMode:: block | segment,
 	    Source:: {app, Pid::pid(), Mod::atom()} | 
@@ -387,6 +399,9 @@ store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode,
 		   ok | 
 		   {error, Reason::term()}.
 
+store(Nid, {Ix, Si}, TransferMode, Source, Timeout)
+  when is_integer(Nid) ->
+    store(co_lib:add_tag(Nid), {Ix, Si}, TransferMode, Source, Timeout);
 store(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode, Source, TimeOut) 
   when is_integer(Nid), 
        is_integer(Ix), 
@@ -411,7 +426,7 @@ store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, Source)
 %% See {@link  store/6}.
 %% @end
 %%--------------------------------------------------------------------
--spec store({TypeOfNid::nodeid | xnodeid, Nid::integer()}, 
+-spec store({TypeOfNid::nodeid | xnodeid, Nid::integer()},
 	    {Ix::integer(), Si::integer()} | integer(),
 	    TransferMode:: block | segment,
 	    Source:: {app, Pid::pid(), Mod::atom()} | 
@@ -420,6 +435,9 @@ store(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, Source)
 		   ok | 
 		   {error, Reason::term()}.
 
+store(Nid, Ix, TransferMode, Source)
+  when is_integer(Nid) ->
+    store(co_lib:add_tag(Nid), Ix, TransferMode, Source);
 store(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode, Source) 
   when is_integer(Nid), 
        is_integer(Ix), 
@@ -956,7 +974,7 @@ spawn_request(F, Args, Client, Request, Dbg) ->
 %% @private
 execute_request(F, Args, Client, Request, Dbg) ->
     co_lib:debug(Dbg),
-    lager:debug("execute_request: F = ~p Args = ~w)", [F, Args]),
+    lager:debug("execute_request: ~p(~w)", [F, Args]),
     Reply = apply(?MODULE,F,Args),
     lager:debug("execute_request: reply  ~p", [Reply]),
     handle_reply(Reply, Client, Request).
