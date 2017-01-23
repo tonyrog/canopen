@@ -40,7 +40,8 @@
 	 canid_to_nodeid/1,
          cobid_to_nodeid/1,
          cobid/2,
-         add_xflag/1]).
+         add_xflag/1,
+	 add_tag/1]).
 
 %% Encode CANOpen attributes
 -export([encode_type/1,
@@ -170,7 +171,17 @@ cobid(F, NodeId) when is_atom(F), is_integer(NodeId)->
 
 %%--------------------------------------------------------------------
 %% @doc
-%% Combine nodeid with extentded flag.
+%% Determine nodeid type and add nodeid/xnodeid tag.
+%% @end
+%%--------------------------------------------------------------------
+add_tag(N) when is_integer(N), N > 16#7f, N =< ?COBID_ENTRY_EXTENDED ->
+    {xnodeid, N bor ?COBID_ENTRY_EXTENDED};
+add_tag(N) when is_integer(N), N > 0 ->
+    {nodeid, N}.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Combine nodeid with extended flag.
 %% @end
 %%--------------------------------------------------------------------
 add_xflag(NodeId) when is_integer(NodeId) ->
