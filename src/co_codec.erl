@@ -51,7 +51,9 @@
 %%--------------------------------------------------------------------
 -spec encode(Data::term(), Type::type_spec() | list(type_spec())) -> 
 		    Bin::binary().
-
+%% special case for top level BOOLAN, since we can not send bitstrings (yet)
+encode(Data, ?BOOLEAN) ->
+    encode_e(Data,?UNSIGNED8);
 encode(Data, Type) ->
     encode_e(Data,Type).
 
