@@ -508,3 +508,32 @@
     {category, optional},
     {access, ro}]}
 ]}.
+
+{version, pds, "2017-02-07",
+ [
+  {objdef, 16#2798,
+   [{id, output_value_delay},
+    {name, "output-value-delay"},
+    {description, "delay before sending output step/value feedback"},
+    {struct, array},
+    {entry, {1,32},
+     [{type, unsigned32},
+      {category, optional},
+      {access, rw}]}
+   ]}
+ ]}.
+
+{version, pdb, "2017-02-07",
+ [
+  {objdef, 16#2798,
+   [{id, output_value_delay},
+    {name, "output-value-delay"},
+    {description, "delay before sending output step/value feedback"},
+    {struct, array},
+    {entry, {1,32},
+     [{type, unsigned32},
+      {category, optional},
+      {access, rw}]}
+   ]}
+ ]}.
+
