@@ -4,16 +4,6 @@
 %% 
 {definitions, misc}.
 
-%% OBSOLETE
-{objdef, 16#2729,
- [{id, pamp},
-  {name, "pamp"},
-  {description, "power frame"},
-  {struct, var},
-  {type, boolean},
-  {category, optional},
-  {access, rw}]}.
-
 %% TEMPORARY (none stored) objects for debugging and play
 
 {objdef, 16#2702,
@@ -55,6 +45,44 @@
   {range, {0, 16#FFFF}},
   {category, optional},
   {access, wo}]}.
+
+%% OBSOLETE
+{objdef, 16#2729,
+ [{id, pamp},
+  {name, "pamp"},
+  {description, "power frame"},
+  {struct, var},
+  {type, boolean},
+  {category, optional},
+  {access, rw}]}.
+
+
+{objdef, 16#272B,
+ [{id, keyout},
+  {name, "keyout"},
+  {description, "Enable digital emit, in range 33-36 from powerZone buttons"},
+  {struct, var},
+  {type, boolean},
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#272C,
+ [{id, report_voltage},
+  {name, "report-voltage"},
+  {description, "Master battery voltage reporter"},
+  {struct, var},
+  {type, unsigned32},  %% report MSG_BATTERY, interval in ms
+  {category, optional},
+  {access, rw}]}.
+
+{objdef, 16#272D,
+ [{id, report_load},
+  {name, "report-load"},
+  {description, "Output load report"},
+  {struct, var},
+  {type, unsigned32},  %% report MSG_LOAD, interval in ms
+  {category, optional},
+  {access, rw}]}.
 
 {objdef, 16#2730,
  [{id, vin},
