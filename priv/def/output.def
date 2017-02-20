@@ -45,7 +45,7 @@
   {ctlact, 16#0004},    %% control active led
   {ctlinv, 16#0008},    %% control is inverted
   {stpmem, 16#4010},    %% save/restore step value (fixme)
-  {stpmst, 16#0010},    %% save step value
+  {stpmld, 16#0010},    %% restore step value
   {outact, 16#0020},    %% outA control activity
   {anself, 16#0040},    %% output duty analog to input
   {ancan,  16#0080},    %% output duty to can bus MSG_ANALOG
@@ -55,7 +55,7 @@
   {anload, 16#0800},    %% send current output "load"
   {anval,  16#1000},    %% send current output "output-value"
   {outstp, 16#2000},    %% send current output "output-step"
-  {stpmld, 16#4000}     %% restore step value
+  {stpmst, 16#4000}     %% save step value
  ]}.
 
 {enum, oflags2,
