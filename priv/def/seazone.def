@@ -21,12 +21,13 @@
 
 %%
 %% serial:
-%%  Product serial number
+%%  Product boot serial number !! Only available in hold !!
+%%  See identity_object: 16#1018 for serial when up
 %%
 {objdef, 16#2607,
  [{id, serial},
   {name, "serial"},
-  {description, "Node serial number"},
+  {description, "Node boot serial number"},
   {struct, var},
   {type, unsigned32},
   {access, rw}]}.
