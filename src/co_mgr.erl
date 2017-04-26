@@ -1035,7 +1035,8 @@ translate_index(Mod,AppVsn,Index,SubInd,Value)
     Res = co_objdef:object(Mod,AppVsn,Index),
     lager:debug("translate_index: found ~p\n", [Res]),
     translate_index1(Mod,AppVsn,Res,Index,SubInd,Value);
-translate_index(_Mod,_AppVsn,_Index,_Subind,_Value) ->
+translate_index(_Mod,_AppVsn,_Index,_SubInd,_Value) ->
+    lager:debug("not possible to translate: ~p:~p\n", [_Index, _SubInd]),
     {error,argument}.
 
 translate_index1(_Mod,_AppVsn,false,_Index,_SubInd,_Value) ->
@@ -1074,10 +1075,9 @@ translate_index2(Mod,AppVsn,_E=#entdef {type=Type, index=SubInd}, Index, _S,
 	    lager:debug("translate_index2: translated value ~p ", [TValue]),
 	    {ok,{Index,SubInd,{value, TValue, co_lib:encode_type(Type)}}};
 	error ->
+	    lager:debug("not possible to translate: ~p:~p\n", [Type, Value]),
 	    {error,argument}
     end.
-
-   
 
 translate_value({enum,Base,_Id},Value,Mod,AppVsn) when is_integer(Value) ->    
     translate_value(Base, Value, Mod,AppVsn);
