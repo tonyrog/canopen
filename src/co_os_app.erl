@@ -74,13 +74,15 @@
 
 -record(loop_data,
 	{
-	  state            ::atom(),
-	  command = ""     ::string() | binary(),   %% Subindex 1
-	  status = 0       ::integer(),  %% Subindex 2
-	  reply =""        ::string(),   %% Subindex 3
-	  exec_pid         ::pid(),      %% Pid of process executing command
-	  co_node          ::node_identity(),  %% Identity of co_node
-	  ref              ::reference(),%% Reference for communication with session
+	  state          ::atom(),
+	  command = ""   ::string() | binary(),   %% Subindex 1
+	  status = 0     ::integer(),  %% Subindex 2
+	  reply =""      ::string(),   %% Subindex 3
+	  exec_pid       ::pid() | undefined,
+                            %% Pid of process executing command
+	  co_node        ::node_identity(),  %% Identity of co_node
+	  ref            ::reference() | undefined,
+	                    %% Reference for communication with session
 	  read_buf = (<<>>)::binary()    %% Tmp buffer when uploading reply
 	}).
 

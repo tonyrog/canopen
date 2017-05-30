@@ -1048,7 +1048,7 @@ store(Identity, NodeId = {_TypeOfNid, _Nid}, Ix, Si,
 		  {app, Pid::pid(), Module::atom()} |
 		  {value, Type::integer() | atom()},
 	    TimeOut::timeout() | default) ->
-		   ok | {ok, Data::binary()} | {error, Error::term()}.
+		   {ok, Data::binary()} | {error, Error::term()}.
 
 
 fetch(Identity, NodeId = {_TypeOfNid, Nid}, Ix, Si, 
