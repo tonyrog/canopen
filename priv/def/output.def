@@ -5,19 +5,22 @@
 
 %% "output-type"
 {enum, otype,
- [{none,    16#00},
-  {onoff,   16#01},
-  {dimmer,  16#02},
-  {interval, 16#03},
-  {moment,   16#04},
-  {pulse,    16#05},
-  {external, 16#06},
-  {alwayson, 16#07},
-  {dmx,      16#08},
-  {backlight,16#81},
-  {block,    16#82},
-  {alarm,    16#83},
-  {input,    16#ff}
+ [{none,          16#00},
+  {onoff,         16#01},
+  {dimmer,        16#02},
+  {interval,      16#03},
+  {moment,        16#04},
+  {pulse,         16#05},
+  {external,      16#06},
+  {alwayson,      16#07},
+  {dmx,           16#08},
+  {out_active,    16#09},
+  {out_alarm,     16#0A},
+  {out_backlight, 16#0B},
+  {backlight,     16#81},
+  {block,         16#82},
+  {alarm,         16#83},
+  {input,         16#ff}
  ]}.
 
 %% "output-done" function

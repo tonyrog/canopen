@@ -15,7 +15,8 @@
   {dec_encoder, 16#0100},    %% decrement push encoder
   {off_only, 16#0200},       %% match for "off" events only
   {on_only,  16#0400},       %% match for "on" events only
-  {digital_encoder,16#0800}  %% convert digital to step value
+  {digital_encoder,16#0800}, %% convert digital to step value
+  {digital_invert, 16#1000}  %% invert digital signal
  ]}.
 
 {objdef, 16#2720,
