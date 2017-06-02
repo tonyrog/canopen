@@ -777,13 +777,21 @@ handle_call({store,default,Index,SubInd,Value,Timeout}, From,
 	    Mgr=#mgr {def_nid = DefNid})
   when DefNid =/= 0 ->
     do_store(DefNid,Index,SubInd,Value,Timeout,From,Mgr);
+handle_call({store,default,_Index,_SubInd,_Value,_Timeout}, _From,
+	    Mgr=#mgr {def_nid = DefNid})
+  when DefNid =:= 0 ->
+    {reply, {error, no_nid_available}, Mgr};
 handle_call({store,Nid,Index,SubInd,Value,Timeout}, From, Mgr) ->
     do_store(Nid,Index,SubInd,Value,Timeout,From,Mgr);
 
 handle_call({fetch,default,Index,SubInd,Timeout}, From, 
-	    Mgr=#mgr {def_nid = DefNid}) 
+	    Mgr=#mgr {def_nid = DefNid})
   when DefNid =/= 0 ->
     do_fetch(DefNid,Index,SubInd,Timeout, From, Mgr);
+handle_call({fetch,default,_Index,_SubInd,_Timeout}, _From,
+	    Mgr=#mgr {def_nid = DefNid})
+  when DefNid =:= 0 ->
+    {reply, {error, no_nid_available}, Mgr};
 handle_call({fetch,Nid,Index,SubInd,Timeout}, From, Mgr) ->
     do_fetch(Nid,Index,SubInd,Timeout, From, Mgr);
 

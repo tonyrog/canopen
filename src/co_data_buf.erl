@@ -46,16 +46,16 @@
 	  access           ::atom(),
 	  data = (<<>>)    ::binary(),
 	  i                ::{integer(), integer()},
-	  type             ::integer(),
-	  size             ::non_neg_integer(),
+	  type             ::integer() | undefined,
+	  size = 0         ::non_neg_integer() | undefined,
 	  buf_size = 0     ::non_neg_integer(),
 	  load_level = 0   ::non_neg_integer(),
 	  tmp = (<<>>)     ::binary(),
 	  write_size = 0   ::non_neg_integer(),
-	  pid              ::pid(),
-	  ref              ::reference(),
+	  pid              ::pid() | undefined,
+	  ref              ::reference() | undefined,
 	  mode             ::term(),
-	  timeout          ::timeout(),
+	  timeout          ::timeout() | undefined,
 	  eof = false      ::boolean()
 	}).
 

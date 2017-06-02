@@ -440,30 +440,33 @@
 
 -record(co_session,
 	{
-	  src    :: cobid(),       %% Sender COBID
-	  dst    :: cobid(),       %% Receiver COBID
-	  index  :: uint16(),      %% object being transfered 1-16#ffff
-	  subind :: uint8(),       %% sub-index of object 1-16#ff
-	  data   :: binary(),      %% Data if expedited
-	  exp    :: uint1(),       %% Expedited flag
-	  n      :: uint8(),       %% bytes not used in data section
-	  size_ind :: uint1(),     %% Size indication
-	  t      :: uint1(),       %% session toggle bit (0|1)
-	  pst    :: uint8(),       %% Protocol switch threshold (block request)
-	  crc    :: boolean(),     %% Generate/check CRC for block data
-	  clientcrc :: boolean(),  %% Client CRC support (for block request)
-	  size    :: uint32(),     %% Total data size (for block request)
+	  src     :: cobid(),      %% Sender COBID
+	  dst     :: cobid(),      %% Receiver COBID
+	  index   :: uint16() | undefined, %% object being transfered 1-16#ffff
+	  subind  :: uint8() | undefined,  %% sub-index of object 1-16#ff
+	  data=(<<>>):: binary(),  %% Data if expedited
+	  exp     :: uint1() | undefined, %% Expedited flag
+	  n       :: uint8() | undefined, %% bytes not used in data section
+	  size_ind :: uint1() | undefined, %% Size indication
+	  t       :: uint1(),      %% session toggle bit (0|1)
+	  pst     :: uint8() | undefined,
+	          %% Protocol switch threshold (block request)
+	  crc     :: boolean(),    %% Generate/check CRC for block data
+	  clientcrc :: boolean() | undefined,
+                  %% Client CRC support (for block request)
+	  size    :: uint32() | undefined,%% Total data size (for block request)
 	  blksize :: uint8(),      %% Max number of segment per block
 	  blkseq  :: uint8(),      %% Block number to expect or to send
 	  blkbytes :: uint16(),    %% Number of bytes transfered so far
-	  lastblk  :: binary(),    %% last received block segment (7 bytes)
-	  blkcrc   :: uint16(),    %% Current block CRC value
-	  last     ::uint1(),      %% Flag indicating if last segment is received
-	  node_pid :: pid(),       %% Pid of the node
-	  client   :: term(),     %% Delayed gen_server:reply caller
-	  ctx      :: #sdo_ctx{},  %% general parameters
-	  buf      :: term(),      %% Data buffer
-	  mref     :: term()      %% Ref to application
+	  lastblk=(<<>>):: binary(), %% last received block segment (7 bytes)
+	  blkcrc  :: uint16() | undefined, %% Current block CRC value
+	  last    ::uint1() | undefined,
+	          %% Flag indicating if last segment is received
+	  node_pid:: pid(),        %% Pid of the node
+	  client  :: term(),       %% Delayed gen_server:reply caller
+	  ctx     :: #sdo_ctx{},   %% general parameters
+	  buf     :: term(),       %% Data buffer
+	  mref    :: term()        %% Ref to application
       }).
 
 -record(app,
