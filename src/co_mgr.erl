@@ -1013,13 +1013,13 @@ do_notify(Nid, Func,Index,SubInd, Value, Mgr) ->
 	    try co_codec:encode(Tv, {Type, 32}) of
 		Data ->
 		    lager:debug([{index, {Ti, Tsi}}],
-			 "do_notify: ~w ~w ~.16.0#:~w ~w\n", 
+			 "do_notify: ~6.16.0# ~w ~.16.0#:~w ~w\n",
 			 [Nid,Func,Ti,Tsi,Data]),
 		    co_api:notify_from(Nid,Func,Ti,Tsi,Data)
 	    catch error:_Reason ->
 		    lager:debug([{index, {Ti, Tsi}}],
-			 "do_notify: encode failed ~w ~w ~.16.0#~w ~w, "
-			 "reason ~p\n", 
+			 "do_notify: encode failed ~6.16.0# ~w ~.16.0#~w ~w, "
+			 "reason ~p\n",
 			 [Nid, Func, Index, SubInd, Value, _Reason])
 	    end;
 	_Error ->
@@ -1141,7 +1141,7 @@ translate_value(_Type, _Value, _Mod, _AppVsn) ->
 context(Nid, Mgr) ->
     case lists:keysearch(Nid, #node.nid, Mgr#mgr.nodes) of
 	false ->
-	    lager:debug("context: Node ~p not found", [Nid]),
+	    lager:debug("context: Node ~6.16.0B not found", [Nid]),
 	    {default,0};
 	{value,N} ->
 	    Mod = N#node.product,

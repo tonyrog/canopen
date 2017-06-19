@@ -1227,11 +1227,16 @@ notify(CobId,Ix,Si,Data)
 		    ok | {error, Error::atom()}.
 
 notify({xnodeid, XNid}, Func, Ix, Si, Data) ->
-    notify(?XCOB_ID(co_lib:encode_func(Func), co_lib:add_xflag(XNid)),
-	   Ix,Si,Data);
+    try notify(?XCOB_ID(co_lib:encode_func(Func), co_lib:add_xflag(XNid)),
+	       Ix,Si,Data) 
+    catch _T:E -> 
+	    {error, E}
+    end;
 notify({nodeid, Nid}, Func, Ix, Si, Data) ->
-    notify(?COB_ID(co_lib:encode_func(Func), Nid),Ix,Si,Data).
-
+    try notify(?COB_ID(co_lib:encode_func(Func), Nid),Ix,Si,Data)
+    catch _T:E -> 
+	    {error, E}
+    end.
 %%--------------------------------------------------------------------
 %% @doc
 %% Send notification but not to (own) Node. <br/>
@@ -1254,23 +1259,34 @@ notify({nodeid, Nid}, Func, Ix, Si, Data) ->
 			 ok | {error, Error::atom()}.
 		  
 
-notify_from(Identity={xnodeid, XNid}, Func, Ix, Si, Data) when is_atom(Func) ->
+notify_from(Identity={xnodeid, XNid}, Func, Ix, Si, Data)
+  when is_atom(Func) ->
     lager:debug([{index, {Ix, Si}}],
 	 "notify_from: NodeId = {xnodeid, ~.16#}, Func = ~p, " ++
 	     "Ix = ~4.16.0B, Si = ~p, Data = ~w", 
 	 [XNid, Func, Ix, Si, Data]),
-    notify_from(Identity,?XCOB_ID(co_lib:encode_func(Func), co_lib:add_xflag(XNid)),
-		Ix,Si,Data);
-notify_from(Identity={nodeid, Nid}, Func, Ix, Si, Data) when is_atom(Func)->
+    try notify_from(Identity,?XCOB_ID(co_lib:encode_func(Func),
+				      co_lib:add_xflag(XNid)),
+		    Ix,Si,Data)
+    catch _T:E ->
+	    {error, E}
+    end;
+notify_from(Identity={nodeid, Nid}, Func, Ix, Si, Data)
+  when is_atom(Func)->
     lager:debug([{index, {Ix, Si}}],
 	"notify_from: NodeId = {nodeid, ~.16#}, Func = ~p, "
 	 "Ix = ~4.16.0B, Si = ~p, Data = ~p", 
 	 [Nid, Func, Ix, Si, Data]),
-    notify_from(Identity,?COB_ID(co_lib:encode_func(Func), Nid),Ix,Si,Data);
-notify_from(Identity,CobId,Ix,Si,Data) when is_integer(CobId),
-?is_index(Ix), ?is_subind(Si),  is_binary(Data) ->
-    co_node:notify_from(identity_to_pid(Identity),CobId,Ix,Si,Data).
-
+    try notify_from(Identity,?COB_ID(co_lib:encode_func(Func), Nid),Ix,Si,Data)
+    catch _T:E ->
+	    {error, E}
+    end; 
+notify_from(Identity,CobId,Ix,Si,Data)
+  when is_integer(CobId), ?is_index(Ix), ?is_subind(Si),  is_binary(Data) ->
+    try co_node:notify_from(identity_to_pid(Identity),CobId,Ix,Si,Data)
+    catch _T:E ->
+	    {error, E}
+    end.
 
 %%--------------------------------------------------------------------
 %% @doc
