@@ -220,6 +220,7 @@
 
 {objdef, 16#2719,
  [{id, output_alarm_high},
+  {name, "output-alarm-high"},
   {description, 
    "High current alarm. Input is cut off if above this level. Input is given as decimal times 10. Set to zero to disable. 75 means 7.5A"},
   {struct, array},
@@ -231,6 +232,7 @@
 
 {objdef, 16#271A,
  [{id, output_prio},
+  {name, "output-prio"},
   {struct, array},
   {entry, {1,8},
    [{type, unsigned8},
