@@ -41,7 +41,8 @@
          cobid_to_nodeid/1,
          cobid/2,
          add_xflag/1,
-	 add_tag/1]).
+	 add_tag/1,
+	 node2string/1]).
 
 %% Encode CANOpen attributes
 -export([encode_type/1,
@@ -189,6 +190,17 @@ add_xflag(NodeId) when is_integer(NodeId) ->
 add_xflag(NodeId) ->
     NodeId.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Translate node  to string for easy output.
+%% @end
+%%--------------------------------------------------------------------
+node2string(NodeId) when is_integer(NodeId), NodeId > 16#7f ->
+    io_lib:format("~6.16.0B", [NodeId band 16#ffffff]);
+node2string(NodeId) when is_integer(NodeId), NodeId < 16#80->
+    io_lib:format("~2.16.0B", [NodeId]);
+node2string({Tag, NodeId})  when is_integer(NodeId) ->
+    lists:flatten(io_lib:fwrite("{~w, ", [Tag]) ++ node2string(NodeId) ++ "}").
 
 %%--------------------------------------------------------------------
 %% @doc
