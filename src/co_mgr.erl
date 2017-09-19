@@ -291,6 +291,9 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, Destination)
 fetch(Nid, Ix, TransferMode, Destination)
   when is_integer(Nid) ->
     fetch(co_lib:add_tag(Nid), Ix, TransferMode, Destination);
+fetch(Nid, {Ix, Si}, TransferMode, Destination)
+  when is_integer(Nid) ->
+    fetch(co_lib:add_tag(Nid), {Ix, Si},TransferMode, Destination);
 fetch(NodeId = {_TypeOfNid, Nid}, {Ix, Si}, TransferMode, Destination) 
   when is_integer(Nid), 
        is_integer(Ix), 
