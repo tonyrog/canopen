@@ -219,6 +219,12 @@
 -define(INDEX_OUTPUT_PWM_MIN,     16#2766). 
 -define(INDEX_OUTPUT_PWM_MAX,     16#2767).
 
+%% For PDS v3
+-define(INDEX_AN3,                16#27A0).  %% UNSIGNED16 (10-bit)
+-define(INDEX_U0A,                16#279A).  %% UNSIGNED16 (10-bit)
+-define(INDEX_U1A,                16#279B).  %% UNSIGNED16 (10-bit)
+-define(INDEX_UNA,                16#279C).  %% UNSIGNED16 (10-bit)
+
 %% ANALOG input
 -define(INDEX_ADC_READ16,         16#6401).  %% Read unsigned 16 analog input
 -define(INDEX_ADC_FLAGS,          16#6421).  %% Trigger selection
