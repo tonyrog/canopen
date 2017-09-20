@@ -265,3 +265,50 @@
   {category, optional},
   {access, rw}
 ]}.
+
+{objdef, 16#27A0,
+ [{id, an3},
+  {name, "an3"},
+  {description, "Analog-3 input"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned16},
+    {access, ro}]}
+]}.
+
+%% For PDS v3
+
+%%  calibration value at ? to convert analog to ampare
+{objdef, 16#279A,
+ [{id, u0a},
+  {name, "u0a"},
+  {description, "Analog calibration value at 10A"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned16},
+    {access, rw}]}
+]}.
+
+%% calibration value at ?? to convert analog to ampare
+{objdef, 16#279B,
+ [{id, u1a},
+  {name, "u1a"},
+  {description, "Analog calibration value at 1A"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned16},
+    {access, rw}]}
+]}.
+
+%% wna - analog nominal load value is used together with 
+%% output_alarm_low to detect under-load (broken components)
+%%
+{objdef, 16#279C,
+ [{id, una},
+  {name, "una"},
+  {description, "Analog nominal load value"},
+  {struct, array},
+  {entry, {1,8},
+   [{type, unsigned16},
+    {access, rw}]}
+]}.
