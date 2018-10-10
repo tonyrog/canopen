@@ -88,6 +88,8 @@ stop() ->
 %%
 %% @end
 %%--------------------------------------------------------------------
+init([no_master]) ->
+    {ok, { {one_for_one, 5, 10}, []} };  %% dummy
 init([Serial]) ->
     lager:debug("serial = ~p,\n pid = ~p", [Serial, self()]),
     Opts = application:get_env(canopen, options, []),
