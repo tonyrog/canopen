@@ -523,8 +523,7 @@ send_dam_mpdo(S=#s {ctx = Ctx, index_list = [{Index = {Ix, Si}, _Size}]},
 		       broadcast -> 0;
 		       NodeId -> NodeId
 		   end,
-	    Bin = <<1:1, Dest:7, Ix:16/little, Si:8, DataToSend:4/binary>>,
-	    Data = co_codec:encode_binary(Bin, 64),
+	    Data = <<1:1, Dest:7, Ix:16/little, Si:8, DataToSend:4/binary>>,
 	    ?dbg("send_dam_mpdo: data = ~p", [Data]),
 	    Frame = #can_frame { id = S#s.id,
 				 len = byte_size(Data),
@@ -547,8 +546,7 @@ send_sam_mpdo(S=#s {state = ?Operational, type = sam_mpdo,
     S1 = 
 	case co_api:tpdo_data(Index, Ctx) of
 	    {ok, DataToSend} ->
-		Bin = <<0:1, Nid:7, Ix:16/little, Si:8, DataToSend:4/binary>>,
-		Data = co_codec:encode_binary(Bin, 64),
+		Data = <<0:1, Nid:7, Ix:16/little, Si:8, DataToSend:4/binary>>,
 		?dbg("send_sam_mpdo: data = ~p", [Data]),
 		Frame = #can_frame { id = S#s.id,
 				     len = byte_size(Data),

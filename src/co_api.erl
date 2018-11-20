@@ -1167,7 +1167,7 @@ tpdo_set(Identity, {Ix, Si} = I, Data, Mode)
     lager:debug([{index, {Ix, Si}}],
 	 "tpdo_set: Identity = ~.16#,  Ix = ~.16#:~w, Data = ~p, Mode ~p",
 	 [Identity, Ix, Si, Data, Mode]), 
-    Data64 = co_codec:encode_binary(Data, 64),
+    Data64 = co_codec:set_binary_size(Data, 64),
     gen_server:call(identity_to_pid(Identity), {tpdo_set,I,Data64,Mode});   
 tpdo_set(Identity, {Ix, Si} = I, {Value, Type}, Mode) 
   when ?is_index(Ix), ?is_subind(Si) ->

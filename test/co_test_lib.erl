@@ -160,8 +160,8 @@ set_cmd(Config, Index, Value, Type, BFlag, Tout) ->
     ct:pal("Command = ~p",[Cmd]),
     Cmd.
 
-set_cmd1(Config, Index, Value, Type, BFlag, Tout) ->
-    cocli(Config) ++ bflag(BFlag) ++ " -T " ++ atom_to_list(Type) ++
+set_cmd1(_Config, Index, Value, Type, BFlag, Tout) ->
+    cocli() ++ bflag(BFlag) ++ " -T " ++ atom_to_list(Type) ++
 	" -s " ++ serial_as_c_string(serial()) ++ timeout(Tout) ++
 	" set " ++ index_as_c_string(Index) ++ value(Value).
 
@@ -173,13 +173,13 @@ get_cmd(Config, Index, Type, BFlag, Tout) ->
     ct:pal("Command = ~p",[Cmd]),
     Cmd.
 
-get_cmd1(Config, Index, Type, BFlag, Tout) ->
-    cocli(Config) ++ bflag(BFlag) ++ " -T " ++ atom_to_list(Type) ++
+get_cmd1(_Config, Index, Type, BFlag, Tout) ->
+    cocli() ++ bflag(BFlag) ++ " -T " ++ atom_to_list(Type) ++
 	" -s " ++ serial_as_c_string(serial()) ++ timeout(Tout) ++
 	" -e" ++ " get " ++ index_as_c_string(Index).
 
 file_cmd(Config, Index, Direction, BFlag) ->
-    cocli(Config) ++ bflag(BFlag) ++ " -s " ++ 
+    cocli() ++ bflag(BFlag) ++ " -s " ++ 
 	serial_as_c_string(serial()) ++ " " ++ 
 	Direction ++ " " ++ index_as_c_string(Index) ++ " " ++
 	filename:join(?config(priv_dir, Config), "tmp_file").
@@ -189,8 +189,8 @@ notify_cmd(Config, Index, Value, BFlag) ->
     ct:pal("Command = ~p",[Cmd]),
     Cmd.
 
-notify_cmd1(Config, Index, Value, BFlag) ->
-    cocli(Config) ++ bflag(BFlag) ++ " -s " ++ 
+notify_cmd1(_Config, Index, Value, BFlag) ->
+    cocli() ++ bflag(BFlag) ++ " -s " ++ 
 	serial_as_c_string(serial()) ++ " notify " ++
 	index_as_c_string(Index) ++ value(Value).
 
@@ -237,10 +237,14 @@ full_index(Ix) when is_integer(Ix) ->
 full_index({_Ix, _Si} = I) ->
     I.
 
-cocli(C) ->
-    DataDir = ?config(data_dir, C),
-    %% Harcoded to use port +1 as in co_node.erl
-    filename:join(DataDir, ct:get_config(cocli)) ++ " -i 2".
+cocli() ->
+    Cmd = filename:join([os:getenv("HOME"),"bin","cocli"]),
+    %% Cmd = "cocli",
+    Cmd ++ " -Iudp -i2".
+
+md5_file(File) ->
+    {ok,Bin} = file:read_file(File),
+    erlang:md5(Bin).
 
 type(T) -> co_lib:encode_type(T).
 

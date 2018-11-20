@@ -74,6 +74,7 @@ stop(_State) ->
 
 %% @private
 start() ->
+    (catch error_logger:tty(false)),
     try application:ensure_all_started(canopen)
     catch 
 	%% Old OTP version

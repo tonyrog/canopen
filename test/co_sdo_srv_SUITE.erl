@@ -1,3 +1,4 @@
+%% coding: latin-1
 %%%---- BEGIN COPYRIGHT --------------------------------------------------------
 %%%
 %%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
@@ -52,7 +53,6 @@
 suite() ->
     [{timetrap,{minutes,10}},
      {require, serial},
-     {require, cocli},
      {require, dict}].
 
 
@@ -718,8 +718,7 @@ stream_file(Config, TransferMode, Size) ->
 
     co_test_lib:generate_file(RFile, Size),
 
-    Md5Res1 = os:cmd("md5 " ++ RFile),
-    [_,_,_,Md5] = string:tokens(Md5Res1," "),
+    Md5 = co_test_lib:md5_file(RFile),
 
     {ok, _Pid} = co_test_stream_app:start(serial(), 
 					  {ct:get_config(file_stream_index), 
@@ -752,10 +751,5 @@ stream_file(Config, TransferMode, Size) ->
     end,
 
     %% Check that file is unchanged
-    Md5Res2 = os:cmd("md5 " ++ WFile),
-    [_,_,_,Md5] = string:tokens(Md5Res2," "),
-    
+    Md5 = co_test_lib:md5_file(WFile),
     ok.
-
-
-

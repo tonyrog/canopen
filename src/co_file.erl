@@ -30,6 +30,15 @@
 -export([load/1]).
 -export([load_objects/2]).
 -import(lists, [map/2, seq/2, foreach/2]).
+
+-ifdef(OTP_RELEASE). %% this implies 21 or higher
+-define(EXCEPTION(Class, Reason, Stacktrace), Class:Reason:Stacktrace).
+-define(GET_STACK(Stacktrace), Stacktrace).
+-else.
+-define(EXCEPTION(Class, Reason, _), Class:Reason).
+-define(GET_STACK(_), erlang:get_stacktrace()).
+-endif.
+
 %%--------------------------------------------------------------------
 %% @doc
 %% Load (symbolic) entries from file.
@@ -49,9 +58,9 @@ load(File) ->
 	    try load_objects(Objects, []) of
 		Os -> {ok,Os}
 	    catch
-		error:Error ->
+		?EXCEPTION(error,Error,Trace) ->
 		    ?ee("load: error ~p\n~w\n",
-			[Error,erlang:get_stacktrace()]),
+			[Error,?GET_STACK(Trace)]),
 		    {error,Error}
 	    end;
 	Error ->

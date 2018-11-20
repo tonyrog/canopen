@@ -1767,7 +1767,7 @@ handle_sync(_Frame, Ctx=#co_ctx {name = _Name}) ->
 handle_time_stamp(Frame, Ctx=#co_ctx {name = _Name}) ->
     lager:debug("~s: handle_timestamp: ~w", [_Name,Frame]),
     try co_codec:decode(Frame#can_frame.data, ?TIME_OF_DAY) of
-	{T, _Bits} when is_record(T, time_of_day) ->
+	T when is_record(T, time_of_day) ->
 	    lager:debug("~s: Got timestamp: ~p", [_Name, T]),
 	    set_time_of_day(T),
 	    Ctx;
@@ -2846,7 +2846,7 @@ rpdo_unpack(I, Data, Ctx=#co_ctx {name = _Name}) ->
 	    lager:debug("~s: rpdo_unpack: data = ~w, il = ~w, bl = ~w", 
 		 [_Name, Data, IL, BitLenList]),
 	    try co_codec:decode_pdo(Data, BitLenList) of
-		{Ds, _} -> 
+		{Ds, _} ->
 		    lager:debug("~s: rpdo_unpack: decoded data ~p", [_Name, Ds]),
 		    rpdo_set(IL, Ds, Ctx)
 	    catch error:_Reason ->

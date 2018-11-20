@@ -38,6 +38,15 @@
 -define(is_hex2(A,B),
 	(?is_hex(A) andalso ?is_hex(B))).
 
+
+-ifdef(OTP_RELEASE). %% this implies 21 or higher
+-define(EXCEPTION(Class, Reason, Stacktrace), Class:Reason:Stacktrace).
+-define(GET_STACK(Stacktrace), Stacktrace).
+-else.
+-define(EXCEPTION(Class, Reason, _), Class:Reason).
+-define(GET_STACK(_), erlang:get_stacktrace()).
+-endif.
+
 load(File) ->
     case file:open(File, [read]) of
 	{ok, Fd} ->
@@ -45,7 +54,8 @@ load(File) ->
 		Sections -> 
 		    reverse(parse_sections(File,Sections))
 	    catch
-		error:Reason -> {error,{Reason,erlang:get_stacktrace()}}
+		?EXCEPTION(error,Reason,Trace) ->
+		    {error,{Reason,?GET_STACK(Trace)}}
 	    after
 		file:close(Fd)
 	    end;

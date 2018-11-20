@@ -413,7 +413,7 @@ write(Buf=#co_data_buf {mode = atomic, pid = Pid, type = Type, data = OldData,
     %% All data received, time to transfer to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
     try co_codec:decode(DataToSend, Type) of
-	{Value, _} ->
+	Value ->
 	    lager:debug([{index, I}], "write: set Value = ~p", [Value]),
 	    app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true},
 		     Pid, {set, I, Value})
@@ -433,7 +433,7 @@ write(Buf=#co_data_buf {mode = atomic = _Mode, pid = Pid, type = Type,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<Data/binary, DataToAdd/binary>>,
     try co_codec:decode(DataToSend, Type) of
-	{Value, _} ->
+	Value ->
 	    lager:debug([{index, I}], "write: set  Value = ~p", [Value]),
 	    app_call(Buf#co_data_buf {data = (<<>>), tmp = (<<>>), eof = true},
 		     Pid, {set, I, Value})
@@ -451,7 +451,7 @@ write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type,
 	 [_Mode, Data, true]),
     %% All data received, time to transfer to app
     DataToSend = <<OldData/binary, TmpData/binary, Data/binary>>,
-    {Value, _} = co_codec:decode(DataToSend, Type),
+    Value = co_codec:decode(DataToSend, Type),
     lager:debug([{index, I}], "write: set Value = ~p", [Value]),
     case Module:set(Pid, I, Value) of
 	ok ->
@@ -468,7 +468,7 @@ write(Buf=#co_data_buf {mode = {atomic, Module} = _Mode, pid = Pid, type = Type,
     <<DataToAdd:Size/binary, _Filler:N/binary>> = TmpData,
     DataToSend = <<Data/binary, DataToAdd/binary>>,
     try co_codec:decode(DataToSend, Type) of
-	{Value, _} ->
+	Value ->
 	    lager:debug([{index, I}], "write: set  Value = ~p", [Value]),
 	    case Module:set(Pid, I, Value) of
 		ok ->

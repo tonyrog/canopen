@@ -310,7 +310,7 @@ handle_call({write, Ref, Data, Eod}, _From, LD) ->
 		    LD#loop_data.store#store {data = <<OldData/binary, Data/binary>>}
 	    end,
     if Eod ->
-	    {NewValue, _} = co_codec:decode(Store#store.data, 
+	    NewValue = co_codec:decode(Store#store.data, 
 					    co_test_lib:type(Store#store.type)),
 	    ?dbg("handle_call: write decoded data = ~p",[NewValue]),
 	    handle_set(LD,Store#store.index, NewValue, Ref);

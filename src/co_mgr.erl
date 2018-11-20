@@ -209,7 +209,7 @@ fetch(NodeId = {_TypeOfNid, Nid}, Ix, Si, TransferMode, {value, Type}, TimeOut)
     case co_api:fetch(?MGR_NODE, NodeId, Ix, Si, TransferMode, data, TimeOut) of
 	{ok, Data} ->
 	    try co_codec:decode(Data, Type) of
-		{Value, _Rest} -> {ok, Value}
+		Value -> {ok, Value}
 	    catch
 		error:Error -> {error, Error}
 	    end;

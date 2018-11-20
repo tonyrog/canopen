@@ -18,15 +18,15 @@ MODULES = \
 	co_test_stream_app \
 	co_test_dict_app \
 	co_ex_app \
-	codec_bench
-
+	codec_bench \
+	co_codec_SUITE
 
 EBIN = .
 ERLC = erlc
 
 ERLDIR  := $(shell erl -noshell -eval "io:format([126,115,126,110],[code:root_dir()])" -s erlang halt)
 
-override ERLC_FLAGS = -Wall -I ../include 
+override ERLC_FLAGS = -Wall -I ../include  +nowarn_export_all
 
 debug: ERLC_FLAGS += +debug_info -Ddebug
 
@@ -37,7 +37,7 @@ all: $(OBJS)
 debug: all
 
 depend:
-	edep -MM -o ../ebin $(ERLC_FLAGS) $(MODULES:%=%.erl) > depend.mk
+	erlc -MMD -MF depend.mk -o ../ebin $(ERLC_FLAGS) $(MODULES:%=%.erl)
 
 dialyze:
 	dialyzer --src -o dia.out -I ../include -c $(MODULES:%=%.erl) 

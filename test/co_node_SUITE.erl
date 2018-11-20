@@ -44,7 +44,6 @@
 suite() ->
     [{timetrap,{minutes,10}},
      {require, serial},
-     {require, cocli},
      {require, dict}].
 
 

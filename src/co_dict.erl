@@ -249,8 +249,8 @@ to_fd(Dict, Ix, Fd) ->
 			case ets:lookup(Dict, {Ix,0}) of
 			    [] -> [];
 			    [E] -> 
-				{V, _Rest} = co_codec:decode(E#dict_entry.data,
-							     E#dict_entry.type),
+				V = co_codec:decode(E#dict_entry.data,
+						    E#dict_entry.type),
 				[{value, V }]
 			end
 		end,
@@ -281,8 +281,8 @@ read_entries(Dict, Ix, Sx, Es) ->
 	    lists:reverse(Es);
 	{Ix,Sx1} ->
 	    [D] = ets:lookup(Dict, {Ix,Sx1}),
-	    {V, _Rest} = co_codec:decode(D#dict_entry.data,
-					 D#dict_entry.type),
+	    V = co_codec:decode(D#dict_entry.data,
+				D#dict_entry.type),
 	    E = {entry,Sx1,
 		 [{access,co_lib:decode_access(D#dict_entry.access)},
 		  {type,co_lib:decode_type(D#dict_entry.type)},
@@ -789,8 +789,7 @@ value(Dict, {Ix, Si} = Index) when ?is_index(Ix), ?is_subind(Si) ->
 		?ACCESS_WO ->
 		    {error,?abort_read_not_allowed};
 		_ ->
-		    {Value, _Rest} =
-			co_codec:decode(E#dict_entry.data,E#dict_entry.type),
+		    Value = co_codec:decode(E#dict_entry.data,E#dict_entry.type),
 		    {ok, Value}
 	    end;
 	_Other ->
@@ -826,9 +825,7 @@ direct_value(Dict,Ix,Si) when ?is_index(Ix), ?is_subind(Si) ->
 direct_value(Dict,{Ix,Si} = Index) when ?is_index(Ix), ?is_subind(Si) ->
     case ets:lookup(Dict, Index) of
 	[E] -> 
-	    {Value, _Rest} =
-		co_codec:decode(E#dict_entry.data,E#dict_entry.type),
-	    Value;
+	    co_codec:decode(E#dict_entry.data,E#dict_entry.type);
 	_Other ->
 	    i_fail(Dict, Index)
     end;
@@ -875,7 +872,7 @@ direct_value(Dict, Ix) when ?is_index(Ix) ->
 %% match_entry_s(Dict, I, J, S, Vf) ->
 %%     case ets:lookup(Dict,{I,S}) of
 %% 	[E] ->
-%% 	    {Value, _Rest} = co_codec:decode(E#dict_entry.data, E#dict_entry.type),
+%% 	    Value = co_codec:decode(E#dict_entry.data, E#dict_entry.type),
 %% 	    case Value of 
 %% 		Vf ->
 %% 		    {ok,I};

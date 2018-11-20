@@ -1,3 +1,4 @@
+%% coding: latin-1
 %%%---- BEGIN COPYRIGHT --------------------------------------------------------
 %%%
 %%% Copyright (C) 2007 - 2012, Rogvall Invest AB, <tony@rogvall.se>
@@ -245,9 +246,9 @@ encode_decode(_Config) ->
 	      try co_codec:encode(ValuesIn, TsInX) of
 		  Bin -> 
 		      try co_codec:decode(Bin, TsOutX) of
-			  {ValuesOut, _Rest} ->
+			  ValuesOut ->
 			      ok;
-			  {OtherValuesOut, Rest} ->
+			  OtherValuesOut ->
 			      %% Add other check when encoding - decoding
 			      %% 'too short' string ???
 			      ct:pal("Encoding values ~p with types ~w = ~w,\n "
@@ -255,7 +256,7 @@ encode_decode(_Config) ->
 				     "decoded ~p with types ~w = ~w,\n"
 				     "residue ~p",
 				     [ValuesIn, TsIn, TsInX, Bin, 
-				      OtherValuesOut, TsOut, TsInX, Rest])
+				      OtherValuesOut, TsOut, TsInX])
 		      catch error:Reason2 ->
 			    ct:pal("Decode of ~p with ~w = ~w failed, reason ~p", 
 				   [Bin, TsOut, TsOutX, Reason2])
