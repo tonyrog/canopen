@@ -29,8 +29,8 @@
 -behaviour(gen_server).
 
 -include_lib("can/include/can.hrl").
--include("canopen.hrl").
--include("co_app.hrl").
+-include("../include/canopen.hrl").
+-include("../include/co_app.hrl").
 
 %% gen_server callbacks
 -export([init/1, 

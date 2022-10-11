@@ -40,8 +40,9 @@ verify() ->
     Ts1 = [{integer,10},{unsigned,5}],
     <<16#59,16#7A>> = co_codec:encode([-423, 30], Ts1),
     {[-423,30],_} = co_codec:decode(<<16#59,16#7A>>,Ts1),
-    V1 = ?T1(co_codec),
-    V2 = ?T2(co_codec).
+    <<101,160>> = ?T1(co_codec),
+    <<64,200,81,217>> = ?T2(co_codec),
+    ok.
 
 
 a1(0) ->  ok;

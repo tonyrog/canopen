@@ -34,7 +34,7 @@
 -export([clear/1]).
 
 -include_lib("canopen/include/canopen.hrl").
--include("co_debug.hrl").
+-include("../include/co_debug.hrl").
 
 -define(TABLE, ?OBJDEF_TABLE).
 -define(SERVER, ?MODULE).

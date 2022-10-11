@@ -28,8 +28,8 @@
 %%===================================================================
 -module(co_sys_app).
 -include_lib("canopen/include/canopen.hrl").
--include("co_app.hrl").
--include("co_debug.hrl").
+-include("../include/co_app.hrl").
+-include("../include/co_debug.hrl").
 
 -behaviour(gen_server).
 -behaviour(co_app).
@@ -137,7 +137,7 @@ index_specification(_Pid, {_Ix, _Si})  ->
     {error, ?abort_no_such_object}.
 
 reply_specification({_Ix, _Si} = I, Type, Access, Mode) ->
-    reply_specification({_Ix, _Si} = I, Type, Access, Mode, undefined).
+    reply_specification(I, Type, Access, Mode, undefined).
 
 reply_specification({_Ix, _Si} = I, Type, Access, Mode, TOut) ->
     ?dbg("reply_specification: ~.16B:~.8B, "

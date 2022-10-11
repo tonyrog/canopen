@@ -25,8 +25,8 @@
 %%%-------------------------------------------------------------------
 -module(co_proc).
 
--include("canopen.hrl").
--include("co_debug.hrl").
+-include("../include/canopen.hrl").
+-include("../include/co_debug.hrl").
 
 -behaviour(gen_server).
 

@@ -25,8 +25,8 @@
 -module(co_format).
 
 -include_lib("can/include/can.hrl").
--include("canopen.hrl").
--include("sdo.hrl").
+-include("../include/canopen.hrl").
+-include("../include/sdo.hrl").
 
 -compile(export_all).
 

@@ -26,7 +26,7 @@
 %%%-------------------------------------------------------------------
 -module(co_script).
 
--include("co_debug.hrl").
+-include("../include/co_debug.hrl").
 
 -import(lists, [reverse/1]).
 

@@ -21,7 +21,7 @@
 %% -define(dbg(F,A), io:format((F),(A))).
 -define(dbg(F,A), ok).
 -define(warn(F,A), io:format((F),(A))).
--define(error(F,A), io:format((F),(A))).
+%% -define(err(F,A), io:format((F),(A))).
 
 get(Nid,Index,SubInd,Timeout) ->
     send_sdo_get(Nid, Index, SubInd),

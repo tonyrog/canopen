@@ -26,8 +26,8 @@
 -module(co_nmt).
 
 -include_lib("can/include/can.hrl").
--include("canopen.hrl").
--include("co_app.hrl").
+-include("../include/canopen.hrl").
+-include("../include/co_app.hrl").
 
 -behaviour(gen_server).
 

@@ -30,7 +30,7 @@
 %%%-------------------------------------------------------------------
 
 -module(co_codec).
--include("canopen.hrl").
+-include("../include/canopen.hrl").
 
 -export([encode/2, decode/2,
 	 set_binary_size/2,

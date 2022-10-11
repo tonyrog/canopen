@@ -29,8 +29,8 @@
 %%-----------------------------------------------------------------------------
 -module(co_os_app).
 -include_lib("canopen/include/canopen.hrl").
--include("co_app.hrl").
--include("co_debug.hrl").
+-include("../include/co_app.hrl").
+-include("../include/co_debug.hrl").
 
 -behaviour(gen_server).
 %% Having the co_app AND co_stream_app behaviours results in a compiler 

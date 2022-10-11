@@ -24,9 +24,9 @@
 -module(co_session).
 
 -include_lib("can/include/can.hrl").
--include("canopen.hrl").
--include("sdo.hrl").
--include("co_debug.hrl").
+-include("../include/canopen.hrl").
+-include("../include/sdo.hrl").
+-include("../include/co_debug.hrl").
 
 -compile(export_all).
 

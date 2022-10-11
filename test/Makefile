@@ -21,8 +21,9 @@ MODULES = \
 	codec_bench \
 	co_codec_SUITE
 
-EBIN = .
+DEPDIR = depend
 ERLC = erlc
+EBIN = .
 
 ERLDIR  := $(shell erl -noshell -eval "io:format([126,115,126,110],[code:root_dir()])" -s erlang halt)
 
@@ -30,14 +31,13 @@ override ERLC_FLAGS = -Wall -I ../include  +nowarn_export_all
 
 debug: ERLC_FLAGS += +debug_info -Ddebug
 
+COMPILE.erl = $(ERLC) $(DEPFLAGS) $(ERLC_FLAGS)
+
 OBJS = $(MODULES:%=$(EBIN)/%.beam)
 
 all: $(OBJS)
 
 debug: all
-
-depend:
-	erlc -MMD -MF depend.mk -o ../ebin $(ERLC_FLAGS) $(MODULES:%=%.erl)
 
 dialyze:
 	dialyzer --src -o dia.out -I ../include -c $(MODULES:%=%.erl) 
@@ -49,12 +49,21 @@ clean:
 	rm -f $(OBJS) 
 
 test:
-	$(ERLDIR)/bin/ct_run -include ../include -config co_test.cfg -suite co_node_SUITE
+	$(ERLDIR)/bin/ct_run -include ../include -config co_test.cfg # -suite co_node_SUITE
 
 test_all:
 	$(ERLDIR)/bin/ct_run -include ../include -config co_test.cfg
 
--include depend.mk
+$(shell mkdir -p $(DEPDIR) >/dev/null)
+DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
 
-./%.beam:	%.erl
-	erlc -o ../ebin $(ERLC_FLAGS) $<
+POSTCOMPILE = mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d
+
+$(EBIN)/%.beam:	%.erl $(DEPDIR)/%.d
+	$(COMPILE.erl) -o $(EBIN) $(ERLC_FLAGS) $<
+	$(POSTCOMPILE)
+
+$(DEPDIR)/%.d: ;
+.PRECIOUS: $(DEPDIR)/%.d
+
+-include $(patsubst %,$(DEPDIR)/%.d,$(basename $(ALLSRC)))

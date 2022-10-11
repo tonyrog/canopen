@@ -27,8 +27,8 @@
 
 -module(co_mgr).
 
--include("canopen.hrl").
--include("sdo.hrl").
+-include("../include/canopen.hrl").
+-include("../include/sdo.hrl").
 
 %% regular api
 -export([start/0, start/1, stop/0]).
@@ -935,11 +935,11 @@ do_store(Nid,Index,SubInd,Value,Timeout,Client,
 	{ok, {Ti, Tsi, Tv} = _T} ->
 	    lager:debug([{index, {Ti, Tsi}}],"translated ~p", [_T]),
 	    Pid = 
-		spawn_request(store, 
-			      [Nid, Ti, Tsi, TransMode, Tv, Timeout],
-			      Client,
-			      {store,Nid,Index,SubInd,Value,Tv,Mod,AppVsn},
-			      Dbg),
+		spawn_req(store, 
+			  [Nid, Ti, Tsi, TransMode, Tv, Timeout],
+			  Client,
+			  {store,Nid,Index,SubInd,Value,Tv,Mod,AppVsn},
+			  Dbg),
 	    {noreply, Mgr#mgr { pids = [Pid | PList] }};
 	Error ->
 	    lager:debug([mgr],"translation failed, error: ~p\n", [Error]),
@@ -955,11 +955,11 @@ do_fetch(Nid,Index,SubInd,Timeout, Client,
 	{ok, {Ti, Tsi, Tv} = _T} ->
 	    lager:debug([{index, {Ti, Tsi}}],"translated  ~p", [_T]),
 	    Pid = 
-		spawn_request(fetch,
-			      [Nid, Ti, Tsi, TransMode, Tv, Timeout],
-			      Client,
-			      {fetch,Nid,Index,SubInd,Tv,Mod,AppVsn},
-			      Dbg),
+		spawn_req(fetch,
+			  [Nid, Ti, Tsi, TransMode, Tv, Timeout],
+			  Client,
+			  {fetch,Nid,Index,SubInd,Tv,Mod,AppVsn},
+			  Dbg),
 	    {noreply,  Mgr#mgr { pids = [Pid | PList] }};
 	Error ->
 	    lager:debug([mgr],"translation failed, error: ~p\n", [Error]),
@@ -978,7 +978,7 @@ do_translate(Nid,Index,SubInd, Mgr) ->
 	    {reply, Error, Mgr}
     end.
 
-spawn_request(F, Args, Client, Request, Dbg) ->
+spawn_req(F, Args, Client, Request, Dbg) ->
     Pid = proc_lib:spawn_link(?MODULE, execute_request,
 			      [F, Args, Client, Request, Dbg]),
     lager:debug("spawned  ~p", [Pid]),

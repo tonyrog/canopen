@@ -33,8 +33,8 @@
 -behaviour(gen_server).
 
 -include_lib("can/include/can.hrl").
--include("canopen.hrl").
--include("co_debug.hrl").
+-include("../include/canopen.hrl").
+-include("../include/co_debug.hrl").
 
 %% API
 -export([start/2, stop/1]).

@@ -26,8 +26,8 @@
 -module(co_sdo).
 
 -include_lib("can/include/can.hrl").
--include("canopen.hrl").
--include("sdo.hrl").
+-include("../include/canopen.hrl").
+-include("../include/sdo.hrl").
 
 -export([decode_tx/1, decode_rx/1, encode/1]).
 -export([decode_abort_code/1,encode_abort_code/1]).

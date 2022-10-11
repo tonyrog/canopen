@@ -27,8 +27,8 @@
 -module(co_lib).
 
 -include_lib("can/include/can.hrl").
--include("canopen.hrl").
--include("co_debug.hrl").
+-include("../include/canopen.hrl").
+-include("../include/co_debug.hrl").
 
 -import(lists, [map/2, reverse/1]).
 

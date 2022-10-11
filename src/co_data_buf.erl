@@ -27,8 +27,8 @@
 %%%-------------------------------------------------------------------
 -module(co_data_buf).
 
--include("canopen.hrl").
--include("co_app.hrl").
+-include("../include/canopen.hrl").
+-include("../include/co_app.hrl").
 
 %% API
 -export([init/3, init/4, init/5,

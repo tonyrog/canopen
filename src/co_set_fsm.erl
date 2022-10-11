@@ -31,10 +31,10 @@
 -behaviour(gen_fsm).
 
 -include_lib("can/include/can.hrl").
--include("canopen.hrl").
--include("sdo.hrl").
--include("co_app.hrl").
--include("co_debug.hrl").
+-include("../include/canopen.hrl").
+-include("../include/sdo.hrl").
+-include("../include/co_app.hrl").
+-include("../include/co_debug.hrl").
 
 %% API
 -export([start/3]).

@@ -27,7 +27,7 @@
 -module(canopen_sup).
 -behaviour(supervisor).
 
--include("canopen.hrl").
+-include("../include/canopen.hrl").
 
 %% API
 -export([start_link/1, 

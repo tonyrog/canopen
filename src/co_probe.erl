@@ -27,8 +27,8 @@
 -export([start/0, init/0]).
 
 -include_lib("can/include/can.hrl").
--include("canopen.hrl").
--include("sdo.hrl").
+-include("../include/canopen.hrl").
+-include("../include/sdo.hrl").
 
 %% @private
 -record(s,

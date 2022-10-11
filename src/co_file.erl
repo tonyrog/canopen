@@ -25,7 +25,7 @@
 %%%-------------------------------------------------------------------
 -module(co_file).
 
--include("canopen.hrl").
+-include("../include/canopen.hrl").
 
 -export([load/1]).
 -export([load_objects/2]).

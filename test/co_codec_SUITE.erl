@@ -52,12 +52,12 @@ test1(_Config) ->
     T = [{unsigned,1},{unsigned,2},{unsigned,3},{unsigned,4},{unsigned,5},
 	 {unsigned,6},{unsigned,7},{unsigned,8},{unsigned,9},{unsigned,10}],
     Bin = co_codec:encode([1,2,3,4,5,6,7,8,9,10], T),
-    [1,2,3,4,5,6,7,8,9,10] = co_code:decode(Bin, T),
+    [1,2,3,4,5,6,7,8,9,10] = co_codec:decode(Bin, T),
     ok.
 
 test2(_Config) ->
-    T = [{integer,1},{integer,2},{integer,3},{integer,4},{integer,5},
-	 {integer,6},{integer,7},{integer,8},{integer,9},{integer,10}],
+    T = [{integer,-1},{integer,2},{integer,-3},{integer,4},{integer,-5},
+	 {integer,6},{integer,-7},{integer,8},{integer,-9},{integer,10}],
     Bin = co_codec:encode([0,-1,2,-3,4,-5,6,-7,8,-9], T),
     [-1,2,-3,4,-5,6,-7,8,-9,10] = co_codec:decode(Bin, T),
     ok.

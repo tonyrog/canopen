@@ -25,7 +25,7 @@
 %%% @end
 %%%-------------------------------------------------------------------
 -module(co_dict).
--include("canopen.hrl").
+-include("../include/canopen.hrl").
 
 -export([new/0, new/1,
 	 delete/1,

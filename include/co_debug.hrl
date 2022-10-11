@@ -26,8 +26,8 @@
 -define(CO_DEBUG_HRL, true).
 
 
-%% Switching to lager (ale)
--define(dbg(Format, Args),
- 	lager:debug(Format, Args)).
+%% Switching to lager (ale) and back to io:format
+-define(dbg(Format, Args), io:format((Format),(Args))).
+%% 	lager:debug(Format, Args)).
 
 -endif.
